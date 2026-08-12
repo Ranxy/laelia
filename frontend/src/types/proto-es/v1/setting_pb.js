@@ -11,7 +11,7 @@ import { file_v1_annotation } from "./annotation_pb";
  * Describes the file v1/setting.proto.
  */
 export const file_v1_setting = /*@__PURE__*/
-  fileDesc("ChB2MS9zZXR0aW5nLnByb3RvEglsYWVsaWEudjEiSQoHU2V0dGluZxIRCgRuYW1lGAEgASgJQgPgQQgSKwoFdmFsdWUYAiABKAsyFy5sYWVsaWEudjEuU2V0dGluZ1ZhbHVlQgPgQQIi2QIKDFNldHRpbmdWYWx1ZRIyCglzM19jb25maWcYASABKAsyHS5sYWVsaWEuc3RvcmUuUzNDb25maWdTZXR0aW5nSAASPwoQbGxtX2FnZW50X2NvbmZpZxgCIAEoCzIjLmxhZWxpYS5zdG9yZS5MbG1BZ2VudENvbmZpZ1NldHRpbmdIABI9Cg91c2VyX21jcF9jb25maWcYAyABKAsyIi5sYWVsaWEuc3RvcmUuVXNlck1jcENvbmZpZ1NldHRpbmdIABJCChF3b3Jrc3BhY2VfcHJvZmlsZRgEIAEoCzIlLmxhZWxpYS5zdG9yZS5Xb3Jrc3BhY2VQcm9maWxlU2V0dGluZ0gAEkgKFHBhc3N3b3JkX3Jlc3RyaWN0aW9uGAUgASgLMigubGFlbGlhLnN0b3JlLlBhc3N3b3JkUmVzdHJpY3Rpb25TZXR0aW5nSABCBwoFdmFsdWUiJgoRR2V0U2V0dGluZ1JlcXVlc3QSEQoEbmFtZRgBIAEoCUID4EECIkAKFFVwZGF0ZVNldHRpbmdSZXF1ZXN0EigKB3NldHRpbmcYASABKAsyEi5sYWVsaWEudjEuU2V0dGluZ0ID4EECIhQKEkdldFMzQ29uZmlnUmVxdWVzdCJEChNHZXRTM0NvbmZpZ1Jlc3BvbnNlEi0KBmNvbmZpZxgBIAEoCzIdLmxhZWxpYS5zdG9yZS5TM0NvbmZpZ1NldHRpbmciSwoVVXBkYXRlUzNDb25maWdSZXF1ZXN0EjIKBmNvbmZpZxgBIAEoCzIdLmxhZWxpYS5zdG9yZS5TM0NvbmZpZ1NldHRpbmdCA+BBAiJHChZVcGRhdGVTM0NvbmZpZ1Jlc3BvbnNlEi0KBmNvbmZpZxgBIAEoCzIdLmxhZWxpYS5zdG9yZS5TM0NvbmZpZ1NldHRpbmciGgoYR2V0TGxtQWdlbnRDb25maWdSZXF1ZXN0IlAKGUdldExsbUFnZW50Q29uZmlnUmVzcG9uc2USMwoGY29uZmlnGAEgASgLMiMubGFlbGlhLnN0b3JlLkxsbUFnZW50Q29uZmlnU2V0dGluZyJXChtVcGRhdGVMbG1BZ2VudENvbmZpZ1JlcXVlc3QSOAoGY29uZmlnGAEgASgLMiMubGFlbGlhLnN0b3JlLkxsbUFnZW50Q29uZmlnU2V0dGluZ0ID4EECIlMKHFVwZGF0ZUxsbUFnZW50Q29uZmlnUmVzcG9uc2USMwoGY29uZmlnGAEgASgLMiMubGFlbGlhLnN0b3JlLkxsbUFnZW50Q29uZmlnU2V0dGluZyIZChdHZXRVc2VyTWNwQ29uZmlnUmVxdWVzdCJOChhHZXRVc2VyTWNwQ29uZmlnUmVzcG9uc2USMgoGY29uZmlnGAEgASgLMiIubGFlbGlhLnN0b3JlLlVzZXJNY3BDb25maWdTZXR0aW5nIlUKGlVwZGF0ZVVzZXJNY3BDb25maWdSZXF1ZXN0EjcKBmNvbmZpZxgBIAEoCzIiLmxhZWxpYS5zdG9yZS5Vc2VyTWNwQ29uZmlnU2V0dGluZ0ID4EECIlEKG1VwZGF0ZVVzZXJNY3BDb25maWdSZXNwb25zZRIyCgZjb25maWcYASABKAsyIi5sYWVsaWEuc3RvcmUuVXNlck1jcENvbmZpZ1NldHRpbmciFwoVR2V0U2V0dXBTdGF0dXNSZXF1ZXN0IisKCVNldHVwSXRlbRIKCgJpZBgBIAEoCRISCgpjb25maWd1cmVkGAIgASgIIj0KFkdldFNldHVwU3RhdHVzUmVzcG9uc2USIwoFaXRlbXMYASADKAsyFC5sYWVsaWEudjEuU2V0dXBJdGVtIhcKFUdldERlYnVnQ29uZmlnUmVxdWVzdCIpChZHZXREZWJ1Z0NvbmZpZ1Jlc3BvbnNlEg8KB2VuYWJsZWQYASABKAgiMAoYVXBkYXRlRGVidWdDb25maWdSZXF1ZXN0EhQKB2VuYWJsZWQYASABKAhCA+BBAiIsChlVcGRhdGVEZWJ1Z0NvbmZpZ1Jlc3BvbnNlEg8KB2VuYWJsZWQYASABKAgiIwohR2V0V29ya3NwYWNlR2VuZXJhbFNldHRpbmdSZXF1ZXN0IlwKIkdldFdvcmtzcGFjZUdlbmVyYWxTZXR0aW5nUmVzcG9uc2USNgoHc2V0dGluZxgBIAEoCzIlLmxhZWxpYS5zdG9yZS5Xb3Jrc3BhY2VQcm9maWxlU2V0dGluZyJjCiRVcGRhdGVXb3Jrc3BhY2VHZW5lcmFsU2V0dGluZ1JlcXVlc3QSOwoHc2V0dGluZxgBIAEoCzIlLmxhZWxpYS5zdG9yZS5Xb3Jrc3BhY2VQcm9maWxlU2V0dGluZ0ID4EECIl8KJVVwZGF0ZVdvcmtzcGFjZUdlbmVyYWxTZXR0aW5nUmVzcG9uc2USNgoHc2V0dGluZxgBIAEoCzIlLmxhZWxpYS5zdG9yZS5Xb3Jrc3BhY2VQcm9maWxlU2V0dGluZyIZChdHZXRXb3Jrc3BhY2VJbmZvUmVxdWVzdCJlChhHZXRXb3Jrc3BhY2VJbmZvUmVzcG9uc2USFwoPZGlzYWxsb3dfc2lnbnVwGAEgASgIEh8KF2VuZm9yY2VfaWRlbnRpdHlfZG9tYWluGAIgASgIEg8KB2RvbWFpbnMYAyADKAkysg0KDlNldHRpbmdTZXJ2aWNlEkQKCkdldFNldHRpbmcSHC5sYWVsaWEudjEuR2V0U2V0dGluZ1JlcXVlc3QaEi5sYWVsaWEudjEuU2V0dGluZyIEkOowARJoCg1VcGRhdGVTZXR0aW5nEh8ubGFlbGlhLnYxLlVwZGF0ZVNldHRpbmdSZXF1ZXN0GhIubGFlbGlhLnYxLlNldHRpbmciIorqMBZsYWVsaWEuc2V0dGluZ3MudXBkYXRlkOowAZjqMAESbAoLR2V0UzNDb25maWcSHS5sYWVsaWEudjEuR2V0UzNDb25maWdSZXF1ZXN0Gh4ubGFlbGlhLnYxLkdldFMzQ29uZmlnUmVzcG9uc2UiHogCAYrqMBNsYWVsaWEuc2V0dGluZ3MuZ2V0kOowARJ8Cg5VcGRhdGVTM0NvbmZpZxIgLmxhZWxpYS52MS5VcGRhdGVTM0NvbmZpZ1JlcXVlc3QaIS5sYWVsaWEudjEuVXBkYXRlUzNDb25maWdSZXNwb25zZSIliAIBiuowFmxhZWxpYS5zZXR0aW5ncy51cGRhdGWQ6jABmOowARJnChFHZXRMbG1BZ2VudENvbmZpZxIjLmxhZWxpYS52MS5HZXRMbG1BZ2VudENvbmZpZ1JlcXVlc3QaJC5sYWVsaWEudjEuR2V0TGxtQWdlbnRDb25maWdSZXNwb25zZSIHiAIBkOowARKOAQoUVXBkYXRlTGxtQWdlbnRDb25maWcSJi5sYWVsaWEudjEuVXBkYXRlTGxtQWdlbnRDb25maWdSZXF1ZXN0GicubGFlbGlhLnYxLlVwZGF0ZUxsbUFnZW50Q29uZmlnUmVzcG9uc2UiJYgCAYrqMBZsYWVsaWEuc2V0dGluZ3MudXBkYXRlkOowAZjqMAESZAoQR2V0VXNlck1jcENvbmZpZxIiLmxhZWxpYS52MS5HZXRVc2VyTWNwQ29uZmlnUmVxdWVzdBojLmxhZWxpYS52MS5HZXRVc2VyTWNwQ29uZmlnUmVzcG9uc2UiB4gCAZDqMAESiwEKE1VwZGF0ZVVzZXJNY3BDb25maWcSJS5sYWVsaWEudjEuVXBkYXRlVXNlck1jcENvbmZpZ1JlcXVlc3QaJi5sYWVsaWEudjEuVXBkYXRlVXNlck1jcENvbmZpZ1Jlc3BvbnNlIiWIAgGK6jAWbGFlbGlhLnNldHRpbmdzLnVwZGF0ZZDqMAGY6jABEnIKDkdldFNldHVwU3RhdHVzEiAubGFlbGlhLnYxLkdldFNldHVwU3RhdHVzUmVxdWVzdBohLmxhZWxpYS52MS5HZXRTZXR1cFN0YXR1c1Jlc3BvbnNlIhuK6jATbGFlbGlhLnNldHRpbmdzLmdldJDqMAEScgoOR2V0RGVidWdDb25maWcSIC5sYWVsaWEudjEuR2V0RGVidWdDb25maWdSZXF1ZXN0GiEubGFlbGlhLnYxLkdldERlYnVnQ29uZmlnUmVzcG9uc2UiG4rqMBNsYWVsaWEuc2V0dGluZ3MuZ2V0kOowARKCAQoRVXBkYXRlRGVidWdDb25maWcSIy5sYWVsaWEudjEuVXBkYXRlRGVidWdDb25maWdSZXF1ZXN0GiQubGFlbGlhLnYxLlVwZGF0ZURlYnVnQ29uZmlnUmVzcG9uc2UiIorqMBZsYWVsaWEuc2V0dGluZ3MudXBkYXRlkOowAZjqMAESmQEKGkdldFdvcmtzcGFjZUdlbmVyYWxTZXR0aW5nEiwubGFlbGlhLnYxLkdldFdvcmtzcGFjZUdlbmVyYWxTZXR0aW5nUmVxdWVzdBotLmxhZWxpYS52MS5HZXRXb3Jrc3BhY2VHZW5lcmFsU2V0dGluZ1Jlc3BvbnNlIh6IAgGK6jATbGFlbGlhLnNldHRpbmdzLmdldJDqMAESqQEKHVVwZGF0ZVdvcmtzcGFjZUdlbmVyYWxTZXR0aW5nEi8ubGFlbGlhLnYxLlVwZGF0ZVdvcmtzcGFjZUdlbmVyYWxTZXR0aW5nUmVxdWVzdBowLmxhZWxpYS52MS5VcGRhdGVXb3Jrc3BhY2VHZW5lcmFsU2V0dGluZ1Jlc3BvbnNlIiWIAgGK6jAWbGFlbGlhLnNldHRpbmdzLnVwZGF0ZZDqMAGY6jABEmEKEEdldFdvcmtzcGFjZUluZm8SIi5sYWVsaWEudjEuR2V0V29ya3NwYWNlSW5mb1JlcXVlc3QaIy5sYWVsaWEudjEuR2V0V29ya3NwYWNlSW5mb1Jlc3BvbnNlIgSA6jABQjFaL2dpdGh1Yi5jb20vUmFueHkvbGFlbGlhL2JhY2tlbmQvZ2VuZXJhdGVkLWdvL3YxYgZwcm90bzM", [file_google_api_field_behavior, file_store_setting, file_v1_annotation]);
+  fileDesc("ChB2MS9zZXR0aW5nLnByb3RvEglsYWVsaWEudjEiSQoHU2V0dGluZxIRCgRuYW1lGAEgASgJQgPgQQgSKwoFdmFsdWUYAiABKAsyFy5sYWVsaWEudjEuU2V0dGluZ1ZhbHVlQgPgQQIi2QIKDFNldHRpbmdWYWx1ZRIyCglzM19jb25maWcYASABKAsyHS5sYWVsaWEuc3RvcmUuUzNDb25maWdTZXR0aW5nSAASPwoQbGxtX2FnZW50X2NvbmZpZxgCIAEoCzIjLmxhZWxpYS5zdG9yZS5MbG1BZ2VudENvbmZpZ1NldHRpbmdIABI9Cg91c2VyX21jcF9jb25maWcYAyABKAsyIi5sYWVsaWEuc3RvcmUuVXNlck1jcENvbmZpZ1NldHRpbmdIABJCChF3b3Jrc3BhY2VfcHJvZmlsZRgEIAEoCzIlLmxhZWxpYS5zdG9yZS5Xb3Jrc3BhY2VQcm9maWxlU2V0dGluZ0gAEkgKFHBhc3N3b3JkX3Jlc3RyaWN0aW9uGAUgASgLMigubGFlbGlhLnN0b3JlLlBhc3N3b3JkUmVzdHJpY3Rpb25TZXR0aW5nSABCBwoFdmFsdWUiJgoRR2V0U2V0dGluZ1JlcXVlc3QSEQoEbmFtZRgBIAEoCUID4EECIkAKFFVwZGF0ZVNldHRpbmdSZXF1ZXN0EigKB3NldHRpbmcYASABKAsyEi5sYWVsaWEudjEuU2V0dGluZ0ID4EECIhcKFUdldFNldHVwU3RhdHVzUmVxdWVzdCIrCglTZXR1cEl0ZW0SCgoCaWQYASABKAkSEgoKY29uZmlndXJlZBgCIAEoCCI9ChZHZXRTZXR1cFN0YXR1c1Jlc3BvbnNlEiMKBWl0ZW1zGAEgAygLMhQubGFlbGlhLnYxLlNldHVwSXRlbSIXChVHZXREZWJ1Z0NvbmZpZ1JlcXVlc3QiKQoWR2V0RGVidWdDb25maWdSZXNwb25zZRIPCgdlbmFibGVkGAEgASgIIjAKGFVwZGF0ZURlYnVnQ29uZmlnUmVxdWVzdBIUCgdlbmFibGVkGAEgASgIQgPgQQIiLAoZVXBkYXRlRGVidWdDb25maWdSZXNwb25zZRIPCgdlbmFibGVkGAEgASgIIhkKF0dldFdvcmtzcGFjZUluZm9SZXF1ZXN0ImUKGEdldFdvcmtzcGFjZUluZm9SZXNwb25zZRIXCg9kaXNhbGxvd19zaWdudXAYASABKAgSHwoXZW5mb3JjZV9pZGVudGl0eV9kb21haW4YAiABKAgSDwoHZG9tYWlucxgDIAMoCTKQBQoOU2V0dGluZ1NlcnZpY2USRAoKR2V0U2V0dGluZxIcLmxhZWxpYS52MS5HZXRTZXR0aW5nUmVxdWVzdBoSLmxhZWxpYS52MS5TZXR0aW5nIgSQ6jABEmgKDVVwZGF0ZVNldHRpbmcSHy5sYWVsaWEudjEuVXBkYXRlU2V0dGluZ1JlcXVlc3QaEi5sYWVsaWEudjEuU2V0dGluZyIiiuowFmxhZWxpYS5zZXR0aW5ncy51cGRhdGWQ6jABmOowARJyCg5HZXRTZXR1cFN0YXR1cxIgLmxhZWxpYS52MS5HZXRTZXR1cFN0YXR1c1JlcXVlc3QaIS5sYWVsaWEudjEuR2V0U2V0dXBTdGF0dXNSZXNwb25zZSIbiuowE2xhZWxpYS5zZXR0aW5ncy5nZXSQ6jABEnIKDkdldERlYnVnQ29uZmlnEiAubGFlbGlhLnYxLkdldERlYnVnQ29uZmlnUmVxdWVzdBohLmxhZWxpYS52MS5HZXREZWJ1Z0NvbmZpZ1Jlc3BvbnNlIhuK6jATbGFlbGlhLnNldHRpbmdzLmdldJDqMAESggEKEVVwZGF0ZURlYnVnQ29uZmlnEiMubGFlbGlhLnYxLlVwZGF0ZURlYnVnQ29uZmlnUmVxdWVzdBokLmxhZWxpYS52MS5VcGRhdGVEZWJ1Z0NvbmZpZ1Jlc3BvbnNlIiKK6jAWbGFlbGlhLnNldHRpbmdzLnVwZGF0ZZDqMAGY6jABEmEKEEdldFdvcmtzcGFjZUluZm8SIi5sYWVsaWEudjEuR2V0V29ya3NwYWNlSW5mb1JlcXVlc3QaIy5sYWVsaWEudjEuR2V0V29ya3NwYWNlSW5mb1Jlc3BvbnNlIgSA6jABQjFaL2dpdGh1Yi5jb20vUmFueHkvbGFlbGlhL2JhY2tlbmQvZ2VuZXJhdGVkLWdvL3YxYgZwcm90bzM", [file_google_api_field_behavior, file_store_setting, file_v1_annotation]);
 
 /**
  * Describes the message laelia.v1.Setting.
@@ -42,188 +42,75 @@ export const UpdateSettingRequestSchema = /*@__PURE__*/
   messageDesc(file_v1_setting, 3);
 
 /**
- * Describes the message laelia.v1.GetS3ConfigRequest.
- * Use `create(GetS3ConfigRequestSchema)` to create a new message.
- */
-export const GetS3ConfigRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 4);
-
-/**
- * Describes the message laelia.v1.GetS3ConfigResponse.
- * Use `create(GetS3ConfigResponseSchema)` to create a new message.
- */
-export const GetS3ConfigResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 5);
-
-/**
- * Describes the message laelia.v1.UpdateS3ConfigRequest.
- * Use `create(UpdateS3ConfigRequestSchema)` to create a new message.
- */
-export const UpdateS3ConfigRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 6);
-
-/**
- * Describes the message laelia.v1.UpdateS3ConfigResponse.
- * Use `create(UpdateS3ConfigResponseSchema)` to create a new message.
- */
-export const UpdateS3ConfigResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 7);
-
-/**
- * Describes the message laelia.v1.GetLlmAgentConfigRequest.
- * Use `create(GetLlmAgentConfigRequestSchema)` to create a new message.
- */
-export const GetLlmAgentConfigRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 8);
-
-/**
- * Describes the message laelia.v1.GetLlmAgentConfigResponse.
- * Use `create(GetLlmAgentConfigResponseSchema)` to create a new message.
- */
-export const GetLlmAgentConfigResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 9);
-
-/**
- * Describes the message laelia.v1.UpdateLlmAgentConfigRequest.
- * Use `create(UpdateLlmAgentConfigRequestSchema)` to create a new message.
- */
-export const UpdateLlmAgentConfigRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 10);
-
-/**
- * Describes the message laelia.v1.UpdateLlmAgentConfigResponse.
- * Use `create(UpdateLlmAgentConfigResponseSchema)` to create a new message.
- */
-export const UpdateLlmAgentConfigResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 11);
-
-/**
- * Describes the message laelia.v1.GetUserMcpConfigRequest.
- * Use `create(GetUserMcpConfigRequestSchema)` to create a new message.
- */
-export const GetUserMcpConfigRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 12);
-
-/**
- * Describes the message laelia.v1.GetUserMcpConfigResponse.
- * Use `create(GetUserMcpConfigResponseSchema)` to create a new message.
- */
-export const GetUserMcpConfigResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 13);
-
-/**
- * Describes the message laelia.v1.UpdateUserMcpConfigRequest.
- * Use `create(UpdateUserMcpConfigRequestSchema)` to create a new message.
- */
-export const UpdateUserMcpConfigRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 14);
-
-/**
- * Describes the message laelia.v1.UpdateUserMcpConfigResponse.
- * Use `create(UpdateUserMcpConfigResponseSchema)` to create a new message.
- */
-export const UpdateUserMcpConfigResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 15);
-
-/**
  * Describes the message laelia.v1.GetSetupStatusRequest.
  * Use `create(GetSetupStatusRequestSchema)` to create a new message.
  */
 export const GetSetupStatusRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 16);
+  messageDesc(file_v1_setting, 4);
 
 /**
  * Describes the message laelia.v1.SetupItem.
  * Use `create(SetupItemSchema)` to create a new message.
  */
 export const SetupItemSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 17);
+  messageDesc(file_v1_setting, 5);
 
 /**
  * Describes the message laelia.v1.GetSetupStatusResponse.
  * Use `create(GetSetupStatusResponseSchema)` to create a new message.
  */
 export const GetSetupStatusResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 18);
+  messageDesc(file_v1_setting, 6);
 
 /**
  * Describes the message laelia.v1.GetDebugConfigRequest.
  * Use `create(GetDebugConfigRequestSchema)` to create a new message.
  */
 export const GetDebugConfigRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 19);
+  messageDesc(file_v1_setting, 7);
 
 /**
  * Describes the message laelia.v1.GetDebugConfigResponse.
  * Use `create(GetDebugConfigResponseSchema)` to create a new message.
  */
 export const GetDebugConfigResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 20);
+  messageDesc(file_v1_setting, 8);
 
 /**
  * Describes the message laelia.v1.UpdateDebugConfigRequest.
  * Use `create(UpdateDebugConfigRequestSchema)` to create a new message.
  */
 export const UpdateDebugConfigRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 21);
+  messageDesc(file_v1_setting, 9);
 
 /**
  * Describes the message laelia.v1.UpdateDebugConfigResponse.
  * Use `create(UpdateDebugConfigResponseSchema)` to create a new message.
  */
 export const UpdateDebugConfigResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 22);
-
-/**
- * Describes the message laelia.v1.GetWorkspaceGeneralSettingRequest.
- * Use `create(GetWorkspaceGeneralSettingRequestSchema)` to create a new message.
- */
-export const GetWorkspaceGeneralSettingRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 23);
-
-/**
- * Describes the message laelia.v1.GetWorkspaceGeneralSettingResponse.
- * Use `create(GetWorkspaceGeneralSettingResponseSchema)` to create a new message.
- */
-export const GetWorkspaceGeneralSettingResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 24);
-
-/**
- * Describes the message laelia.v1.UpdateWorkspaceGeneralSettingRequest.
- * Use `create(UpdateWorkspaceGeneralSettingRequestSchema)` to create a new message.
- */
-export const UpdateWorkspaceGeneralSettingRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 25);
-
-/**
- * Describes the message laelia.v1.UpdateWorkspaceGeneralSettingResponse.
- * Use `create(UpdateWorkspaceGeneralSettingResponseSchema)` to create a new message.
- */
-export const UpdateWorkspaceGeneralSettingResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 26);
+  messageDesc(file_v1_setting, 10);
 
 /**
  * Describes the message laelia.v1.GetWorkspaceInfoRequest.
  * Use `create(GetWorkspaceInfoRequestSchema)` to create a new message.
  */
 export const GetWorkspaceInfoRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 27);
+  messageDesc(file_v1_setting, 11);
 
 /**
  * Describes the message laelia.v1.GetWorkspaceInfoResponse.
  * Use `create(GetWorkspaceInfoResponseSchema)` to create a new message.
  */
 export const GetWorkspaceInfoResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_setting, 28);
+  messageDesc(file_v1_setting, 12);
 
 /**
- * SettingService exposes workspace-level configuration. GetSetting/UpdateSetting
- * are the unified resource-based accessors; the legacy per-setting RPCs are
- * deprecated and kept for compatibility. GetSetting is handler-gated (no
- * permission annotation): llm_agent_config and user_mcp_config are readable by
- * any authenticated member, all other settings require admin. UpdateSetting is
- * admin-only (laelia.settings.update). The S3 secret_key is masked on read; an
- * update carrying a masked secret preserves the stored value.
+ * SettingService exposes workspace-level configuration through the unified
+ * resource-based accessors GetSetting/UpdateSetting. GetSetting is
+ * handler-gated (no permission annotation): llm_agent_config and user_mcp_config
+ * are readable by any authenticated member, all other settings require admin.
+ * UpdateSetting is admin-only (laelia.settings.update). The S3 secret_key is
+ * masked on read; an update carrying a masked secret preserves the stored value.
  *
  * @generated from service laelia.v1.SettingService
  */

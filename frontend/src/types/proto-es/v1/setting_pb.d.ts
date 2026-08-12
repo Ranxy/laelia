@@ -128,186 +128,6 @@ export declare type UpdateSettingRequest = Message<"laelia.v1.UpdateSettingReque
 export declare const UpdateSettingRequestSchema: GenMessage<UpdateSettingRequest>;
 
 /**
- * @generated from message laelia.v1.GetS3ConfigRequest
- */
-export declare type GetS3ConfigRequest = Message<"laelia.v1.GetS3ConfigRequest"> & {
-};
-
-/**
- * Describes the message laelia.v1.GetS3ConfigRequest.
- * Use `create(GetS3ConfigRequestSchema)` to create a new message.
- */
-export declare const GetS3ConfigRequestSchema: GenMessage<GetS3ConfigRequest>;
-
-/**
- * @generated from message laelia.v1.GetS3ConfigResponse
- */
-export declare type GetS3ConfigResponse = Message<"laelia.v1.GetS3ConfigResponse"> & {
-  /**
-   * @generated from field: laelia.store.S3ConfigSetting config = 1;
-   */
-  config?: S3ConfigSetting | undefined;
-};
-
-/**
- * Describes the message laelia.v1.GetS3ConfigResponse.
- * Use `create(GetS3ConfigResponseSchema)` to create a new message.
- */
-export declare const GetS3ConfigResponseSchema: GenMessage<GetS3ConfigResponse>;
-
-/**
- * @generated from message laelia.v1.UpdateS3ConfigRequest
- */
-export declare type UpdateS3ConfigRequest = Message<"laelia.v1.UpdateS3ConfigRequest"> & {
-  /**
-   * @generated from field: laelia.store.S3ConfigSetting config = 1;
-   */
-  config?: S3ConfigSetting | undefined;
-};
-
-/**
- * Describes the message laelia.v1.UpdateS3ConfigRequest.
- * Use `create(UpdateS3ConfigRequestSchema)` to create a new message.
- */
-export declare const UpdateS3ConfigRequestSchema: GenMessage<UpdateS3ConfigRequest>;
-
-/**
- * @generated from message laelia.v1.UpdateS3ConfigResponse
- */
-export declare type UpdateS3ConfigResponse = Message<"laelia.v1.UpdateS3ConfigResponse"> & {
-  /**
-   * @generated from field: laelia.store.S3ConfigSetting config = 1;
-   */
-  config?: S3ConfigSetting | undefined;
-};
-
-/**
- * Describes the message laelia.v1.UpdateS3ConfigResponse.
- * Use `create(UpdateS3ConfigResponseSchema)` to create a new message.
- */
-export declare const UpdateS3ConfigResponseSchema: GenMessage<UpdateS3ConfigResponse>;
-
-/**
- * @generated from message laelia.v1.GetLlmAgentConfigRequest
- */
-export declare type GetLlmAgentConfigRequest = Message<"laelia.v1.GetLlmAgentConfigRequest"> & {
-};
-
-/**
- * Describes the message laelia.v1.GetLlmAgentConfigRequest.
- * Use `create(GetLlmAgentConfigRequestSchema)` to create a new message.
- */
-export declare const GetLlmAgentConfigRequestSchema: GenMessage<GetLlmAgentConfigRequest>;
-
-/**
- * @generated from message laelia.v1.GetLlmAgentConfigResponse
- */
-export declare type GetLlmAgentConfigResponse = Message<"laelia.v1.GetLlmAgentConfigResponse"> & {
-  /**
-   * @generated from field: laelia.store.LlmAgentConfigSetting config = 1;
-   */
-  config?: LlmAgentConfigSetting | undefined;
-};
-
-/**
- * Describes the message laelia.v1.GetLlmAgentConfigResponse.
- * Use `create(GetLlmAgentConfigResponseSchema)` to create a new message.
- */
-export declare const GetLlmAgentConfigResponseSchema: GenMessage<GetLlmAgentConfigResponse>;
-
-/**
- * @generated from message laelia.v1.UpdateLlmAgentConfigRequest
- */
-export declare type UpdateLlmAgentConfigRequest = Message<"laelia.v1.UpdateLlmAgentConfigRequest"> & {
-  /**
-   * @generated from field: laelia.store.LlmAgentConfigSetting config = 1;
-   */
-  config?: LlmAgentConfigSetting | undefined;
-};
-
-/**
- * Describes the message laelia.v1.UpdateLlmAgentConfigRequest.
- * Use `create(UpdateLlmAgentConfigRequestSchema)` to create a new message.
- */
-export declare const UpdateLlmAgentConfigRequestSchema: GenMessage<UpdateLlmAgentConfigRequest>;
-
-/**
- * @generated from message laelia.v1.UpdateLlmAgentConfigResponse
- */
-export declare type UpdateLlmAgentConfigResponse = Message<"laelia.v1.UpdateLlmAgentConfigResponse"> & {
-  /**
-   * @generated from field: laelia.store.LlmAgentConfigSetting config = 1;
-   */
-  config?: LlmAgentConfigSetting | undefined;
-};
-
-/**
- * Describes the message laelia.v1.UpdateLlmAgentConfigResponse.
- * Use `create(UpdateLlmAgentConfigResponseSchema)` to create a new message.
- */
-export declare const UpdateLlmAgentConfigResponseSchema: GenMessage<UpdateLlmAgentConfigResponse>;
-
-/**
- * @generated from message laelia.v1.GetUserMcpConfigRequest
- */
-export declare type GetUserMcpConfigRequest = Message<"laelia.v1.GetUserMcpConfigRequest"> & {
-};
-
-/**
- * Describes the message laelia.v1.GetUserMcpConfigRequest.
- * Use `create(GetUserMcpConfigRequestSchema)` to create a new message.
- */
-export declare const GetUserMcpConfigRequestSchema: GenMessage<GetUserMcpConfigRequest>;
-
-/**
- * @generated from message laelia.v1.GetUserMcpConfigResponse
- */
-export declare type GetUserMcpConfigResponse = Message<"laelia.v1.GetUserMcpConfigResponse"> & {
-  /**
-   * @generated from field: laelia.store.UserMcpConfigSetting config = 1;
-   */
-  config?: UserMcpConfigSetting | undefined;
-};
-
-/**
- * Describes the message laelia.v1.GetUserMcpConfigResponse.
- * Use `create(GetUserMcpConfigResponseSchema)` to create a new message.
- */
-export declare const GetUserMcpConfigResponseSchema: GenMessage<GetUserMcpConfigResponse>;
-
-/**
- * @generated from message laelia.v1.UpdateUserMcpConfigRequest
- */
-export declare type UpdateUserMcpConfigRequest = Message<"laelia.v1.UpdateUserMcpConfigRequest"> & {
-  /**
-   * @generated from field: laelia.store.UserMcpConfigSetting config = 1;
-   */
-  config?: UserMcpConfigSetting | undefined;
-};
-
-/**
- * Describes the message laelia.v1.UpdateUserMcpConfigRequest.
- * Use `create(UpdateUserMcpConfigRequestSchema)` to create a new message.
- */
-export declare const UpdateUserMcpConfigRequestSchema: GenMessage<UpdateUserMcpConfigRequest>;
-
-/**
- * @generated from message laelia.v1.UpdateUserMcpConfigResponse
- */
-export declare type UpdateUserMcpConfigResponse = Message<"laelia.v1.UpdateUserMcpConfigResponse"> & {
-  /**
-   * @generated from field: laelia.store.UserMcpConfigSetting config = 1;
-   */
-  config?: UserMcpConfigSetting | undefined;
-};
-
-/**
- * Describes the message laelia.v1.UpdateUserMcpConfigResponse.
- * Use `create(UpdateUserMcpConfigResponseSchema)` to create a new message.
- */
-export declare const UpdateUserMcpConfigResponseSchema: GenMessage<UpdateUserMcpConfigResponse>;
-
-/**
  * @generated from message laelia.v1.GetSetupStatusRequest
  */
 export declare type GetSetupStatusRequest = Message<"laelia.v1.GetSetupStatusRequest"> & {
@@ -421,66 +241,6 @@ export declare type UpdateDebugConfigResponse = Message<"laelia.v1.UpdateDebugCo
 export declare const UpdateDebugConfigResponseSchema: GenMessage<UpdateDebugConfigResponse>;
 
 /**
- * @generated from message laelia.v1.GetWorkspaceGeneralSettingRequest
- */
-export declare type GetWorkspaceGeneralSettingRequest = Message<"laelia.v1.GetWorkspaceGeneralSettingRequest"> & {
-};
-
-/**
- * Describes the message laelia.v1.GetWorkspaceGeneralSettingRequest.
- * Use `create(GetWorkspaceGeneralSettingRequestSchema)` to create a new message.
- */
-export declare const GetWorkspaceGeneralSettingRequestSchema: GenMessage<GetWorkspaceGeneralSettingRequest>;
-
-/**
- * @generated from message laelia.v1.GetWorkspaceGeneralSettingResponse
- */
-export declare type GetWorkspaceGeneralSettingResponse = Message<"laelia.v1.GetWorkspaceGeneralSettingResponse"> & {
-  /**
-   * @generated from field: laelia.store.WorkspaceProfileSetting setting = 1;
-   */
-  setting?: WorkspaceProfileSetting | undefined;
-};
-
-/**
- * Describes the message laelia.v1.GetWorkspaceGeneralSettingResponse.
- * Use `create(GetWorkspaceGeneralSettingResponseSchema)` to create a new message.
- */
-export declare const GetWorkspaceGeneralSettingResponseSchema: GenMessage<GetWorkspaceGeneralSettingResponse>;
-
-/**
- * @generated from message laelia.v1.UpdateWorkspaceGeneralSettingRequest
- */
-export declare type UpdateWorkspaceGeneralSettingRequest = Message<"laelia.v1.UpdateWorkspaceGeneralSettingRequest"> & {
-  /**
-   * @generated from field: laelia.store.WorkspaceProfileSetting setting = 1;
-   */
-  setting?: WorkspaceProfileSetting | undefined;
-};
-
-/**
- * Describes the message laelia.v1.UpdateWorkspaceGeneralSettingRequest.
- * Use `create(UpdateWorkspaceGeneralSettingRequestSchema)` to create a new message.
- */
-export declare const UpdateWorkspaceGeneralSettingRequestSchema: GenMessage<UpdateWorkspaceGeneralSettingRequest>;
-
-/**
- * @generated from message laelia.v1.UpdateWorkspaceGeneralSettingResponse
- */
-export declare type UpdateWorkspaceGeneralSettingResponse = Message<"laelia.v1.UpdateWorkspaceGeneralSettingResponse"> & {
-  /**
-   * @generated from field: laelia.store.WorkspaceProfileSetting setting = 1;
-   */
-  setting?: WorkspaceProfileSetting | undefined;
-};
-
-/**
- * Describes the message laelia.v1.UpdateWorkspaceGeneralSettingResponse.
- * Use `create(UpdateWorkspaceGeneralSettingResponseSchema)` to create a new message.
- */
-export declare const UpdateWorkspaceGeneralSettingResponseSchema: GenMessage<UpdateWorkspaceGeneralSettingResponse>;
-
-/**
  * GetWorkspaceInfoRequest is empty.
  *
  * @generated from message laelia.v1.GetWorkspaceInfoRequest
@@ -533,13 +293,12 @@ export declare type GetWorkspaceInfoResponse = Message<"laelia.v1.GetWorkspaceIn
 export declare const GetWorkspaceInfoResponseSchema: GenMessage<GetWorkspaceInfoResponse>;
 
 /**
- * SettingService exposes workspace-level configuration. GetSetting/UpdateSetting
- * are the unified resource-based accessors; the legacy per-setting RPCs are
- * deprecated and kept for compatibility. GetSetting is handler-gated (no
- * permission annotation): llm_agent_config and user_mcp_config are readable by
- * any authenticated member, all other settings require admin. UpdateSetting is
- * admin-only (laelia.settings.update). The S3 secret_key is masked on read; an
- * update carrying a masked secret preserves the stored value.
+ * SettingService exposes workspace-level configuration through the unified
+ * resource-based accessors GetSetting/UpdateSetting. GetSetting is
+ * handler-gated (no permission annotation): llm_agent_config and user_mcp_config
+ * are readable by any authenticated member, all other settings require admin.
+ * UpdateSetting is admin-only (laelia.settings.update). The S3 secret_key is
+ * masked on read; an update carrying a masked secret preserves the stored value.
  *
  * @generated from service laelia.v1.SettingService
  */
@@ -564,74 +323,6 @@ export declare const SettingService: GenService<{
     methodKind: "unary";
     input: typeof UpdateSettingRequestSchema;
     output: typeof SettingSchema;
-  },
-  /**
-   * @generated from rpc laelia.v1.SettingService.GetS3Config
-   * @deprecated
-   */
-  getS3Config: {
-    methodKind: "unary";
-    input: typeof GetS3ConfigRequestSchema;
-    output: typeof GetS3ConfigResponseSchema;
-  },
-  /**
-   * @generated from rpc laelia.v1.SettingService.UpdateS3Config
-   * @deprecated
-   */
-  updateS3Config: {
-    methodKind: "unary";
-    input: typeof UpdateS3ConfigRequestSchema;
-    output: typeof UpdateS3ConfigResponseSchema;
-  },
-  /**
-   * GetLlmAgentConfig reads the workspace LLM agent configuration. It is
-   * handler-gated (no permission annotation) so the agent create/edit forms —
-   * which members use — can read the toggle without a settings permission.
-   *
-   * @generated from rpc laelia.v1.SettingService.GetLlmAgentConfig
-   * @deprecated
-   */
-  getLlmAgentConfig: {
-    methodKind: "unary";
-    input: typeof GetLlmAgentConfigRequestSchema;
-    output: typeof GetLlmAgentConfigResponseSchema;
-  },
-  /**
-   * UpdateLlmAgentConfig updates the workspace LLM agent configuration.
-   * Admin (laelia.settings.update) only.
-   *
-   * @generated from rpc laelia.v1.SettingService.UpdateLlmAgentConfig
-   * @deprecated
-   */
-  updateLlmAgentConfig: {
-    methodKind: "unary";
-    input: typeof UpdateLlmAgentConfigRequestSchema;
-    output: typeof UpdateLlmAgentConfigResponseSchema;
-  },
-  /**
-   * GetUserMcpConfig reads whether users may configure personal MCP servers.
-   * It is handler-gated (no permission annotation) so any authenticated user
-   * can render the personal MCP settings page.
-   *
-   * @generated from rpc laelia.v1.SettingService.GetUserMcpConfig
-   * @deprecated
-   */
-  getUserMcpConfig: {
-    methodKind: "unary";
-    input: typeof GetUserMcpConfigRequestSchema;
-    output: typeof GetUserMcpConfigResponseSchema;
-  },
-  /**
-   * UpdateUserMcpConfig updates whether users may configure personal MCP
-   * servers. Admin (laelia.settings.update) only.
-   *
-   * @generated from rpc laelia.v1.SettingService.UpdateUserMcpConfig
-   * @deprecated
-   */
-  updateUserMcpConfig: {
-    methodKind: "unary";
-    input: typeof UpdateUserMcpConfigRequestSchema;
-    output: typeof UpdateUserMcpConfigResponseSchema;
   },
   /**
    * GetSetupStatus reports which required-config items are not yet configured,
@@ -659,30 +350,6 @@ export declare const SettingService: GenService<{
     methodKind: "unary";
     input: typeof UpdateDebugConfigRequestSchema;
     output: typeof UpdateDebugConfigResponseSchema;
-  },
-  /**
-   * GetWorkspaceGeneralSetting reads the workspace general setting (signup
-   * policy, email suffix restriction, ...). Admin (laelia.settings.get) only.
-   *
-   * @generated from rpc laelia.v1.SettingService.GetWorkspaceGeneralSetting
-   * @deprecated
-   */
-  getWorkspaceGeneralSetting: {
-    methodKind: "unary";
-    input: typeof GetWorkspaceGeneralSettingRequestSchema;
-    output: typeof GetWorkspaceGeneralSettingResponseSchema;
-  },
-  /**
-   * UpdateWorkspaceGeneralSetting updates the workspace general setting.
-   * Admin (laelia.settings.update) only.
-   *
-   * @generated from rpc laelia.v1.SettingService.UpdateWorkspaceGeneralSetting
-   * @deprecated
-   */
-  updateWorkspaceGeneralSetting: {
-    methodKind: "unary";
-    input: typeof UpdateWorkspaceGeneralSettingRequestSchema;
-    output: typeof UpdateWorkspaceGeneralSettingResponseSchema;
   },
   /**
    * GetWorkspaceInfo returns the workspace signup policy for the

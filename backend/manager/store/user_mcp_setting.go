@@ -18,7 +18,8 @@ const userMcpConfigCacheTTL = 30 * time.Second
 
 // GetUserMcpConfigSetting returns whether users may configure personal MCP
 // servers plus the MCP target IP policy. It never returns a nil payload: a
-// missing row yields the default (personal MCP servers enabled, policy off).
+// missing row yields the registered default (personal MCP servers enabled,
+// policy off).
 func (s *Store) GetUserMcpConfigSetting(ctx context.Context) (*models.UserMcpConfigSetting, error) {
 	s.userMcpConfigMu.Lock()
 	setting := s.userMcpConfigSetting
@@ -36,14 +37,9 @@ func (s *Store) GetUserMcpConfigSetting(ctx context.Context) (*models.UserMcpCon
 		s.userMcpConfigMu.Unlock()
 	}
 
-	cfg := &models.UserMcpConfigSetting{AllowUserMcpServers: true}
-	if setting == nil {
-		return cfg, nil
-	}
-	if err := json.Unmarshal([]byte(setting.Value), cfg); err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal user mcp config")
-	}
-	return cfg, nil
+	return unmarshalSettingValue(setting, func() *models.UserMcpConfigSetting {
+		return &models.UserMcpConfigSetting{AllowUserMcpServers: true}
+	})
 }
 
 // UpsertUserMcpConfigSetting stores whether users may configure personal MCP

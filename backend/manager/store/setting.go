@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/Ranxy/laelia/backend/common"
 	models "github.com/Ranxy/laelia/backend/generated-go/store"
@@ -30,51 +31,115 @@ type SettingMessage struct {
 	Value string
 }
 
+// settingPayloadDefaults maps every typed setting to a factory producing its
+// default payload, used when the row is missing. Raw-string settings
+// (AUTH_SECRET, WORKSPACE_ID, BRANDING_LOGO) are intentionally absent: their
+// values are opaque strings, not JSON payloads.
+var settingPayloadDefaults = map[models.SettingName]func() proto.Message{
+	models.SettingName_S3_CONFIG: func() proto.Message {
+		return &models.S3ConfigSetting{UseSsl: true}
+	},
+	models.SettingName_LLM_AGENT_CONFIG: func() proto.Message {
+		return &models.LlmAgentConfigSetting{AllowUserSelfProvidedKeys: true}
+	},
+	models.SettingName_USER_MCP_CONFIG: func() proto.Message {
+		return &models.UserMcpConfigSetting{AllowUserMcpServers: true}
+	},
+	models.SettingName_PASSWORD_RESTRICTION: func() proto.Message {
+		return &models.PasswordRestrictionSetting{MinLength: 8}
+	},
+	models.SettingName_WORKSPACE_PROFILE: func() proto.Message {
+		return &models.WorkspaceProfileSetting{}
+	},
+	models.SettingName_WEB_PUSH_CONFIG: func() proto.Message {
+		return &models.WebPushSetting{}
+	},
+}
+
+// GetSettingValue reads a typed setting payload by name. A missing row yields
+// the registered default; an invalid stored value is an error. Names without a
+// registered payload type (raw-string settings) are rejected.
+func (s *Store) GetSettingValue(ctx context.Context, name models.SettingName) (proto.Message, error) {
+	defaults, ok := settingPayloadDefaults[name]
+	if !ok {
+		return nil, errors.Errorf("no typed payload registered for setting %v", name)
+	}
+	return getSettingValue(ctx, s, name, defaults)
+}
+
+// UpsertSettingValue stores a typed setting payload by name.
+func (s *Store) UpsertSettingValue(ctx context.Context, name models.SettingName, value proto.Message) error {
+	_, err := upsertSettingValue(ctx, s, name, value)
+	return err
+}
+
+// getSettingValue reads the raw setting row and unmarshals it into a payload
+// created by defaults; a missing row yields defaults() as-is.
+func getSettingValue[T proto.Message](ctx context.Context, s *Store, name models.SettingName, defaults func() T) (T, error) {
+	setting, err := s.GetSettingV2(ctx, name)
+	if err != nil {
+		return *new(T), errors.Wrapf(err, "failed to get setting %v", name)
+	}
+	return unmarshalSettingValue(setting, defaults)
+}
+
+// unmarshalSettingValue decodes a raw setting row into a payload created by
+// defaults; a nil row yields defaults() as-is.
+func unmarshalSettingValue[T proto.Message](setting *SettingMessage, defaults func() T) (T, error) {
+	out := defaults()
+	if setting == nil {
+		return out, nil
+	}
+	if err := json.Unmarshal([]byte(setting.Value), out); err != nil {
+		return *new(T), errors.Wrapf(err, "failed to unmarshal setting %v", setting.Name)
+	}
+	return out, nil
+}
+
+// upsertSettingValue marshals a typed payload and upserts the setting row.
+func upsertSettingValue[T proto.Message](ctx context.Context, s *Store, name models.SettingName, value T) (T, error) {
+	payload, err := json.Marshal(value)
+	if err != nil {
+		return *new(T), errors.Wrapf(err, "failed to marshal setting %v", name)
+	}
+	if _, err := s.UpsertSettingV2(ctx, &SetSettingMessage{Name: name, Value: string(payload)}); err != nil {
+		return *new(T), errors.Wrapf(err, "failed to upsert setting %v", name)
+	}
+	return value, nil
+}
+
+// getSettingPayload reads the typed payload for name and asserts it to T.
+func getSettingPayload[T proto.Message](ctx context.Context, s *Store, name models.SettingName) (T, error) {
+	value, err := s.GetSettingValue(ctx, name)
+	if err != nil {
+		return *new(T), err
+	}
+	out, ok := value.(T)
+	if !ok {
+		return *new(T), errors.Errorf("unexpected payload type %T for setting %v", value, name)
+	}
+	return out, nil
+}
+
+// GetPasswordRestrictionSetting returns the password restriction payload.
 func (s *Store) GetPasswordRestrictionSetting(ctx context.Context) (*models.PasswordRestrictionSetting, error) {
-	passwordRestriction := &models.PasswordRestrictionSetting{
-		MinLength: 8,
-	}
-	setting, err := s.GetSettingV2(ctx, models.SettingName_PASSWORD_RESTRICTION)
-	if err != nil {
-		return nil, err
-	}
-	if setting == nil {
-		return passwordRestriction, nil
-	}
-
-	if err := json.Unmarshal([]byte(setting.Value), passwordRestriction); err != nil {
-		return nil, err
-	}
-	return passwordRestriction, nil
+	return getSettingPayload[*models.PasswordRestrictionSetting](ctx, s, models.SettingName_PASSWORD_RESTRICTION)
 }
 
-// GetWorkspaceGeneralSetting gets the workspace general setting payload.
+// UpsertPasswordRestrictionSetting stores the password restriction payload.
+func (s *Store) UpsertPasswordRestrictionSetting(ctx context.Context, setting *models.PasswordRestrictionSetting) error {
+	_, err := upsertSettingValue(ctx, s, models.SettingName_PASSWORD_RESTRICTION, setting)
+	return err
+}
+
+// GetWorkspaceGeneralSetting returns the workspace general setting payload.
 func (s *Store) GetWorkspaceGeneralSetting(ctx context.Context) (*models.WorkspaceProfileSetting, error) {
-	setting, err := s.GetSettingV2(ctx, models.SettingName_WORKSPACE_PROFILE)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get setting %v", models.SettingName_WORKSPACE_PROFILE)
-	}
-	if setting == nil {
-		return nil, errors.Errorf("cannot find setting %v", models.SettingName_WORKSPACE_PROFILE)
-	}
-
-	payload := new(models.WorkspaceProfileSetting)
-	if err := json.Unmarshal([]byte(setting.Value), payload); err != nil {
-		return nil, err
-	}
-	return payload, nil
+	return getSettingPayload[*models.WorkspaceProfileSetting](ctx, s, models.SettingName_WORKSPACE_PROFILE)
 }
 
-// UpsertWorkspaceGeneralSetting upserts the workspace general setting payload.
+// UpsertWorkspaceGeneralSetting stores the workspace general setting payload.
 func (s *Store) UpsertWorkspaceGeneralSetting(ctx context.Context, setting *models.WorkspaceProfileSetting) error {
-	payload, err := json.Marshal(setting)
-	if err != nil {
-		return err
-	}
-	_, err = s.UpsertSettingV2(ctx, &SetSettingMessage{
-		Name:  models.SettingName_WORKSPACE_PROFILE,
-		Value: string(payload),
-	})
+	_, err := upsertSettingValue(ctx, s, models.SettingName_WORKSPACE_PROFILE, setting)
 	return err
 }
 
@@ -306,17 +371,4 @@ func listSettingV2Impl(ctx context.Context, txn *sql.Tx, find *FindSettingMessag
 	}
 
 	return settingMessages, nil
-}
-
-// UpsertPasswordRestrictionSetting stores the password restriction payload.
-func (s *Store) UpsertPasswordRestrictionSetting(ctx context.Context, setting *models.PasswordRestrictionSetting) error {
-	payload, err := json.Marshal(setting)
-	if err != nil {
-		return err
-	}
-	_, err = s.UpsertSettingV2(ctx, &SetSettingMessage{
-		Name:  models.SettingName_PASSWORD_RESTRICTION,
-		Value: string(payload),
-	})
-	return err
 }

@@ -44,48 +44,6 @@ message UpdateSettingRequest {
   Setting setting = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
-message GetS3ConfigRequest {}
-
-message GetS3ConfigResponse {
-  laelia.store.S3ConfigSetting config = 1;
-}
-
-message UpdateS3ConfigRequest {
-  laelia.store.S3ConfigSetting config = 1 [(google.api.field_behavior) = REQUIRED];
-}
-
-message UpdateS3ConfigResponse {
-  laelia.store.S3ConfigSetting config = 1;
-}
-
-message GetLlmAgentConfigRequest {}
-
-message GetLlmAgentConfigResponse {
-  laelia.store.LlmAgentConfigSetting config = 1;
-}
-
-message UpdateLlmAgentConfigRequest {
-  laelia.store.LlmAgentConfigSetting config = 1 [(google.api.field_behavior) = REQUIRED];
-}
-
-message UpdateLlmAgentConfigResponse {
-  laelia.store.LlmAgentConfigSetting config = 1;
-}
-
-message GetUserMcpConfigRequest {}
-
-message GetUserMcpConfigResponse {
-  laelia.store.UserMcpConfigSetting config = 1;
-}
-
-message UpdateUserMcpConfigRequest {
-  laelia.store.UserMcpConfigSetting config = 1 [(google.api.field_behavior) = REQUIRED];
-}
-
-message UpdateUserMcpConfigResponse {
-  laelia.store.UserMcpConfigSetting config = 1;
-}
-
 message GetSetupStatusRequest {}
 
 // SetupItem describes one required-config item the admin onboarding overlay
@@ -114,13 +72,12 @@ message UpdateDebugConfigResponse {
   bool enabled = 1;
 }
 
-// SettingService exposes workspace-level configuration. GetSetting/UpdateSetting
-// are the unified resource-based accessors; the legacy per-setting RPCs are
-// deprecated and kept for compatibility. GetSetting is handler-gated (no
-// permission annotation): llm_agent_config and user_mcp_config are readable by
-// any authenticated member, all other settings require admin. UpdateSetting is
-// admin-only (laelia.settings.update). The S3 secret_key is masked on read; an
-// update carrying a masked secret preserves the stored value.
+// SettingService exposes workspace-level configuration through the unified
+// resource-based accessors GetSetting/UpdateSetting. GetSetting is
+// handler-gated (no permission annotation): llm_agent_config and user_mcp_config
+// are readable by any authenticated member, all other settings require admin.
+// UpdateSetting is admin-only (laelia.settings.update). The S3 secret_key is
+// masked on read; an update carrying a masked secret preserves the stored value.
 service SettingService {
   // GetSetting reads one workspace setting by resource name.
   rpc GetSetting(GetSettingRequest) returns (Setting) {
@@ -130,53 +87,6 @@ service SettingService {
   // UpdateSetting writes one workspace setting. Admin (laelia.settings.update)
   // only.
   rpc UpdateSetting(UpdateSettingRequest) returns (Setting) {
-    option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.settings.update";
-    option (laelia.v1.audit) = true;
-  }
-
-  rpc GetS3Config(GetS3ConfigRequest) returns (GetS3ConfigResponse) {
-    option deprecated = true;
-    option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.settings.get";
-  }
-
-  rpc UpdateS3Config(UpdateS3ConfigRequest) returns (UpdateS3ConfigResponse) {
-    option deprecated = true;
-    option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.settings.update";
-    option (laelia.v1.audit) = true;
-  }
-
-  // GetLlmAgentConfig reads the workspace LLM agent configuration. It is
-  // handler-gated (no permission annotation) so the agent create/edit forms —
-  // which members use — can read the toggle without a settings permission.
-  rpc GetLlmAgentConfig(GetLlmAgentConfigRequest) returns (GetLlmAgentConfigResponse) {
-    option deprecated = true;
-    option (laelia.v1.auth_method) = IAM;
-  }
-
-  // UpdateLlmAgentConfig updates the workspace LLM agent configuration.
-  // Admin (laelia.settings.update) only.
-  rpc UpdateLlmAgentConfig(UpdateLlmAgentConfigRequest) returns (UpdateLlmAgentConfigResponse) {
-    option deprecated = true;
-    option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.settings.update";
-    option (laelia.v1.audit) = true;
-  }
-
-  // GetUserMcpConfig reads whether users may configure personal MCP servers.
-  // It is handler-gated (no permission annotation) so any authenticated user
-  // can render the personal MCP settings page.
-  rpc GetUserMcpConfig(GetUserMcpConfigRequest) returns (GetUserMcpConfigResponse) {
-    option deprecated = true;
-    option (laelia.v1.auth_method) = IAM;
-  }
-
-  // UpdateUserMcpConfig updates whether users may configure personal MCP
-  // servers. Admin (laelia.settings.update) only.
-  rpc UpdateUserMcpConfig(UpdateUserMcpConfigRequest) returns (UpdateUserMcpConfigResponse) {
-    option deprecated = true;
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.update";
     option (laelia.v1.audit) = true;
@@ -200,42 +110,11 @@ service SettingService {
     option (laelia.v1.audit) = true;
   }
 
-  // GetWorkspaceGeneralSetting reads the workspace general setting (signup
-  // policy, email suffix restriction, ...). Admin (laelia.settings.get) only.
-  rpc GetWorkspaceGeneralSetting(GetWorkspaceGeneralSettingRequest) returns (GetWorkspaceGeneralSettingResponse) {
-    option deprecated = true;
-    option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.settings.get";
-  }
-
-  // UpdateWorkspaceGeneralSetting updates the workspace general setting.
-  // Admin (laelia.settings.update) only.
-  rpc UpdateWorkspaceGeneralSetting(UpdateWorkspaceGeneralSettingRequest) returns (UpdateWorkspaceGeneralSettingResponse) {
-    option deprecated = true;
-    option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.settings.update";
-    option (laelia.v1.audit) = true;
-  }
-
   // GetWorkspaceInfo returns the workspace signup policy for the
   // unauthenticated sign-in/sign-up pages. No auth required.
   rpc GetWorkspaceInfo(GetWorkspaceInfoRequest) returns (GetWorkspaceInfoResponse) {
     option (laelia.v1.allow_without_credential) = true;
   }
-}
-
-message GetWorkspaceGeneralSettingRequest {}
-
-message GetWorkspaceGeneralSettingResponse {
-  laelia.store.WorkspaceProfileSetting setting = 1;
-}
-
-message UpdateWorkspaceGeneralSettingRequest {
-  laelia.store.WorkspaceProfileSetting setting = 1 [(google.api.field_behavior) = REQUIRED];
-}
-
-message UpdateWorkspaceGeneralSettingResponse {
-  laelia.store.WorkspaceProfileSetting setting = 1;
 }
 
 // GetWorkspaceInfoRequest is empty.

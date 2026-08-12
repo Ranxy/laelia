@@ -8,6 +8,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/pkg/errors"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/Ranxy/laelia/backend/common/log"
 	"github.com/Ranxy/laelia/backend/common/permission"
 	models "github.com/Ranxy/laelia/backend/generated-go/store"
@@ -42,142 +44,23 @@ func NewSettingService(s *store.Store, s3clientManager *s3client.Client, profile
 	return &SettingService{store: s, s3clientManager: s3clientManager, profile: profile, iam: iamManager}
 }
 
-// settingHandler implements read/write for one setting name.
-type settingHandler struct {
+// settingMeta describes one setting exposed through GetSetting/UpdateSetting.
+type settingMeta struct {
 	// adminOnly gates GetSetting: when true, only callers holding
 	// laelia.settings.get may read; otherwise any authenticated user may.
 	adminOnly bool
-	get       func(ctx context.Context) (*v1pb.SettingValue, error)
-	update    func(ctx context.Context, value *v1pb.SettingValue) (*v1pb.SettingValue, error)
 }
 
-// settingHandlers is the registry of settings exposed through
-// GetSetting/UpdateSetting. Add an entry here to expose a new setting.
-func (s *SettingService) settingHandlers() map[models.SettingName]settingHandler {
-	return map[models.SettingName]settingHandler{
-		models.SettingName_S3_CONFIG: {
-			adminOnly: true,
-			get: func(ctx context.Context) (*v1pb.SettingValue, error) {
-				cfg, err := s.store.GetS3ConfigSetting(ctx)
-				if err != nil {
-					return nil, err
-				}
-				cfg.SecretKey = maskSecret(cfg.SecretKey)
-				return &v1pb.SettingValue{Value: &v1pb.SettingValue_S3Config{S3Config: cfg}}, nil
-			},
-			update: func(ctx context.Context, value *v1pb.SettingValue) (*v1pb.SettingValue, error) {
-				cfg := value.GetS3Config()
-				if cfg == nil {
-					return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("s3_config value is required"))
-				}
-				// A masked secret means "leave unchanged": pull the stored
-				// value so the caller doesn't have to re-enter the secret to
-				// toggle a boolean.
-				if strings.HasPrefix(cfg.SecretKey, secretMaskPrefix) {
-					stored, err := s.store.GetS3ConfigSetting(ctx)
-					if err != nil {
-						return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get s3 config"))
-					}
-					cfg.SecretKey = stored.SecretKey
-				}
-				if _, err := s.store.UpsertS3ConfigSetting(ctx, cfg); err != nil {
-					return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to upsert s3 config"))
-				}
-				if s.s3clientManager != nil {
-					s.s3clientManager.Invalidate()
-				}
-				cfg.SecretKey = maskSecret(cfg.SecretKey)
-				return &v1pb.SettingValue{Value: &v1pb.SettingValue_S3Config{S3Config: cfg}}, nil
-			},
-		},
-		models.SettingName_LLM_AGENT_CONFIG: {
-			adminOnly: false,
-			get: func(ctx context.Context) (*v1pb.SettingValue, error) {
-				cfg, err := s.store.GetLlmAgentConfigSetting(ctx)
-				if err != nil {
-					return nil, err
-				}
-				return &v1pb.SettingValue{Value: &v1pb.SettingValue_LlmAgentConfig{LlmAgentConfig: cfg}}, nil
-			},
-			update: func(ctx context.Context, value *v1pb.SettingValue) (*v1pb.SettingValue, error) {
-				cfg := value.GetLlmAgentConfig()
-				if cfg == nil {
-					return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("llm_agent_config value is required"))
-				}
-				if _, err := s.store.UpsertLlmAgentConfigSetting(ctx, cfg); err != nil {
-					return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update llm agent config"))
-				}
-				return &v1pb.SettingValue{Value: &v1pb.SettingValue_LlmAgentConfig{LlmAgentConfig: cfg}}, nil
-			},
-		},
-		models.SettingName_USER_MCP_CONFIG: {
-			adminOnly: false,
-			get: func(ctx context.Context) (*v1pb.SettingValue, error) {
-				cfg, err := s.store.GetUserMcpConfigSetting(ctx)
-				if err != nil {
-					return nil, err
-				}
-				return &v1pb.SettingValue{Value: &v1pb.SettingValue_UserMcpConfig{UserMcpConfig: cfg}}, nil
-			},
-			update: func(ctx context.Context, value *v1pb.SettingValue) (*v1pb.SettingValue, error) {
-				cfg := value.GetUserMcpConfig()
-				if cfg == nil {
-					return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("user_mcp_config value is required"))
-				}
-				if _, err := mcp.ParsePolicy(cfg.GetMcpIpPolicy()); err != nil {
-					return nil, connect.NewError(connect.CodeInvalidArgument, err)
-				}
-				if _, err := s.store.UpsertUserMcpConfigSetting(ctx, cfg); err != nil {
-					return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update user mcp config"))
-				}
-				return &v1pb.SettingValue{Value: &v1pb.SettingValue_UserMcpConfig{UserMcpConfig: cfg}}, nil
-			},
-		},
-		models.SettingName_WORKSPACE_PROFILE: {
-			adminOnly: true,
-			get: func(ctx context.Context) (*v1pb.SettingValue, error) {
-				setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
-				if err != nil {
-					return nil, err
-				}
-				return &v1pb.SettingValue{Value: &v1pb.SettingValue_WorkspaceProfile{WorkspaceProfile: setting}}, nil
-			},
-			update: func(ctx context.Context, value *v1pb.SettingValue) (*v1pb.SettingValue, error) {
-				setting := value.GetWorkspaceProfile()
-				if setting == nil {
-					return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("workspace_profile value is required"))
-				}
-				normalizeWorkspaceGeneralSetting(setting)
-				if err := validateWorkspaceGeneralSetting(setting); err != nil {
-					return nil, connect.NewError(connect.CodeInvalidArgument, err)
-				}
-				if err := s.store.UpsertWorkspaceGeneralSetting(ctx, setting); err != nil {
-					return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update workspace general setting"))
-				}
-				return &v1pb.SettingValue{Value: &v1pb.SettingValue_WorkspaceProfile{WorkspaceProfile: setting}}, nil
-			},
-		},
-		models.SettingName_PASSWORD_RESTRICTION: {
-			adminOnly: true,
-			get: func(ctx context.Context) (*v1pb.SettingValue, error) {
-				setting, err := s.store.GetPasswordRestrictionSetting(ctx)
-				if err != nil {
-					return nil, err
-				}
-				return &v1pb.SettingValue{Value: &v1pb.SettingValue_PasswordRestriction{PasswordRestriction: setting}}, nil
-			},
-			update: func(ctx context.Context, value *v1pb.SettingValue) (*v1pb.SettingValue, error) {
-				setting := value.GetPasswordRestriction()
-				if setting == nil {
-					return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("password_restriction value is required"))
-				}
-				if err := s.store.UpsertPasswordRestrictionSetting(ctx, setting); err != nil {
-					return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update password restriction setting"))
-				}
-				return &v1pb.SettingValue{Value: &v1pb.SettingValue_PasswordRestriction{PasswordRestriction: setting}}, nil
-			},
-		},
-	}
+// exposedSettings is the registry of settings exposed through
+// GetSetting/UpdateSetting. Add an entry here to expose a new setting; the
+// typed payload conversion lives in convertV1ToStoreSetting and
+// convertStoreToSettingValue.
+var exposedSettings = map[models.SettingName]settingMeta{
+	models.SettingName_S3_CONFIG:            {adminOnly: true},
+	models.SettingName_LLM_AGENT_CONFIG:     {},
+	models.SettingName_USER_MCP_CONFIG:      {},
+	models.SettingName_WORKSPACE_PROFILE:    {adminOnly: true},
+	models.SettingName_PASSWORD_RESTRICTION: {adminOnly: true},
 }
 
 // parseSettingName converts a resource name ("settings/s3_config") to the
@@ -211,18 +94,22 @@ func (s *SettingService) GetSetting(ctx context.Context, req *connect.Request[v1
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	handler, ok := s.settingHandlers()[name]
+	meta, ok := exposedSettings[name]
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unknown setting %q", req.Msg.GetName()))
 	}
-	if handler.adminOnly {
+	if meta.adminOnly {
 		if err := s.requireSettingsGet(ctx); err != nil {
 			return nil, err
 		}
 	}
-	value, err := handler.get(ctx)
+	payload, err := s.store.GetSettingValue(ctx, name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get setting %q", req.Msg.GetName()))
+	}
+	value, err := convertStoreToSettingValue(name, payload)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&v1pb.Setting{Name: formatSettingName(name), Value: value}), nil
 }
@@ -238,15 +125,143 @@ func (s *SettingService) UpdateSetting(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	handler, ok := s.settingHandlers()[name]
-	if !ok {
+	if _, ok := exposedSettings[name]; !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unknown setting %q", in.GetName()))
 	}
-	value, err := handler.update(ctx, in.GetValue())
+	payload, err := convertV1ToStoreSetting(name, in.GetValue())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	after, err := s.prepareSettingUpdate(ctx, name, payload)
 	if err != nil {
 		return nil, err
 	}
+	if err := s.store.UpsertSettingValue(ctx, name, payload); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to update setting %q", in.GetName()))
+	}
+	if after != nil {
+		after()
+	}
+	value, err := convertStoreToSettingValue(name, payload)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
 	return connect.NewResponse(&v1pb.Setting{Name: formatSettingName(name), Value: value}), nil
+}
+
+// convertV1ToStoreSetting extracts the typed store payload from a v1 oneof.
+func convertV1ToStoreSetting(name models.SettingName, value *v1pb.SettingValue) (proto.Message, error) {
+	switch name {
+	case models.SettingName_S3_CONFIG:
+		if cfg := value.GetS3Config(); cfg != nil {
+			return cfg, nil
+		}
+	case models.SettingName_LLM_AGENT_CONFIG:
+		if cfg := value.GetLlmAgentConfig(); cfg != nil {
+			return cfg, nil
+		}
+	case models.SettingName_USER_MCP_CONFIG:
+		if cfg := value.GetUserMcpConfig(); cfg != nil {
+			return cfg, nil
+		}
+	case models.SettingName_WORKSPACE_PROFILE:
+		if cfg := value.GetWorkspaceProfile(); cfg != nil {
+			return cfg, nil
+		}
+	case models.SettingName_PASSWORD_RESTRICTION:
+		if cfg := value.GetPasswordRestriction(); cfg != nil {
+			return cfg, nil
+		}
+	default:
+	}
+	return nil, errors.Errorf("%s value is required", strings.ToLower(name.String()))
+}
+
+// convertStoreToSettingValue wraps a store payload into the v1 oneof, applying
+// API-representation transforms (the S3 secret is masked on read-back).
+func convertStoreToSettingValue(name models.SettingName, payload proto.Message) (*v1pb.SettingValue, error) {
+	switch name {
+	case models.SettingName_S3_CONFIG:
+		cfg, ok := payload.(*models.S3ConfigSetting)
+		if !ok {
+			return nil, errors.Errorf("unexpected payload type %T for setting %v", payload, name)
+		}
+		cfg.SecretKey = maskSecret(cfg.SecretKey)
+		return &v1pb.SettingValue{Value: &v1pb.SettingValue_S3Config{S3Config: cfg}}, nil
+	case models.SettingName_LLM_AGENT_CONFIG:
+		cfg, ok := payload.(*models.LlmAgentConfigSetting)
+		if !ok {
+			return nil, errors.Errorf("unexpected payload type %T for setting %v", payload, name)
+		}
+		return &v1pb.SettingValue{Value: &v1pb.SettingValue_LlmAgentConfig{LlmAgentConfig: cfg}}, nil
+	case models.SettingName_USER_MCP_CONFIG:
+		cfg, ok := payload.(*models.UserMcpConfigSetting)
+		if !ok {
+			return nil, errors.Errorf("unexpected payload type %T for setting %v", payload, name)
+		}
+		return &v1pb.SettingValue{Value: &v1pb.SettingValue_UserMcpConfig{UserMcpConfig: cfg}}, nil
+	case models.SettingName_WORKSPACE_PROFILE:
+		cfg, ok := payload.(*models.WorkspaceProfileSetting)
+		if !ok {
+			return nil, errors.Errorf("unexpected payload type %T for setting %v", payload, name)
+		}
+		return &v1pb.SettingValue{Value: &v1pb.SettingValue_WorkspaceProfile{WorkspaceProfile: cfg}}, nil
+	case models.SettingName_PASSWORD_RESTRICTION:
+		cfg, ok := payload.(*models.PasswordRestrictionSetting)
+		if !ok {
+			return nil, errors.Errorf("unexpected payload type %T for setting %v", payload, name)
+		}
+		return &v1pb.SettingValue{Value: &v1pb.SettingValue_PasswordRestriction{PasswordRestriction: cfg}}, nil
+	default:
+		return nil, errors.Errorf("unsupported setting %v", name)
+	}
+}
+
+// prepareSettingUpdate validates and normalizes a request payload before the
+// upsert, and returns an optional callback to run after the write succeeds
+// (e.g. cache invalidation). Only settings with extra semantics are handled;
+// the rest fall through as a no-op.
+func (s *SettingService) prepareSettingUpdate(ctx context.Context, name models.SettingName, payload proto.Message) (func(), error) {
+	switch name {
+	case models.SettingName_S3_CONFIG:
+		cfg, ok := payload.(*models.S3ConfigSetting)
+		if !ok {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("unexpected payload type %T for setting %v", payload, name))
+		}
+		// A masked secret means "leave unchanged": pull the stored value so the
+		// caller doesn't have to re-enter the secret to toggle a boolean.
+		if strings.HasPrefix(cfg.SecretKey, secretMaskPrefix) {
+			stored, err := s.store.GetS3ConfigSetting(ctx)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get s3 config"))
+			}
+			cfg.SecretKey = stored.SecretKey
+		}
+		return func() {
+			if s.s3clientManager != nil {
+				s.s3clientManager.Invalidate()
+			}
+		}, nil
+	case models.SettingName_USER_MCP_CONFIG:
+		cfg, ok := payload.(*models.UserMcpConfigSetting)
+		if !ok {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("unexpected payload type %T for setting %v", payload, name))
+		}
+		if _, err := mcp.ParsePolicy(cfg.GetMcpIpPolicy()); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+	case models.SettingName_WORKSPACE_PROFILE:
+		setting, ok := payload.(*models.WorkspaceProfileSetting)
+		if !ok {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("unexpected payload type %T for setting %v", payload, name))
+		}
+		normalizeWorkspaceGeneralSetting(setting)
+		if err := validateWorkspaceGeneralSetting(setting); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+	default:
+	}
+	return nil, nil
 }
 
 // requireSettingsGet denies callers that do not hold laelia.settings.get.
@@ -260,93 +275,6 @@ func (s *SettingService) requireSettingsGet(ctx context.Context) error {
 		return connect.NewError(connect.CodePermissionDenied, errors.New("you are not allowed to read this setting"))
 	}
 	return nil
-}
-
-func (s *SettingService) GetS3Config(ctx context.Context, _ *connect.Request[v1pb.GetS3ConfigRequest]) (*connect.Response[v1pb.GetS3ConfigResponse], error) {
-	cfg, err := s.store.GetS3ConfigSetting(ctx)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get s3 config"))
-	}
-	cfg.SecretKey = maskSecret(cfg.SecretKey)
-	return connect.NewResponse(&v1pb.GetS3ConfigResponse{Config: cfg}), nil
-}
-
-func (s *SettingService) UpdateS3Config(ctx context.Context, req *connect.Request[v1pb.UpdateS3ConfigRequest]) (*connect.Response[v1pb.UpdateS3ConfigResponse], error) {
-	in := req.Msg.GetConfig()
-	if in == nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("config is required"))
-	}
-
-	// A masked secret means "leave unchanged": pull the stored value so the
-	// caller doesn't have to re-enter the secret to toggle a boolean.
-	if strings.HasPrefix(in.SecretKey, secretMaskPrefix) {
-		stored, err := s.store.GetS3ConfigSetting(ctx)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get s3 config"))
-		}
-		in.SecretKey = stored.SecretKey
-	}
-
-	if _, err := s.store.UpsertS3ConfigSetting(ctx, in); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to upsert s3 config"))
-	}
-	if s.s3clientManager != nil {
-		s.s3clientManager.Invalidate()
-	}
-
-	in.SecretKey = maskSecret(in.SecretKey)
-	return connect.NewResponse(&v1pb.UpdateS3ConfigResponse{Config: in}), nil
-}
-
-// GetLlmAgentConfig reads the workspace LLM agent configuration. It is
-// handler-gated (no permission annotation): the agent create/edit forms read
-// the toggle for any authenticated user.
-func (s *SettingService) GetLlmAgentConfig(ctx context.Context, _ *connect.Request[v1pb.GetLlmAgentConfigRequest]) (*connect.Response[v1pb.GetLlmAgentConfigResponse], error) {
-	cfg, err := s.store.GetLlmAgentConfigSetting(ctx)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get llm agent config"))
-	}
-	return connect.NewResponse(&v1pb.GetLlmAgentConfigResponse{Config: cfg}), nil
-}
-
-// UpdateLlmAgentConfig updates the workspace LLM agent configuration. Gated by
-// the IAM interceptor on laelia.settings.update (admin).
-func (s *SettingService) UpdateLlmAgentConfig(ctx context.Context, req *connect.Request[v1pb.UpdateLlmAgentConfigRequest]) (*connect.Response[v1pb.UpdateLlmAgentConfigResponse], error) {
-	in := req.Msg.GetConfig()
-	if in == nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("config is required"))
-	}
-	if _, err := s.store.UpsertLlmAgentConfigSetting(ctx, in); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update llm agent config"))
-	}
-	return connect.NewResponse(&v1pb.UpdateLlmAgentConfigResponse{Config: in}), nil
-}
-
-// GetUserMcpConfig reads whether users may configure personal MCP servers. It
-// is handler-gated (no permission annotation): the personal MCP settings page
-// and agent profile render the toggle state for any authenticated user.
-func (s *SettingService) GetUserMcpConfig(ctx context.Context, _ *connect.Request[v1pb.GetUserMcpConfigRequest]) (*connect.Response[v1pb.GetUserMcpConfigResponse], error) {
-	cfg, err := s.store.GetUserMcpConfigSetting(ctx)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get user mcp config"))
-	}
-	return connect.NewResponse(&v1pb.GetUserMcpConfigResponse{Config: cfg}), nil
-}
-
-// UpdateUserMcpConfig updates whether users may configure personal MCP
-// servers. Gated by the IAM interceptor on laelia.settings.update (admin).
-func (s *SettingService) UpdateUserMcpConfig(ctx context.Context, req *connect.Request[v1pb.UpdateUserMcpConfigRequest]) (*connect.Response[v1pb.UpdateUserMcpConfigResponse], error) {
-	in := req.Msg.GetConfig()
-	if in == nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("config is required"))
-	}
-	if _, err := mcp.ParsePolicy(in.GetMcpIpPolicy()); err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
-	if _, err := s.store.UpsertUserMcpConfigSetting(ctx, in); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update user mcp config"))
-	}
-	return connect.NewResponse(&v1pb.UpdateUserMcpConfigResponse{Config: in}), nil
 }
 
 // setupCheck reports whether one required-config item is fully configured.
@@ -414,34 +342,6 @@ func (s *SettingService) UpdateDebugConfig(_ context.Context, req *connect.Reque
 	}
 
 	return connect.NewResponse(&v1pb.UpdateDebugConfigResponse{Enabled: enabled}), nil
-}
-
-// GetWorkspaceGeneralSetting reads the workspace general setting (signup
-// policy, email suffix restriction, ...). Gated by the IAM interceptor on
-// laelia.settings.get (admin).
-func (s *SettingService) GetWorkspaceGeneralSetting(ctx context.Context, _ *connect.Request[v1pb.GetWorkspaceGeneralSettingRequest]) (*connect.Response[v1pb.GetWorkspaceGeneralSettingResponse], error) {
-	setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get workspace general setting"))
-	}
-	return connect.NewResponse(&v1pb.GetWorkspaceGeneralSettingResponse{Setting: setting}), nil
-}
-
-// UpdateWorkspaceGeneralSetting updates the workspace general setting. Gated
-// by the IAM interceptor on laelia.settings.update (admin).
-func (s *SettingService) UpdateWorkspaceGeneralSetting(ctx context.Context, req *connect.Request[v1pb.UpdateWorkspaceGeneralSettingRequest]) (*connect.Response[v1pb.UpdateWorkspaceGeneralSettingResponse], error) {
-	in := req.Msg.GetSetting()
-	if in == nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("setting is required"))
-	}
-	normalizeWorkspaceGeneralSetting(in)
-	if err := validateWorkspaceGeneralSetting(in); err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
-	if err := s.store.UpsertWorkspaceGeneralSetting(ctx, in); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update workspace general setting"))
-	}
-	return connect.NewResponse(&v1pb.UpdateWorkspaceGeneralSettingResponse{Setting: in}), nil
 }
 
 // GetWorkspaceInfo returns the workspace signup policy for the
