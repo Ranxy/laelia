@@ -37,6 +37,16 @@ var (
 	invalidUserOrPasswordError = connect.NewError(connect.CodeUnauthenticated, errors.Errorf("the email or password is not valid"))
 )
 
+// resendGlobalRate and resendGlobalBurst bound the total number of
+// verification emails the unauthenticated resend endpoint can send per minute
+// across all addresses. The per-address limiter stops single-victim spam; the
+// global budget stops a distributed attacker from fanning out one email per
+// minute to every registered unverified address.
+const (
+	resendGlobalRate  = 30.0 / 60.0
+	resendGlobalBurst = 10
+)
+
 // AuthService implements the auth service.
 type AuthService struct {
 	v1connect.UnimplementedAuthServiceHandler
@@ -49,6 +59,9 @@ type AuthService struct {
 	// the endpoint cannot be used to spam a victim's inbox even though its
 	// response deliberately reveals nothing about registered addresses.
 	resendLimiters *lru.Cache[string, *rate.Limiter]
+	// resendGlobal bounds total verification emails sent by the resend
+	// endpoint across all addresses (see ResendVerificationEmail).
+	resendGlobal *rate.Limiter
 }
 
 // NewAuthService creates a new AuthService.
@@ -61,6 +74,7 @@ func NewAuthService(store *store.Store, secret string, profile *config.Profile, 
 		stateCfg:       stateCfg,
 		mailer:         mailerSender,
 		resendLimiters: limiters,
+		resendGlobal:   rate.NewLimiter(rate.Limit(resendGlobalRate), resendGlobalBurst),
 	}
 }
 
@@ -263,6 +277,12 @@ func (s *AuthService) ResendVerificationEmail(ctx context.Context, req *connect.
 		}
 		user, err := s.store.GetUserByEmail(ctx, email)
 		if err == nil && user != nil && !user.MemberDeleted && user.Type == models.PrincipalType_END_USER && user.EmailVerifiedAt == nil {
+			// The global budget is consumed only when an email is actually
+			// sent, so junk addresses cannot exhaust it and deny legitimate
+			// resends.
+			if !s.resendGlobal.Allow() {
+				return connect.NewResponse(&v1pb.ResendVerificationEmailResponse{}), nil
+			}
 			if setting, err := s.store.GetWorkspaceGeneralSetting(ctx); err == nil {
 				baseURL := setting.GetExternalUrl()
 				if baseURL == "" {
