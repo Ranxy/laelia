@@ -22,6 +22,7 @@ import {
   REMINDER_ROUTE_LIST,
   SETTINGS_ROUTE,
   SETTINGS_ROUTE_AGENTS,
+  SETTINGS_ROUTE_GENERAL,
   SETTINGS_ROUTE_API_PROVIDERS,
   SETTINGS_ROUTE_AUDIT,
   SETTINGS_ROUTE_GROUPS,
@@ -284,6 +285,14 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         lazy: () =>
           import("@/pages/dashboard/settings-agents").then((m) => ({
             Component: m.SettingsAgentsPage,
+          })),
+      },
+      {
+        path: "general",
+        handle: { name: SETTINGS_ROUTE_GENERAL },
+        lazy: () =>
+          import("@/pages/dashboard/settings-general").then((m) => ({
+            Component: m.SettingsGeneralPage,
           })),
       },
       {

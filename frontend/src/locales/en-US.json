@@ -56,7 +56,9 @@
       "password-require-letter": "At least 1 letter",
       "password-require-number": "At least 1 number",
       "email-placeholder": "you@example.com",
-      "name-placeholder": "foo bar"
+      "name-placeholder": "foo bar",
+      "disallowed": "Self-service signup is disabled. Please contact your workspace administrator to create an account.",
+      "allowed-domains": "Registration is limited to emails ending in: {{domains}}"
     }
   },
   "mobile": {
@@ -81,7 +83,8 @@
     "settings-api-providers": "API Providers",
     "settings-mcp-servers": "MCP Servers",
     "settings-agents": "Agents / LLM",
-    "settings-profile": "Profile"
+    "settings-profile": "Profile",
+    "settings-general": "General"
   },
   "settings": {
     "title": "Settings",
@@ -445,6 +448,20 @@
       "ip-policy-preset": "Add internal / cloud-metadata presets",
       "ip-policy-empty-warning": "Policy is enabled but no CIDRs are configured, so nothing is restricted.",
       "ip-policy-save": "Save policy"
+    },
+    "general": {
+      "title": "General",
+      "description": "Configure self-service signup and email suffix restrictions.",
+      "allow-signup": "Allow self-service signup",
+      "allow-signup-description": "When off, users cannot register themselves; only admins can create users.",
+      "enforce-domain": "Enforce email suffix restriction",
+      "enforce-domain-description": "When on, registration emails must match one of the suffixes below.",
+      "domains": "Allowed email suffixes",
+      "domains-placeholder": "example.com, laelia.dev",
+      "domains-hint": "Separate multiple suffixes with commas, e.g. example.com, laelia.dev",
+      "saved": "General settings saved",
+      "load-failed": "Failed to load general settings",
+      "save-failed": "Failed to save general settings"
     }
   },
   "setup": {

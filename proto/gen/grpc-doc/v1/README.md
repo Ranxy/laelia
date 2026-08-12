@@ -456,6 +456,10 @@
     - [GetSetupStatusResponse](#laelia-v1-GetSetupStatusResponse)
     - [GetUserMcpConfigRequest](#laelia-v1-GetUserMcpConfigRequest)
     - [GetUserMcpConfigResponse](#laelia-v1-GetUserMcpConfigResponse)
+    - [GetWorkspaceGeneralSettingRequest](#laelia-v1-GetWorkspaceGeneralSettingRequest)
+    - [GetWorkspaceGeneralSettingResponse](#laelia-v1-GetWorkspaceGeneralSettingResponse)
+    - [GetWorkspaceInfoRequest](#laelia-v1-GetWorkspaceInfoRequest)
+    - [GetWorkspaceInfoResponse](#laelia-v1-GetWorkspaceInfoResponse)
     - [SetupItem](#laelia-v1-SetupItem)
     - [UpdateDebugConfigRequest](#laelia-v1-UpdateDebugConfigRequest)
     - [UpdateDebugConfigResponse](#laelia-v1-UpdateDebugConfigResponse)
@@ -465,6 +469,8 @@
     - [UpdateS3ConfigResponse](#laelia-v1-UpdateS3ConfigResponse)
     - [UpdateUserMcpConfigRequest](#laelia-v1-UpdateUserMcpConfigRequest)
     - [UpdateUserMcpConfigResponse](#laelia-v1-UpdateUserMcpConfigResponse)
+    - [UpdateWorkspaceGeneralSettingRequest](#laelia-v1-UpdateWorkspaceGeneralSettingRequest)
+    - [UpdateWorkspaceGeneralSettingResponse](#laelia-v1-UpdateWorkspaceGeneralSettingResponse)
   
     - [SettingService](#laelia-v1-SettingService)
   
@@ -7637,6 +7643,60 @@ laelia.roles.* permissions.
 
 
 
+<a name="laelia-v1-GetWorkspaceGeneralSettingRequest"></a>
+
+### GetWorkspaceGeneralSettingRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-GetWorkspaceGeneralSettingResponse"></a>
+
+### GetWorkspaceGeneralSettingResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| setting | [laelia.store.WorkspaceProfileSetting](#laelia-store-WorkspaceProfileSetting) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetWorkspaceInfoRequest"></a>
+
+### GetWorkspaceInfoRequest
+GetWorkspaceInfoRequest is empty.
+
+
+
+
+
+
+<a name="laelia-v1-GetWorkspaceInfoResponse"></a>
+
+### GetWorkspaceInfoResponse
+GetWorkspaceInfoResponse carries the workspace signup policy that the
+unauthenticated sign-in/sign-up pages need to render: whether self-service
+signup is offered and which email suffixes are accepted.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| disallow_signup | [bool](#bool) |  | Whether self-service signup is disallowed. When true, users can only be created by workspace admins. |
+| enforce_identity_domain | [bool](#bool) |  | Whether the email suffix restriction is enforced for signup. |
+| domains | [string](#string) | repeated | The allowed email suffixes (e.g. &#34;example.com&#34;) when enforce_identity_domain is set. |
+
+
+
+
+
+
 <a name="laelia-v1-SetupItem"></a>
 
 ### SetupItem
@@ -7774,6 +7834,36 @@ owns presentation (title/description/route) keyed by `id`.
 
 
 
+
+<a name="laelia-v1-UpdateWorkspaceGeneralSettingRequest"></a>
+
+### UpdateWorkspaceGeneralSettingRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| setting | [laelia.store.WorkspaceProfileSetting](#laelia-store-WorkspaceProfileSetting) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateWorkspaceGeneralSettingResponse"></a>
+
+### UpdateWorkspaceGeneralSettingResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| setting | [laelia.store.WorkspaceProfileSetting](#laelia-store-WorkspaceProfileSetting) |  |  |
+
+
+
+
+
  
 
  
@@ -7800,6 +7890,9 @@ an update carrying a masked secret preserves the stored value.
 | GetSetupStatus | [GetSetupStatusRequest](#laelia-v1-GetSetupStatusRequest) | [GetSetupStatusResponse](#laelia-v1-GetSetupStatusResponse) | GetSetupStatus reports which required-config items are not yet configured, so the frontend can guide an admin to finish setting up the workspace. |
 | GetDebugConfig | [GetDebugConfigRequest](#laelia-v1-GetDebugConfigRequest) | [GetDebugConfigResponse](#laelia-v1-GetDebugConfigResponse) |  |
 | UpdateDebugConfig | [UpdateDebugConfigRequest](#laelia-v1-UpdateDebugConfigRequest) | [UpdateDebugConfigResponse](#laelia-v1-UpdateDebugConfigResponse) |  |
+| GetWorkspaceGeneralSetting | [GetWorkspaceGeneralSettingRequest](#laelia-v1-GetWorkspaceGeneralSettingRequest) | [GetWorkspaceGeneralSettingResponse](#laelia-v1-GetWorkspaceGeneralSettingResponse) | GetWorkspaceGeneralSetting reads the workspace general setting (signup policy, email suffix restriction, ...). Admin (laelia.settings.get) only. |
+| UpdateWorkspaceGeneralSetting | [UpdateWorkspaceGeneralSettingRequest](#laelia-v1-UpdateWorkspaceGeneralSettingRequest) | [UpdateWorkspaceGeneralSettingResponse](#laelia-v1-UpdateWorkspaceGeneralSettingResponse) | UpdateWorkspaceGeneralSetting updates the workspace general setting. Admin (laelia.settings.update) only. |
+| GetWorkspaceInfo | [GetWorkspaceInfoRequest](#laelia-v1-GetWorkspaceInfoRequest) | [GetWorkspaceInfoResponse](#laelia-v1-GetWorkspaceInfoResponse) | GetWorkspaceInfo returns the workspace signup policy for the unauthenticated sign-in/sign-up pages. No auth required. |
 
  
 

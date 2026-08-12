@@ -65,6 +65,19 @@ func (s *Store) GetWorkspaceGeneralSetting(ctx context.Context) (*models.Workspa
 	return payload, nil
 }
 
+// UpsertWorkspaceGeneralSetting upserts the workspace general setting payload.
+func (s *Store) UpsertWorkspaceGeneralSetting(ctx context.Context, setting *models.WorkspaceProfileSetting) error {
+	payload, err := json.Marshal(setting)
+	if err != nil {
+		return err
+	}
+	_, err = s.UpsertSettingV2(ctx, &SetSettingMessage{
+		Name:  models.SettingName_WORKSPACE_PROFILE,
+		Value: string(payload),
+	})
+	return err
+}
+
 // GetWorkspaceID finds the workspace id in setting ll.workspace.id.
 func (s *Store) GetWorkspaceID(ctx context.Context) (string, error) {
 	setting, err := s.GetSettingV2(ctx, models.SettingName_WORKSPACE_ID)

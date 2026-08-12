@@ -4,7 +4,7 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { LlmAgentConfigSetting, S3ConfigSetting, UserMcpConfigSetting } from "../store/setting_pb";
+import type { LlmAgentConfigSetting, S3ConfigSetting, UserMcpConfigSetting, WorkspaceProfileSetting } from "../store/setting_pb";
 
 /**
  * Describes the file v1/setting.proto.
@@ -305,6 +305,118 @@ export declare type UpdateDebugConfigResponse = Message<"laelia.v1.UpdateDebugCo
 export declare const UpdateDebugConfigResponseSchema: GenMessage<UpdateDebugConfigResponse>;
 
 /**
+ * @generated from message laelia.v1.GetWorkspaceGeneralSettingRequest
+ */
+export declare type GetWorkspaceGeneralSettingRequest = Message<"laelia.v1.GetWorkspaceGeneralSettingRequest"> & {
+};
+
+/**
+ * Describes the message laelia.v1.GetWorkspaceGeneralSettingRequest.
+ * Use `create(GetWorkspaceGeneralSettingRequestSchema)` to create a new message.
+ */
+export declare const GetWorkspaceGeneralSettingRequestSchema: GenMessage<GetWorkspaceGeneralSettingRequest>;
+
+/**
+ * @generated from message laelia.v1.GetWorkspaceGeneralSettingResponse
+ */
+export declare type GetWorkspaceGeneralSettingResponse = Message<"laelia.v1.GetWorkspaceGeneralSettingResponse"> & {
+  /**
+   * @generated from field: laelia.store.WorkspaceProfileSetting setting = 1;
+   */
+  setting?: WorkspaceProfileSetting | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.GetWorkspaceGeneralSettingResponse.
+ * Use `create(GetWorkspaceGeneralSettingResponseSchema)` to create a new message.
+ */
+export declare const GetWorkspaceGeneralSettingResponseSchema: GenMessage<GetWorkspaceGeneralSettingResponse>;
+
+/**
+ * @generated from message laelia.v1.UpdateWorkspaceGeneralSettingRequest
+ */
+export declare type UpdateWorkspaceGeneralSettingRequest = Message<"laelia.v1.UpdateWorkspaceGeneralSettingRequest"> & {
+  /**
+   * @generated from field: laelia.store.WorkspaceProfileSetting setting = 1;
+   */
+  setting?: WorkspaceProfileSetting | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateWorkspaceGeneralSettingRequest.
+ * Use `create(UpdateWorkspaceGeneralSettingRequestSchema)` to create a new message.
+ */
+export declare const UpdateWorkspaceGeneralSettingRequestSchema: GenMessage<UpdateWorkspaceGeneralSettingRequest>;
+
+/**
+ * @generated from message laelia.v1.UpdateWorkspaceGeneralSettingResponse
+ */
+export declare type UpdateWorkspaceGeneralSettingResponse = Message<"laelia.v1.UpdateWorkspaceGeneralSettingResponse"> & {
+  /**
+   * @generated from field: laelia.store.WorkspaceProfileSetting setting = 1;
+   */
+  setting?: WorkspaceProfileSetting | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateWorkspaceGeneralSettingResponse.
+ * Use `create(UpdateWorkspaceGeneralSettingResponseSchema)` to create a new message.
+ */
+export declare const UpdateWorkspaceGeneralSettingResponseSchema: GenMessage<UpdateWorkspaceGeneralSettingResponse>;
+
+/**
+ * GetWorkspaceInfoRequest is empty.
+ *
+ * @generated from message laelia.v1.GetWorkspaceInfoRequest
+ */
+export declare type GetWorkspaceInfoRequest = Message<"laelia.v1.GetWorkspaceInfoRequest"> & {
+};
+
+/**
+ * Describes the message laelia.v1.GetWorkspaceInfoRequest.
+ * Use `create(GetWorkspaceInfoRequestSchema)` to create a new message.
+ */
+export declare const GetWorkspaceInfoRequestSchema: GenMessage<GetWorkspaceInfoRequest>;
+
+/**
+ * GetWorkspaceInfoResponse carries the workspace signup policy that the
+ * unauthenticated sign-in/sign-up pages need to render: whether self-service
+ * signup is offered and which email suffixes are accepted.
+ *
+ * @generated from message laelia.v1.GetWorkspaceInfoResponse
+ */
+export declare type GetWorkspaceInfoResponse = Message<"laelia.v1.GetWorkspaceInfoResponse"> & {
+  /**
+   * Whether self-service signup is disallowed. When true, users can only be
+   * created by workspace admins.
+   *
+   * @generated from field: bool disallow_signup = 1;
+   */
+  disallowSignup: boolean;
+
+  /**
+   * Whether the email suffix restriction is enforced for signup.
+   *
+   * @generated from field: bool enforce_identity_domain = 2;
+   */
+  enforceIdentityDomain: boolean;
+
+  /**
+   * The allowed email suffixes (e.g. "example.com") when
+   * enforce_identity_domain is set.
+   *
+   * @generated from field: repeated string domains = 3;
+   */
+  domains: string[];
+};
+
+/**
+ * Describes the message laelia.v1.GetWorkspaceInfoResponse.
+ * Use `create(GetWorkspaceInfoResponseSchema)` to create a new message.
+ */
+export declare const GetWorkspaceInfoResponseSchema: GenMessage<GetWorkspaceInfoResponse>;
+
+/**
  * SettingService exposes workspace-level configuration. It is admin-only; the
  * handlers enforce workspace admin membership and return
  * connect.CodePermissionDenied otherwise. The S3 secret_key is masked on read;
@@ -401,6 +513,39 @@ export declare const SettingService: GenService<{
     methodKind: "unary";
     input: typeof UpdateDebugConfigRequestSchema;
     output: typeof UpdateDebugConfigResponseSchema;
+  },
+  /**
+   * GetWorkspaceGeneralSetting reads the workspace general setting (signup
+   * policy, email suffix restriction, ...). Admin (laelia.settings.get) only.
+   *
+   * @generated from rpc laelia.v1.SettingService.GetWorkspaceGeneralSetting
+   */
+  getWorkspaceGeneralSetting: {
+    methodKind: "unary";
+    input: typeof GetWorkspaceGeneralSettingRequestSchema;
+    output: typeof GetWorkspaceGeneralSettingResponseSchema;
+  },
+  /**
+   * UpdateWorkspaceGeneralSetting updates the workspace general setting.
+   * Admin (laelia.settings.update) only.
+   *
+   * @generated from rpc laelia.v1.SettingService.UpdateWorkspaceGeneralSetting
+   */
+  updateWorkspaceGeneralSetting: {
+    methodKind: "unary";
+    input: typeof UpdateWorkspaceGeneralSettingRequestSchema;
+    output: typeof UpdateWorkspaceGeneralSettingResponseSchema;
+  },
+  /**
+   * GetWorkspaceInfo returns the workspace signup policy for the
+   * unauthenticated sign-in/sign-up pages. No auth required.
+   *
+   * @generated from rpc laelia.v1.SettingService.GetWorkspaceInfo
+   */
+  getWorkspaceInfo: {
+    methodKind: "unary";
+    input: typeof GetWorkspaceInfoRequestSchema;
+    output: typeof GetWorkspaceInfoResponseSchema;
   },
 }>;
 

@@ -141,4 +141,58 @@ service SettingService {
     option (laelia.v1.permission) = "laelia.settings.update";
     option (laelia.v1.audit) = true;
   }
+
+  // GetWorkspaceGeneralSetting reads the workspace general setting (signup
+  // policy, email suffix restriction, ...). Admin (laelia.settings.get) only.
+  rpc GetWorkspaceGeneralSetting(GetWorkspaceGeneralSettingRequest) returns (GetWorkspaceGeneralSettingResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.settings.get";
+  }
+
+  // UpdateWorkspaceGeneralSetting updates the workspace general setting.
+  // Admin (laelia.settings.update) only.
+  rpc UpdateWorkspaceGeneralSetting(UpdateWorkspaceGeneralSettingRequest) returns (UpdateWorkspaceGeneralSettingResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.settings.update";
+    option (laelia.v1.audit) = true;
+  }
+
+  // GetWorkspaceInfo returns the workspace signup policy for the
+  // unauthenticated sign-in/sign-up pages. No auth required.
+  rpc GetWorkspaceInfo(GetWorkspaceInfoRequest) returns (GetWorkspaceInfoResponse) {
+    option (laelia.v1.allow_without_credential) = true;
+  }
+}
+
+message GetWorkspaceGeneralSettingRequest {}
+
+message GetWorkspaceGeneralSettingResponse {
+  laelia.store.WorkspaceProfileSetting setting = 1;
+}
+
+message UpdateWorkspaceGeneralSettingRequest {
+  laelia.store.WorkspaceProfileSetting setting = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateWorkspaceGeneralSettingResponse {
+  laelia.store.WorkspaceProfileSetting setting = 1;
+}
+
+// GetWorkspaceInfoRequest is empty.
+message GetWorkspaceInfoRequest {}
+
+// GetWorkspaceInfoResponse carries the workspace signup policy that the
+// unauthenticated sign-in/sign-up pages need to render: whether self-service
+// signup is offered and which email suffixes are accepted.
+message GetWorkspaceInfoResponse {
+  // Whether self-service signup is disallowed. When true, users can only be
+  // created by workspace admins.
+  bool disallow_signup = 1;
+
+  // Whether the email suffix restriction is enforced for signup.
+  bool enforce_identity_domain = 2;
+
+  // The allowed email suffixes (e.g. "example.com") when
+  // enforce_identity_domain is set.
+  repeated string domains = 3;
 }

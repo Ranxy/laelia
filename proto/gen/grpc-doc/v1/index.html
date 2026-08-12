@@ -1945,6 +1945,22 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.GetWorkspaceGeneralSettingRequest"><span class="badge">M</span>GetWorkspaceGeneralSettingRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetWorkspaceGeneralSettingResponse"><span class="badge">M</span>GetWorkspaceGeneralSettingResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetWorkspaceInfoRequest"><span class="badge">M</span>GetWorkspaceInfoRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetWorkspaceInfoResponse"><span class="badge">M</span>GetWorkspaceInfoResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.SetupItem"><span class="badge">M</span>SetupItem</a>
                 </li>
               
@@ -1978,6 +1994,14 @@
               
                 <li>
                   <a href="#laelia.v1.UpdateUserMcpConfigResponse"><span class="badge">M</span>UpdateUserMcpConfigResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateWorkspaceGeneralSettingRequest"><span class="badge">M</span>UpdateWorkspaceGeneralSettingRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateWorkspaceGeneralSettingResponse"><span class="badge">M</span>UpdateWorkspaceGeneralSettingResponse</a>
                 </li>
               
               
@@ -2438,7 +2462,6 @@ the agent acts on its owner&#39;s behalf for member management only — it never
 inherits the owner&#39;s other manage powers (rename, delete, transfer, roles).
 Default true. </p></td>
                 </tr>
-              
               
                 <tr>
                   <td>machine_title</td>
@@ -18052,6 +18075,84 @@ string from the permission catalog. </p></td>
 
         
       
+        <h3 id="laelia.v1.GetWorkspaceGeneralSettingRequest">GetWorkspaceGeneralSettingRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.GetWorkspaceGeneralSettingResponse">GetWorkspaceGeneralSettingResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>setting</td>
+                  <td><a href="#laelia.store.WorkspaceProfileSetting">laelia.store.WorkspaceProfileSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetWorkspaceInfoRequest">GetWorkspaceInfoRequest</h3>
+        <p>GetWorkspaceInfoRequest is empty.</p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.GetWorkspaceInfoResponse">GetWorkspaceInfoResponse</h3>
+        <p>GetWorkspaceInfoResponse carries the workspace signup policy that the</p><p>unauthenticated sign-in/sign-up pages need to render: whether self-service</p><p>signup is offered and which email suffixes are accepted.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>disallow_signup</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Whether self-service signup is disallowed. When true, users can only be
+created by workspace admins. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>enforce_identity_domain</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Whether the email suffix restriction is enforced for signup. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>domains</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>The allowed email suffixes (e.g. &#34;example.com&#34;) when
+enforce_identity_domain is set. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.SetupItem">SetupItem</h3>
         <p>SetupItem describes one required-config item the admin onboarding overlay</p><p>surfaces. The backend is the source of truth for `configured`; the frontend</p><p>owns presentation (title/description/route) keyed by `id`.</p>
 
@@ -18275,6 +18376,54 @@ string from the permission catalog. </p></td>
 
         
       
+        <h3 id="laelia.v1.UpdateWorkspaceGeneralSettingRequest">UpdateWorkspaceGeneralSettingRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>setting</td>
+                  <td><a href="#laelia.store.WorkspaceProfileSetting">laelia.store.WorkspaceProfileSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateWorkspaceGeneralSettingResponse">UpdateWorkspaceGeneralSettingResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>setting</td>
+                  <td><a href="#laelia.store.WorkspaceProfileSetting">laelia.store.WorkspaceProfileSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
 
       
 
@@ -18357,6 +18506,30 @@ so the frontend can guide an admin to finish setting up the workspace.</p></td>
                 <td><a href="#laelia.v1.UpdateDebugConfigRequest">UpdateDebugConfigRequest</a></td>
                 <td><a href="#laelia.v1.UpdateDebugConfigResponse">UpdateDebugConfigResponse</a></td>
                 <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>GetWorkspaceGeneralSetting</td>
+                <td><a href="#laelia.v1.GetWorkspaceGeneralSettingRequest">GetWorkspaceGeneralSettingRequest</a></td>
+                <td><a href="#laelia.v1.GetWorkspaceGeneralSettingResponse">GetWorkspaceGeneralSettingResponse</a></td>
+                <td><p>GetWorkspaceGeneralSetting reads the workspace general setting (signup
+policy, email suffix restriction, ...). Admin (laelia.settings.get) only.</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateWorkspaceGeneralSetting</td>
+                <td><a href="#laelia.v1.UpdateWorkspaceGeneralSettingRequest">UpdateWorkspaceGeneralSettingRequest</a></td>
+                <td><a href="#laelia.v1.UpdateWorkspaceGeneralSettingResponse">UpdateWorkspaceGeneralSettingResponse</a></td>
+                <td><p>UpdateWorkspaceGeneralSetting updates the workspace general setting.
+Admin (laelia.settings.update) only.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetWorkspaceInfo</td>
+                <td><a href="#laelia.v1.GetWorkspaceInfoRequest">GetWorkspaceInfoRequest</a></td>
+                <td><a href="#laelia.v1.GetWorkspaceInfoResponse">GetWorkspaceInfoResponse</a></td>
+                <td><p>GetWorkspaceInfo returns the workspace signup policy for the
+unauthenticated sign-in/sign-up pages. No auth required.</p></td>
               </tr>
             
           </tbody>

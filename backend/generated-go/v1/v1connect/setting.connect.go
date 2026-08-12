@@ -60,6 +60,15 @@ const (
 	// SettingServiceUpdateDebugConfigProcedure is the fully-qualified name of the SettingService's
 	// UpdateDebugConfig RPC.
 	SettingServiceUpdateDebugConfigProcedure = "/laelia.v1.SettingService/UpdateDebugConfig"
+	// SettingServiceGetWorkspaceGeneralSettingProcedure is the fully-qualified name of the
+	// SettingService's GetWorkspaceGeneralSetting RPC.
+	SettingServiceGetWorkspaceGeneralSettingProcedure = "/laelia.v1.SettingService/GetWorkspaceGeneralSetting"
+	// SettingServiceUpdateWorkspaceGeneralSettingProcedure is the fully-qualified name of the
+	// SettingService's UpdateWorkspaceGeneralSetting RPC.
+	SettingServiceUpdateWorkspaceGeneralSettingProcedure = "/laelia.v1.SettingService/UpdateWorkspaceGeneralSetting"
+	// SettingServiceGetWorkspaceInfoProcedure is the fully-qualified name of the SettingService's
+	// GetWorkspaceInfo RPC.
+	SettingServiceGetWorkspaceInfoProcedure = "/laelia.v1.SettingService/GetWorkspaceInfo"
 )
 
 // SettingServiceClient is a client for the laelia.v1.SettingService service.
@@ -85,6 +94,15 @@ type SettingServiceClient interface {
 	GetSetupStatus(context.Context, *connect.Request[v1.GetSetupStatusRequest]) (*connect.Response[v1.GetSetupStatusResponse], error)
 	GetDebugConfig(context.Context, *connect.Request[v1.GetDebugConfigRequest]) (*connect.Response[v1.GetDebugConfigResponse], error)
 	UpdateDebugConfig(context.Context, *connect.Request[v1.UpdateDebugConfigRequest]) (*connect.Response[v1.UpdateDebugConfigResponse], error)
+	// GetWorkspaceGeneralSetting reads the workspace general setting (signup
+	// policy, email suffix restriction, ...). Admin (laelia.settings.get) only.
+	GetWorkspaceGeneralSetting(context.Context, *connect.Request[v1.GetWorkspaceGeneralSettingRequest]) (*connect.Response[v1.GetWorkspaceGeneralSettingResponse], error)
+	// UpdateWorkspaceGeneralSetting updates the workspace general setting.
+	// Admin (laelia.settings.update) only.
+	UpdateWorkspaceGeneralSetting(context.Context, *connect.Request[v1.UpdateWorkspaceGeneralSettingRequest]) (*connect.Response[v1.UpdateWorkspaceGeneralSettingResponse], error)
+	// GetWorkspaceInfo returns the workspace signup policy for the
+	// unauthenticated sign-in/sign-up pages. No auth required.
+	GetWorkspaceInfo(context.Context, *connect.Request[v1.GetWorkspaceInfoRequest]) (*connect.Response[v1.GetWorkspaceInfoResponse], error)
 }
 
 // NewSettingServiceClient constructs a client for the laelia.v1.SettingService service. By default,
@@ -152,20 +170,41 @@ func NewSettingServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(settingServiceMethods.ByName("UpdateDebugConfig")),
 			connect.WithClientOptions(opts...),
 		),
+		getWorkspaceGeneralSetting: connect.NewClient[v1.GetWorkspaceGeneralSettingRequest, v1.GetWorkspaceGeneralSettingResponse](
+			httpClient,
+			baseURL+SettingServiceGetWorkspaceGeneralSettingProcedure,
+			connect.WithSchema(settingServiceMethods.ByName("GetWorkspaceGeneralSetting")),
+			connect.WithClientOptions(opts...),
+		),
+		updateWorkspaceGeneralSetting: connect.NewClient[v1.UpdateWorkspaceGeneralSettingRequest, v1.UpdateWorkspaceGeneralSettingResponse](
+			httpClient,
+			baseURL+SettingServiceUpdateWorkspaceGeneralSettingProcedure,
+			connect.WithSchema(settingServiceMethods.ByName("UpdateWorkspaceGeneralSetting")),
+			connect.WithClientOptions(opts...),
+		),
+		getWorkspaceInfo: connect.NewClient[v1.GetWorkspaceInfoRequest, v1.GetWorkspaceInfoResponse](
+			httpClient,
+			baseURL+SettingServiceGetWorkspaceInfoProcedure,
+			connect.WithSchema(settingServiceMethods.ByName("GetWorkspaceInfo")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // settingServiceClient implements SettingServiceClient.
 type settingServiceClient struct {
-	getS3Config          *connect.Client[v1.GetS3ConfigRequest, v1.GetS3ConfigResponse]
-	updateS3Config       *connect.Client[v1.UpdateS3ConfigRequest, v1.UpdateS3ConfigResponse]
-	getLlmAgentConfig    *connect.Client[v1.GetLlmAgentConfigRequest, v1.GetLlmAgentConfigResponse]
-	updateLlmAgentConfig *connect.Client[v1.UpdateLlmAgentConfigRequest, v1.UpdateLlmAgentConfigResponse]
-	getUserMcpConfig     *connect.Client[v1.GetUserMcpConfigRequest, v1.GetUserMcpConfigResponse]
-	updateUserMcpConfig  *connect.Client[v1.UpdateUserMcpConfigRequest, v1.UpdateUserMcpConfigResponse]
-	getSetupStatus       *connect.Client[v1.GetSetupStatusRequest, v1.GetSetupStatusResponse]
-	getDebugConfig       *connect.Client[v1.GetDebugConfigRequest, v1.GetDebugConfigResponse]
-	updateDebugConfig    *connect.Client[v1.UpdateDebugConfigRequest, v1.UpdateDebugConfigResponse]
+	getS3Config                   *connect.Client[v1.GetS3ConfigRequest, v1.GetS3ConfigResponse]
+	updateS3Config                *connect.Client[v1.UpdateS3ConfigRequest, v1.UpdateS3ConfigResponse]
+	getLlmAgentConfig             *connect.Client[v1.GetLlmAgentConfigRequest, v1.GetLlmAgentConfigResponse]
+	updateLlmAgentConfig          *connect.Client[v1.UpdateLlmAgentConfigRequest, v1.UpdateLlmAgentConfigResponse]
+	getUserMcpConfig              *connect.Client[v1.GetUserMcpConfigRequest, v1.GetUserMcpConfigResponse]
+	updateUserMcpConfig           *connect.Client[v1.UpdateUserMcpConfigRequest, v1.UpdateUserMcpConfigResponse]
+	getSetupStatus                *connect.Client[v1.GetSetupStatusRequest, v1.GetSetupStatusResponse]
+	getDebugConfig                *connect.Client[v1.GetDebugConfigRequest, v1.GetDebugConfigResponse]
+	updateDebugConfig             *connect.Client[v1.UpdateDebugConfigRequest, v1.UpdateDebugConfigResponse]
+	getWorkspaceGeneralSetting    *connect.Client[v1.GetWorkspaceGeneralSettingRequest, v1.GetWorkspaceGeneralSettingResponse]
+	updateWorkspaceGeneralSetting *connect.Client[v1.UpdateWorkspaceGeneralSettingRequest, v1.UpdateWorkspaceGeneralSettingResponse]
+	getWorkspaceInfo              *connect.Client[v1.GetWorkspaceInfoRequest, v1.GetWorkspaceInfoResponse]
 }
 
 // GetS3Config calls laelia.v1.SettingService.GetS3Config.
@@ -213,6 +252,21 @@ func (c *settingServiceClient) UpdateDebugConfig(ctx context.Context, req *conne
 	return c.updateDebugConfig.CallUnary(ctx, req)
 }
 
+// GetWorkspaceGeneralSetting calls laelia.v1.SettingService.GetWorkspaceGeneralSetting.
+func (c *settingServiceClient) GetWorkspaceGeneralSetting(ctx context.Context, req *connect.Request[v1.GetWorkspaceGeneralSettingRequest]) (*connect.Response[v1.GetWorkspaceGeneralSettingResponse], error) {
+	return c.getWorkspaceGeneralSetting.CallUnary(ctx, req)
+}
+
+// UpdateWorkspaceGeneralSetting calls laelia.v1.SettingService.UpdateWorkspaceGeneralSetting.
+func (c *settingServiceClient) UpdateWorkspaceGeneralSetting(ctx context.Context, req *connect.Request[v1.UpdateWorkspaceGeneralSettingRequest]) (*connect.Response[v1.UpdateWorkspaceGeneralSettingResponse], error) {
+	return c.updateWorkspaceGeneralSetting.CallUnary(ctx, req)
+}
+
+// GetWorkspaceInfo calls laelia.v1.SettingService.GetWorkspaceInfo.
+func (c *settingServiceClient) GetWorkspaceInfo(ctx context.Context, req *connect.Request[v1.GetWorkspaceInfoRequest]) (*connect.Response[v1.GetWorkspaceInfoResponse], error) {
+	return c.getWorkspaceInfo.CallUnary(ctx, req)
+}
+
 // SettingServiceHandler is an implementation of the laelia.v1.SettingService service.
 type SettingServiceHandler interface {
 	GetS3Config(context.Context, *connect.Request[v1.GetS3ConfigRequest]) (*connect.Response[v1.GetS3ConfigResponse], error)
@@ -236,6 +290,15 @@ type SettingServiceHandler interface {
 	GetSetupStatus(context.Context, *connect.Request[v1.GetSetupStatusRequest]) (*connect.Response[v1.GetSetupStatusResponse], error)
 	GetDebugConfig(context.Context, *connect.Request[v1.GetDebugConfigRequest]) (*connect.Response[v1.GetDebugConfigResponse], error)
 	UpdateDebugConfig(context.Context, *connect.Request[v1.UpdateDebugConfigRequest]) (*connect.Response[v1.UpdateDebugConfigResponse], error)
+	// GetWorkspaceGeneralSetting reads the workspace general setting (signup
+	// policy, email suffix restriction, ...). Admin (laelia.settings.get) only.
+	GetWorkspaceGeneralSetting(context.Context, *connect.Request[v1.GetWorkspaceGeneralSettingRequest]) (*connect.Response[v1.GetWorkspaceGeneralSettingResponse], error)
+	// UpdateWorkspaceGeneralSetting updates the workspace general setting.
+	// Admin (laelia.settings.update) only.
+	UpdateWorkspaceGeneralSetting(context.Context, *connect.Request[v1.UpdateWorkspaceGeneralSettingRequest]) (*connect.Response[v1.UpdateWorkspaceGeneralSettingResponse], error)
+	// GetWorkspaceInfo returns the workspace signup policy for the
+	// unauthenticated sign-in/sign-up pages. No auth required.
+	GetWorkspaceInfo(context.Context, *connect.Request[v1.GetWorkspaceInfoRequest]) (*connect.Response[v1.GetWorkspaceInfoResponse], error)
 }
 
 // NewSettingServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -299,6 +362,24 @@ func NewSettingServiceHandler(svc SettingServiceHandler, opts ...connect.Handler
 		connect.WithSchema(settingServiceMethods.ByName("UpdateDebugConfig")),
 		connect.WithHandlerOptions(opts...),
 	)
+	settingServiceGetWorkspaceGeneralSettingHandler := connect.NewUnaryHandler(
+		SettingServiceGetWorkspaceGeneralSettingProcedure,
+		svc.GetWorkspaceGeneralSetting,
+		connect.WithSchema(settingServiceMethods.ByName("GetWorkspaceGeneralSetting")),
+		connect.WithHandlerOptions(opts...),
+	)
+	settingServiceUpdateWorkspaceGeneralSettingHandler := connect.NewUnaryHandler(
+		SettingServiceUpdateWorkspaceGeneralSettingProcedure,
+		svc.UpdateWorkspaceGeneralSetting,
+		connect.WithSchema(settingServiceMethods.ByName("UpdateWorkspaceGeneralSetting")),
+		connect.WithHandlerOptions(opts...),
+	)
+	settingServiceGetWorkspaceInfoHandler := connect.NewUnaryHandler(
+		SettingServiceGetWorkspaceInfoProcedure,
+		svc.GetWorkspaceInfo,
+		connect.WithSchema(settingServiceMethods.ByName("GetWorkspaceInfo")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.SettingService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SettingServiceGetS3ConfigProcedure:
@@ -319,6 +400,12 @@ func NewSettingServiceHandler(svc SettingServiceHandler, opts ...connect.Handler
 			settingServiceGetDebugConfigHandler.ServeHTTP(w, r)
 		case SettingServiceUpdateDebugConfigProcedure:
 			settingServiceUpdateDebugConfigHandler.ServeHTTP(w, r)
+		case SettingServiceGetWorkspaceGeneralSettingProcedure:
+			settingServiceGetWorkspaceGeneralSettingHandler.ServeHTTP(w, r)
+		case SettingServiceUpdateWorkspaceGeneralSettingProcedure:
+			settingServiceUpdateWorkspaceGeneralSettingHandler.ServeHTTP(w, r)
+		case SettingServiceGetWorkspaceInfoProcedure:
+			settingServiceGetWorkspaceInfoHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -362,4 +449,16 @@ func (UnimplementedSettingServiceHandler) GetDebugConfig(context.Context, *conne
 
 func (UnimplementedSettingServiceHandler) UpdateDebugConfig(context.Context, *connect.Request[v1.UpdateDebugConfigRequest]) (*connect.Response[v1.UpdateDebugConfigResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.UpdateDebugConfig is not implemented"))
+}
+
+func (UnimplementedSettingServiceHandler) GetWorkspaceGeneralSetting(context.Context, *connect.Request[v1.GetWorkspaceGeneralSettingRequest]) (*connect.Response[v1.GetWorkspaceGeneralSettingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.GetWorkspaceGeneralSetting is not implemented"))
+}
+
+func (UnimplementedSettingServiceHandler) UpdateWorkspaceGeneralSetting(context.Context, *connect.Request[v1.UpdateWorkspaceGeneralSettingRequest]) (*connect.Response[v1.UpdateWorkspaceGeneralSettingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.UpdateWorkspaceGeneralSetting is not implemented"))
+}
+
+func (UnimplementedSettingServiceHandler) GetWorkspaceInfo(context.Context, *connect.Request[v1.GetWorkspaceInfoRequest]) (*connect.Response[v1.GetWorkspaceInfoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.GetWorkspaceInfo is not implemented"))
 }

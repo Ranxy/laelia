@@ -18,6 +18,7 @@ import {
   REMINDER_ROUTE_LIST,
   SETTINGS_ROUTE,
   SETTINGS_ROUTE_AGENTS,
+  SETTINGS_ROUTE_GENERAL,
   SETTINGS_ROUTE_API_PROVIDERS,
   SETTINGS_ROUTE_AUDIT,
   SETTINGS_ROUTE_GROUPS,
@@ -91,6 +92,10 @@ export const ROUTE_INFO: Record<string, RouteInfo> = {
   },
   [SETTINGS_ROUTE_AGENTS]: {
     titleKey: "sidebar.settings-agents",
+    backTo: "/settings",
+  },
+  [SETTINGS_ROUTE_GENERAL]: {
+    titleKey: "sidebar.settings-general",
     backTo: "/settings",
   },
   [SETTINGS_ROUTE_NOTIFICATIONS]: {

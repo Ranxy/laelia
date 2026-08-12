@@ -11,6 +11,7 @@ import {
   LogOut,
   Monitor,
   Server,
+  Settings2,
   Shield,
   UserCircle,
   UserCog,
@@ -75,6 +76,11 @@ function useSettingsMenuItems(): MenuItem[] {
           to: "/settings/storage",
           icon: Database,
           label: t("sidebar.settings-storage"),
+        },
+        canViewStorage && {
+          to: "/settings/general",
+          icon: Settings2,
+          label: t("sidebar.settings-general"),
         },
         canViewStorage && {
           to: "/settings/agents",

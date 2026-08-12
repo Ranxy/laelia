@@ -3,46 +3,54 @@
 /* eslint-disable */
 
 import { enumDesc, fileDesc, messageDesc, tsEnum } from "@bufbuild/protobuf/codegenv2";
+import { file_google_protobuf_duration } from "@bufbuild/protobuf/wkt";
 
 /**
  * Describes the file store/setting.proto.
  */
 export const file_store_setting = /*@__PURE__*/
-  fileDesc("ChNzdG9yZS9zZXR0aW5nLnByb3RvEgxsYWVsaWEuc3RvcmUilgEKD1MzQ29uZmlnU2V0dGluZxIQCghlbmRwb2ludBgBIAEoCRIOCgZyZWdpb24YAiABKAkSDgoGYnVja2V0GAMgASgJEhIKCmFjY2Vzc19rZXkYBCABKAkSEgoKc2VjcmV0X2tleRgFIAEoCRIYChBmb3JjZV9wYXRoX3N0eWxlGAYgASgIEg8KB3VzZV9zc2wYByABKAgiPgoVTGxtQWdlbnRDb25maWdTZXR0aW5nEiUKHWFsbG93X3VzZXJfc2VsZl9wcm92aWRlZF9rZXlzGAEgASgIImgKFFVzZXJNY3BDb25maWdTZXR0aW5nEh4KFmFsbG93X3VzZXJfbWNwX3NlcnZlcnMYASABKAgSMAoNbWNwX2lwX3BvbGljeRgCIAEoCzIZLmxhZWxpYS5zdG9yZS5NY3BJcFBvbGljeSK+AQoLTWNwSXBQb2xpY3kSDwoHZW5hYmxlZBgBIAEoCBIuCgVzY29wZRgCIAEoDjIfLmxhZWxpYS5zdG9yZS5NY3BJcFBvbGljeS5TY29wZRITCgthbGxvd19jaWRycxgDIAMoCRISCgpkZW55X2NpZHJzGAQgAygJIkUKBVNjb3BlEhUKEVNDT1BFX1VOU1BFQ0lGSUVEEAASDQoJU0NPUEVfQUxMEAESFgoSU0NPUEVfVVNFUl9DUkVBVEVEEAJCNFoyZ2l0aHViLmNvbS9SYW54eS9sYWVsaWEvYmFja2VuZC9nZW5lcmF0ZWQtZ28vc3RvcmViBnByb3RvMw");
+  fileDesc("ChNzdG9yZS9zZXR0aW5nLnByb3RvEgxsYWVsaWEuc3RvcmUiwgIKF1dvcmtzcGFjZVByb2ZpbGVTZXR0aW5nEhQKDGV4dGVybmFsX3VybBgBIAEoCRIXCg9kaXNhbGxvd19zaWdudXAYAiABKAgSEwoLcmVxdWlyZV8yZmEYAyABKAgSMQoOdG9rZW5fZHVyYXRpb24YBCABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SOgoXbWF4aW11bV9yb2xlX2V4cGlyYXRpb24YBSABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SDwoHZG9tYWlucxgGIAMoCRIfChdlbmZvcmNlX2lkZW50aXR5X2RvbWFpbhgHIAEoCBIgChhkaXNhbGxvd19wYXNzd29yZF9zaWduaW4YCCABKAgSIAoYZW5hYmxlX21ldHJpY19jb2xsZWN0aW9uGAkgASgIIpYBCg9TM0NvbmZpZ1NldHRpbmcSEAoIZW5kcG9pbnQYASABKAkSDgoGcmVnaW9uGAIgASgJEg4KBmJ1Y2tldBgDIAEoCRISCgphY2Nlc3Nfa2V5GAQgASgJEhIKCnNlY3JldF9rZXkYBSABKAkSGAoQZm9yY2VfcGF0aF9zdHlsZRgGIAEoCBIPCgd1c2Vfc3NsGAcgASgIIj4KFUxsbUFnZW50Q29uZmlnU2V0dGluZxIlCh1hbGxvd191c2VyX3NlbGZfcHJvdmlkZWRfa2V5cxgBIAEoCCJoChRVc2VyTWNwQ29uZmlnU2V0dGluZxIeChZhbGxvd191c2VyX21jcF9zZXJ2ZXJzGAEgASgIEjAKDW1jcF9pcF9wb2xpY3kYAiABKAsyGS5sYWVsaWEuc3RvcmUuTWNwSXBQb2xpY3kivgEKC01jcElwUG9saWN5Eg8KB2VuYWJsZWQYASABKAgSLgoFc2NvcGUYAiABKA4yHy5sYWVsaWEuc3RvcmUuTWNwSXBQb2xpY3kuU2NvcGUSEwoLYWxsb3dfY2lkcnMYAyADKAkSEgoKZGVueV9jaWRycxgEIAMoCSJFCgVTY29wZRIVChFTQ09QRV9VTlNQRUNJRklFRBAAEg0KCVNDT1BFX0FMTBABEhYKElNDT1BFX1VTRVJfQ1JFQVRFRBACQjRaMmdpdGh1Yi5jb20vUmFueHkvbGFlbGlhL2JhY2tlbmQvZ2VuZXJhdGVkLWdvL3N0b3JlYgZwcm90bzM", [file_google_protobuf_duration]);
+
+/**
+ * Describes the message laelia.store.WorkspaceProfileSetting.
+ * Use `create(WorkspaceProfileSettingSchema)` to create a new message.
+ */
+export const WorkspaceProfileSettingSchema = /*@__PURE__*/
+  messageDesc(file_store_setting, 0);
 
 /**
  * Describes the message laelia.store.S3ConfigSetting.
  * Use `create(S3ConfigSettingSchema)` to create a new message.
  */
 export const S3ConfigSettingSchema = /*@__PURE__*/
-  messageDesc(file_store_setting, 0);
+  messageDesc(file_store_setting, 1);
 
 /**
  * Describes the message laelia.store.LlmAgentConfigSetting.
  * Use `create(LlmAgentConfigSettingSchema)` to create a new message.
  */
 export const LlmAgentConfigSettingSchema = /*@__PURE__*/
-  messageDesc(file_store_setting, 1);
+  messageDesc(file_store_setting, 2);
 
 /**
  * Describes the message laelia.store.UserMcpConfigSetting.
  * Use `create(UserMcpConfigSettingSchema)` to create a new message.
  */
 export const UserMcpConfigSettingSchema = /*@__PURE__*/
-  messageDesc(file_store_setting, 2);
+  messageDesc(file_store_setting, 3);
 
 /**
  * Describes the message laelia.store.McpIpPolicy.
  * Use `create(McpIpPolicySchema)` to create a new message.
  */
 export const McpIpPolicySchema = /*@__PURE__*/
-  messageDesc(file_store_setting, 3);
+  messageDesc(file_store_setting, 4);
 
 /**
  * Describes the enum laelia.store.McpIpPolicy.Scope.
  */
 export const McpIpPolicy_ScopeSchema = /*@__PURE__*/
-  enumDesc(file_store_setting, 3, 0);
+  enumDesc(file_store_setting, 4, 0);
 
 /**
  * Scope selects which MCP servers the policy applies to.

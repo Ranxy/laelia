@@ -4,11 +4,86 @@
 
 import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
+import type { Duration } from "@bufbuild/protobuf/wkt";
 
 /**
  * Describes the file store/setting.proto.
  */
 export declare const file_store_setting: GenFile;
+
+/**
+ * @generated from message laelia.store.WorkspaceProfileSetting
+ */
+export declare type WorkspaceProfileSetting = Message<"laelia.store.WorkspaceProfileSetting"> & {
+  /**
+   * The external URL is used for sso authentication callback.
+   *
+   * @generated from field: string external_url = 1;
+   */
+  externalUrl: string;
+
+  /**
+   * Disallow self-service signup, users can only be invited by the owner.
+   *
+   * @generated from field: bool disallow_signup = 2;
+   */
+  disallowSignup: boolean;
+
+  /**
+   * Require 2FA for all users.
+   *
+   * @generated from field: bool require_2fa = 3;
+   */
+  require2fa: boolean;
+
+  /**
+   * The duration for token.
+   *
+   * @generated from field: google.protobuf.Duration token_duration = 4;
+   */
+  tokenDuration?: Duration | undefined;
+
+  /**
+   * The max duration for role expired.
+   *
+   * @generated from field: google.protobuf.Duration maximum_role_expiration = 5;
+   */
+  maximumRoleExpiration?: Duration | undefined;
+
+  /**
+   * The workspace domain, e.g. example.com.
+   *
+   * @generated from field: repeated string domains = 6;
+   */
+  domains: string[];
+
+  /**
+   * Only user and group from the domains can be created and login.
+   *
+   * @generated from field: bool enforce_identity_domain = 7;
+   */
+  enforceIdentityDomain: boolean;
+
+  /**
+   * Whether to disallow password signin. (Except workspace admins)
+   *
+   * @generated from field: bool disallow_password_signin = 8;
+   */
+  disallowPasswordSignin: boolean;
+
+  /**
+   * Whether to enable metric collection for the workspace.
+   *
+   * @generated from field: bool enable_metric_collection = 9;
+   */
+  enableMetricCollection: boolean;
+};
+
+/**
+ * Describes the message laelia.store.WorkspaceProfileSetting.
+ * Use `create(WorkspaceProfileSettingSchema)` to create a new message.
+ */
+export declare const WorkspaceProfileSettingSchema: GenMessage<WorkspaceProfileSetting>;
 
 /**
  * S3ConfigSetting holds the connection details for the object storage used to

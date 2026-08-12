@@ -56,7 +56,9 @@
       "password-require-letter": "至少包含 1 个字母",
       "password-require-number": "至少包含 1 个数字",
       "email-placeholder": "you@example.com",
-      "name-placeholder": "张三"
+      "name-placeholder": "张三",
+      "disallowed": "自助注册已关闭，请联系工作区管理员创建账户。",
+      "allowed-domains": "仅允许以下邮箱后缀注册：{{domains}}"
     }
   },
   "mobile": {
@@ -81,7 +83,8 @@
     "settings-api-providers": "API 提供方",
     "settings-mcp-servers": "MCP 服务",
     "settings-agents": "Agents / LLM",
-    "settings-profile": "个人资料"
+    "settings-profile": "个人资料",
+    "settings-general": "常规设置"
   },
   "settings": {
     "title": "设置",
@@ -445,6 +448,20 @@
       "ip-policy-preset": "添加内网/云元数据预设",
       "ip-policy-empty-warning": "策略已启用但未配置任何网段，当前不会限制任何地址。",
       "ip-policy-save": "保存策略"
+    },
+    "general": {
+      "title": "常规设置",
+      "description": "配置自助注册与邮箱后缀限制。",
+      "allow-signup": "允许自助注册",
+      "allow-signup-description": "关闭后用户无法自行注册，只能由管理员创建。",
+      "enforce-domain": "启用邮箱后缀限制",
+      "enforce-domain-description": "开启后，注册邮箱必须匹配下方配置的后缀之一。",
+      "domains": "允许的邮箱后缀",
+      "domains-placeholder": "example.com, laelia.dev",
+      "domains-hint": "多个后缀用逗号分隔，例如 example.com, laelia.dev",
+      "saved": "常规设置已保存",
+      "load-failed": "加载常规设置失败",
+      "save-failed": "保存常规设置失败"
     }
   },
   "setup": {

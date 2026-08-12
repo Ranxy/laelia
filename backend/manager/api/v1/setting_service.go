@@ -190,6 +190,80 @@ func (s *SettingService) UpdateDebugConfig(_ context.Context, req *connect.Reque
 	return connect.NewResponse(&v1pb.UpdateDebugConfigResponse{Enabled: enabled}), nil
 }
 
+// GetWorkspaceGeneralSetting reads the workspace general setting (signup
+// policy, email suffix restriction, ...). Gated by the IAM interceptor on
+// laelia.settings.get (admin).
+func (s *SettingService) GetWorkspaceGeneralSetting(ctx context.Context, _ *connect.Request[v1pb.GetWorkspaceGeneralSettingRequest]) (*connect.Response[v1pb.GetWorkspaceGeneralSettingResponse], error) {
+	setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get workspace general setting"))
+	}
+	return connect.NewResponse(&v1pb.GetWorkspaceGeneralSettingResponse{Setting: setting}), nil
+}
+
+// UpdateWorkspaceGeneralSetting updates the workspace general setting. Gated
+// by the IAM interceptor on laelia.settings.update (admin).
+func (s *SettingService) UpdateWorkspaceGeneralSetting(ctx context.Context, req *connect.Request[v1pb.UpdateWorkspaceGeneralSettingRequest]) (*connect.Response[v1pb.UpdateWorkspaceGeneralSettingResponse], error) {
+	in := req.Msg.GetSetting()
+	if in == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("setting is required"))
+	}
+	normalizeWorkspaceGeneralSetting(in)
+	if err := validateWorkspaceGeneralSetting(in); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	if err := s.store.UpsertWorkspaceGeneralSetting(ctx, in); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update workspace general setting"))
+	}
+	return connect.NewResponse(&v1pb.UpdateWorkspaceGeneralSettingResponse{Setting: in}), nil
+}
+
+// GetWorkspaceInfo returns the workspace signup policy for the
+// unauthenticated sign-in/sign-up pages. No auth required.
+func (s *SettingService) GetWorkspaceInfo(ctx context.Context, _ *connect.Request[v1pb.GetWorkspaceInfoRequest]) (*connect.Response[v1pb.GetWorkspaceInfoResponse], error) {
+	setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get workspace general setting"))
+	}
+	return connect.NewResponse(&v1pb.GetWorkspaceInfoResponse{
+		DisallowSignup:        setting.DisallowSignup,
+		EnforceIdentityDomain: setting.EnforceIdentityDomain,
+		Domains:               setting.Domains,
+	}), nil
+}
+
+// normalizeWorkspaceGeneralSetting cleans the domain list in place: trims
+// whitespace, strips a leading "@", lowercases, and dedupes.
+func normalizeWorkspaceGeneralSetting(setting *models.WorkspaceProfileSetting) {
+	seen := make(map[string]struct{}, len(setting.Domains))
+	domains := setting.Domains[:0]
+	for _, d := range setting.Domains {
+		d = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(d), "@"))
+		if d == "" {
+			continue
+		}
+		if _, ok := seen[d]; ok {
+			continue
+		}
+		seen[d] = struct{}{}
+		domains = append(domains, d)
+	}
+	setting.Domains = domains
+}
+
+// validateWorkspaceGeneralSetting rejects malformed domain entries.
+func validateWorkspaceGeneralSetting(setting *models.WorkspaceProfileSetting) error {
+	for _, d := range setting.Domains {
+		if strings.ContainsAny(d, "@/ \t") {
+			return errors.Errorf("invalid domain %q", d)
+		}
+		if d != strings.ToLower(d) {
+			return errors.Errorf("domain %q must be lowercase", d)
+		}
+	}
+	return nil
+}
+
 // maskSecret returns a masked form of the secret for read-back. An empty secret
 // stays empty so the frontend can tell "not yet set" from "set but hidden".
 func maskSecret(secret string) string {

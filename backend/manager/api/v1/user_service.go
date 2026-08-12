@@ -367,6 +367,30 @@ func (s *UserService) CreateUser(ctx context.Context, request *connect.Request[v
 	}
 	firstEndUser := count == 0
 
+	// Self-service signup is the anonymous CreateUser path. When the workspace
+	// disallows signup, only callers holding laelia.users.create (workspace
+	// admins) may create users. The very first end user is exempt so a fresh
+	// workspace can always bootstrap its first admin.
+	if principalType == storepb.PrincipalType_END_USER && !firstEndUser {
+		setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get workspace general setting"))
+		}
+		if setting.DisallowSignup {
+			caller, ok := GetUserFromContext(ctx)
+			if !ok || caller == nil {
+				return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("signup is disallowed, please contact the workspace administrator"))
+			}
+			allowed, err := canCreateUser(ctx, s.iam, caller)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check permission"))
+			}
+			if !allowed {
+				return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("signup is disallowed, only workspace admins can create users"))
+			}
+		}
+	}
+
 	if request.Msg.User.Phone != "" {
 		if err := common.ValidatePhone(request.Msg.User.Phone); err != nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid phone %q, error: %v", request.Msg.User.Phone, err))

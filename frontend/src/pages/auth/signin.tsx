@@ -1,7 +1,8 @@
 import { Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { settingServiceClient } from "@/connect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toastManager } from "@/lib/toast";
@@ -17,6 +18,25 @@ export function SignInPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [signupDisallowed, setSignupDisallowed] = useState(false);
+
+  // The signup policy is public (GetWorkspaceInfo needs no auth): hide the
+  // signup entry when the workspace disallows self-service registration.
+  useEffect(() => {
+    let cancelled = false;
+    settingServiceClient
+      .getWorkspaceInfo({})
+      .then((res) => {
+        if (!cancelled) setSignupDisallowed(res.disallowSignup);
+      })
+      .catch(() => {
+        // Keep the signup link on failure; the backend still enforces the
+        // policy on the signup attempt itself.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const redirectTo = searchParams.get("redirect") ?? "/";
   const allowSubmit = email.length > 0 && password.length > 0 && !loading;
@@ -117,20 +137,22 @@ export function SignInPage() {
         </div>
       </form>
 
-      <p className="text-center text-sm text-control-light">
-        {t("auth.sign-in.new-user")}{" "}
-        <button
-          type="button"
-          className="text-accent hover:underline"
-          onClick={() =>
-            navigate(
-              `/auth/signup${redirectTo !== "/" ? `?redirect=${encodeURIComponent(redirectTo)}` : ""}`
-            )
-          }
-        >
-          {t("common.sign-up")}
-        </button>
-      </p>
+      {!signupDisallowed && (
+        <p className="text-center text-sm text-control-light">
+          {t("auth.sign-in.new-user")}{" "}
+          <button
+            type="button"
+            className="text-accent hover:underline"
+            onClick={() =>
+              navigate(
+                `/auth/signup${redirectTo !== "/" ? `?redirect=${encodeURIComponent(redirectTo)}` : ""}`
+              )
+            }
+          >
+            {t("common.sign-up")}
+          </button>
+        </p>
+      )}
     </div>
   );
 }
