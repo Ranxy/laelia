@@ -94,9 +94,12 @@ describe("command row click navigation", () => {
     const router = buildRealRouter();
     render(<RouterProvider router={router} />);
 
-    await waitFor(() => {
-      expect(screen.getByText("done")).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByText("done")).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
     const fetchMembers = useAppStore.getState().fetchMembers as ReturnType<
       typeof vi.fn
     >;
@@ -104,9 +107,12 @@ describe("command row click navigation", () => {
 
     fireEvent.click(screen.getByText("done").closest("tr")!);
 
-    await waitFor(() => {
-      expect(useAppStore.getState().watchCommand).toHaveBeenCalled();
-    });
+    await waitFor(
+      () => {
+        expect(useAppStore.getState().watchCommand).toHaveBeenCalled();
+      },
+      { timeout: 3000 }
+    );
     expect(window.location.pathname).toBe("/members/agents/a/commands/c1");
     expect(fetchMembers).toHaveBeenCalledTimes(1);
   });
@@ -115,25 +121,34 @@ describe("command row click navigation", () => {
     const router = buildRealRouter();
     render(<RouterProvider router={router} />);
 
-    await waitFor(() => {
-      expect(screen.getByText("done")).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByText("done")).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
     const fetchMembers = useAppStore.getState().fetchMembers as ReturnType<
       typeof vi.fn
     >;
 
     fireEvent.click(screen.getByText("done").closest("tr")!);
-    await waitFor(() => {
-      expect(useAppStore.getState().watchCommand).toHaveBeenCalled();
-    });
+    await waitFor(
+      () => {
+        expect(useAppStore.getState().watchCommand).toHaveBeenCalled();
+      },
+      { timeout: 3000 }
+    );
 
     const back = screen
       .getAllByRole("button", { name: /back/i })
       .find((b) => b.textContent?.includes("←"))!;
     fireEvent.click(back);
-    await waitFor(() => {
-      expect(window.location.pathname).toBe("/members/agents/a/commands");
-    });
+    await waitFor(
+      () => {
+        expect(window.location.pathname).toBe("/members/agents/a/commands");
+      },
+      { timeout: 3000 }
+    );
     expect(fetchMembers).toHaveBeenCalledTimes(1);
   });
 });

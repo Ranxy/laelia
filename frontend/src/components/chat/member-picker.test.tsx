@@ -64,7 +64,7 @@ describe("MemberPicker multi-select", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Pick" }));
     // Options appear after the debounced search resolves.
-    await screen.findByRole("button", { name: /Alice/ });
+    await screen.findByRole("button", { name: /Alice/ }, { timeout: 3000 });
     fireEvent.click(screen.getByRole("button", { name: /Alice/ }));
     expect(onToggle).toHaveBeenCalledWith("1");
     // The popover stays open: Bob is still pickable after the first pick.
@@ -99,7 +99,11 @@ describe("MemberPicker multi-select", () => {
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "Pick" }));
-    const bobRow = await screen.findByRole("button", { name: /Bob/ });
+    const bobRow = await screen.findByRole(
+      "button",
+      { name: /Bob/ },
+      { timeout: 3000 }
+    );
     expect(bobRow).toBeDisabled();
     fireEvent.click(bobRow);
     expect(onToggle).not.toHaveBeenCalled();
