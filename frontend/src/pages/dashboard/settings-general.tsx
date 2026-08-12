@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PageLoading, SettingsPage } from "@/components/settings-page";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { settingServiceClient } from "@/connect";
 import { toastManager } from "@/lib/toast";
 import { SettingValueSchema } from "@/types/proto-es/v1/setting_pb";
@@ -22,13 +22,13 @@ const EMPTY: GeneralForm = {
   domains: "",
 };
 
-// parseDomains splits a comma-separated suffix list, trimming whitespace,
+// parseDomains splits a newline-separated suffix list, trimming whitespace,
 // stripping a leading "@", lowercasing, and dropping empties — mirroring the
 // backend normalization.
 function parseDomains(raw: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const part of raw.split(",")) {
+  for (const part of raw.split("\n")) {
     const d = part.trim().replace(/^@/, "").toLowerCase();
     if (d === "" || seen.has(d)) continue;
     seen.add(d);
@@ -40,8 +40,11 @@ function parseDomains(raw: string): string[] {
 export function SettingsGeneralPage() {
   const { t } = useTranslation();
   const [form, setForm] = useState<GeneralForm>(EMPTY);
+  const [saved, setSaved] = useState<GeneralForm>(EMPTY);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingSignup, setSavingSignup] = useState(false);
+  const [savingDomain, setSavingDomain] = useState(false);
+  const [savingDomains, setSavingDomains] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,11 +56,13 @@ export function SettingsGeneralPage() {
         if (cancelled) return;
         const v = res.value?.value;
         const s = v?.case === "workspaceProfile" ? v.value : undefined;
-        setForm({
+        const next = {
           allowSignup: !(s?.disallowSignup ?? false),
           enforceIdentityDomain: s?.enforceIdentityDomain ?? false,
-          domains: (s?.domains ?? []).join(", "),
-        });
+          domains: (s?.domains ?? []).join("\n"),
+        };
+        setForm(next);
+        setSaved(next);
       } catch (err) {
         toastManager.add({
           type: "error",
@@ -73,31 +78,80 @@ export function SettingsGeneralPage() {
     };
   }, [t]);
 
-  async function handleSave() {
-    setSaving(true);
-    try {
-      const res = await settingServiceClient.updateSetting({
-        setting: {
-          name: "settings/workspace_profile",
-          value: create(SettingValueSchema, {
+  function applyResponse(
+    res: Awaited<ReturnType<typeof settingServiceClient.updateSetting>>
+  ) {
+    const v = res.value?.value;
+    const s = v?.case === "workspaceProfile" ? v.value : undefined;
+    const next = {
+      allowSignup: !(s?.disallowSignup ?? false),
+      enforceIdentityDomain: s?.enforceIdentityDomain ?? false,
+      domains: (s?.domains ?? []).join("\n"),
+    };
+    setForm(next);
+    setSaved(next);
+  }
+
+  async function saveField(patch: Partial<GeneralForm>) {
+    const next = { ...form, ...patch };
+    const res = await settingServiceClient.updateSetting({
+      setting: {
+        name: "settings/workspace_profile",
+        value: create(SettingValueSchema, {
+          value: {
+            case: "workspaceProfile" as const,
             value: {
-              case: "workspaceProfile" as const,
-              value: {
-                disallowSignup: !form.allowSignup,
-                enforceIdentityDomain: form.enforceIdentityDomain,
-                domains: parseDomains(form.domains),
-              },
+              disallowSignup: !next.allowSignup,
+              enforceIdentityDomain: next.enforceIdentityDomain,
+              domains: parseDomains(next.domains),
             },
-          }),
-        },
+          },
+        }),
+      },
+    });
+    applyResponse(res);
+  }
+
+  async function handleToggleSignup(v: boolean) {
+    const prev = form.allowSignup;
+    setForm((f) => ({ ...f, allowSignup: v }));
+    setSavingSignup(true);
+    try {
+      await saveField({ allowSignup: v });
+    } catch (err) {
+      setForm((f) => ({ ...f, allowSignup: prev }));
+      toastManager.add({
+        type: "error",
+        title: t("settings.general.save-failed"),
+        description: err instanceof Error ? err.message : String(err),
       });
-      const v = res.value?.value;
-      const s = v?.case === "workspaceProfile" ? v.value : undefined;
-      setForm({
-        allowSignup: !(s?.disallowSignup ?? false),
-        enforceIdentityDomain: s?.enforceIdentityDomain ?? false,
-        domains: (s?.domains ?? []).join(", "),
+    } finally {
+      setSavingSignup(false);
+    }
+  }
+
+  async function handleToggleDomain(v: boolean) {
+    const prev = form.enforceIdentityDomain;
+    setForm((f) => ({ ...f, enforceIdentityDomain: v }));
+    setSavingDomain(true);
+    try {
+      await saveField({ enforceIdentityDomain: v });
+    } catch (err) {
+      setForm((f) => ({ ...f, enforceIdentityDomain: prev }));
+      toastManager.add({
+        type: "error",
+        title: t("settings.general.save-failed"),
+        description: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      setSavingDomain(false);
+    }
+  }
+
+  async function handleSaveDomains() {
+    setSavingDomains(true);
+    try {
+      await saveField({ domains: form.domains });
       toastManager.add({
         type: "success",
         title: t("settings.general.saved"),
@@ -109,9 +163,13 @@ export function SettingsGeneralPage() {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
-      setSaving(false);
+      setSavingDomains(false);
     }
   }
+
+  const domainsDirty =
+    parseDomains(form.domains).join("\n") !==
+    parseDomains(saved.domains).join("\n");
 
   const set = <K extends keyof GeneralForm>(key: K, value: GeneralForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -136,7 +194,8 @@ export function SettingsGeneralPage() {
             </div>
             <Switch
               checked={form.allowSignup}
-              onCheckedChange={(v) => set("allowSignup", v)}
+              onCheckedChange={handleToggleSignup}
+              disabled={savingSignup}
               size="md"
             />
           </div>
@@ -152,7 +211,8 @@ export function SettingsGeneralPage() {
             </div>
             <Switch
               checked={form.enforceIdentityDomain}
-              onCheckedChange={(v) => set("enforceIdentityDomain", v)}
+              onCheckedChange={handleToggleDomain}
+              disabled={savingDomain}
               size="md"
             />
           </div>
@@ -165,30 +225,34 @@ export function SettingsGeneralPage() {
               >
                 {t("settings.general.domains")}
               </label>
-              <Input
+              <Textarea
                 id="general-domains"
                 value={form.domains}
                 placeholder={t("settings.general.domains-placeholder")}
                 onChange={(e) => set("domains", e.target.value)}
                 spellCheck={false}
+                rows={5}
                 className="mt-2"
               />
-              <p className="mt-1.5 text-xs text-control-light">
-                {t("settings.general.domains-hint")}
-              </p>
+              <div className="mt-1.5 flex items-center justify-between gap-3">
+                <p className="text-xs text-control-light">
+                  {t("settings.general.domains-hint")}
+                </p>
+                <Button
+                  size="sm"
+                  onClick={handleSaveDomains}
+                  disabled={savingDomains || !domainsDirty}
+                >
+                  {savingDomains ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Save className="size-4" />
+                  )}
+                  {t("common.save")}
+                </Button>
+              </div>
             </div>
           )}
-
-          <div className="flex justify-end pt-2">
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Save className="size-4" />
-              )}
-              {t("common.save")}
-            </Button>
-          </div>
         </div>
       )}
     </SettingsPage>

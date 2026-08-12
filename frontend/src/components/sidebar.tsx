@@ -27,6 +27,7 @@ import {
   SETTINGS_ROUTE_AGENTS,
   SETTINGS_ROUTE_API_PROVIDERS,
   SETTINGS_ROUTE_AUDIT,
+  SETTINGS_ROUTE_GENERAL,
   SETTINGS_ROUTE_GROUPS,
   SETTINGS_ROUTE_IAM,
   SETTINGS_ROUTE_MCP_SERVERS,
@@ -152,6 +153,12 @@ function useSidebarItems(): SidebarItem[] {
           {
             title: t("sidebar.settings-storage"),
             name: SETTINGS_ROUTE_STORAGE,
+            type: "route",
+            hide: !canViewStorage,
+          },
+          {
+            title: t("sidebar.settings-general"),
+            name: SETTINGS_ROUTE_GENERAL,
             type: "route",
             hide: !canViewStorage,
           },

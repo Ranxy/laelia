@@ -457,8 +457,8 @@
       "enforce-domain": "启用邮箱后缀限制",
       "enforce-domain-description": "开启后，注册邮箱必须匹配下方配置的后缀之一。",
       "domains": "允许的邮箱后缀",
-      "domains-placeholder": "example.com, laelia.dev",
-      "domains-hint": "多个后缀用逗号分隔，例如 example.com, laelia.dev",
+      "domains-placeholder": "example.com\nlaeila.dev",
+      "domains-hint": "每行一个邮箱后缀，例如 example.com",
       "saved": "常规设置已保存",
       "load-failed": "加载常规设置失败",
       "save-failed": "保存常规设置失败"

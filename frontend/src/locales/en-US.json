@@ -457,8 +457,8 @@
       "enforce-domain": "Enforce email suffix restriction",
       "enforce-domain-description": "When on, registration emails must match one of the suffixes below.",
       "domains": "Allowed email suffixes",
-      "domains-placeholder": "example.com, laelia.dev",
-      "domains-hint": "Separate multiple suffixes with commas, e.g. example.com, laelia.dev",
+      "domains-placeholder": "example.com\nlaeila.dev",
+      "domains-hint": "One suffix per line, e.g. example.com",
       "saved": "General settings saved",
       "load-failed": "Failed to load general settings",
       "save-failed": "Failed to save general settings"
