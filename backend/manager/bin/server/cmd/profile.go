@@ -10,7 +10,7 @@ import (
 
 func getBaseProfile(_ string) *config.Profile {
 	cfg := &config.Profile{
-		Mode:           common.ReleaseMode("dev"),
+		Mode:           common.ReleaseModeProd,
 		Port:           flags.port,
 		PgURL:          os.Getenv("LAELIA_PG_URL"),
 		TLSCertDir:     flags.tlsCertDir,
