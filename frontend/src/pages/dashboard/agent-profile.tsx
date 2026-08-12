@@ -691,16 +691,20 @@ export function AgentProfilePage() {
                 </Field>
                 {agent.machine && (
                   <Field label={t("agent.detail-machine")}>
-                    <button
-                      type="button"
-                      className="text-sm text-link hover:underline"
-                      onClick={() =>
-                        machineResourceID &&
-                        navigate(`/machines/${machineResourceID}`)
-                      }
-                    >
-                      {machineDisplay}
-                    </button>
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        className="text-sm text-link hover:underline"
+                        onClick={() =>
+                          machineResourceID &&
+                          navigate(`/machines/${machineResourceID}`)
+                        }
+                      >
+                        {machineDisplay}
+                      </button>
+                    ) : (
+                      <span className="text-sm">{machineDisplay}</span>
+                    )}
                   </Field>
                 )}
                 {agent.owner && (
@@ -995,7 +999,7 @@ export function AgentProfilePage() {
                         </SelectContent>
                       </Select>
                     )}
-                    {machineResourceID && (
+                    {machineResourceID && canEdit && (
                       <p className="text-xs text-control-light">
                         <button
                           type="button"
