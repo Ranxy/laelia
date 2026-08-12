@@ -1,3 +1,4 @@
+import { create } from "@bufbuild/protobuf";
 import { Loader2, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -7,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { settingServiceClient } from "@/connect";
 import { toastManager } from "@/lib/toast";
+import { SettingValueSchema } from "@/types/proto-es/v1/setting_pb";
 
 interface GeneralForm {
   allowSignup: boolean;
@@ -45,9 +47,12 @@ export function SettingsGeneralPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await settingServiceClient.getWorkspaceGeneralSetting({});
+        const res = await settingServiceClient.getSetting({
+          name: "settings/workspace_profile",
+        });
         if (cancelled) return;
-        const s = res.setting;
+        const v = res.value?.value;
+        const s = v?.case === "workspaceProfile" ? v.value : undefined;
         setForm({
           allowSignup: !(s?.disallowSignup ?? false),
           enforceIdentityDomain: s?.enforceIdentityDomain ?? false,
@@ -71,14 +76,23 @@ export function SettingsGeneralPage() {
   async function handleSave() {
     setSaving(true);
     try {
-      const res = await settingServiceClient.updateWorkspaceGeneralSetting({
+      const res = await settingServiceClient.updateSetting({
         setting: {
-          disallowSignup: !form.allowSignup,
-          enforceIdentityDomain: form.enforceIdentityDomain,
-          domains: parseDomains(form.domains),
+          name: "settings/workspace_profile",
+          value: create(SettingValueSchema, {
+            value: {
+              case: "workspaceProfile" as const,
+              value: {
+                disallowSignup: !form.allowSignup,
+                enforceIdentityDomain: form.enforceIdentityDomain,
+                domains: parseDomains(form.domains),
+              },
+            },
+          }),
         },
       });
-      const s = res.setting;
+      const v = res.value?.value;
+      const s = v?.case === "workspaceProfile" ? v.value : undefined;
       setForm({
         allowSignup: !(s?.disallowSignup ?? false),
         enforceIdentityDomain: s?.enforceIdentityDomain ?? false,

@@ -26,6 +26,7 @@ import {
   McpIpPolicySchema,
   UserMcpConfigSettingSchema,
 } from "@/types/proto-es/store/setting_pb";
+import { SettingValueSchema } from "@/types/proto-es/v1/setting_pb";
 
 // Preset deny list of internal / cloud-metadata ranges appended idempotently
 // by the "add presets" button.
@@ -82,14 +83,23 @@ export function SettingsAgentsPage() {
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
-      settingServiceClient.getLlmAgentConfig({}),
-      settingServiceClient.getUserMcpConfig({}),
+      settingServiceClient.getSetting({ name: "settings/llm_agent_config" }),
+      settingServiceClient.getSetting({ name: "settings/user_mcp_config" }),
     ])
       .then(([llmRes, mcpRes]) => {
         if (cancelled) return;
-        setEnabled(llmRes.config?.allowUserSelfProvidedKeys ?? true);
-        setUserMcpEnabled(mcpRes.config?.allowUserMcpServers ?? true);
-        const p = mcpRes.config?.mcpIpPolicy;
+        const llmV = llmRes.value?.value;
+        const mcpV = mcpRes.value?.value;
+        setEnabled(
+          llmV?.case === "llmAgentConfig"
+            ? llmV.value.allowUserSelfProvidedKeys
+            : true
+        );
+        setUserMcpEnabled(
+          mcpV?.case === "userMcpConfig" ? mcpV.value.allowUserMcpServers : true
+        );
+        const p =
+          mcpV?.case === "userMcpConfig" ? mcpV.value.mcpIpPolicy : undefined;
         setPolicyEnabled(p?.enabled ?? false);
         setPolicyScope(p?.scope ?? McpIpPolicy_Scope.USER_CREATED);
         setAllowText((p?.allowCidrs ?? []).join("\n"));
@@ -117,11 +127,19 @@ export function SettingsAgentsPage() {
   async function persistUserMcp(nextEnabled: boolean) {
     setUserMcpSaving(true);
     try {
-      await settingServiceClient.updateUserMcpConfig({
-        config: create(UserMcpConfigSettingSchema, {
-          allowUserMcpServers: nextEnabled,
-          mcpIpPolicy: buildPolicy(),
-        }),
+      await settingServiceClient.updateSetting({
+        setting: {
+          name: "settings/user_mcp_config",
+          value: create(SettingValueSchema, {
+            value: {
+              case: "userMcpConfig" as const,
+              value: create(UserMcpConfigSettingSchema, {
+                allowUserMcpServers: nextEnabled,
+                mcpIpPolicy: buildPolicy(),
+              }),
+            },
+          }),
+        },
       });
       setUserMcpEnabled(nextEnabled);
       toastManager.add({
@@ -142,10 +160,18 @@ export function SettingsAgentsPage() {
   async function handleToggle(next: boolean) {
     setSaving(true);
     try {
-      await settingServiceClient.updateLlmAgentConfig({
-        config: create(LlmAgentConfigSettingSchema, {
-          allowUserSelfProvidedKeys: next,
-        }),
+      await settingServiceClient.updateSetting({
+        setting: {
+          name: "settings/llm_agent_config",
+          value: create(SettingValueSchema, {
+            value: {
+              case: "llmAgentConfig" as const,
+              value: create(LlmAgentConfigSettingSchema, {
+                allowUserSelfProvidedKeys: next,
+              }),
+            },
+          }),
+        },
       });
       setEnabled(next);
       toastManager.add({ type: "success", title: t("settings.agents.saved") });

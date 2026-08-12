@@ -307,3 +307,16 @@ func listSettingV2Impl(ctx context.Context, txn *sql.Tx, find *FindSettingMessag
 
 	return settingMessages, nil
 }
+
+// UpsertPasswordRestrictionSetting stores the password restriction payload.
+func (s *Store) UpsertPasswordRestrictionSetting(ctx context.Context, setting *models.PasswordRestrictionSetting) error {
+	payload, err := json.Marshal(setting)
+	if err != nil {
+		return err
+	}
+	_, err = s.UpsertSettingV2(ctx, &SetSettingMessage{
+		Name:  models.SettingName_PASSWORD_RESTRICTION,
+		Value: string(payload),
+	})
+	return err
+}

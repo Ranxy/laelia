@@ -246,9 +246,16 @@ export function AgentProfilePage() {
   // Read the workspace LLM config toggle that decides whether the legacy
   // self-provided-key fields are shown to non-admin owners.
   useEffect(() => {
-    void settingServiceClient.getLlmAgentConfig({}).then((res) => {
-      setSelfProvidedKeysEnabled(res.config?.allowUserSelfProvidedKeys ?? true);
-    });
+    void settingServiceClient
+      .getSetting({ name: "settings/llm_agent_config" })
+      .then((res) => {
+        const v = res.value?.value;
+        setSelfProvidedKeysEnabled(
+          v?.case === "llmAgentConfig"
+            ? v.value.allowUserSelfProvidedKeys
+            : true
+        );
+      });
   }, []);
 
   // Seed the editor once per agent (on load / agent switch). Deliberately keyed

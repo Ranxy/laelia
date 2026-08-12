@@ -4,12 +4,128 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { LlmAgentConfigSetting, S3ConfigSetting, UserMcpConfigSetting, WorkspaceProfileSetting } from "../store/setting_pb";
+import type { LlmAgentConfigSetting, PasswordRestrictionSetting, S3ConfigSetting, UserMcpConfigSetting, WorkspaceProfileSetting } from "../store/setting_pb";
 
 /**
  * Describes the file v1/setting.proto.
  */
 export declare const file_v1_setting: GenFile;
+
+/**
+ * Setting is a workspace-level configuration resource. The resource name is
+ * "settings/{setting}", where {setting} maps to laelia.store.SettingName in
+ * lowercase (e.g. "settings/s3_config").
+ *
+ * @generated from message laelia.v1.Setting
+ */
+export declare type Setting = Message<"laelia.v1.Setting"> & {
+  /**
+   * The resource name of the setting.
+   * Format: settings/{setting}
+   * Example: "settings/s3_config"
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * The configuration value of the setting.
+   *
+   * @generated from field: laelia.v1.SettingValue value = 2;
+   */
+  value?: SettingValue | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.Setting.
+ * Use `create(SettingSchema)` to create a new message.
+ */
+export declare const SettingSchema: GenMessage<Setting>;
+
+/**
+ * The data in setting value. Each branch corresponds to a stored setting
+ * payload; the schema reuses the existing laelia.store messages so there is
+ * exactly one source of truth.
+ *
+ * @generated from message laelia.v1.SettingValue
+ */
+export declare type SettingValue = Message<"laelia.v1.SettingValue"> & {
+  /**
+   * @generated from oneof laelia.v1.SettingValue.value
+   */
+  value: {
+    /**
+     * @generated from field: laelia.store.S3ConfigSetting s3_config = 1;
+     */
+    value: S3ConfigSetting;
+    case: "s3Config";
+  } | {
+    /**
+     * @generated from field: laelia.store.LlmAgentConfigSetting llm_agent_config = 2;
+     */
+    value: LlmAgentConfigSetting;
+    case: "llmAgentConfig";
+  } | {
+    /**
+     * @generated from field: laelia.store.UserMcpConfigSetting user_mcp_config = 3;
+     */
+    value: UserMcpConfigSetting;
+    case: "userMcpConfig";
+  } | {
+    /**
+     * @generated from field: laelia.store.WorkspaceProfileSetting workspace_profile = 4;
+     */
+    value: WorkspaceProfileSetting;
+    case: "workspaceProfile";
+  } | {
+    /**
+     * @generated from field: laelia.store.PasswordRestrictionSetting password_restriction = 5;
+     */
+    value: PasswordRestrictionSetting;
+    case: "passwordRestriction";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message laelia.v1.SettingValue.
+ * Use `create(SettingValueSchema)` to create a new message.
+ */
+export declare const SettingValueSchema: GenMessage<SettingValue>;
+
+/**
+ * @generated from message laelia.v1.GetSettingRequest
+ */
+export declare type GetSettingRequest = Message<"laelia.v1.GetSettingRequest"> & {
+  /**
+   * The resource name of the setting.
+   * Format: settings/{setting}
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetSettingRequest.
+ * Use `create(GetSettingRequestSchema)` to create a new message.
+ */
+export declare const GetSettingRequestSchema: GenMessage<GetSettingRequest>;
+
+/**
+ * @generated from message laelia.v1.UpdateSettingRequest
+ */
+export declare type UpdateSettingRequest = Message<"laelia.v1.UpdateSettingRequest"> & {
+  /**
+   * @generated from field: laelia.v1.Setting setting = 1;
+   */
+  setting?: Setting | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateSettingRequest.
+ * Use `create(UpdateSettingRequestSchema)` to create a new message.
+ */
+export declare const UpdateSettingRequestSchema: GenMessage<UpdateSettingRequest>;
 
 /**
  * @generated from message laelia.v1.GetS3ConfigRequest
@@ -417,16 +533,41 @@ export declare type GetWorkspaceInfoResponse = Message<"laelia.v1.GetWorkspaceIn
 export declare const GetWorkspaceInfoResponseSchema: GenMessage<GetWorkspaceInfoResponse>;
 
 /**
- * SettingService exposes workspace-level configuration. It is admin-only; the
- * handlers enforce workspace admin membership and return
- * connect.CodePermissionDenied otherwise. The S3 secret_key is masked on read;
- * an update carrying a masked secret preserves the stored value.
+ * SettingService exposes workspace-level configuration. GetSetting/UpdateSetting
+ * are the unified resource-based accessors; the legacy per-setting RPCs are
+ * deprecated and kept for compatibility. GetSetting is handler-gated (no
+ * permission annotation): llm_agent_config and user_mcp_config are readable by
+ * any authenticated member, all other settings require admin. UpdateSetting is
+ * admin-only (laelia.settings.update). The S3 secret_key is masked on read; an
+ * update carrying a masked secret preserves the stored value.
  *
  * @generated from service laelia.v1.SettingService
  */
 export declare const SettingService: GenService<{
   /**
+   * GetSetting reads one workspace setting by resource name.
+   *
+   * @generated from rpc laelia.v1.SettingService.GetSetting
+   */
+  getSetting: {
+    methodKind: "unary";
+    input: typeof GetSettingRequestSchema;
+    output: typeof SettingSchema;
+  },
+  /**
+   * UpdateSetting writes one workspace setting. Admin (laelia.settings.update)
+   * only.
+   *
+   * @generated from rpc laelia.v1.SettingService.UpdateSetting
+   */
+  updateSetting: {
+    methodKind: "unary";
+    input: typeof UpdateSettingRequestSchema;
+    output: typeof SettingSchema;
+  },
+  /**
    * @generated from rpc laelia.v1.SettingService.GetS3Config
+   * @deprecated
    */
   getS3Config: {
     methodKind: "unary";
@@ -435,6 +576,7 @@ export declare const SettingService: GenService<{
   },
   /**
    * @generated from rpc laelia.v1.SettingService.UpdateS3Config
+   * @deprecated
    */
   updateS3Config: {
     methodKind: "unary";
@@ -447,6 +589,7 @@ export declare const SettingService: GenService<{
    * which members use — can read the toggle without a settings permission.
    *
    * @generated from rpc laelia.v1.SettingService.GetLlmAgentConfig
+   * @deprecated
    */
   getLlmAgentConfig: {
     methodKind: "unary";
@@ -458,6 +601,7 @@ export declare const SettingService: GenService<{
    * Admin (laelia.settings.update) only.
    *
    * @generated from rpc laelia.v1.SettingService.UpdateLlmAgentConfig
+   * @deprecated
    */
   updateLlmAgentConfig: {
     methodKind: "unary";
@@ -470,6 +614,7 @@ export declare const SettingService: GenService<{
    * can render the personal MCP settings page.
    *
    * @generated from rpc laelia.v1.SettingService.GetUserMcpConfig
+   * @deprecated
    */
   getUserMcpConfig: {
     methodKind: "unary";
@@ -481,6 +626,7 @@ export declare const SettingService: GenService<{
    * servers. Admin (laelia.settings.update) only.
    *
    * @generated from rpc laelia.v1.SettingService.UpdateUserMcpConfig
+   * @deprecated
    */
   updateUserMcpConfig: {
     methodKind: "unary";
@@ -519,6 +665,7 @@ export declare const SettingService: GenService<{
    * policy, email suffix restriction, ...). Admin (laelia.settings.get) only.
    *
    * @generated from rpc laelia.v1.SettingService.GetWorkspaceGeneralSetting
+   * @deprecated
    */
   getWorkspaceGeneralSetting: {
     methodKind: "unary";
@@ -530,6 +677,7 @@ export declare const SettingService: GenService<{
    * Admin (laelia.settings.update) only.
    *
    * @generated from rpc laelia.v1.SettingService.UpdateWorkspaceGeneralSetting
+   * @deprecated
    */
   updateWorkspaceGeneralSetting: {
     methodKind: "unary";

@@ -24,9 +24,11 @@ export const createMcpServerSlice: AppSliceCreator<McpServerSlice> = (
           pageSize: params?.pageSize ?? 1000,
           pageToken: params?.pageToken ?? "",
         }),
-        settingServiceClient.getUserMcpConfig({}),
+        settingServiceClient.getSetting({ name: "settings/user_mcp_config" }),
       ]);
-      const personalEnabled = cfgRes.config?.allowUserMcpServers ?? true;
+      const v = cfgRes.value?.value;
+      const personalEnabled =
+        v?.case === "userMcpConfig" ? v.value.allowUserMcpServers : true;
       set({
         mcpServers: [
           ...(wsRes.mcpServers ?? []),

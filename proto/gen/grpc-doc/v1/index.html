@@ -1929,6 +1929,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.GetSettingRequest"><span class="badge">M</span>GetSettingRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.GetSetupStatusRequest"><span class="badge">M</span>GetSetupStatusRequest</a>
                 </li>
               
@@ -1961,6 +1965,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.Setting"><span class="badge">M</span>Setting</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SettingValue"><span class="badge">M</span>SettingValue</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.SetupItem"><span class="badge">M</span>SetupItem</a>
                 </li>
               
@@ -1986,6 +1998,10 @@
               
                 <li>
                   <a href="#laelia.v1.UpdateS3ConfigResponse"><span class="badge">M</span>UpdateS3ConfigResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateSettingRequest"><span class="badge">M</span>UpdateSettingRequest</a>
                 </li>
               
                 <li>
@@ -18013,6 +18029,31 @@ string from the permission catalog. </p></td>
 
         
       
+        <h3 id="laelia.v1.GetSettingRequest">GetSettingRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The resource name of the setting.
+Format: settings/{setting} </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.GetSetupStatusRequest">GetSetupStatusRequest</h3>
         <p></p>
 
@@ -18144,6 +18185,91 @@ created by workspace admins. </p></td>
                   <td>repeated</td>
                   <td><p>The allowed email suffixes (e.g. &#34;example.com&#34;) when
 enforce_identity_domain is set. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.Setting">Setting</h3>
+        <p>Setting is a workspace-level configuration resource. The resource name is</p><p>"settings/{setting}", where {setting} maps to laelia.store.SettingName in</p><p>lowercase (e.g. "settings/s3_config").</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The resource name of the setting.
+Format: settings/{setting}
+Example: &#34;settings/s3_config&#34; </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#laelia.v1.SettingValue">SettingValue</a></td>
+                  <td></td>
+                  <td><p>The configuration value of the setting. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SettingValue">SettingValue</h3>
+        <p>The data in setting value. Each branch corresponds to a stored setting</p><p>payload; the schema reuses the existing laelia.store messages so there is</p><p>exactly one source of truth.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>s3_config</td>
+                  <td><a href="#laelia.store.S3ConfigSetting">laelia.store.S3ConfigSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>llm_agent_config</td>
+                  <td><a href="#laelia.store.LlmAgentConfigSetting">laelia.store.LlmAgentConfigSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>user_mcp_config</td>
+                  <td><a href="#laelia.store.UserMcpConfigSetting">laelia.store.UserMcpConfigSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>workspace_profile</td>
+                  <td><a href="#laelia.store.WorkspaceProfileSetting">laelia.store.WorkspaceProfileSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>password_restriction</td>
+                  <td><a href="#laelia.store.PasswordRestrictionSetting">laelia.store.PasswordRestrictionSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -18328,6 +18454,30 @@ enforce_identity_domain is set. </p></td>
 
         
       
+        <h3 id="laelia.v1.UpdateSettingRequest">UpdateSettingRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>setting</td>
+                  <td><a href="#laelia.v1.Setting">Setting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.UpdateUserMcpConfigRequest">UpdateUserMcpConfigRequest</h3>
         <p></p>
 
@@ -18431,12 +18581,27 @@ enforce_identity_domain is set. </p></td>
 
       
         <h3 id="laelia.v1.SettingService">SettingService</h3>
-        <p>SettingService exposes workspace-level configuration. It is admin-only; the</p><p>handlers enforce workspace admin membership and return</p><p>connect.CodePermissionDenied otherwise. The S3 secret_key is masked on read;</p><p>an update carrying a masked secret preserves the stored value.</p>
+        <p>SettingService exposes workspace-level configuration. GetSetting/UpdateSetting</p><p>are the unified resource-based accessors; the legacy per-setting RPCs are</p><p>deprecated and kept for compatibility. GetSetting is handler-gated (no</p><p>permission annotation): llm_agent_config and user_mcp_config are readable by</p><p>any authenticated member, all other settings require admin. UpdateSetting is</p><p>admin-only (laelia.settings.update). The S3 secret_key is masked on read; an</p><p>update carrying a masked secret preserves the stored value.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
           </thead>
           <tbody>
+            
+              <tr>
+                <td>GetSetting</td>
+                <td><a href="#laelia.v1.GetSettingRequest">GetSettingRequest</a></td>
+                <td><a href="#laelia.v1.Setting">Setting</a></td>
+                <td><p>GetSetting reads one workspace setting by resource name.</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateSetting</td>
+                <td><a href="#laelia.v1.UpdateSettingRequest">UpdateSettingRequest</a></td>
+                <td><a href="#laelia.v1.Setting">Setting</a></td>
+                <td><p>UpdateSetting writes one workspace setting. Admin (laelia.settings.update)
+only.</p></td>
+              </tr>
             
               <tr>
                 <td>GetS3Config</td>
@@ -18535,6 +18700,62 @@ unauthenticated sign-in/sign-up pages. No auth required.</p></td>
           </tbody>
         </table>
 
+        
+          
+          
+          <h4>Methods with deprecated option</h4>
+          <table>
+            <thead>
+              <tr>
+                <td>Method Name</td>
+                <td>Option</td>
+              </tr>
+            </thead>
+            <tbody>
+            
+              <tr>
+                <td>GetS3Config</td>
+                <td><p>true</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateS3Config</td>
+                <td><p>true</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetLlmAgentConfig</td>
+                <td><p>true</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateLlmAgentConfig</td>
+                <td><p>true</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetUserMcpConfig</td>
+                <td><p>true</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateUserMcpConfig</td>
+                <td><p>true</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetWorkspaceGeneralSetting</td>
+                <td><p>true</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateWorkspaceGeneralSetting</td>
+                <td><p>true</p></td>
+              </tr>
+            
+            </tbody>
+          </table>
+          
         
     
 

@@ -86,6 +86,66 @@ export declare type WorkspaceProfileSetting = Message<"laelia.store.WorkspacePro
 export declare const WorkspaceProfileSettingSchema: GenMessage<WorkspaceProfileSetting>;
 
 /**
+ * @generated from message laelia.store.PasswordRestrictionSetting
+ */
+export declare type PasswordRestrictionSetting = Message<"laelia.store.PasswordRestrictionSetting"> & {
+  /**
+   * min_length is the minimum length for password, should no less than 8.
+   *
+   * @generated from field: int32 min_length = 1;
+   */
+  minLength: number;
+
+  /**
+   * require_number requires the password must contains at least one number.
+   *
+   * @generated from field: bool require_number = 2;
+   */
+  requireNumber: boolean;
+
+  /**
+   * require_letter requires the password must contains at least one letter, regardless of upper case or lower case
+   *
+   * @generated from field: bool require_letter = 3;
+   */
+  requireLetter: boolean;
+
+  /**
+   * require_uppercase_letter requires the password must contains at least one upper case letter.
+   *
+   * @generated from field: bool require_uppercase_letter = 4;
+   */
+  requireUppercaseLetter: boolean;
+
+  /**
+   * require_uppercase_letter requires the password must contains at least one special character.
+   *
+   * @generated from field: bool require_special_character = 5;
+   */
+  requireSpecialCharacter: boolean;
+
+  /**
+   * require_reset_password_for_first_login requires users to reset their password after the 1st login.
+   *
+   * @generated from field: bool require_reset_password_for_first_login = 6;
+   */
+  requireResetPasswordForFirstLogin: boolean;
+
+  /**
+   * password_rotation requires users to reset their password after the duration.
+   *
+   * @generated from field: google.protobuf.Duration password_rotation = 7;
+   */
+  passwordRotation?: Duration | undefined;
+};
+
+/**
+ * Describes the message laelia.store.PasswordRestrictionSetting.
+ * Use `create(PasswordRestrictionSettingSchema)` to create a new message.
+ */
+export declare const PasswordRestrictionSettingSchema: GenMessage<PasswordRestrictionSetting>;
+
+/**
  * S3ConfigSetting holds the connection details for the object storage used to
  * back file upload/download. When endpoint and bucket are both empty, S3 is
  * considered unconfigured and upload/download endpoints reject with

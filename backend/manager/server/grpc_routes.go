@@ -57,7 +57,7 @@ func configureV1Routers(
 	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)
 	machineService := apiv1.NewMachineService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager)
 	machineStreamService := apiv1.NewMachineStreamService(stores, cmdDispatcher)
-	settingService := apiv1.NewSettingService(stores, s3clientmanager, profile)
+	settingService := apiv1.NewSettingService(stores, s3clientmanager, profile, iamManager)
 	roleService := apiv1.NewRoleService(stores)
 	iamService := apiv1.NewIamService(stores, iamManager)
 	groupService := apiv1.NewGroupService(stores, iamManager)

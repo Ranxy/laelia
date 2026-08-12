@@ -8,6 +8,42 @@ import "v1/annotation.proto";
 
 option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
 
+// Setting is a workspace-level configuration resource. The resource name is
+// "settings/{setting}", where {setting} maps to laelia.store.SettingName in
+// lowercase (e.g. "settings/s3_config").
+message Setting {
+  // The resource name of the setting.
+  // Format: settings/{setting}
+  // Example: "settings/s3_config"
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // The configuration value of the setting.
+  SettingValue value = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// The data in setting value. Each branch corresponds to a stored setting
+// payload; the schema reuses the existing laelia.store messages so there is
+// exactly one source of truth.
+message SettingValue {
+  oneof value {
+    laelia.store.S3ConfigSetting s3_config = 1;
+    laelia.store.LlmAgentConfigSetting llm_agent_config = 2;
+    laelia.store.UserMcpConfigSetting user_mcp_config = 3;
+    laelia.store.WorkspaceProfileSetting workspace_profile = 4;
+    laelia.store.PasswordRestrictionSetting password_restriction = 5;
+  }
+}
+
+message GetSettingRequest {
+  // The resource name of the setting.
+  // Format: settings/{setting}
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateSettingRequest {
+  Setting setting = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
 message GetS3ConfigRequest {}
 
 message GetS3ConfigResponse {
@@ -78,17 +114,35 @@ message UpdateDebugConfigResponse {
   bool enabled = 1;
 }
 
-// SettingService exposes workspace-level configuration. It is admin-only; the
-// handlers enforce workspace admin membership and return
-// connect.CodePermissionDenied otherwise. The S3 secret_key is masked on read;
-// an update carrying a masked secret preserves the stored value.
+// SettingService exposes workspace-level configuration. GetSetting/UpdateSetting
+// are the unified resource-based accessors; the legacy per-setting RPCs are
+// deprecated and kept for compatibility. GetSetting is handler-gated (no
+// permission annotation): llm_agent_config and user_mcp_config are readable by
+// any authenticated member, all other settings require admin. UpdateSetting is
+// admin-only (laelia.settings.update). The S3 secret_key is masked on read; an
+// update carrying a masked secret preserves the stored value.
 service SettingService {
+  // GetSetting reads one workspace setting by resource name.
+  rpc GetSetting(GetSettingRequest) returns (Setting) {
+    option (laelia.v1.auth_method) = IAM;
+  }
+
+  // UpdateSetting writes one workspace setting. Admin (laelia.settings.update)
+  // only.
+  rpc UpdateSetting(UpdateSettingRequest) returns (Setting) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.settings.update";
+    option (laelia.v1.audit) = true;
+  }
+
   rpc GetS3Config(GetS3ConfigRequest) returns (GetS3ConfigResponse) {
+    option deprecated = true;
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.get";
   }
 
   rpc UpdateS3Config(UpdateS3ConfigRequest) returns (UpdateS3ConfigResponse) {
+    option deprecated = true;
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.update";
     option (laelia.v1.audit) = true;
@@ -98,12 +152,14 @@ service SettingService {
   // handler-gated (no permission annotation) so the agent create/edit forms —
   // which members use — can read the toggle without a settings permission.
   rpc GetLlmAgentConfig(GetLlmAgentConfigRequest) returns (GetLlmAgentConfigResponse) {
+    option deprecated = true;
     option (laelia.v1.auth_method) = IAM;
   }
 
   // UpdateLlmAgentConfig updates the workspace LLM agent configuration.
   // Admin (laelia.settings.update) only.
   rpc UpdateLlmAgentConfig(UpdateLlmAgentConfigRequest) returns (UpdateLlmAgentConfigResponse) {
+    option deprecated = true;
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.update";
     option (laelia.v1.audit) = true;
@@ -113,12 +169,14 @@ service SettingService {
   // It is handler-gated (no permission annotation) so any authenticated user
   // can render the personal MCP settings page.
   rpc GetUserMcpConfig(GetUserMcpConfigRequest) returns (GetUserMcpConfigResponse) {
+    option deprecated = true;
     option (laelia.v1.auth_method) = IAM;
   }
 
   // UpdateUserMcpConfig updates whether users may configure personal MCP
   // servers. Admin (laelia.settings.update) only.
   rpc UpdateUserMcpConfig(UpdateUserMcpConfigRequest) returns (UpdateUserMcpConfigResponse) {
+    option deprecated = true;
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.update";
     option (laelia.v1.audit) = true;
@@ -145,6 +203,7 @@ service SettingService {
   // GetWorkspaceGeneralSetting reads the workspace general setting (signup
   // policy, email suffix restriction, ...). Admin (laelia.settings.get) only.
   rpc GetWorkspaceGeneralSetting(GetWorkspaceGeneralSettingRequest) returns (GetWorkspaceGeneralSettingResponse) {
+    option deprecated = true;
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.get";
   }
@@ -152,6 +211,7 @@ service SettingService {
   // UpdateWorkspaceGeneralSetting updates the workspace general setting.
   // Admin (laelia.settings.update) only.
   rpc UpdateWorkspaceGeneralSetting(UpdateWorkspaceGeneralSettingRequest) returns (UpdateWorkspaceGeneralSettingResponse) {
+    option deprecated = true;
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.update";
     option (laelia.v1.audit) = true;

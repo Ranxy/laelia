@@ -206,9 +206,16 @@ export function MachineProfilePage() {
   // offered in the sheet.
   useEffect(() => {
     void useAppStore.getState().fetchApiProviders(undefined, { silent: true });
-    void settingServiceClient.getLlmAgentConfig({}).then((res) => {
-      setSelfProvidedKeysEnabled(res.config?.allowUserSelfProvidedKeys ?? true);
-    });
+    void settingServiceClient
+      .getSetting({ name: "settings/llm_agent_config" })
+      .then((res) => {
+        const v = res.value?.value;
+        setSelfProvidedKeysEnabled(
+          v?.case === "llmAgentConfig"
+            ? v.value.allowUserSelfProvidedKeys
+            : true
+        );
+      });
   }, []);
 
   // fetchPiModels loads the model list for a self-provided LLM API provider

@@ -188,11 +188,13 @@ export function SettingsMcpServersPage() {
     setLoading(true);
     try {
       const [cfgRes, myRes] = await Promise.all([
-        settingServiceClient.getUserMcpConfig({}),
+        settingServiceClient.getSetting({ name: "settings/user_mcp_config" }),
         mcpServerServiceClient.listMyMcpServers({ pageSize: 1000 }),
       ]);
-      setAllowUserMcp(cfgRes.config?.allowUserMcpServers ?? true);
-      setMcpIpPolicyEnabled(cfgRes.config?.mcpIpPolicy?.enabled ?? false);
+      const v = cfgRes.value?.value;
+      const cfg = v?.case === "userMcpConfig" ? v.value : undefined;
+      setAllowUserMcp(cfg?.allowUserMcpServers ?? true);
+      setMcpIpPolicyEnabled(cfg?.mcpIpPolicy?.enabled ?? false);
       setMyServers(myRes.mcpServers ?? []);
       if (isAdmin) {
         const [wsRes, allUserRes, userRes, groupRes] = await Promise.all([

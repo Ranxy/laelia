@@ -452,6 +452,7 @@
     - [GetLlmAgentConfigResponse](#laelia-v1-GetLlmAgentConfigResponse)
     - [GetS3ConfigRequest](#laelia-v1-GetS3ConfigRequest)
     - [GetS3ConfigResponse](#laelia-v1-GetS3ConfigResponse)
+    - [GetSettingRequest](#laelia-v1-GetSettingRequest)
     - [GetSetupStatusRequest](#laelia-v1-GetSetupStatusRequest)
     - [GetSetupStatusResponse](#laelia-v1-GetSetupStatusResponse)
     - [GetUserMcpConfigRequest](#laelia-v1-GetUserMcpConfigRequest)
@@ -460,6 +461,8 @@
     - [GetWorkspaceGeneralSettingResponse](#laelia-v1-GetWorkspaceGeneralSettingResponse)
     - [GetWorkspaceInfoRequest](#laelia-v1-GetWorkspaceInfoRequest)
     - [GetWorkspaceInfoResponse](#laelia-v1-GetWorkspaceInfoResponse)
+    - [Setting](#laelia-v1-Setting)
+    - [SettingValue](#laelia-v1-SettingValue)
     - [SetupItem](#laelia-v1-SetupItem)
     - [UpdateDebugConfigRequest](#laelia-v1-UpdateDebugConfigRequest)
     - [UpdateDebugConfigResponse](#laelia-v1-UpdateDebugConfigResponse)
@@ -467,6 +470,7 @@
     - [UpdateLlmAgentConfigResponse](#laelia-v1-UpdateLlmAgentConfigResponse)
     - [UpdateS3ConfigRequest](#laelia-v1-UpdateS3ConfigRequest)
     - [UpdateS3ConfigResponse](#laelia-v1-UpdateS3ConfigResponse)
+    - [UpdateSettingRequest](#laelia-v1-UpdateSettingRequest)
     - [UpdateUserMcpConfigRequest](#laelia-v1-UpdateUserMcpConfigRequest)
     - [UpdateUserMcpConfigResponse](#laelia-v1-UpdateUserMcpConfigResponse)
     - [UpdateWorkspaceGeneralSettingRequest](#laelia-v1-UpdateWorkspaceGeneralSettingRequest)
@@ -7593,6 +7597,21 @@ laelia.roles.* permissions.
 
 
 
+<a name="laelia-v1-GetSettingRequest"></a>
+
+### GetSettingRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The resource name of the setting. Format: settings/{setting} |
+
+
+
+
+
+
 <a name="laelia-v1-GetSetupStatusRequest"></a>
 
 ### GetSetupStatusRequest
@@ -7691,6 +7710,45 @@ signup is offered and which email suffixes are accepted.
 | disallow_signup | [bool](#bool) |  | Whether self-service signup is disallowed. When true, users can only be created by workspace admins. |
 | enforce_identity_domain | [bool](#bool) |  | Whether the email suffix restriction is enforced for signup. |
 | domains | [string](#string) | repeated | The allowed email suffixes (e.g. &#34;example.com&#34;) when enforce_identity_domain is set. |
+
+
+
+
+
+
+<a name="laelia-v1-Setting"></a>
+
+### Setting
+Setting is a workspace-level configuration resource. The resource name is
+&#34;settings/{setting}&#34;, where {setting} maps to laelia.store.SettingName in
+lowercase (e.g. &#34;settings/s3_config&#34;).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The resource name of the setting. Format: settings/{setting} Example: &#34;settings/s3_config&#34; |
+| value | [SettingValue](#laelia-v1-SettingValue) |  | The configuration value of the setting. |
+
+
+
+
+
+
+<a name="laelia-v1-SettingValue"></a>
+
+### SettingValue
+The data in setting value. Each branch corresponds to a stored setting
+payload; the schema reuses the existing laelia.store messages so there is
+exactly one source of truth.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| s3_config | [laelia.store.S3ConfigSetting](#laelia-store-S3ConfigSetting) |  |  |
+| llm_agent_config | [laelia.store.LlmAgentConfigSetting](#laelia-store-LlmAgentConfigSetting) |  |  |
+| user_mcp_config | [laelia.store.UserMcpConfigSetting](#laelia-store-UserMcpConfigSetting) |  |  |
+| workspace_profile | [laelia.store.WorkspaceProfileSetting](#laelia-store-WorkspaceProfileSetting) |  |  |
+| password_restriction | [laelia.store.PasswordRestrictionSetting](#laelia-store-PasswordRestrictionSetting) |  |  |
 
 
 
@@ -7805,6 +7863,21 @@ owns presentation (title/description/route) keyed by `id`.
 
 
 
+<a name="laelia-v1-UpdateSettingRequest"></a>
+
+### UpdateSettingRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| setting | [Setting](#laelia-v1-Setting) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-UpdateUserMcpConfigRequest"></a>
 
 ### UpdateUserMcpConfigRequest
@@ -7874,13 +7947,18 @@ owns presentation (title/description/route) keyed by `id`.
 <a name="laelia-v1-SettingService"></a>
 
 ### SettingService
-SettingService exposes workspace-level configuration. It is admin-only; the
-handlers enforce workspace admin membership and return
-connect.CodePermissionDenied otherwise. The S3 secret_key is masked on read;
-an update carrying a masked secret preserves the stored value.
+SettingService exposes workspace-level configuration. GetSetting/UpdateSetting
+are the unified resource-based accessors; the legacy per-setting RPCs are
+deprecated and kept for compatibility. GetSetting is handler-gated (no
+permission annotation): llm_agent_config and user_mcp_config are readable by
+any authenticated member, all other settings require admin. UpdateSetting is
+admin-only (laelia.settings.update). The S3 secret_key is masked on read; an
+update carrying a masked secret preserves the stored value.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
+| GetSetting | [GetSettingRequest](#laelia-v1-GetSettingRequest) | [Setting](#laelia-v1-Setting) | GetSetting reads one workspace setting by resource name. |
+| UpdateSetting | [UpdateSettingRequest](#laelia-v1-UpdateSettingRequest) | [Setting](#laelia-v1-Setting) | UpdateSetting writes one workspace setting. Admin (laelia.settings.update) only. |
 | GetS3Config | [GetS3ConfigRequest](#laelia-v1-GetS3ConfigRequest) | [GetS3ConfigResponse](#laelia-v1-GetS3ConfigResponse) |  |
 | UpdateS3Config | [UpdateS3ConfigRequest](#laelia-v1-UpdateS3ConfigRequest) | [UpdateS3ConfigResponse](#laelia-v1-UpdateS3ConfigResponse) |  |
 | GetLlmAgentConfig | [GetLlmAgentConfigRequest](#laelia-v1-GetLlmAgentConfigRequest) | [GetLlmAgentConfigResponse](#laelia-v1-GetLlmAgentConfigResponse) | GetLlmAgentConfig reads the workspace LLM agent configuration. It is handler-gated (no permission annotation) so the agent create/edit forms — which members use — can read the toggle without a settings permission. |

@@ -33,6 +33,12 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// SettingServiceGetSettingProcedure is the fully-qualified name of the SettingService's GetSetting
+	// RPC.
+	SettingServiceGetSettingProcedure = "/laelia.v1.SettingService/GetSetting"
+	// SettingServiceUpdateSettingProcedure is the fully-qualified name of the SettingService's
+	// UpdateSetting RPC.
+	SettingServiceUpdateSettingProcedure = "/laelia.v1.SettingService/UpdateSetting"
 	// SettingServiceGetS3ConfigProcedure is the fully-qualified name of the SettingService's
 	// GetS3Config RPC.
 	SettingServiceGetS3ConfigProcedure = "/laelia.v1.SettingService/GetS3Config"
@@ -73,21 +79,36 @@ const (
 
 // SettingServiceClient is a client for the laelia.v1.SettingService service.
 type SettingServiceClient interface {
+	// GetSetting reads one workspace setting by resource name.
+	GetSetting(context.Context, *connect.Request[v1.GetSettingRequest]) (*connect.Response[v1.Setting], error)
+	// UpdateSetting writes one workspace setting. Admin (laelia.settings.update)
+	// only.
+	UpdateSetting(context.Context, *connect.Request[v1.UpdateSettingRequest]) (*connect.Response[v1.Setting], error)
+	// Deprecated: do not use.
 	GetS3Config(context.Context, *connect.Request[v1.GetS3ConfigRequest]) (*connect.Response[v1.GetS3ConfigResponse], error)
+	// Deprecated: do not use.
 	UpdateS3Config(context.Context, *connect.Request[v1.UpdateS3ConfigRequest]) (*connect.Response[v1.UpdateS3ConfigResponse], error)
 	// GetLlmAgentConfig reads the workspace LLM agent configuration. It is
 	// handler-gated (no permission annotation) so the agent create/edit forms —
 	// which members use — can read the toggle without a settings permission.
+	//
+	// Deprecated: do not use.
 	GetLlmAgentConfig(context.Context, *connect.Request[v1.GetLlmAgentConfigRequest]) (*connect.Response[v1.GetLlmAgentConfigResponse], error)
 	// UpdateLlmAgentConfig updates the workspace LLM agent configuration.
 	// Admin (laelia.settings.update) only.
+	//
+	// Deprecated: do not use.
 	UpdateLlmAgentConfig(context.Context, *connect.Request[v1.UpdateLlmAgentConfigRequest]) (*connect.Response[v1.UpdateLlmAgentConfigResponse], error)
 	// GetUserMcpConfig reads whether users may configure personal MCP servers.
 	// It is handler-gated (no permission annotation) so any authenticated user
 	// can render the personal MCP settings page.
+	//
+	// Deprecated: do not use.
 	GetUserMcpConfig(context.Context, *connect.Request[v1.GetUserMcpConfigRequest]) (*connect.Response[v1.GetUserMcpConfigResponse], error)
 	// UpdateUserMcpConfig updates whether users may configure personal MCP
 	// servers. Admin (laelia.settings.update) only.
+	//
+	// Deprecated: do not use.
 	UpdateUserMcpConfig(context.Context, *connect.Request[v1.UpdateUserMcpConfigRequest]) (*connect.Response[v1.UpdateUserMcpConfigResponse], error)
 	// GetSetupStatus reports which required-config items are not yet configured,
 	// so the frontend can guide an admin to finish setting up the workspace.
@@ -96,9 +117,13 @@ type SettingServiceClient interface {
 	UpdateDebugConfig(context.Context, *connect.Request[v1.UpdateDebugConfigRequest]) (*connect.Response[v1.UpdateDebugConfigResponse], error)
 	// GetWorkspaceGeneralSetting reads the workspace general setting (signup
 	// policy, email suffix restriction, ...). Admin (laelia.settings.get) only.
+	//
+	// Deprecated: do not use.
 	GetWorkspaceGeneralSetting(context.Context, *connect.Request[v1.GetWorkspaceGeneralSettingRequest]) (*connect.Response[v1.GetWorkspaceGeneralSettingResponse], error)
 	// UpdateWorkspaceGeneralSetting updates the workspace general setting.
 	// Admin (laelia.settings.update) only.
+	//
+	// Deprecated: do not use.
 	UpdateWorkspaceGeneralSetting(context.Context, *connect.Request[v1.UpdateWorkspaceGeneralSettingRequest]) (*connect.Response[v1.UpdateWorkspaceGeneralSettingResponse], error)
 	// GetWorkspaceInfo returns the workspace signup policy for the
 	// unauthenticated sign-in/sign-up pages. No auth required.
@@ -116,6 +141,18 @@ func NewSettingServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 	baseURL = strings.TrimRight(baseURL, "/")
 	settingServiceMethods := v1.File_v1_setting_proto.Services().ByName("SettingService").Methods()
 	return &settingServiceClient{
+		getSetting: connect.NewClient[v1.GetSettingRequest, v1.Setting](
+			httpClient,
+			baseURL+SettingServiceGetSettingProcedure,
+			connect.WithSchema(settingServiceMethods.ByName("GetSetting")),
+			connect.WithClientOptions(opts...),
+		),
+		updateSetting: connect.NewClient[v1.UpdateSettingRequest, v1.Setting](
+			httpClient,
+			baseURL+SettingServiceUpdateSettingProcedure,
+			connect.WithSchema(settingServiceMethods.ByName("UpdateSetting")),
+			connect.WithClientOptions(opts...),
+		),
 		getS3Config: connect.NewClient[v1.GetS3ConfigRequest, v1.GetS3ConfigResponse](
 			httpClient,
 			baseURL+SettingServiceGetS3ConfigProcedure,
@@ -193,6 +230,8 @@ func NewSettingServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 
 // settingServiceClient implements SettingServiceClient.
 type settingServiceClient struct {
+	getSetting                    *connect.Client[v1.GetSettingRequest, v1.Setting]
+	updateSetting                 *connect.Client[v1.UpdateSettingRequest, v1.Setting]
 	getS3Config                   *connect.Client[v1.GetS3ConfigRequest, v1.GetS3ConfigResponse]
 	updateS3Config                *connect.Client[v1.UpdateS3ConfigRequest, v1.UpdateS3ConfigResponse]
 	getLlmAgentConfig             *connect.Client[v1.GetLlmAgentConfigRequest, v1.GetLlmAgentConfigResponse]
@@ -207,32 +246,54 @@ type settingServiceClient struct {
 	getWorkspaceInfo              *connect.Client[v1.GetWorkspaceInfoRequest, v1.GetWorkspaceInfoResponse]
 }
 
+// GetSetting calls laelia.v1.SettingService.GetSetting.
+func (c *settingServiceClient) GetSetting(ctx context.Context, req *connect.Request[v1.GetSettingRequest]) (*connect.Response[v1.Setting], error) {
+	return c.getSetting.CallUnary(ctx, req)
+}
+
+// UpdateSetting calls laelia.v1.SettingService.UpdateSetting.
+func (c *settingServiceClient) UpdateSetting(ctx context.Context, req *connect.Request[v1.UpdateSettingRequest]) (*connect.Response[v1.Setting], error) {
+	return c.updateSetting.CallUnary(ctx, req)
+}
+
 // GetS3Config calls laelia.v1.SettingService.GetS3Config.
+//
+// Deprecated: do not use.
 func (c *settingServiceClient) GetS3Config(ctx context.Context, req *connect.Request[v1.GetS3ConfigRequest]) (*connect.Response[v1.GetS3ConfigResponse], error) {
 	return c.getS3Config.CallUnary(ctx, req)
 }
 
 // UpdateS3Config calls laelia.v1.SettingService.UpdateS3Config.
+//
+// Deprecated: do not use.
 func (c *settingServiceClient) UpdateS3Config(ctx context.Context, req *connect.Request[v1.UpdateS3ConfigRequest]) (*connect.Response[v1.UpdateS3ConfigResponse], error) {
 	return c.updateS3Config.CallUnary(ctx, req)
 }
 
 // GetLlmAgentConfig calls laelia.v1.SettingService.GetLlmAgentConfig.
+//
+// Deprecated: do not use.
 func (c *settingServiceClient) GetLlmAgentConfig(ctx context.Context, req *connect.Request[v1.GetLlmAgentConfigRequest]) (*connect.Response[v1.GetLlmAgentConfigResponse], error) {
 	return c.getLlmAgentConfig.CallUnary(ctx, req)
 }
 
 // UpdateLlmAgentConfig calls laelia.v1.SettingService.UpdateLlmAgentConfig.
+//
+// Deprecated: do not use.
 func (c *settingServiceClient) UpdateLlmAgentConfig(ctx context.Context, req *connect.Request[v1.UpdateLlmAgentConfigRequest]) (*connect.Response[v1.UpdateLlmAgentConfigResponse], error) {
 	return c.updateLlmAgentConfig.CallUnary(ctx, req)
 }
 
 // GetUserMcpConfig calls laelia.v1.SettingService.GetUserMcpConfig.
+//
+// Deprecated: do not use.
 func (c *settingServiceClient) GetUserMcpConfig(ctx context.Context, req *connect.Request[v1.GetUserMcpConfigRequest]) (*connect.Response[v1.GetUserMcpConfigResponse], error) {
 	return c.getUserMcpConfig.CallUnary(ctx, req)
 }
 
 // UpdateUserMcpConfig calls laelia.v1.SettingService.UpdateUserMcpConfig.
+//
+// Deprecated: do not use.
 func (c *settingServiceClient) UpdateUserMcpConfig(ctx context.Context, req *connect.Request[v1.UpdateUserMcpConfigRequest]) (*connect.Response[v1.UpdateUserMcpConfigResponse], error) {
 	return c.updateUserMcpConfig.CallUnary(ctx, req)
 }
@@ -253,11 +314,15 @@ func (c *settingServiceClient) UpdateDebugConfig(ctx context.Context, req *conne
 }
 
 // GetWorkspaceGeneralSetting calls laelia.v1.SettingService.GetWorkspaceGeneralSetting.
+//
+// Deprecated: do not use.
 func (c *settingServiceClient) GetWorkspaceGeneralSetting(ctx context.Context, req *connect.Request[v1.GetWorkspaceGeneralSettingRequest]) (*connect.Response[v1.GetWorkspaceGeneralSettingResponse], error) {
 	return c.getWorkspaceGeneralSetting.CallUnary(ctx, req)
 }
 
 // UpdateWorkspaceGeneralSetting calls laelia.v1.SettingService.UpdateWorkspaceGeneralSetting.
+//
+// Deprecated: do not use.
 func (c *settingServiceClient) UpdateWorkspaceGeneralSetting(ctx context.Context, req *connect.Request[v1.UpdateWorkspaceGeneralSettingRequest]) (*connect.Response[v1.UpdateWorkspaceGeneralSettingResponse], error) {
 	return c.updateWorkspaceGeneralSetting.CallUnary(ctx, req)
 }
@@ -269,21 +334,36 @@ func (c *settingServiceClient) GetWorkspaceInfo(ctx context.Context, req *connec
 
 // SettingServiceHandler is an implementation of the laelia.v1.SettingService service.
 type SettingServiceHandler interface {
+	// GetSetting reads one workspace setting by resource name.
+	GetSetting(context.Context, *connect.Request[v1.GetSettingRequest]) (*connect.Response[v1.Setting], error)
+	// UpdateSetting writes one workspace setting. Admin (laelia.settings.update)
+	// only.
+	UpdateSetting(context.Context, *connect.Request[v1.UpdateSettingRequest]) (*connect.Response[v1.Setting], error)
+	// Deprecated: do not use.
 	GetS3Config(context.Context, *connect.Request[v1.GetS3ConfigRequest]) (*connect.Response[v1.GetS3ConfigResponse], error)
+	// Deprecated: do not use.
 	UpdateS3Config(context.Context, *connect.Request[v1.UpdateS3ConfigRequest]) (*connect.Response[v1.UpdateS3ConfigResponse], error)
 	// GetLlmAgentConfig reads the workspace LLM agent configuration. It is
 	// handler-gated (no permission annotation) so the agent create/edit forms —
 	// which members use — can read the toggle without a settings permission.
+	//
+	// Deprecated: do not use.
 	GetLlmAgentConfig(context.Context, *connect.Request[v1.GetLlmAgentConfigRequest]) (*connect.Response[v1.GetLlmAgentConfigResponse], error)
 	// UpdateLlmAgentConfig updates the workspace LLM agent configuration.
 	// Admin (laelia.settings.update) only.
+	//
+	// Deprecated: do not use.
 	UpdateLlmAgentConfig(context.Context, *connect.Request[v1.UpdateLlmAgentConfigRequest]) (*connect.Response[v1.UpdateLlmAgentConfigResponse], error)
 	// GetUserMcpConfig reads whether users may configure personal MCP servers.
 	// It is handler-gated (no permission annotation) so any authenticated user
 	// can render the personal MCP settings page.
+	//
+	// Deprecated: do not use.
 	GetUserMcpConfig(context.Context, *connect.Request[v1.GetUserMcpConfigRequest]) (*connect.Response[v1.GetUserMcpConfigResponse], error)
 	// UpdateUserMcpConfig updates whether users may configure personal MCP
 	// servers. Admin (laelia.settings.update) only.
+	//
+	// Deprecated: do not use.
 	UpdateUserMcpConfig(context.Context, *connect.Request[v1.UpdateUserMcpConfigRequest]) (*connect.Response[v1.UpdateUserMcpConfigResponse], error)
 	// GetSetupStatus reports which required-config items are not yet configured,
 	// so the frontend can guide an admin to finish setting up the workspace.
@@ -292,9 +372,13 @@ type SettingServiceHandler interface {
 	UpdateDebugConfig(context.Context, *connect.Request[v1.UpdateDebugConfigRequest]) (*connect.Response[v1.UpdateDebugConfigResponse], error)
 	// GetWorkspaceGeneralSetting reads the workspace general setting (signup
 	// policy, email suffix restriction, ...). Admin (laelia.settings.get) only.
+	//
+	// Deprecated: do not use.
 	GetWorkspaceGeneralSetting(context.Context, *connect.Request[v1.GetWorkspaceGeneralSettingRequest]) (*connect.Response[v1.GetWorkspaceGeneralSettingResponse], error)
 	// UpdateWorkspaceGeneralSetting updates the workspace general setting.
 	// Admin (laelia.settings.update) only.
+	//
+	// Deprecated: do not use.
 	UpdateWorkspaceGeneralSetting(context.Context, *connect.Request[v1.UpdateWorkspaceGeneralSettingRequest]) (*connect.Response[v1.UpdateWorkspaceGeneralSettingResponse], error)
 	// GetWorkspaceInfo returns the workspace signup policy for the
 	// unauthenticated sign-in/sign-up pages. No auth required.
@@ -308,6 +392,18 @@ type SettingServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewSettingServiceHandler(svc SettingServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	settingServiceMethods := v1.File_v1_setting_proto.Services().ByName("SettingService").Methods()
+	settingServiceGetSettingHandler := connect.NewUnaryHandler(
+		SettingServiceGetSettingProcedure,
+		svc.GetSetting,
+		connect.WithSchema(settingServiceMethods.ByName("GetSetting")),
+		connect.WithHandlerOptions(opts...),
+	)
+	settingServiceUpdateSettingHandler := connect.NewUnaryHandler(
+		SettingServiceUpdateSettingProcedure,
+		svc.UpdateSetting,
+		connect.WithSchema(settingServiceMethods.ByName("UpdateSetting")),
+		connect.WithHandlerOptions(opts...),
+	)
 	settingServiceGetS3ConfigHandler := connect.NewUnaryHandler(
 		SettingServiceGetS3ConfigProcedure,
 		svc.GetS3Config,
@@ -382,6 +478,10 @@ func NewSettingServiceHandler(svc SettingServiceHandler, opts ...connect.Handler
 	)
 	return "/laelia.v1.SettingService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case SettingServiceGetSettingProcedure:
+			settingServiceGetSettingHandler.ServeHTTP(w, r)
+		case SettingServiceUpdateSettingProcedure:
+			settingServiceUpdateSettingHandler.ServeHTTP(w, r)
 		case SettingServiceGetS3ConfigProcedure:
 			settingServiceGetS3ConfigHandler.ServeHTTP(w, r)
 		case SettingServiceUpdateS3ConfigProcedure:
@@ -414,6 +514,14 @@ func NewSettingServiceHandler(svc SettingServiceHandler, opts ...connect.Handler
 
 // UnimplementedSettingServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedSettingServiceHandler struct{}
+
+func (UnimplementedSettingServiceHandler) GetSetting(context.Context, *connect.Request[v1.GetSettingRequest]) (*connect.Response[v1.Setting], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.GetSetting is not implemented"))
+}
+
+func (UnimplementedSettingServiceHandler) UpdateSetting(context.Context, *connect.Request[v1.UpdateSettingRequest]) (*connect.Response[v1.Setting], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.UpdateSetting is not implemented"))
+}
 
 func (UnimplementedSettingServiceHandler) GetS3Config(context.Context, *connect.Request[v1.GetS3ConfigRequest]) (*connect.Response[v1.GetS3ConfigResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.GetS3Config is not implemented"))
