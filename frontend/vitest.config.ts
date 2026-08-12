@@ -17,8 +17,7 @@ export default mergeConfig(
         provider: "v8",
         include: [
           "src/stores/**",
-          "src/pages/auth/**",
-          "src/pages/dashboard/settings-*.tsx",
+          "src/pages/**",
           "src/router/auth-redirect.ts",
         ],
         exclude: ["**/*.test.*", "**/*.spec.*", "src/test/**"],
