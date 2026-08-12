@@ -127,20 +127,36 @@ func (s *MachineService) ListMachines(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, err
 	}
-	limitPlusOne := offset.limit + 1
 
-	machines, err := s.store.ListMachines(ctx, &store.FindMachineMessage{
-		Limit:       &limitPlusOne,
-		Offset:      &offset.offset,
-		ShowDeleted: req.Msg.ShowDeleted,
-	})
+	// Visibility is per-machine (creator or laelia.machines.createAgent on the
+	// machine), so the whole roster is fetched and filtered in the handler and
+	// then paginated in memory. Machine counts are small (a workspace has a
+	// handful of hosts), so this stays cheap.
+	machines, err := s.store.ListMachines(ctx, &store.FindMachineMessage{ShowDeleted: req.Msg.ShowDeleted})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to list machines, error: %v", err))
 	}
 
+	caller, _ := GetUserFromContext(ctx)
+	visible := make([]*store.MachineMessage, 0, len(machines))
+	for _, m := range machines {
+		if canSeeMachine(ctx, s.iam, caller, m) {
+			visible = append(visible, m)
+		}
+	}
+
+	start := offset.offset
+	if start > len(visible) {
+		start = len(visible)
+	}
+	end := start + offset.limit
+	if end > len(visible) {
+		end = len(visible)
+	}
+	page := visible[start:end]
+
 	nextPageToken := ""
-	if len(machines) == limitPlusOne {
-		machines = machines[:offset.limit]
+	if end < len(visible) {
 		if nextPageToken, err = offset.getNextPageToken(); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to marshal next page token, error: %v", err))
 		}
@@ -148,8 +164,8 @@ func (s *MachineService) ListMachines(ctx context.Context, req *connect.Request[
 
 	// One batched count query for the whole page instead of a ListAgents query
 	// per row, so a page of N machines costs 2 queries, not N+1.
-	machineIDs := make([]int, 0, len(machines))
-	for _, m := range machines {
+	machineIDs := make([]int, 0, len(page))
+	for _, m := range page {
 		machineIDs = append(machineIDs, m.ID)
 	}
 	agentCounts, err := s.store.CountAgentsByMachine(ctx, machineIDs)
@@ -160,11 +176,10 @@ func (s *MachineService) ListMachines(ctx context.Context, req *connect.Request[
 	// machines.edit / machines.delete are workspace-scope permissions, so the
 	// IAM lookups are done once for the whole page; per machine only the
 	// creator comparison varies (a page of N machines stays 2 queries, not N+1).
-	caller, _ := GetUserFromContext(ctx)
 	canEdit := s.canEditMachine(ctx, caller)
 	canDelete := canDeleteMachineByPermission(ctx, s.iam, caller)
 	resp := &v1pb.ListMachinesResponse{NextPageToken: nextPageToken}
-	for _, m := range machines {
+	for _, m := range page {
 		summary := convertToMachineSummary(m, agentCounts[m.ID])
 		summary.CanEdit = canEdit
 		summary.CanManage = canEdit || isMachineCreator(caller, m)
@@ -201,6 +216,21 @@ func canDeleteMachine(ctx context.Context, im *iam.Manager, user *store.UserMess
 	return canDeleteMachineByPermission(ctx, im, user)
 }
 
+// canSeeMachine reports whether the caller may see a machine: its creator or a
+// principal who may create agents on it (laelia.machines.createAgent on the
+// machine — workspace admins via the workspace-scoped permission, or
+// roles/machineAgentCreator bound in the machine's IAM policy). Visibility
+// deliberately equals the create-agent rule: a user granted "who can create
+// agents" on a machine may see it. Fail-closed: a nil caller, nil manager, or
+// a lookup error denies.
+func canSeeMachine(ctx context.Context, im *iam.Manager, user *store.UserMessage, machine *store.MachineMessage) bool {
+	if user == nil || im == nil {
+		return false
+	}
+	ok, err := canCreateAgentOnMachine(ctx, im, user, machine)
+	return err == nil && ok
+}
+
 func (s *MachineService) GetMachine(ctx context.Context, req *connect.Request[v1pb.GetMachineRequest]) (*connect.Response[v1pb.Machine], error) {
 	resourceID, err := common.GetMachineResourceID(req.Msg.Name)
 	if err != nil {
@@ -213,12 +243,17 @@ func (s *MachineService) GetMachine(ctx context.Context, req *connect.Request[v1
 	if machine == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
 	}
-	out := convertToMachine(machine)
 	caller, _ := GetUserFromContext(ctx)
-	out.CanEdit = s.canEditMachine(ctx, caller)
-	if create, err := canCreateAgentOnMachine(ctx, s.iam, caller, machine); err == nil {
-		out.CanCreateAgent = create
+	// An invisible machine is indistinguishable from a missing one (NotFound),
+	// so existence is not leaked to users without access.
+	if !canSeeMachine(ctx, s.iam, caller, machine) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
 	}
+	out := convertToMachine(machine)
+	out.CanEdit = s.canEditMachine(ctx, caller)
+	// Visibility is granted by the create-agent rule, so a visible machine
+	// always allows agent creation for this caller.
+	out.CanCreateAgent = true
 	out.CanManage = isMachineAdmin(ctx, s.iam, caller, machine)
 	return connect.NewResponse(out), nil
 }
@@ -470,6 +505,12 @@ func (s *MachineService) ListMachineAgents(ctx context.Context, req *connect.Req
 	if machine == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
 	}
+	caller, _ := GetUserFromContext(ctx)
+	// Same visibility rule as GetMachine: an invisible machine is
+	// indistinguishable from a missing one.
+	if !canSeeMachine(ctx, s.iam, caller, machine) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
+	}
 
 	agents, err := s.store.ListAgents(ctx, &store.FindAgentMessage{MachineID: &machine.ID})
 	if err != nil {
@@ -480,7 +521,6 @@ func (s *MachineService) ListMachineAgents(ctx context.Context, req *connect.Req
 	// agents.edit lookup for the whole roster plus the per-row owner comparison
 	// (per-agent policy bindings are not consulted, so a custom role bound on
 	// the agent may still delete server-side while the UI hides the button).
-	caller, _ := GetUserFromContext(ctx)
 	canDelete := canDeleteAgentWorkspace(ctx, s.iam, caller)
 	resp := &v1pb.ListMachineAgentsResponse{}
 	for _, agent := range agents {
