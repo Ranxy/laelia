@@ -1,6 +1,6 @@
 import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ModelCombobox } from "./combobox";
 
 (
@@ -37,8 +37,17 @@ function Harness({ initial = "" }: { initial?: string }) {
 }
 
 describe("ModelCombobox", () => {
+  beforeEach(() => {
+    // The combobox closes 120ms after blur; fake timers keep that pending
+    // timer deterministic so it can't fire after the jsdom environment is
+    // torn down (vitest reports that as an unhandled "window is not defined").
+    vi.useFakeTimers();
+  });
+
   afterEach(() => {
     document.body.innerHTML = "";
+    vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   test("filtering the options by typed text and selecting one commits its id", async () => {
