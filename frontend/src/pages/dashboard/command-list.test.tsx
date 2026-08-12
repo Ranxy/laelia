@@ -1,8 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import {
   createBrowserRouter,
+  MemoryRouter,
+  Route,
   type RouteObject,
   RouterProvider,
+  Routes,
   redirect,
 } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,8 +17,10 @@ import { authRoutes } from "@/router/routes/auth";
 import { dashboardRoutes } from "@/router/routes/dashboard";
 import { useAppStore } from "@/stores";
 import type { ChatMessage, Command } from "@/types/proto-es/v1/command_pb";
+import { CommandStatus } from "@/types/proto-es/v1/command_pb";
 import type { MachineSummary } from "@/types/proto-es/v1/machine_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";
+import { CommandListPage } from "./command-list";
 
 // Regression: command rows (and the detail back button) must navigate to the
 // canonical /members/agents/... routes. The legacy /agents/... redirect route
@@ -150,5 +155,217 @@ describe("command row click navigation", () => {
       { timeout: 3000 }
     );
     expect(fetchMembers).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("command list page", () => {
+  function renderListPage() {
+    return render(
+      <MemoryRouter initialEntries={["/members/agents/a/commands"]}>
+        <Routes>
+          <Route
+            path="/members/agents/:agentId/commands"
+            element={<CommandListPage />}
+          />
+          <Route
+            path="/members/agents/:agentId/commands/:commandId"
+            element={<div data-testid="detail" />}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
+  function cmd(name: string, summary: string): Command {
+    return {
+      name,
+      status: CommandStatus.COMPLETED,
+      finalSummary: summary,
+    } as unknown as Command;
+  }
+
+  beforeEach(() => {
+    seedStore();
+  });
+
+  it("shows the loading row while commands are being fetched", () => {
+    useAppStore.setState({ commands: [], commandsLoading: true });
+
+    renderListPage();
+
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
+  });
+
+  it("shows the empty state and opens the new-task sheet from it", async () => {
+    useAppStore.setState({ commands: [], commandsLoading: false });
+
+    renderListPage();
+
+    expect(
+      await screen.findByText("No tasks yet", {}, { timeout: 3000 })
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create your first task" })
+    );
+    expect(
+      await screen.findByText("Send a task to agent a", {}, { timeout: 3000 })
+    ).toBeInTheDocument();
+  });
+
+  it("filters the list by status", async () => {
+    const listCommands = vi.fn(async () => ({
+      commands: [],
+      nextPageToken: "",
+    }));
+    useAppStore.setState({
+      commands: [],
+      commandsLoading: false,
+      listCommands,
+    });
+
+    renderListPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Running" }, { timeout: 3000 })
+    );
+    await waitFor(
+      () =>
+        expect(listCommands).toHaveBeenCalledWith(
+          "agents/a",
+          expect.objectContaining({ status: CommandStatus.RUNNING })
+        ),
+      { timeout: 3000 }
+    );
+  });
+
+  it("paginates with next/prev", async () => {
+    // The real store listCommands writes the fetched page into the store; the
+    // mock mirrors that so the table re-renders per page.
+    const listCommands = vi.fn(
+      async (
+        _agent: string,
+        params?: { pageSize?: number; pageToken?: string; status?: number }
+      ) => {
+        const page =
+          params?.pageToken === "tok2"
+            ? {
+                commands: [cmd("agents/a/commands/c2", "two")],
+                nextPageToken: "",
+              }
+            : {
+                commands: [cmd("agents/a/commands/c1", "one")],
+                nextPageToken: "tok2",
+              };
+        useAppStore.setState({ commands: page.commands });
+        return page;
+      }
+    );
+    useAppStore.setState({
+      commands: [cmd("agents/a/commands/c1", "one")],
+      commandsLoading: false,
+      listCommands,
+    });
+
+    renderListPage();
+
+    expect(
+      await screen.findByText("one", {}, { timeout: 3000 })
+    ).toBeInTheDocument();
+    expect(screen.getByText("Page 1")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(
+      await screen.findByText("two", {}, { timeout: 3000 })
+    ).toBeInTheDocument();
+    expect(screen.getByText("Page 2")).toBeInTheDocument();
+    expect(listCommands).toHaveBeenCalledWith(
+      "agents/a",
+      expect.objectContaining({ pageToken: "tok2" })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Prev" }));
+    expect(
+      await screen.findByText("one", {}, { timeout: 3000 })
+    ).toBeInTheDocument();
+    expect(screen.getByText("Page 1")).toBeInTheDocument();
+  });
+
+  it("sends a new task from the sheet", async () => {
+    const sendChatMessage = vi.fn(async () => ({}) as ChatMessage);
+    const listCommands = vi.fn(async () => ({
+      commands: [],
+      nextPageToken: "",
+    }));
+    useAppStore.setState({
+      commands: [],
+      commandsLoading: false,
+      sendChatMessage,
+      listCommands,
+    });
+
+    renderListPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "New Task" }, { timeout: 3000 })
+    );
+    const textarea = await screen.findByPlaceholderText(
+      /Read config\.yaml/,
+      {},
+      { timeout: 3000 }
+    );
+    fireEvent.change(textarea, { target: { value: "list ports" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(
+      () =>
+        expect(sendChatMessage).toHaveBeenCalledWith("agents/a", "list ports"),
+      { timeout: 3000 }
+    );
+    await waitFor(
+      () =>
+        expect(
+          screen.queryByPlaceholderText(/Read config\.yaml/)
+        ).not.toBeInTheDocument(),
+      { timeout: 3000 }
+    );
+  });
+
+  it("expands the final summary in a sheet", async () => {
+    useAppStore.setState({
+      commands: [cmd("agents/a/commands/c1", "long summary text")],
+      commandsLoading: false,
+    });
+
+    renderListPage();
+
+    fireEvent.click(
+      await screen.findByRole(
+        "button",
+        { name: "Show final summary" },
+        { timeout: 3000 }
+      )
+    );
+    // The sheet title joins the table header, confirming the sheet opened.
+    expect(
+      await screen.findAllByText("Final Summary", {}, { timeout: 3000 })
+    ).toHaveLength(2);
+    expect(screen.getAllByText(/long summary text/).length).toBeGreaterThan(0);
+  });
+
+  it("opens the detail page when a row is activated with the keyboard", async () => {
+    useAppStore.setState({
+      commands: [cmd("agents/a/commands/c1", "done")],
+      commandsLoading: false,
+    });
+
+    renderListPage();
+
+    const row = (
+      await screen.findByText("done", {}, { timeout: 3000 })
+    ).closest("tr")!;
+    fireEvent.keyDown(row, { key: "Enter" });
+    expect(
+      await screen.findByTestId("detail", {}, { timeout: 3000 })
+    ).toBeInTheDocument();
   });
 });

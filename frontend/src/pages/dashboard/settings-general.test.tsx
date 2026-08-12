@@ -188,4 +188,148 @@ describe("settings-general", () => {
       screen.queryByText(EMAIL_VERIFICATION_LABEL)
     ).not.toBeInTheDocument();
   });
+
+  it("shows the loading spinner while the profile is being fetched", () => {
+    mock.getSetting.mockReturnValue(new Promise(() => {}));
+
+    const { container } = renderPage();
+
+    expect(container.querySelector("svg.animate-spin")).toBeInTheDocument();
+  });
+
+  it("toasts an error when the profile fails to load", async () => {
+    mock.getSetting.mockRejectedValue(new Error("network down"));
+
+    renderPage();
+
+    await waitFor(
+      () =>
+        expect(toastMock.add).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "error",
+            title: "settings.general.load-failed",
+          })
+        ),
+      { timeout: 3000 }
+    );
+  });
+
+  it("sends a field-level update for only the disallow-signup path when toggled", async () => {
+    mock.getSetting.mockResolvedValue(settingResponse(profile()));
+    mock.updateSetting.mockResolvedValue(
+      settingResponse(profile({ disallowSignup: true }))
+    );
+
+    renderPage();
+    const sw = await waitFor(() => rowSwitch("settings.general.allow-signup"));
+    fireEvent.click(sw);
+
+    await waitFor(() => expect(mock.updateSetting).toHaveBeenCalledTimes(1));
+    const req = mock.updateSetting.mock.calls[0][0] as UpdateSettingRequest;
+    expect(req.updateMask?.paths).toEqual([
+      "value.workspace_profile.disallow_signup",
+    ]);
+    const sent = req.setting?.value?.value?.value as
+      | WorkspaceProfileSetting
+      | undefined;
+    expect(sent?.disallowSignup).toBe(true);
+  });
+
+  it("rolls the signup switch back and toasts when the save fails", async () => {
+    mock.getSetting.mockResolvedValue(settingResponse(profile()));
+    mock.updateSetting.mockRejectedValue(new Error("boom"));
+
+    renderPage();
+    const sw = await waitFor(() => rowSwitch("settings.general.allow-signup"));
+    fireEvent.click(sw);
+
+    await waitFor(() => expect(sw).toBeChecked());
+    expect(toastMock.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "error",
+        title: "settings.general.save-failed",
+      })
+    );
+  });
+
+  it("toggles identity-domain enforcement and reveals the domains editor", async () => {
+    mock.getSetting.mockResolvedValue(settingResponse(profile()));
+    mock.updateSetting.mockResolvedValue(
+      settingResponse(profile({ enforceIdentityDomain: true }))
+    );
+
+    renderPage();
+    const sw = await waitFor(() =>
+      rowSwitch("settings.general.enforce-domain")
+    );
+    fireEvent.click(sw);
+
+    await waitFor(() => expect(mock.updateSetting).toHaveBeenCalledTimes(1));
+    const req = mock.updateSetting.mock.calls[0][0] as UpdateSettingRequest;
+    expect(req.updateMask?.paths).toEqual([
+      "value.workspace_profile.enforce_identity_domain",
+    ]);
+    expect(
+      await screen.findByLabelText(
+        "settings.general.domains",
+        {},
+        { timeout: 3000 }
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("saves the parsed domains list", async () => {
+    mock.getSetting.mockResolvedValue(
+      settingResponse(profile({ enforceIdentityDomain: true, domains: [] }))
+    );
+    mock.updateSetting.mockResolvedValue(
+      settingResponse(
+        profile({
+          enforceIdentityDomain: true,
+          domains: ["example.com", "foo.com"],
+        })
+      )
+    );
+
+    renderPage();
+    const textarea = await screen.findByLabelText(
+      "settings.general.domains",
+      {},
+      { timeout: 3000 }
+    );
+    fireEvent.change(textarea, {
+      target: { value: "Example.com\n@foo.com\n\n" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "common.save" }));
+
+    await waitFor(() => expect(mock.updateSetting).toHaveBeenCalledTimes(1));
+    const req = mock.updateSetting.mock.calls[0][0] as UpdateSettingRequest;
+    expect(req.updateMask?.paths).toEqual(["value.workspace_profile.domains"]);
+    const sent = req.setting?.value?.value?.value as
+      | WorkspaceProfileSetting
+      | undefined;
+    expect(sent?.domains).toEqual(["example.com", "foo.com"]);
+    expect(toastMock.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "success",
+        title: "settings.general.saved",
+      })
+    );
+  });
+
+  it("keeps the domains save button disabled until the list changes", async () => {
+    mock.getSetting.mockResolvedValue(
+      settingResponse(
+        profile({ enforceIdentityDomain: true, domains: ["example.com"] })
+      )
+    );
+
+    renderPage();
+    await screen.findByLabelText(
+      "settings.general.domains",
+      {},
+      { timeout: 3000 }
+    );
+    expect(screen.getByRole("button", { name: "common.save" })).toBeDisabled();
+  });
 });
