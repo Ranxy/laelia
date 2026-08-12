@@ -107,6 +107,7 @@ export function SettingsGeneralPage() {
             case: "workspaceProfile" as const,
             value: {
               disallowSignup: !next.allowSignup,
+              requireEmailVerification: next.requireEmailVerification,
               enforceIdentityDomain: next.enforceIdentityDomain,
               domains: parseDomains(next.domains),
             },
