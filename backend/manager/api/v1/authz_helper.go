@@ -67,6 +67,18 @@ func canCreateUser(ctx context.Context, checker PermissionChecker, caller *store
 	return checker.CheckPermission(ctx, permission.UsersCreate, caller, nil, nil)
 }
 
+// canDeleteUser authorizes DeleteUser/UndeleteUser calls: the caller must
+// hold the workspace-scope laelia.users.delete permission. There is no
+// self-service exception (deleting your own account is rejected by the
+// handler). Both RPCs are annotated IAM so the interceptor gates them; this
+// check runs in the handler as defense in depth.
+func canDeleteUser(ctx context.Context, checker PermissionChecker, caller *store.UserMessage) (bool, error) {
+	if caller == nil {
+		return false, nil
+	}
+	return checker.CheckPermission(ctx, permission.UsersDelete, caller, nil, nil)
+}
+
 // authorizeServiceAccountCreation gates service-account creation to callers
 // holding the workspace-scope laelia.users.create permission (workspace
 // admins). Service accounts receive a generated access key that authenticates

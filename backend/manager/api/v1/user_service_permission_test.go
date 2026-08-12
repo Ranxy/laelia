@@ -57,6 +57,49 @@ func TestUserUpdatePermission(t *testing.T) {
 	})
 }
 
+// TestUserDeletePermission covers the DeleteUser/UndeleteUser authorization:
+// the caller must hold the workspace-scope laelia.users.delete permission
+// (there is no self-service exception; deleting your own account is rejected
+// by the handler), and the checker failing closed must deny.
+func TestUserDeletePermission(t *testing.T) {
+	me := &store.UserMessage{ID: 1, Email: "me@example.com", Name: "me"}
+
+	t.Run("admin granted via checker", func(t *testing.T) {
+		checker := &fakeChecker{adminIDs: map[int]bool{1: true}}
+		ok, err := canDeleteUser(context.Background(), checker, me)
+		if err != nil || !ok {
+			t.Fatalf("admin must be allowed to delete users, ok=%v err=%v", ok, err)
+		}
+	})
+
+	t.Run("plain member denied", func(t *testing.T) {
+		ok, err := canDeleteUser(context.Background(), &fakeChecker{}, me)
+		if err != nil || ok {
+			t.Fatalf("plain member must be denied, ok=%v err=%v", ok, err)
+		}
+	})
+
+	t.Run("nil caller denied", func(t *testing.T) {
+		ok, err := canDeleteUser(context.Background(), iam.NewManager(nil), nil)
+		if err != nil || ok {
+			t.Fatalf("nil caller must be denied, ok=%v err=%v", ok, err)
+		}
+	})
+
+	t.Run("checker error propagated", func(t *testing.T) {
+		checker := &fakeChecker{err: context.DeadlineExceeded}
+		if _, err := canDeleteUser(context.Background(), checker, me); err == nil {
+			t.Fatal("checker error must be propagated")
+		}
+	})
+
+	// Guard: UsersDelete must stay out of the member baseline, otherwise
+	// delete/undelete become open to every workspace member.
+	if store.GetPredefinedRole(store.WorkspaceMemberRole).Permissions[permission.UsersDelete] {
+		t.Fatal("laelia.users.delete must not be in the workspaceMember baseline")
+	}
+}
+
 // TestUserCreatePermission covers the UpdateUser allow_missing fallback: it
 // requires the workspace-scope laelia.users.create permission so it cannot be
 // used as an open user-creation backdoor by plain members.

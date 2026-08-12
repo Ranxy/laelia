@@ -612,8 +612,13 @@ func (s *UserService) DeleteUser(ctx context.Context, request *connect.Request[v
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("failed to get caller user"))
 	}
 
-	// todo check permission
-
+	allowed, err := canDeleteUser(ctx, s.iam, caller)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check permission"))
+	}
+	if !allowed {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("permission %q denied", permission.UsersDelete))
+	}
 	userID, err := common.GetUserID(request.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
@@ -660,12 +665,17 @@ func (s *UserService) UndeleteUser(ctx context.Context, request *connect.Request
 		return nil, err
 	}
 
-	_, ok := GetUserFromContext(ctx)
+	caller, ok := GetUserFromContext(ctx)
 	if !ok {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("failed to get caller user"))
 	}
-	// todo check permission
-
+	allowed, err := canDeleteUser(ctx, s.iam, caller)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check permission"))
+	}
+	if !allowed {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("permission %q denied", permission.UsersDelete))
+	}
 	userID, err := common.GetUserID(request.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
