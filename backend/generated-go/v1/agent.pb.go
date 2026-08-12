@@ -2636,8 +2636,14 @@ type Agent struct {
 	// inherits the owner's other manage powers (rename, delete, transfer, roles).
 	// Default true.
 	CanManageChannelMembers bool `protobuf:"varint,20,opt,name=can_manage_channel_members,json=canManageChannelMembers,proto3" json:"can_manage_channel_members,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	// machine_title is the display name (title) of the machine this agent is
+	// bound to, resolved server-side by GetAgent so clients can render a
+	// human-readable machine name without a second GetMachine round-trip (the
+	// machine may be invisible to the caller, in which case GetMachine would
+	// return NotFound). Empty when the machine is missing.
+	MachineTitle  string `protobuf:"bytes,21,opt,name=machine_title,json=machineTitle,proto3" json:"machine_title,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Agent) Reset() {
@@ -2801,6 +2807,13 @@ func (x *Agent) GetCanManageChannelMembers() bool {
 		return x.CanManageChannelMembers
 	}
 	return false
+}
+
+func (x *Agent) GetMachineTitle() string {
+	if x != nil {
+		return x.MachineTitle
+	}
+	return ""
 }
 
 // AgentSummary is the lightweight list-view projection of an Agent returned by
@@ -3878,7 +3891,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\fHelloRequest\"Y\n" +
 	"\rHelloResponse\x12!\n" +
 	"\fcurrent_time\x18\x01 \x01(\x03R\vcurrentTime\x12%\n" +
-	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\x8b\a\n" +
+	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\xb5\a\n" +
 	"\x05Agent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -3903,7 +3916,8 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x18follow_owner_permissions\x18\x12 \x01(\bR\x16followOwnerPermissions\x12\x1f\n" +
 	"\vmcp_servers\x18\x13 \x03(\tR\n" +
 	"mcpServers\x12;\n" +
-	"\x1acan_manage_channel_members\x18\x14 \x01(\bR\x17canManageChannelMembers\x1a9\n" +
+	"\x1acan_manage_channel_members\x18\x14 \x01(\bR\x17canManageChannelMembers\x12(\n" +
+	"\rmachine_title\x18\x15 \x01(\tB\x03\xe0A\x03R\fmachineTitle\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:!\xeaA\x1e\n" +

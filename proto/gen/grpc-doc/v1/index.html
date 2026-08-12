@@ -2439,6 +2439,18 @@ inherits the owner&#39;s other manage powers (rename, delete, transfer, roles).
 Default true. </p></td>
                 </tr>
               
+              
+                <tr>
+                  <td>machine_title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>machine_title is the display name (title) of the machine this agent is
+bound to, resolved server-side by GetAgent so clients can render a
+human-readable machine name without a second GetMachine round-trip (the
+machine may be invisible to the caller, in which case GetMachine would
+return NotFound). Empty when the machine is missing. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 

@@ -642,6 +642,7 @@ RiskLevel is the risk level.
 | follow_owner_permissions | [bool](#bool) |  | follow_owner_permissions grants this agent read access to every channel (and DM) its owner can read, without requiring the agent to be added as a member. The agent can read and proactively join such channels; posting still requires explicit membership. Default true: the agent acts within its owner&#39;s channel visibility. |
 | mcp_servers | [string](#string) | repeated | mcp_servers is the set of MCP server resource names (mcpServers/{id}) enabled on this agent. The manager resolves them into a tool catalog when the agent starts; the machine never receives transport configuration. |
 | can_manage_channel_members | [bool](#bool) |  | can_manage_channel_members grants this agent the ability to add/remove members in a channel where its owner is a channel Admin or Owner. This is separate from follow_owner_permissions (which controls read visibility): the agent acts on its owner&#39;s behalf for member management only — it never inherits the owner&#39;s other manage powers (rename, delete, transfer, roles). Default true. |
+| machine_title | [string](#string) |  | machine_title is the display name (title) of the machine this agent is bound to, resolved server-side by GetAgent so clients can render a human-readable machine name without a second GetMachine round-trip (the machine may be invisible to the caller, in which case GetMachine would return NotFound). Empty when the machine is missing. |
 
 
 

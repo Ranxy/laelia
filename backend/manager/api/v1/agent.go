@@ -1200,6 +1200,14 @@ func (s *AgentService) convertToAgent(ctx context.Context, agent *store.AgentMes
 		CanManageChannelMembers: agent.CanManageChannelMembers,
 		Machine:                 common.FormatMachineUID(agent.MachineResourceID),
 	}
+	if agent.MachineID != 0 {
+		// The machine's display name rides along so clients can render a
+		// human-readable machine name without a second GetMachine round-trip
+		// (which would 404 for machines the caller may not see).
+		if machine, err := s.store.GetMachine(ctx, agent.MachineID); err == nil && machine != nil {
+			result.MachineTitle = machine.Name
+		}
+	}
 	if !agent.LastTokenRotatedAt.IsZero() {
 		result.LastTokenRotatedAt = timestamppb.New(agent.LastTokenRotatedAt)
 	}

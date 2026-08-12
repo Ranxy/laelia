@@ -1294,6 +1294,17 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
    * @generated from field: bool can_manage_channel_members = 20;
    */
   canManageChannelMembers: boolean;
+
+  /**
+   * machine_title is the display name (title) of the machine this agent is
+   * bound to, resolved server-side by GetAgent so clients can render a
+   * human-readable machine name without a second GetMachine round-trip (the
+   * machine may be invisible to the caller, in which case GetMachine would
+   * return NotFound). Empty when the machine is missing.
+   *
+   * @generated from field: string machine_title = 21;
+   */
+  machineTitle: string;
 };
 
 /**
