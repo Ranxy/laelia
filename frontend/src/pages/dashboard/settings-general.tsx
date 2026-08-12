@@ -1,4 +1,3 @@
-import { create } from "@bufbuild/protobuf";
 import { Loader2, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,9 +5,9 @@ import { PageLoading, SettingsPage } from "@/components/settings-page";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { settingServiceClient } from "@/connect";
 import { toastManager } from "@/lib/toast";
-import { SettingValueSchema } from "@/types/proto-es/v1/setting_pb";
+import { useAppStore } from "@/stores";
+import type { WorkspaceProfileSetting } from "@/types/proto-es/store/setting_pb";
 
 interface GeneralForm {
   allowSignup: boolean;
@@ -53,17 +52,13 @@ export function SettingsGeneralPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await settingServiceClient.getSetting({
-          name: "settings/workspace_profile",
-        });
+        const profile = await useAppStore.getState().fetchWorkspaceProfile();
         if (cancelled) return;
-        const v = res.value?.value;
-        const s = v?.case === "workspaceProfile" ? v.value : undefined;
         const next = {
-          allowSignup: !(s?.disallowSignup ?? false),
-          requireEmailVerification: s?.requireEmailVerification ?? true,
-          enforceIdentityDomain: s?.enforceIdentityDomain ?? false,
-          domains: (s?.domains ?? []).join("\n"),
+          allowSignup: !(profile?.disallowSignup ?? false),
+          requireEmailVerification: profile?.requireEmailVerification ?? true,
+          enforceIdentityDomain: profile?.enforceIdentityDomain ?? false,
+          domains: (profile?.domains ?? []).join("\n"),
         };
         setForm(next);
         setSaved(next);
@@ -82,40 +77,27 @@ export function SettingsGeneralPage() {
     };
   }, [t]);
 
-  function applyResponse(
-    res: Awaited<ReturnType<typeof settingServiceClient.updateSetting>>
-  ) {
-    const v = res.value?.value;
-    const s = v?.case === "workspaceProfile" ? v.value : undefined;
+  function applyProfile(profile: WorkspaceProfileSetting | undefined) {
     const next = {
-      allowSignup: !(s?.disallowSignup ?? false),
-      requireEmailVerification: s?.requireEmailVerification ?? true,
-      enforceIdentityDomain: s?.enforceIdentityDomain ?? false,
-      domains: (s?.domains ?? []).join("\n"),
+      allowSignup: !(profile?.disallowSignup ?? false),
+      requireEmailVerification: profile?.requireEmailVerification ?? true,
+      enforceIdentityDomain: profile?.enforceIdentityDomain ?? false,
+      domains: (profile?.domains ?? []).join("\n"),
     };
     setForm(next);
     setSaved(next);
   }
 
-  async function saveField(patch: Partial<GeneralForm>) {
-    const next = { ...form, ...patch };
-    const res = await settingServiceClient.updateSetting({
-      setting: {
-        name: "settings/workspace_profile",
-        value: create(SettingValueSchema, {
-          value: {
-            case: "workspaceProfile" as const,
-            value: {
-              disallowSignup: !next.allowSignup,
-              requireEmailVerification: next.requireEmailVerification,
-              enforceIdentityDomain: next.enforceIdentityDomain,
-              domains: parseDomains(next.domains),
-            },
-          },
-        }),
-      },
-    });
-    applyResponse(res);
+  // saveField sends a field-level update: only the mask-listed paths are
+  // written server-side, so unrelated fields are never round-tripped.
+  async function saveField(
+    patch: Partial<WorkspaceProfileSetting>,
+    paths: string[]
+  ) {
+    const profile = await useAppStore
+      .getState()
+      .updateWorkspaceProfile(patch, paths);
+    applyProfile(profile);
   }
 
   async function handleToggleSignup(v: boolean) {
@@ -123,7 +105,9 @@ export function SettingsGeneralPage() {
     setForm((f) => ({ ...f, allowSignup: v }));
     setSavingSignup(true);
     try {
-      await saveField({ allowSignup: v });
+      await saveField({ disallowSignup: !v }, [
+        "value.workspace_profile.disallow_signup",
+      ]);
     } catch (err) {
       setForm((f) => ({ ...f, allowSignup: prev }));
       toastManager.add({
@@ -141,7 +125,9 @@ export function SettingsGeneralPage() {
     setForm((f) => ({ ...f, enforceIdentityDomain: v }));
     setSavingDomain(true);
     try {
-      await saveField({ enforceIdentityDomain: v });
+      await saveField({ enforceIdentityDomain: v }, [
+        "value.workspace_profile.enforce_identity_domain",
+      ]);
     } catch (err) {
       setForm((f) => ({ ...f, enforceIdentityDomain: prev }));
       toastManager.add({
@@ -159,7 +145,9 @@ export function SettingsGeneralPage() {
     setForm((f) => ({ ...f, requireEmailVerification: v }));
     setSavingEmailVerification(true);
     try {
-      await saveField({ requireEmailVerification: v });
+      await saveField({ requireEmailVerification: v }, [
+        "value.workspace_profile.require_email_verification",
+      ]);
     } catch (err) {
       setForm((f) => ({ ...f, requireEmailVerification: prev }));
       toastManager.add({
@@ -175,7 +163,9 @@ export function SettingsGeneralPage() {
   async function handleSaveDomains() {
     setSavingDomains(true);
     try {
-      await saveField({ domains: form.domains });
+      await saveField({ domains: parseDomains(form.domains) }, [
+        "value.workspace_profile.domains",
+      ]);
       toastManager.add({
         type: "success",
         title: t("settings.general.saved"),

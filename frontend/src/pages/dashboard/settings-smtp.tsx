@@ -1,4 +1,3 @@
-import { create } from "@bufbuild/protobuf";
 import { Loader2, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -7,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { SecretInput } from "@/components/ui/secret-input";
-import { settingServiceClient } from "@/connect";
 import { toastManager } from "@/lib/toast";
-import { SettingValueSchema } from "@/types/proto-es/v1/setting_pb";
+import { useAppStore } from "@/stores";
+import { smtpConfigPaths } from "@/stores/setting";
 
 interface SmtpForm {
   host: string;
@@ -45,12 +44,8 @@ export function SettingsSmtpPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await settingServiceClient.getSetting({
-          name: "settings/smtp_config",
-        });
+        const cfg = await useAppStore.getState().fetchSmtpConfig();
         if (cancelled) return;
-        const v = res.value?.value;
-        const cfg = v?.case === "smtpConfig" ? v.value : undefined;
         setForm({
           host: cfg?.host ?? "",
           port: cfg?.port ?? 587,
@@ -77,29 +72,20 @@ export function SettingsSmtpPage() {
   async function handleSave() {
     setSaving(true);
     try {
-      const res = await settingServiceClient.updateSetting({
-        setting: {
-          name: "settings/smtp_config",
-          value: create(SettingValueSchema, {
-            value: {
-              case: "smtpConfig" as const,
-              value: {
-                host: form.host.trim(),
-                port: form.port,
-                username: form.username.trim(),
-                // Send the masked value back when the user didn't edit the
-                // password; the backend interprets a "****" prefix as "leave
-                // unchanged".
-                password: form.password,
-                from: form.from.trim(),
-                useTls: form.useTls,
-              },
-            },
-          }),
+      const cfg = await useAppStore.getState().updateSmtpConfig(
+        {
+          host: form.host.trim(),
+          port: form.port,
+          username: form.username.trim(),
+          // Send the masked value back when the user didn't edit the
+          // password; the backend interprets a "****" prefix as "leave
+          // unchanged".
+          password: form.password,
+          from: form.from.trim(),
+          useTls: form.useTls,
         },
-      });
-      const v = res.value?.value;
-      const cfg = v?.case === "smtpConfig" ? v.value : undefined;
+        [...smtpConfigPaths]
+      );
       setForm({
         host: cfg?.host ?? "",
         port: cfg?.port ?? 587,

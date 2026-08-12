@@ -1,5 +1,13 @@
 import type { StateCreator } from "zustand";
 import type {
+  LlmAgentConfigSetting,
+  PasswordRestrictionSetting,
+  S3ConfigSetting,
+  SMTPSetting,
+  UserMcpConfigSetting,
+  WorkspaceProfileSetting,
+} from "@/types/proto-es/store/setting_pb";
+import type {
   Agent,
   AgentProviderInfo,
   AgentStatus_ConnectionState,
@@ -644,6 +652,54 @@ export interface McpServerSlice {
   ) => Promise<{ nextPageToken: string } | undefined>;
 }
 
+// SettingSlice owns the workspace-level settings (workspace profile, SMTP, S3,
+// LLM agent, user MCP, password restriction). Configs are cached as full proto
+// messages after fetch; update methods merge only the mask-listed paths into
+// the stored value server-side (bytebase-style field-level update) and refresh
+// the cache from the authoritative response.
+export interface SettingSlice {
+  workspaceProfile?: WorkspaceProfileSetting;
+  smtpConfig?: SMTPSetting;
+  s3Config?: S3ConfigSetting;
+  llmAgentConfig?: LlmAgentConfigSetting;
+  userMcpConfig?: UserMcpConfigSetting;
+  passwordRestriction?: PasswordRestrictionSetting;
+
+  fetchWorkspaceProfile: () => Promise<WorkspaceProfileSetting | undefined>;
+  fetchSmtpConfig: () => Promise<SMTPSetting | undefined>;
+  fetchS3Config: () => Promise<S3ConfigSetting | undefined>;
+  fetchLlmAgentConfig: () => Promise<LlmAgentConfigSetting | undefined>;
+  fetchUserMcpConfig: () => Promise<UserMcpConfigSetting | undefined>;
+  fetchPasswordRestriction: () => Promise<
+    PasswordRestrictionSetting | undefined
+  >;
+
+  updateWorkspaceProfile: (
+    patch: Partial<WorkspaceProfileSetting>,
+    paths: string[]
+  ) => Promise<WorkspaceProfileSetting | undefined>;
+  updateSmtpConfig: (
+    patch: Partial<SMTPSetting>,
+    paths: string[]
+  ) => Promise<SMTPSetting | undefined>;
+  updateS3Config: (
+    patch: Partial<S3ConfigSetting>,
+    paths: string[]
+  ) => Promise<S3ConfigSetting | undefined>;
+  updateLlmAgentConfig: (
+    patch: Partial<LlmAgentConfigSetting>,
+    paths: string[]
+  ) => Promise<LlmAgentConfigSetting | undefined>;
+  updateUserMcpConfig: (
+    patch: Partial<UserMcpConfigSetting>,
+    paths: string[]
+  ) => Promise<UserMcpConfigSetting | undefined>;
+  updatePasswordRestriction: (
+    patch: Partial<PasswordRestrictionSetting>,
+    paths: string[]
+  ) => Promise<PasswordRestrictionSetting | undefined>;
+}
+
 // WorkspaceSlice exposes the workspace browser RPCs (agent file tree + file
 // preview, machine workspace list + delete). Authorization is handler-gated
 // server-side; the UI additionally hides the workspace tabs without
@@ -676,6 +732,7 @@ export type AppStoreState = AuthSlice &
   ReminderSlice &
   ActivitySlice &
   UserSlice &
+  SettingSlice &
   PreviewSlice &
   ImagePreviewSlice & {
     // reset restores every slice to its pristine initial state (clearing

@@ -76,6 +76,54 @@ func (s *Store) UpsertSettingValue(ctx context.Context, name models.SettingName,
 	return err
 }
 
+// UpdateSettingValueAtomic reads the stored payload, lets apply compute the next
+// value from it (a missing row yields the registered default), and writes the
+// result back -- all in one transaction with a row lock so concurrent updates
+// to the same setting serialize instead of losing fields. The cache is
+// refreshed on success; apply must not call back into the store (it runs
+// inside the transaction).
+func (s *Store) UpdateSettingValueAtomic(ctx context.Context, name models.SettingName, apply func(current proto.Message) (proto.Message, error)) (proto.Message, error) {
+	defaults, ok := settingPayloadDefaults[name]
+	if !ok {
+		return nil, errors.Errorf("no typed payload registered for setting %v", name)
+	}
+	tx, err := s.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to begin transaction")
+	}
+	defer tx.Rollback()
+
+	// Ensure the row exists, then lock it so concurrent updates serialize.
+	// A rolled-back apply also rolls back the placeholder row.
+	if _, err := tx.ExecContext(ctx, `INSERT INTO setting (name, value) VALUES ($1, '{}') ON CONFLICT (name) DO NOTHING`, name.String()); err != nil {
+		return nil, err
+	}
+	var raw string
+	if err := tx.QueryRowContext(ctx, `SELECT value FROM setting WHERE name = $1 FOR UPDATE`, name.String()).Scan(&raw); err != nil {
+		return nil, err
+	}
+	current := defaults()
+	if err := json.Unmarshal([]byte(raw), current); err != nil {
+		return nil, errors.Wrapf(err, "failed to unmarshal setting %v", name)
+	}
+	next, err := apply(current)
+	if err != nil {
+		return nil, err
+	}
+	payload, err := json.Marshal(next)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal setting %v", name)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE setting SET value = $2 WHERE name = $1`, name.String(), string(payload)); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, errors.Wrap(err, "failed to commit transaction")
+	}
+	s.settingCache.Add(name, &SettingMessage{Name: name, Value: string(payload)})
+	return next, nil
+}
+
 // getSettingValue reads the raw setting row and unmarshals it into a payload
 // created by defaults; a missing row yields defaults() as-is.
 func getSettingValue[T proto.Message](ctx context.Context, s *Store, name models.SettingName, defaults func() T) (T, error) {

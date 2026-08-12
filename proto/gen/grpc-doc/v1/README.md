@@ -7755,6 +7755,7 @@ owns presentation (title/description/route) keyed by `id`.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | setting | [Setting](#laelia-v1-Setting) |  |  |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | Fields to update, AIP-134 style paths under the setting value, e.g. &#34;value.workspace_profile.disallow_signup&#34;. Required: the backend merges only the listed paths into the stored payload, so callers never need to round-trip unrelated fields. |
 
 
 

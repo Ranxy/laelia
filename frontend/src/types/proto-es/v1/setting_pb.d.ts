@@ -5,6 +5,7 @@
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 import type { LlmAgentConfigSetting, PasswordRestrictionSetting, S3ConfigSetting, SMTPSetting, UserMcpConfigSetting, WorkspaceProfileSetting } from "../store/setting_pb";
+import type { FieldMask } from "@bufbuild/protobuf/wkt";
 
 /**
  * Describes the file v1/setting.proto.
@@ -125,6 +126,16 @@ export declare type UpdateSettingRequest = Message<"laelia.v1.UpdateSettingReque
    * @generated from field: laelia.v1.Setting setting = 1;
    */
   setting?: Setting | undefined;
+
+  /**
+   * Fields to update, AIP-134 style paths under the setting value, e.g.
+   * "value.workspace_profile.disallow_signup". Required: the backend merges
+   * only the listed paths into the stored payload, so callers never need to
+   * round-trip unrelated fields.
+   *
+   * @generated from field: google.protobuf.FieldMask update_mask = 2;
+   */
+  updateMask?: FieldMask | undefined;
 };
 
 /**

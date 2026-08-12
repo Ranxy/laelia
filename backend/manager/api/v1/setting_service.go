@@ -2,11 +2,12 @@ package v1
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 
 	"connectrpc.com/connect"
-	"github.com/pkg/errors"
+	pkgerrors "github.com/pkg/errors"
 
 	"google.golang.org/protobuf/proto"
 
@@ -68,15 +69,15 @@ var exposedSettings = map[models.SettingName]settingMeta{
 // store SettingName enum.
 func parseSettingName(name string) (models.SettingName, error) {
 	if !strings.HasPrefix(name, settingNamePrefix) {
-		return models.SettingName_SETTING_NAME_UNSPECIFIED, errors.Errorf("invalid setting name %q", name)
+		return models.SettingName_SETTING_NAME_UNSPECIFIED, pkgerrors.Errorf("invalid setting name %q", name)
 	}
 	key := strings.TrimPrefix(name, settingNamePrefix)
 	if key == "" || key != strings.ToLower(key) {
-		return models.SettingName_SETTING_NAME_UNSPECIFIED, errors.Errorf("invalid setting name %q", name)
+		return models.SettingName_SETTING_NAME_UNSPECIFIED, pkgerrors.Errorf("invalid setting name %q", name)
 	}
 	value, ok := models.SettingName_value[strings.ToUpper(key)]
 	if !ok {
-		return models.SettingName_SETTING_NAME_UNSPECIFIED, errors.Errorf("unknown setting %q", name)
+		return models.SettingName_SETTING_NAME_UNSPECIFIED, pkgerrors.Errorf("unknown setting %q", name)
 	}
 	return models.SettingName(value), nil
 }
@@ -97,7 +98,7 @@ func (s *SettingService) GetSetting(ctx context.Context, req *connect.Request[v1
 	}
 	meta, ok := exposedSettings[name]
 	if !ok {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unknown setting %q", req.Msg.GetName()))
+		return nil, connect.NewError(connect.CodeInvalidArgument, pkgerrors.Errorf("unknown setting %q", req.Msg.GetName()))
 	}
 	if meta.adminOnly {
 		if err := s.requireSettingsGet(ctx); err != nil {
@@ -106,7 +107,7 @@ func (s *SettingService) GetSetting(ctx context.Context, req *connect.Request[v1
 	}
 	payload, err := s.store.GetSettingValue(ctx, name)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get setting %q", req.Msg.GetName()))
+		return nil, connect.NewError(connect.CodeInternal, pkgerrors.Wrapf(err, "failed to get setting %q", req.Msg.GetName()))
 	}
 	value, err := convertStoreToSettingValue(name, payload)
 	if err != nil {
@@ -120,66 +121,421 @@ func (s *SettingService) GetSetting(ctx context.Context, req *connect.Request[v1
 func (s *SettingService) UpdateSetting(ctx context.Context, req *connect.Request[v1pb.UpdateSettingRequest]) (*connect.Response[v1pb.Setting], error) {
 	in := req.Msg.GetSetting()
 	if in == nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("setting is required"))
+		return nil, connect.NewError(connect.CodeInvalidArgument, pkgerrors.New("setting is required"))
 	}
 	name, err := parseSettingName(in.GetName())
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	if _, ok := exposedSettings[name]; !ok {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unknown setting %q", in.GetName()))
+		return nil, connect.NewError(connect.CodeInvalidArgument, pkgerrors.Errorf("unknown setting %q", in.GetName()))
 	}
-	payload, err := convertV1ToStoreSetting(name, in.GetValue())
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	// The update mask is required (AIP-134): only the listed paths are written
+	// to the stored payload, so callers never round-trip unrelated fields and
+	// concurrent updates cannot clobber each other.
+	if req.Msg.GetUpdateMask() == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, pkgerrors.New("update mask is required"))
 	}
-	after, err := s.prepareSettingUpdate(ctx, name, payload)
+	after, err := s.updateSettingValue(ctx, name, req)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.store.UpsertSettingValue(ctx, name, payload); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to update setting %q", in.GetName()))
-	}
-	if after != nil {
-		after()
-	}
-	value, err := convertStoreToSettingValue(name, payload)
+	value, err := convertStoreToSettingValue(name, after)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&v1pb.Setting{Name: formatSettingName(name), Value: value}), nil
 }
 
-// convertV1ToStoreSetting extracts the typed store payload from a v1 oneof.
-func convertV1ToStoreSetting(name models.SettingName, value *v1pb.SettingValue) (proto.Message, error) {
+// updateSettingValue dispatches to the per-setting merge path. Each path
+// merges the mask-listed fields of the request payload into the stored value
+// inside a single locked transaction and returns the resulting payload.
+func (s *SettingService) updateSettingValue(ctx context.Context, name models.SettingName, req *connect.Request[v1pb.UpdateSettingRequest]) (proto.Message, error) {
 	switch name {
 	case models.SettingName_S3_CONFIG:
-		if cfg := value.GetS3Config(); cfg != nil {
-			return cfg, nil
-		}
+		return s.updateS3Config(ctx, req)
 	case models.SettingName_LLM_AGENT_CONFIG:
-		if cfg := value.GetLlmAgentConfig(); cfg != nil {
-			return cfg, nil
-		}
+		return s.updateLlmAgentConfig(ctx, req)
 	case models.SettingName_USER_MCP_CONFIG:
-		if cfg := value.GetUserMcpConfig(); cfg != nil {
-			return cfg, nil
-		}
+		return s.updateUserMcpConfig(ctx, req)
 	case models.SettingName_WORKSPACE_PROFILE:
-		if cfg := value.GetWorkspaceProfile(); cfg != nil {
-			return cfg, nil
-		}
+		return s.updateWorkspaceProfile(ctx, req)
 	case models.SettingName_PASSWORD_RESTRICTION:
-		if cfg := value.GetPasswordRestriction(); cfg != nil {
-			return cfg, nil
-		}
+		return s.updatePasswordRestriction(ctx, req)
 	case models.SettingName_SMTP_CONFIG:
-		if cfg := value.GetSmtpConfig(); cfg != nil {
-			return cfg, nil
-		}
+		return s.updateSMTPConfig(ctx, req)
 	default:
+		return nil, connect.NewError(connect.CodeInvalidArgument, pkgerrors.Errorf("unsupported setting %v", name))
 	}
-	return nil, errors.Errorf("%s value is required", strings.ToLower(name.String()))
+}
+
+func (s *SettingService) updateWorkspaceProfile(ctx context.Context, req *connect.Request[v1pb.UpdateSettingRequest]) (proto.Message, error) {
+	payload := req.Msg.GetSetting().GetValue().GetWorkspaceProfile()
+	if payload == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, pkgerrors.New("workspace_profile value is required"))
+	}
+	after, err := s.store.UpdateSettingValueAtomic(ctx, models.SettingName_WORKSPACE_PROFILE, func(current proto.Message) (proto.Message, error) {
+		setting, err := typedPayload[*models.WorkspaceProfileSetting](current, models.SettingName_WORKSPACE_PROFILE)
+		if err != nil {
+			return nil, err
+		}
+		if err := mergeWorkspaceProfilePaths(req.Msg.GetUpdateMask().GetPaths(), payload, setting); err != nil {
+			return nil, err
+		}
+		normalizeWorkspaceGeneralSetting(setting)
+		if err := validateWorkspaceGeneralSetting(setting); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		return setting, nil
+	})
+	if err != nil {
+		return nil, asSettingUpdateError(err)
+	}
+	return after, nil
+}
+
+func (s *SettingService) updateSMTPConfig(ctx context.Context, req *connect.Request[v1pb.UpdateSettingRequest]) (proto.Message, error) {
+	payload := req.Msg.GetSetting().GetValue().GetSmtpConfig()
+	if payload == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, pkgerrors.New("smtp_config value is required"))
+	}
+	// A masked password means "leave unchanged": pull the stored value so the
+	// caller doesn't have to re-enter the password to tweak the host.
+	if strings.HasPrefix(payload.GetPassword(), secretMaskPrefix) {
+		stored, err := s.store.GetSMTPSetting(ctx)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, pkgerrors.Wrap(err, "failed to get SMTP setting"))
+		}
+		payload.Password = stored.Password
+	}
+	after, err := s.store.UpdateSettingValueAtomic(ctx, models.SettingName_SMTP_CONFIG, func(current proto.Message) (proto.Message, error) {
+		cfg, err := typedPayload[*models.SMTPSetting](current, models.SettingName_SMTP_CONFIG)
+		if err != nil {
+			return nil, err
+		}
+		if err := mergeSMTPConfigPaths(req.Msg.GetUpdateMask().GetPaths(), payload, cfg); err != nil {
+			return nil, err
+		}
+		if err := validateSMTPSetting(cfg); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		return cfg, nil
+	})
+	if err != nil {
+		return nil, asSettingUpdateError(err)
+	}
+	return after, nil
+}
+
+func (s *SettingService) updateS3Config(ctx context.Context, req *connect.Request[v1pb.UpdateSettingRequest]) (proto.Message, error) {
+	payload := req.Msg.GetSetting().GetValue().GetS3Config()
+	if payload == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, pkgerrors.New("s3_config value is required"))
+	}
+	// A masked secret means "leave unchanged": pull the stored value so the
+	// caller doesn't have to re-enter the secret to toggle a boolean.
+	if strings.HasPrefix(payload.GetSecretKey(), secretMaskPrefix) {
+		stored, err := s.store.GetS3ConfigSetting(ctx)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, pkgerrors.Wrap(err, "failed to get s3 config"))
+		}
+		payload.SecretKey = stored.SecretKey
+	}
+	after, err := s.store.UpdateSettingValueAtomic(ctx, models.SettingName_S3_CONFIG, func(current proto.Message) (proto.Message, error) {
+		cfg, err := typedPayload[*models.S3ConfigSetting](current, models.SettingName_S3_CONFIG)
+		if err != nil {
+			return nil, err
+		}
+		return cfg, mergeS3ConfigPaths(req.Msg.GetUpdateMask().GetPaths(), payload, cfg)
+	})
+	if err != nil {
+		return nil, asSettingUpdateError(err)
+	}
+	if s.s3clientManager != nil {
+		s.s3clientManager.Invalidate()
+	}
+	return after, nil
+}
+
+func (s *SettingService) updateLlmAgentConfig(ctx context.Context, req *connect.Request[v1pb.UpdateSettingRequest]) (proto.Message, error) {
+	payload := req.Msg.GetSetting().GetValue().GetLlmAgentConfig()
+	if payload == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, pkgerrors.New("llm_agent_config value is required"))
+	}
+	after, err := s.store.UpdateSettingValueAtomic(ctx, models.SettingName_LLM_AGENT_CONFIG, func(current proto.Message) (proto.Message, error) {
+		cfg, err := typedPayload[*models.LlmAgentConfigSetting](current, models.SettingName_LLM_AGENT_CONFIG)
+		if err != nil {
+			return nil, err
+		}
+		return cfg, mergeLlmAgentConfigPaths(req.Msg.GetUpdateMask().GetPaths(), payload, cfg)
+	})
+	if err != nil {
+		return nil, asSettingUpdateError(err)
+	}
+	return after, nil
+}
+
+func (s *SettingService) updateUserMcpConfig(ctx context.Context, req *connect.Request[v1pb.UpdateSettingRequest]) (proto.Message, error) {
+	payload := req.Msg.GetSetting().GetValue().GetUserMcpConfig()
+	if payload == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, pkgerrors.New("user_mcp_config value is required"))
+	}
+	after, err := s.store.UpdateSettingValueAtomic(ctx, models.SettingName_USER_MCP_CONFIG, func(current proto.Message) (proto.Message, error) {
+		cfg, err := typedPayload[*models.UserMcpConfigSetting](current, models.SettingName_USER_MCP_CONFIG)
+		if err != nil {
+			return nil, err
+		}
+		if err := mergeUserMcpConfigPaths(req.Msg.GetUpdateMask().GetPaths(), payload, cfg); err != nil {
+			return nil, err
+		}
+		if _, err := mcp.ParsePolicy(cfg.GetMcpIpPolicy()); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		return cfg, nil
+	})
+	if err != nil {
+		return nil, asSettingUpdateError(err)
+	}
+	return after, nil
+}
+
+func (s *SettingService) updatePasswordRestriction(ctx context.Context, req *connect.Request[v1pb.UpdateSettingRequest]) (proto.Message, error) {
+	payload := req.Msg.GetSetting().GetValue().GetPasswordRestriction()
+	if payload == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, pkgerrors.New("password_restriction value is required"))
+	}
+	after, err := s.store.UpdateSettingValueAtomic(ctx, models.SettingName_PASSWORD_RESTRICTION, func(current proto.Message) (proto.Message, error) {
+		cfg, err := typedPayload[*models.PasswordRestrictionSetting](current, models.SettingName_PASSWORD_RESTRICTION)
+		if err != nil {
+			return nil, err
+		}
+		return cfg, mergePasswordRestrictionPaths(req.Msg.GetUpdateMask().GetPaths(), payload, cfg)
+	})
+	if err != nil {
+		return nil, asSettingUpdateError(err)
+	}
+	return after, nil
+}
+
+// asSettingUpdateError unwraps a connect error returned from a merge/validate
+// callback; any other error becomes an internal error.
+func asSettingUpdateError(err error) error {
+	if connectErr, ok := errors.AsType[*connect.Error](err); ok {
+		return connectErr
+	}
+	return connect.NewError(connect.CodeInternal, pkgerrors.Wrap(err, "failed to update setting"))
+}
+
+// mergeSettingPaths validates mask paths against the setting's path prefix and
+// applies each listed field via apply. An empty paths list means "update all
+// fields" (AIP-134). Unknown paths are rejected.
+func mergeSettingPaths(paths []string, prefix string, allPaths []string, apply func(field string) error) error {
+	if len(paths) == 0 {
+		paths = allPaths
+	}
+	for _, path := range paths {
+		field, ok := strings.CutPrefix(path, prefix)
+		if !ok {
+			return connect.NewError(connect.CodeInvalidArgument, pkgerrors.Errorf("invalid update mask path %q", path))
+		}
+		if err := apply(field); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var workspaceProfilePaths = []string{
+	"value.workspace_profile.external_url",
+	"value.workspace_profile.disallow_signup",
+	"value.workspace_profile.require_2fa",
+	"value.workspace_profile.token_duration",
+	"value.workspace_profile.maximum_role_expiration",
+	"value.workspace_profile.domains",
+	"value.workspace_profile.enforce_identity_domain",
+	"value.workspace_profile.disallow_password_signin",
+	"value.workspace_profile.enable_metric_collection",
+	"value.workspace_profile.require_email_verification",
+}
+
+func mergeWorkspaceProfilePaths(paths []string, src, dst *models.WorkspaceProfileSetting) error {
+	return mergeSettingPaths(paths, "value.workspace_profile.", workspaceProfilePaths, func(field string) error {
+		switch field {
+		case "external_url":
+			dst.ExternalUrl = src.GetExternalUrl()
+		case "disallow_signup":
+			dst.DisallowSignup = src.GetDisallowSignup()
+		case "require_2fa":
+			dst.Require_2Fa = src.GetRequire_2Fa()
+		case "token_duration":
+			dst.TokenDuration = src.TokenDuration
+		case "maximum_role_expiration":
+			dst.MaximumRoleExpiration = src.MaximumRoleExpiration
+		case "domains":
+			dst.Domains = src.GetDomains()
+		case "enforce_identity_domain":
+			dst.EnforceIdentityDomain = src.GetEnforceIdentityDomain()
+		case "disallow_password_signin":
+			dst.DisallowPasswordSignin = src.GetDisallowPasswordSignin()
+		case "enable_metric_collection":
+			dst.EnableMetricCollection = src.GetEnableMetricCollection()
+		case "require_email_verification":
+			dst.RequireEmailVerification = src.RequireEmailVerification
+		default:
+			return invalidMaskPath("value.workspace_profile." + field)
+		}
+		return nil
+	})
+}
+
+var smtpConfigPaths = []string{
+	"value.smtp_config.host",
+	"value.smtp_config.port",
+	"value.smtp_config.username",
+	"value.smtp_config.password",
+	"value.smtp_config.from",
+	"value.smtp_config.use_tls",
+}
+
+func mergeSMTPConfigPaths(paths []string, src, dst *models.SMTPSetting) error {
+	return mergeSettingPaths(paths, "value.smtp_config.", smtpConfigPaths, func(field string) error {
+		switch field {
+		case "host":
+			dst.Host = src.GetHost()
+		case "port":
+			dst.Port = src.GetPort()
+		case "username":
+			dst.Username = src.GetUsername()
+		case "password":
+			dst.Password = src.GetPassword()
+		case "from":
+			dst.From = src.GetFrom()
+		case "use_tls":
+			dst.UseTls = src.GetUseTls()
+		default:
+			return invalidMaskPath("value.smtp_config." + field)
+		}
+		return nil
+	})
+}
+
+var s3ConfigPaths = []string{
+	"value.s3_config.endpoint",
+	"value.s3_config.region",
+	"value.s3_config.bucket",
+	"value.s3_config.access_key",
+	"value.s3_config.secret_key",
+	"value.s3_config.force_path_style",
+	"value.s3_config.use_ssl",
+}
+
+func mergeS3ConfigPaths(paths []string, src, dst *models.S3ConfigSetting) error {
+	return mergeSettingPaths(paths, "value.s3_config.", s3ConfigPaths, func(field string) error {
+		switch field {
+		case "endpoint":
+			dst.Endpoint = src.GetEndpoint()
+		case "region":
+			dst.Region = src.GetRegion()
+		case "bucket":
+			dst.Bucket = src.GetBucket()
+		case "access_key":
+			dst.AccessKey = src.GetAccessKey()
+		case "secret_key":
+			dst.SecretKey = src.GetSecretKey()
+		case "force_path_style":
+			dst.ForcePathStyle = src.GetForcePathStyle()
+		case "use_ssl":
+			dst.UseSsl = src.GetUseSsl()
+		default:
+			return invalidMaskPath("value.s3_config." + field)
+		}
+		return nil
+	})
+}
+
+var llmAgentConfigPaths = []string{
+	"value.llm_agent_config.allow_user_self_provided_keys",
+}
+
+func mergeLlmAgentConfigPaths(paths []string, src, dst *models.LlmAgentConfigSetting) error {
+	return mergeSettingPaths(paths, "value.llm_agent_config.", llmAgentConfigPaths, func(field string) error {
+		switch field {
+		case "allow_user_self_provided_keys":
+			dst.AllowUserSelfProvidedKeys = src.GetAllowUserSelfProvidedKeys()
+		default:
+			return invalidMaskPath("value.llm_agent_config." + field)
+		}
+		return nil
+	})
+}
+
+var userMcpConfigPaths = []string{
+	"value.user_mcp_config.allow_user_mcp_servers",
+	"value.user_mcp_config.mcp_ip_policy",
+}
+
+func mergeUserMcpConfigPaths(paths []string, src, dst *models.UserMcpConfigSetting) error {
+	return mergeSettingPaths(paths, "value.user_mcp_config.", userMcpConfigPaths, func(field string) error {
+		switch field {
+		case "allow_user_mcp_servers":
+			dst.AllowUserMcpServers = src.GetAllowUserMcpServers()
+		case "mcp_ip_policy":
+			dst.McpIpPolicy = src.McpIpPolicy
+		default:
+			return invalidMaskPath("value.user_mcp_config." + field)
+		}
+		return nil
+	})
+}
+
+var passwordRestrictionPaths = []string{
+	"value.password_restriction.min_length",
+	"value.password_restriction.require_number",
+	"value.password_restriction.require_letter",
+	"value.password_restriction.require_uppercase_letter",
+	"value.password_restriction.require_special_character",
+	"value.password_restriction.require_reset_password_for_first_login",
+	"value.password_restriction.password_rotation",
+}
+
+func mergePasswordRestrictionPaths(paths []string, src, dst *models.PasswordRestrictionSetting) error {
+	return mergeSettingPaths(paths, "value.password_restriction.", passwordRestrictionPaths, func(field string) error {
+		switch field {
+		case "min_length":
+			dst.MinLength = src.GetMinLength()
+		case "require_number":
+			dst.RequireNumber = src.GetRequireNumber()
+		case "require_letter":
+			dst.RequireLetter = src.GetRequireLetter()
+		case "require_uppercase_letter":
+			dst.RequireUppercaseLetter = src.GetRequireUppercaseLetter()
+		case "require_special_character":
+			dst.RequireSpecialCharacter = src.GetRequireSpecialCharacter()
+		case "require_reset_password_for_first_login":
+			dst.RequireResetPasswordForFirstLogin = src.GetRequireResetPasswordForFirstLogin()
+		case "password_rotation":
+			dst.PasswordRotation = src.PasswordRotation
+		default:
+			return invalidMaskPath("value.password_restriction." + field)
+		}
+		return nil
+	})
+}
+
+// typedPayload asserts the payload has the expected concrete type. The store
+// payload factory registered for the setting guarantees it, so a mismatch is a
+// programming error rather than a user error.
+func typedPayload[T proto.Message](current proto.Message, name models.SettingName) (T, error) {
+	typed, ok := current.(T)
+	if !ok {
+		return *new(T), pkgerrors.Errorf("unexpected payload type %T for setting %v", current, name)
+	}
+	return typed, nil
+}
+
+// invalidMaskPath builds the InvalidArgument error for an unknown mask path.
+func invalidMaskPath(path string) error {
+	return connect.NewError(connect.CodeInvalidArgument, pkgerrors.Errorf("invalid update mask path %q", path))
 }
 
 // convertStoreToSettingValue wraps a store payload into the v1 oneof, applying
@@ -189,108 +545,44 @@ func convertStoreToSettingValue(name models.SettingName, payload proto.Message) 
 	case models.SettingName_S3_CONFIG:
 		cfg, ok := payload.(*models.S3ConfigSetting)
 		if !ok {
-			return nil, errors.Errorf("unexpected payload type %T for setting %v", payload, name)
+			return nil, pkgerrors.Errorf("unexpected payload type %T for setting %v", payload, name)
 		}
 		cfg.SecretKey = maskSecret(cfg.SecretKey)
 		return &v1pb.SettingValue{Value: &v1pb.SettingValue_S3Config{S3Config: cfg}}, nil
 	case models.SettingName_LLM_AGENT_CONFIG:
 		cfg, ok := payload.(*models.LlmAgentConfigSetting)
 		if !ok {
-			return nil, errors.Errorf("unexpected payload type %T for setting %v", payload, name)
+			return nil, pkgerrors.Errorf("unexpected payload type %T for setting %v", payload, name)
 		}
 		return &v1pb.SettingValue{Value: &v1pb.SettingValue_LlmAgentConfig{LlmAgentConfig: cfg}}, nil
 	case models.SettingName_USER_MCP_CONFIG:
 		cfg, ok := payload.(*models.UserMcpConfigSetting)
 		if !ok {
-			return nil, errors.Errorf("unexpected payload type %T for setting %v", payload, name)
+			return nil, pkgerrors.Errorf("unexpected payload type %T for setting %v", payload, name)
 		}
 		return &v1pb.SettingValue{Value: &v1pb.SettingValue_UserMcpConfig{UserMcpConfig: cfg}}, nil
 	case models.SettingName_WORKSPACE_PROFILE:
 		cfg, ok := payload.(*models.WorkspaceProfileSetting)
 		if !ok {
-			return nil, errors.Errorf("unexpected payload type %T for setting %v", payload, name)
+			return nil, pkgerrors.Errorf("unexpected payload type %T for setting %v", payload, name)
 		}
 		return &v1pb.SettingValue{Value: &v1pb.SettingValue_WorkspaceProfile{WorkspaceProfile: cfg}}, nil
 	case models.SettingName_PASSWORD_RESTRICTION:
 		cfg, ok := payload.(*models.PasswordRestrictionSetting)
 		if !ok {
-			return nil, errors.Errorf("unexpected payload type %T for setting %v", payload, name)
+			return nil, pkgerrors.Errorf("unexpected payload type %T for setting %v", payload, name)
 		}
 		return &v1pb.SettingValue{Value: &v1pb.SettingValue_PasswordRestriction{PasswordRestriction: cfg}}, nil
 	case models.SettingName_SMTP_CONFIG:
 		cfg, ok := payload.(*models.SMTPSetting)
 		if !ok {
-			return nil, errors.Errorf("unexpected payload type %T for setting %v", payload, name)
+			return nil, pkgerrors.Errorf("unexpected payload type %T for setting %v", payload, name)
 		}
 		cfg.Password = maskSecret(cfg.Password)
 		return &v1pb.SettingValue{Value: &v1pb.SettingValue_SmtpConfig{SmtpConfig: cfg}}, nil
 	default:
-		return nil, errors.Errorf("unsupported setting %v", name)
+		return nil, pkgerrors.Errorf("unsupported setting %v", name)
 	}
-}
-
-// prepareSettingUpdate validates and normalizes a request payload before the
-// upsert, and returns an optional callback to run after the write succeeds
-// (e.g. cache invalidation). Only settings with extra semantics are handled;
-// the rest fall through as a no-op.
-func (s *SettingService) prepareSettingUpdate(ctx context.Context, name models.SettingName, payload proto.Message) (func(), error) {
-	switch name {
-	case models.SettingName_S3_CONFIG:
-		cfg, ok := payload.(*models.S3ConfigSetting)
-		if !ok {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("unexpected payload type %T for setting %v", payload, name))
-		}
-		// A masked secret means "leave unchanged": pull the stored value so the
-		// caller doesn't have to re-enter the secret to toggle a boolean.
-		if strings.HasPrefix(cfg.SecretKey, secretMaskPrefix) {
-			stored, err := s.store.GetS3ConfigSetting(ctx)
-			if err != nil {
-				return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get s3 config"))
-			}
-			cfg.SecretKey = stored.SecretKey
-		}
-		return func() {
-			if s.s3clientManager != nil {
-				s.s3clientManager.Invalidate()
-			}
-		}, nil
-	case models.SettingName_USER_MCP_CONFIG:
-		cfg, ok := payload.(*models.UserMcpConfigSetting)
-		if !ok {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("unexpected payload type %T for setting %v", payload, name))
-		}
-		if _, err := mcp.ParsePolicy(cfg.GetMcpIpPolicy()); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-	case models.SettingName_WORKSPACE_PROFILE:
-		setting, ok := payload.(*models.WorkspaceProfileSetting)
-		if !ok {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("unexpected payload type %T for setting %v", payload, name))
-		}
-		normalizeWorkspaceGeneralSetting(setting)
-		if err := validateWorkspaceGeneralSetting(setting); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-	case models.SettingName_SMTP_CONFIG:
-		cfg, ok := payload.(*models.SMTPSetting)
-		if !ok {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("unexpected payload type %T for setting %v", payload, name))
-		}
-		// A masked password means "leave unchanged": pull the stored value so
-		// the caller doesn't have to re-enter the password to tweak the host.
-		if strings.HasPrefix(cfg.Password, secretMaskPrefix) {
-			stored, err := s.store.GetSMTPSetting(ctx)
-			if err != nil {
-				return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get SMTP setting"))
-			}
-			cfg.Password = stored.Password
-		}
-		if err := validateSMTPSetting(cfg); err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-	default:
-	}
-	return nil, nil
 }
 
 // requireSettingsGet denies callers that do not hold laelia.settings.get.
@@ -298,10 +590,10 @@ func (s *SettingService) requireSettingsGet(ctx context.Context) error {
 	user, _ := GetUserFromContext(ctx)
 	ok, err := s.iam.CheckPermission(ctx, permission.SettingsGet, user, nil, nil)
 	if err != nil {
-		return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check permission"))
+		return connect.NewError(connect.CodeInternal, pkgerrors.Wrap(err, "failed to check permission"))
 	}
 	if !ok {
-		return connect.NewError(connect.CodePermissionDenied, errors.New("you are not allowed to read this setting"))
+		return connect.NewError(connect.CodePermissionDenied, pkgerrors.New("you are not allowed to read this setting"))
 	}
 	return nil
 }
@@ -348,7 +640,7 @@ func (s *SettingService) GetSetupStatus(ctx context.Context, _ *connect.Request[
 	for _, c := range s.setupChecks() {
 		ok, err := c.check(ctx)
 		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to check setup item %q", c.id))
+			return nil, connect.NewError(connect.CodeInternal, pkgerrors.Wrapf(err, "failed to check setup item %q", c.id))
 		}
 		items = append(items, &v1pb.SetupItem{Id: c.id, Configured: ok})
 	}
@@ -378,7 +670,7 @@ func (s *SettingService) UpdateDebugConfig(_ context.Context, req *connect.Reque
 func (s *SettingService) GetWorkspaceInfo(ctx context.Context, _ *connect.Request[v1pb.GetWorkspaceInfoRequest]) (*connect.Response[v1pb.GetWorkspaceInfoResponse], error) {
 	setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get workspace general setting"))
+		return nil, connect.NewError(connect.CodeInternal, pkgerrors.Wrap(err, "failed to get workspace general setting"))
 	}
 	return connect.NewResponse(&v1pb.GetWorkspaceInfoResponse{
 		DisallowSignup:           setting.DisallowSignup,
@@ -411,10 +703,10 @@ func normalizeWorkspaceGeneralSetting(setting *models.WorkspaceProfileSetting) {
 func validateWorkspaceGeneralSetting(setting *models.WorkspaceProfileSetting) error {
 	for _, d := range setting.Domains {
 		if strings.ContainsAny(d, "@/ \t") {
-			return errors.Errorf("invalid domain %q", d)
+			return pkgerrors.Errorf("invalid domain %q", d)
 		}
 		if d != strings.ToLower(d) {
-			return errors.Errorf("domain %q must be lowercase", d)
+			return pkgerrors.Errorf("domain %q must be lowercase", d)
 		}
 	}
 	return nil
@@ -423,13 +715,13 @@ func validateWorkspaceGeneralSetting(setting *models.WorkspaceProfileSetting) er
 // validateSMTPSetting rejects SMTP configs that could never deliver mail.
 func validateSMTPSetting(cfg *models.SMTPSetting) error {
 	if cfg.GetHost() == "" {
-		return errors.Errorf("SMTP host is required")
+		return pkgerrors.Errorf("SMTP host is required")
 	}
 	if cfg.GetFrom() == "" {
-		return errors.Errorf("SMTP from address is required")
+		return pkgerrors.Errorf("SMTP from address is required")
 	}
 	if cfg.GetPort() < 0 || cfg.GetPort() > 65535 {
-		return errors.Errorf("SMTP port %d is out of range", cfg.GetPort())
+		return pkgerrors.Errorf("SMTP port %d is out of range", cfg.GetPort())
 	}
 	return nil
 }

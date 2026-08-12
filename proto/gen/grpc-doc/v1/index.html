@@ -18300,6 +18300,16 @@ Example: &#34;settings/s3_config&#34; </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>update_mask</td>
+                  <td><a href="#google.protobuf.FieldMask">google.protobuf.FieldMask</a></td>
+                  <td></td>
+                  <td><p>Fields to update, AIP-134 style paths under the setting value, e.g.
+&#34;value.workspace_profile.disallow_signup&#34;. Required: the backend merges
+only the listed paths into the stored payload, so callers never need to
+round-trip unrelated fields. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 

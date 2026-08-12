@@ -13,6 +13,7 @@ import { createChannelSlice } from "./channel";
 import { createTaskSlice } from "./task";
 import { createReminderSlice } from "./reminder";
 import { createActivitySlice } from "./activity";
+import { createSettingSlice } from "./setting";
 import { createThreadSlice } from "./thread";
 import { createUserSlice } from "./user";
 import { createImagePreviewSlice } from "./image-preview";
@@ -70,6 +71,7 @@ export const useAppStore = create<AppStoreState>()((...args) => {
     ...createTaskSlice(...wrappedArgs),
     ...createReminderSlice(...wrappedArgs),
     ...createActivitySlice(...wrappedArgs),
+    ...createSettingSlice(...wrappedArgs),
     ...createUserSlice(...wrappedArgs),
     ...createPreviewSlice(...wrappedArgs),
     ...createImagePreviewSlice(...wrappedArgs),

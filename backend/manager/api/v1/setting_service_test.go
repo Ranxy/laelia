@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	models "github.com/Ranxy/laelia/backend/generated-go/store"
-	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
 // TestParseSettingName guards the "settings/{setting}" resource-name parser
@@ -69,51 +68,82 @@ func TestExposedSettings(t *testing.T) {
 	assert.True(t, exposedSettings[models.SettingName_PASSWORD_RESTRICTION].adminOnly)
 }
 
-// TestConvertV1ToStoreSetting guards the request-side conversion: the oneof
-// branch must match the setting name, and the returned payload has the typed
-// store shape.
-func TestConvertV1ToStoreSetting(t *testing.T) {
-	cases := []struct {
-		name  models.SettingName
-		value func() *v1pb.SettingValue
-	}{
-		{models.SettingName_S3_CONFIG, func() *v1pb.SettingValue {
-			return &v1pb.SettingValue{Value: &v1pb.SettingValue_S3Config{S3Config: &models.S3ConfigSetting{Endpoint: "e"}}}
-		}},
-		{models.SettingName_LLM_AGENT_CONFIG, func() *v1pb.SettingValue {
-			return &v1pb.SettingValue{Value: &v1pb.SettingValue_LlmAgentConfig{LlmAgentConfig: &models.LlmAgentConfigSetting{}}}
-		}},
-		{models.SettingName_USER_MCP_CONFIG, func() *v1pb.SettingValue {
-			return &v1pb.SettingValue{Value: &v1pb.SettingValue_UserMcpConfig{UserMcpConfig: &models.UserMcpConfigSetting{}}}
-		}},
-		{models.SettingName_WORKSPACE_PROFILE, func() *v1pb.SettingValue {
-			return &v1pb.SettingValue{Value: &v1pb.SettingValue_WorkspaceProfile{WorkspaceProfile: &models.WorkspaceProfileSetting{}}}
-		}},
-		{models.SettingName_PASSWORD_RESTRICTION, func() *v1pb.SettingValue {
-			return &v1pb.SettingValue{Value: &v1pb.SettingValue_PasswordRestriction{PasswordRestriction: &models.PasswordRestrictionSetting{}}}
-		}},
-	}
-	for _, c := range cases {
-		t.Run(c.name.String(), func(t *testing.T) {
-			payload, err := convertV1ToStoreSetting(c.name, c.value())
-			require.NoError(t, err)
-			assert.IsType(t, payloadTypeFor(c.name), payload)
-		})
-	}
+// TestMergeWorkspaceProfilePaths guards the field-level merge: only the masked
+// fields are written and every other field is preserved, the optional
+// require_email_verification can be set and cleared, an empty mask means
+// "update all fields" (AIP-134), and unknown paths are rejected.
+func TestMergeWorkspaceProfilePaths(t *testing.T) {
+	dst := &models.WorkspaceProfileSetting{ExternalUrl: "https://example.com", DisallowSignup: true, Domains: []string{"a.com"}}
+	src := &models.WorkspaceProfileSetting{DisallowSignup: false}
+	require.NoError(t, mergeWorkspaceProfilePaths([]string{"value.workspace_profile.disallow_signup"}, src, dst))
+	assert.False(t, dst.DisallowSignup)
+	assert.Equal(t, "https://example.com", dst.ExternalUrl)
+	assert.Equal(t, []string{"a.com"}, dst.Domains)
+	assert.Nil(t, dst.RequireEmailVerification)
 
-	// A mismatched oneof branch is rejected.
-	_, err := convertV1ToStoreSetting(models.SettingName_S3_CONFIG, &v1pb.SettingValue{
-		Value: &v1pb.SettingValue_LlmAgentConfig{LlmAgentConfig: &models.LlmAgentConfigSetting{}},
-	})
-	assert.Error(t, err)
-	// An empty oneof is rejected.
-	_, err = convertV1ToStoreSetting(models.SettingName_S3_CONFIG, &v1pb.SettingValue{})
-	assert.Error(t, err)
+	// The optional field can be set to true.
+	trueVal := true
+	src.RequireEmailVerification = &trueVal
+	require.NoError(t, mergeWorkspaceProfilePaths([]string{"value.workspace_profile.require_email_verification"}, src, dst))
+	require.NotNil(t, dst.RequireEmailVerification)
+	assert.True(t, *dst.RequireEmailVerification)
+
+	// And cleared back to nil (the "enabled" default) by masking it with a nil value.
+	src.RequireEmailVerification = nil
+	require.NoError(t, mergeWorkspaceProfilePaths([]string{"value.workspace_profile.require_email_verification"}, src, dst))
+	assert.Nil(t, dst.RequireEmailVerification)
+
+	// An empty mask updates every field.
+	all := &models.WorkspaceProfileSetting{ExternalUrl: "https://new.example.com", DisallowSignup: true, Domains: []string{"b.com"}}
+	dstAll := &models.WorkspaceProfileSetting{}
+	require.NoError(t, mergeWorkspaceProfilePaths(nil, all, dstAll))
+	assert.Equal(t, "https://new.example.com", dstAll.ExternalUrl)
+	assert.True(t, dstAll.DisallowSignup)
+	assert.Equal(t, []string{"b.com"}, dstAll.Domains)
+
+	// Unknown paths and wrong prefixes are rejected.
+	assert.Error(t, mergeWorkspaceProfilePaths([]string{"value.workspace_profile.nope"}, src, dst))
+	assert.Error(t, mergeWorkspaceProfilePaths([]string{"value.smtp_config.host"}, src, dst))
 }
 
-// TestConvertStoreToSettingValue guards the response-side conversion: the
-// oneof branch matches the setting name, and the S3 secret is masked on
-// read-back.
+// TestMergeS3ConfigPaths guards the masked-secret flow: updating a non-secret
+// field leaves the stored secret untouched unless the secret itself is masked.
+func TestMergeS3ConfigPaths(t *testing.T) {
+	dst := &models.S3ConfigSetting{Endpoint: "https://s3.example.com", Bucket: "b", SecretKey: "real-secret"}
+	src := &models.S3ConfigSetting{Bucket: "other"}
+	require.NoError(t, mergeS3ConfigPaths([]string{"value.s3_config.bucket"}, src, dst))
+	assert.Equal(t, "other", dst.Bucket)
+	assert.Equal(t, "real-secret", dst.SecretKey)
+	assert.Equal(t, "https://s3.example.com", dst.Endpoint)
+
+	// Masking the secret replaces it (the API layer maps "****" back to the
+	// stored value before the merge; here a plain value flows through).
+	src.SecretKey = "new-secret"
+	require.NoError(t, mergeS3ConfigPaths([]string{"value.s3_config.secret_key"}, src, dst))
+	assert.Equal(t, "new-secret", dst.SecretKey)
+}
+
+// TestMergeSettingPaths guards the generic path walker: an empty path list
+// expands to all fields, and a path with the wrong prefix is rejected before
+// any field is applied.
+func TestMergeSettingPaths(t *testing.T) {
+	var applied []string
+	err := mergeSettingPaths(nil, "value.smtp_config.", smtpConfigPaths, func(field string) error {
+		applied = append(applied, field)
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"host", "port", "username", "password", "from", "use_tls"}, applied)
+
+	applied = nil
+	err = mergeSettingPaths([]string{"value.llm_agent_config.allow_user_self_provided_keys"}, "value.smtp_config.", smtpConfigPaths, func(field string) error {
+		applied = append(applied, field)
+		return nil
+	})
+	assert.Error(t, err)
+	assert.Nil(t, applied)
+}
+
 func TestConvertStoreToSettingValue(t *testing.T) {
 	value, err := convertStoreToSettingValue(models.SettingName_S3_CONFIG, &models.S3ConfigSetting{SecretKey: "abc12345"})
 	require.NoError(t, err)
@@ -130,43 +160,23 @@ func TestConvertStoreToSettingValue(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// payloadTypeFor mirrors the store payload type registered for a setting name.
-func payloadTypeFor(name models.SettingName) any {
-	switch name {
-	case models.SettingName_S3_CONFIG:
-		return &models.S3ConfigSetting{}
-	case models.SettingName_LLM_AGENT_CONFIG:
-		return &models.LlmAgentConfigSetting{}
-	case models.SettingName_USER_MCP_CONFIG:
-		return &models.UserMcpConfigSetting{}
-	case models.SettingName_WORKSPACE_PROFILE:
-		return &models.WorkspaceProfileSetting{}
-	case models.SettingName_PASSWORD_RESTRICTION:
-		return &models.PasswordRestrictionSetting{}
-	default:
-		return nil
-	}
-}
+// TestValidateWorkspaceProfileMerge guards the validation wired into the
+// workspace_profile update path: an invalid domain is rejected after merge.
+func TestValidateWorkspaceProfileMerge(t *testing.T) {
+	src := &models.WorkspaceProfileSetting{Domains: []string{" Example.com ", "@example.com"}}
+	dst := &models.WorkspaceProfileSetting{}
+	require.NoError(t, mergeWorkspaceProfilePaths([]string{"value.workspace_profile.domains"}, src, dst))
+	normalizeWorkspaceGeneralSetting(dst)
+	assert.Equal(t, []string{"example.com"}, dst.Domains)
+	assert.NoError(t, validateWorkspaceGeneralSetting(dst))
 
-// TestPrepareSettingUpdate guards the per-setting validation/normalization:
-// workspace_profile domains are normalized in place, and a malformed MCP
-// policy is rejected.
-func TestPrepareSettingUpdate(t *testing.T) {
-	s := &SettingService{}
-	profile := &models.WorkspaceProfileSetting{Domains: []string{" Example.com ", "@example.com"}}
-	after, err := s.prepareSettingUpdate(t.Context(), models.SettingName_WORKSPACE_PROFILE, profile)
-	require.NoError(t, err)
-	assert.Nil(t, after)
-	assert.Equal(t, []string{"example.com"}, profile.Domains)
-
-	_, err = s.prepareSettingUpdate(t.Context(), models.SettingName_USER_MCP_CONFIG, &models.UserMcpConfigSetting{
-		McpIpPolicy: &models.McpIpPolicy{Enabled: true, DenyCidrs: []string{"not-a-cidr"}},
-	})
-	assert.Error(t, err)
-
-	after, err = s.prepareSettingUpdate(t.Context(), models.SettingName_LLM_AGENT_CONFIG, &models.LlmAgentConfigSetting{})
-	require.NoError(t, err)
-	assert.Nil(t, after)
+	// The merge itself is structural: the policy value is copied verbatim.
+	// Its semantic validation (mcp.ParsePolicy) runs in the update path and is
+	// covered by the mcp component tests.
+	dstMcp := &models.UserMcpConfigSetting{}
+	srcMcp := &models.UserMcpConfigSetting{McpIpPolicy: &models.McpIpPolicy{Enabled: true, DenyCidrs: []string{"10.0.0.0/8"}}}
+	require.NoError(t, mergeUserMcpConfigPaths([]string{"value.user_mcp_config.mcp_ip_policy"}, srcMcp, dstMcp))
+	assert.Equal(t, []string{"10.0.0.0/8"}, dstMcp.GetMcpIpPolicy().GetDenyCidrs())
 }
 
 // TestMaskSecret guards the read-back masking contract: an empty secret stays

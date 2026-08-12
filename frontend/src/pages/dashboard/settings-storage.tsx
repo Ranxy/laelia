@@ -1,4 +1,3 @@
-import { create } from "@bufbuild/protobuf";
 import { Loader2, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -7,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { SecretInput } from "@/components/ui/secret-input";
-import { settingServiceClient } from "@/connect";
 import { toastManager } from "@/lib/toast";
-import { SettingValueSchema } from "@/types/proto-es/v1/setting_pb";
+import { useAppStore } from "@/stores";
+import { s3ConfigPaths } from "@/stores/setting";
 
 interface S3Form {
   endpoint: string;
@@ -47,12 +46,8 @@ export function SettingsStoragePage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await settingServiceClient.getSetting({
-          name: "settings/s3_config",
-        });
+        const cfg = await useAppStore.getState().fetchS3Config();
         if (cancelled) return;
-        const v = res.value?.value;
-        const cfg = v?.case === "s3Config" ? v.value : undefined;
         setForm({
           endpoint: cfg?.endpoint ?? "",
           region: cfg?.region ?? "",
@@ -80,30 +75,21 @@ export function SettingsStoragePage() {
   async function handleSave() {
     setSaving(true);
     try {
-      const res = await settingServiceClient.updateSetting({
-        setting: {
-          name: "settings/s3_config",
-          value: create(SettingValueSchema, {
-            value: {
-              case: "s3Config" as const,
-              value: {
-                endpoint: form.endpoint.trim(),
-                region: form.region.trim(),
-                bucket: form.bucket.trim(),
-                accessKey: form.accessKey,
-                // Send the masked value back when the user didn't edit the
-                // secret; the backend interprets a "****" prefix as "leave
-                // unchanged".
-                secretKey: form.secretKey,
-                forcePathStyle: form.forcePathStyle,
-                useSsl: form.useSsl,
-              },
-            },
-          }),
+      const cfg = await useAppStore.getState().updateS3Config(
+        {
+          endpoint: form.endpoint.trim(),
+          region: form.region.trim(),
+          bucket: form.bucket.trim(),
+          accessKey: form.accessKey,
+          // Send the masked value back when the user didn't edit the
+          // secret; the backend interprets a "****" prefix as "leave
+          // unchanged".
+          secretKey: form.secretKey,
+          forcePathStyle: form.forcePathStyle,
+          useSsl: form.useSsl,
         },
-      });
-      const v = res.value?.value;
-      const cfg = v?.case === "s3Config" ? v.value : undefined;
+        [...s3ConfigPaths]
+      );
       setForm({
         endpoint: cfg?.endpoint ?? "",
         region: cfg?.region ?? "",

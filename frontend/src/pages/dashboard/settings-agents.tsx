@@ -15,18 +15,16 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { settingServiceClient } from "@/connect";
 import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
+import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
+import { llmAgentConfigPaths, userMcpConfigPaths } from "@/stores/setting";
 import {
-  LlmAgentConfigSettingSchema,
   type McpIpPolicy,
   McpIpPolicy_Scope,
   McpIpPolicySchema,
-  UserMcpConfigSettingSchema,
 } from "@/types/proto-es/store/setting_pb";
-import { SettingValueSchema } from "@/types/proto-es/v1/setting_pb";
 
 // Preset deny list of internal / cloud-metadata ranges appended idempotently
 // by the "add presets" button.
@@ -83,23 +81,14 @@ export function SettingsAgentsPage() {
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
-      settingServiceClient.getSetting({ name: "settings/llm_agent_config" }),
-      settingServiceClient.getSetting({ name: "settings/user_mcp_config" }),
+      useAppStore.getState().fetchLlmAgentConfig(),
+      useAppStore.getState().fetchUserMcpConfig(),
     ])
-      .then(([llmRes, mcpRes]) => {
+      .then(([llm, mcp]) => {
         if (cancelled) return;
-        const llmV = llmRes.value?.value;
-        const mcpV = mcpRes.value?.value;
-        setEnabled(
-          llmV?.case === "llmAgentConfig"
-            ? llmV.value.allowUserSelfProvidedKeys
-            : true
-        );
-        setUserMcpEnabled(
-          mcpV?.case === "userMcpConfig" ? mcpV.value.allowUserMcpServers : true
-        );
-        const p =
-          mcpV?.case === "userMcpConfig" ? mcpV.value.mcpIpPolicy : undefined;
+        setEnabled(llm?.allowUserSelfProvidedKeys ?? true);
+        setUserMcpEnabled(mcp?.allowUserMcpServers ?? true);
+        const p = mcp?.mcpIpPolicy;
         setPolicyEnabled(p?.enabled ?? false);
         setPolicyScope(p?.scope ?? McpIpPolicy_Scope.USER_CREATED);
         setAllowText((p?.allowCidrs ?? []).join("\n"));
@@ -127,21 +116,14 @@ export function SettingsAgentsPage() {
   async function persistUserMcp(nextEnabled: boolean) {
     setUserMcpSaving(true);
     try {
-      await settingServiceClient.updateSetting({
-        setting: {
-          name: "settings/user_mcp_config",
-          value: create(SettingValueSchema, {
-            value: {
-              case: "userMcpConfig" as const,
-              value: create(UserMcpConfigSettingSchema, {
-                allowUserMcpServers: nextEnabled,
-                mcpIpPolicy: buildPolicy(),
-              }),
-            },
-          }),
+      const cfg = await useAppStore.getState().updateUserMcpConfig(
+        {
+          allowUserMcpServers: nextEnabled,
+          mcpIpPolicy: buildPolicy(),
         },
-      });
-      setUserMcpEnabled(nextEnabled);
+        [...userMcpConfigPaths]
+      );
+      setUserMcpEnabled(cfg?.allowUserMcpServers ?? nextEnabled);
       toastManager.add({
         type: "success",
         title: t("settings.agents.saved"),
@@ -160,20 +142,12 @@ export function SettingsAgentsPage() {
   async function handleToggle(next: boolean) {
     setSaving(true);
     try {
-      await settingServiceClient.updateSetting({
-        setting: {
-          name: "settings/llm_agent_config",
-          value: create(SettingValueSchema, {
-            value: {
-              case: "llmAgentConfig" as const,
-              value: create(LlmAgentConfigSettingSchema, {
-                allowUserSelfProvidedKeys: next,
-              }),
-            },
-          }),
-        },
-      });
-      setEnabled(next);
+      const cfg = await useAppStore
+        .getState()
+        .updateLlmAgentConfig({ allowUserSelfProvidedKeys: next }, [
+          ...llmAgentConfigPaths,
+        ]);
+      setEnabled(cfg?.allowUserSelfProvidedKeys ?? next);
       toastManager.add({ type: "success", title: t("settings.agents.saved") });
     } catch (err) {
       toastManager.add({

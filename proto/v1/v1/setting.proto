@@ -3,6 +3,7 @@ syntax = "proto3";
 package laelia.v1;
 
 import "google/api/field_behavior.proto";
+import "google/protobuf/field_mask.proto";
 import "store/setting.proto";
 import "v1/annotation.proto";
 
@@ -43,6 +44,12 @@ message GetSettingRequest {
 
 message UpdateSettingRequest {
   Setting setting = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Fields to update, AIP-134 style paths under the setting value, e.g.
+  // "value.workspace_profile.disallow_signup". Required: the backend merges
+  // only the listed paths into the stored payload, so callers never need to
+  // round-trip unrelated fields.
+  google.protobuf.FieldMask update_mask = 2;
 }
 
 message GetSetupStatusRequest {}
