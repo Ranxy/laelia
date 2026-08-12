@@ -88,7 +88,14 @@ func configureV1Routers(
 	onPanic := func(_ context.Context, s connect.Spec, _ http.Header, p any) error {
 		stack := stacktrace.TakeStacktrace(20 /* n */, 5 /* skip */)
 		slog.Error("v1 server panic error", "method", s.Procedure, log.WithError(errors.Errorf("error: %v\n%s", p, stack)))
-		return connect.NewError(connect.CodeInternal, errors.Errorf("error: %v\n%s", p, stack))
+		// Panic details (internal file paths, function names, line numbers)
+		// are only safe to return to the client in debug mode; otherwise they
+		// help an attacker locate unpatched dependencies. The full stack is
+		// always logged above.
+		if profile.RuntimeDebug.Load() {
+			return connect.NewError(connect.CodeInternal, errors.Errorf("error: %v\n%s", p, stack))
+		}
+		return connect.NewError(connect.CodeInternal, errors.New("internal server error"))
 	}
 
 	ipValidator := auth.NewIPValidator(auth.IPValidationWarn, profile.TrustProxy)
