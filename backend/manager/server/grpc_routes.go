@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/pkg/errors"
 
+	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/common/log"
 	"github.com/Ranxy/laelia/backend/common/stacktrace"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
@@ -157,29 +158,36 @@ func configureV1Routers(
 	notificationPath, notificationHandler := v1connect.NewNotificationServiceHandler(notificationService, handlerOpts)
 	connectHandlers[notificationPath] = notificationHandler
 
-	reflector := grpcreflect.NewStaticReflector(
-		v1connect.UserServiceName,
-		v1connect.AuthServiceName,
-		v1connect.AgentServiceName,
-		v1connect.CommandServiceName,
-		v1connect.AgentStreamServiceName,
-		v1connect.MachineServiceName,
-		v1connect.MachineStreamServiceName,
-		v1connect.SettingServiceName,
-		v1connect.RoleServiceName,
-		v1connect.IamServiceName,
-		v1connect.GroupServiceName,
-		v1connect.ApiProviderServiceName,
-		v1connect.McpServerServiceName,
-		v1connect.McpGatewayServiceName,
-		v1connect.AuditLogServiceName,
-		v1connect.NotificationServiceName,
-	)
-	reflectPath, reflectHandler := grpcreflect.NewHandlerV1(reflector)
-	connectHandlers[reflectPath] = reflectHandler
+	// gRPC reflection is a dev-only convenience: it lets unauthenticated
+	// callers enumerate every RPC, message shape, and permission annotation,
+	// which lowers the bar for attackers in production. Register it only in
+	// dev mode; the auth exemption in api/auth is gated the same way as
+	// defense in depth.
+	if profile.Mode == common.ReleaseModeDev {
+		reflector := grpcreflect.NewStaticReflector(
+			v1connect.UserServiceName,
+			v1connect.AuthServiceName,
+			v1connect.AgentServiceName,
+			v1connect.CommandServiceName,
+			v1connect.AgentStreamServiceName,
+			v1connect.MachineServiceName,
+			v1connect.MachineStreamServiceName,
+			v1connect.SettingServiceName,
+			v1connect.RoleServiceName,
+			v1connect.IamServiceName,
+			v1connect.GroupServiceName,
+			v1connect.ApiProviderServiceName,
+			v1connect.McpServerServiceName,
+			v1connect.McpGatewayServiceName,
+			v1connect.AuditLogServiceName,
+			v1connect.NotificationServiceName,
+		)
+		reflectPath, reflectHandler := grpcreflect.NewHandlerV1(reflector)
+		connectHandlers[reflectPath] = reflectHandler
 
-	reflectAlphaPath, reflectAlphaHandler := grpcreflect.NewHandlerV1Alpha(reflector)
-	connectHandlers[reflectAlphaPath] = reflectAlphaHandler
+		reflectAlphaPath, reflectAlphaHandler := grpcreflect.NewHandlerV1Alpha(reflector)
+		connectHandlers[reflectAlphaPath] = reflectAlphaHandler
+	}
 
 	for path, handler := range connectHandlers {
 		e.Any(path+"*", echo.WrapHandler(handler))

@@ -107,7 +107,7 @@ func (in *APIAuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFun
 
 		result, err := in.getUserOrAgentConnect(ctx, accessTokenStr)
 		if err != nil {
-			if IsAuthenticationAllowed(req.Spec().Procedure, authContext) {
+			if IsAuthenticationAllowed(req.Spec().Procedure, authContext, in.profile.Mode == common.ReleaseModeDev) {
 				return next(ctx, req)
 			}
 			return nil, err
@@ -164,7 +164,7 @@ func (in *APIAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandler
 
 		result, err := in.getUserOrAgentConnect(ctx, accessTokenStr)
 		if err != nil {
-			if IsAuthenticationAllowed(conn.Spec().Procedure, authContext) {
+			if IsAuthenticationAllowed(conn.Spec().Procedure, authContext, in.profile.Mode == common.ReleaseModeDev) {
 				return next(ctx, conn)
 			}
 			return err
