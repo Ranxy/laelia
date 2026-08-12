@@ -21,6 +21,7 @@ export const CHANNEL_ROUTE_DETAIL = "channel.detail";
 export const SETTINGS_ROUTE = "settings";
 export const SETTINGS_ROUTE_AGENTS = "settings.agents";
 export const SETTINGS_ROUTE_GENERAL = "settings.general";
+export const SETTINGS_ROUTE_SMTP = "settings.smtp";
 export const SETTINGS_ROUTE_PROFILE = "settings.profile";
 export const SETTINGS_ROUTE_STORAGE = "settings.storage";
 export const SETTINGS_ROUTE_NOTIFICATIONS = "settings.notifications";

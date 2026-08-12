@@ -12,11 +12,14 @@ import (
 
 	"github.com/Ranxy/laelia/backend/common/log"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
+	"github.com/Ranxy/laelia/backend/manager/component/mailer"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/plugin/idp/oauth2"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -41,15 +44,23 @@ type AuthService struct {
 	secret   string
 	profile  *config.Profile
 	stateCfg *state.State
+	mailer   *mailer.Sender
+	// resendLimiters throttles ResendVerificationEmail per address (1/min) so
+	// the endpoint cannot be used to spam a victim's inbox even though its
+	// response deliberately reveals nothing about registered addresses.
+	resendLimiters *lru.Cache[string, *rate.Limiter]
 }
 
 // NewAuthService creates a new AuthService.
-func NewAuthService(store *store.Store, secret string, profile *config.Profile, stateCfg *state.State) *AuthService {
+func NewAuthService(store *store.Store, secret string, profile *config.Profile, stateCfg *state.State, mailerSender *mailer.Sender) *AuthService {
+	limiters, _ := lru.New[string, *rate.Limiter](10000)
 	return &AuthService{
-		store:    store,
-		secret:   secret,
-		profile:  profile,
-		stateCfg: stateCfg,
+		store:          store,
+		secret:         secret,
+		profile:        profile,
+		stateCfg:       stateCfg,
+		mailer:         mailerSender,
+		resendLimiters: limiters,
 	}
 }
 
@@ -78,6 +89,13 @@ func (s *AuthService) Login(ctx context.Context, req *connect.Request[v1pb.Login
 
 	if loginUser.MemberDeleted {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Errorf("user has been deactivated by administrators"))
+	}
+
+	// An end user whose signup email was never verified cannot sign in with a
+	// password. SSO (IDP) logins are exempt: the identity provider vouches for
+	// the address. Service accounts are always created verified.
+	if loginUser.EmailVerifiedAt == nil && loginUser.Type == models.PrincipalType_END_USER && !loginViaIDP {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("please verify your email before signing in, check your inbox for the verification link"))
 	}
 
 	setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
@@ -212,6 +230,63 @@ func (s *AuthService) Logout(ctx context.Context, req *connect.Request[v1pb.Logo
 	return resp, nil
 }
 
+// VerifyEmail completes self-service signup: the user clicked the link in the
+// verification email, which marks the account's email as verified so sign-in
+// is allowed. The endpoint needs no credential; the token is the secret.
+func (s *AuthService) VerifyEmail(ctx context.Context, req *connect.Request[v1pb.VerifyEmailRequest]) (*connect.Response[v1pb.VerifyEmailResponse], error) {
+	token := strings.TrimSpace(req.Msg.GetToken())
+	if token == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("verification token is required"))
+	}
+	if err := s.store.VerifyUserEmail(ctx, hashEmailVerificationToken(token)); err != nil {
+		switch {
+		case errors.Is(err, store.ErrVerificationTokenNotFound), errors.Is(err, store.ErrVerificationTokenConsumed):
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("the verification link is invalid or has already been used"))
+		case errors.Is(err, store.ErrVerificationTokenExpired):
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Errorf("the verification link has expired, request a new one"))
+		default:
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to verify email"))
+		}
+	}
+	return connect.NewResponse(&v1pb.VerifyEmailResponse{}), nil
+}
+
+// ResendVerificationEmail re-sends the signup verification email to an
+// unverified account. The response is identical whether or not the address
+// belongs to an unverified account, so the endpoint cannot be used to probe
+// registered addresses; a per-address limiter prevents mail bombing.
+func (s *AuthService) ResendVerificationEmail(ctx context.Context, req *connect.Request[v1pb.ResendVerificationEmailRequest]) (*connect.Response[v1pb.ResendVerificationEmailResponse], error) {
+	email := strings.ToLower(strings.TrimSpace(req.Msg.GetEmail()))
+	if email != "" {
+		if !s.allowResend(email) {
+			return connect.NewResponse(&v1pb.ResendVerificationEmailResponse{}), nil
+		}
+		user, err := s.store.GetUserByEmail(ctx, email)
+		if err == nil && user != nil && !user.MemberDeleted && user.Type == models.PrincipalType_END_USER && user.EmailVerifiedAt == nil {
+			if setting, err := s.store.GetWorkspaceGeneralSetting(ctx); err == nil {
+				baseURL := setting.GetExternalUrl()
+				if baseURL == "" {
+					baseURL = req.Header().Get("Origin")
+				}
+				if err := issueVerificationEmail(ctx, s.mailer, s.store, user, baseURL); err != nil {
+					slog.Error("failed to resend verification email", log.WithError(err), slog.String("user", user.Email))
+				}
+			}
+		}
+	}
+	return connect.NewResponse(&v1pb.ResendVerificationEmailResponse{}), nil
+}
+
+// allowResend applies the per-address resend budget (1 per minute).
+func (s *AuthService) allowResend(email string) bool {
+	limiter, ok := s.resendLimiters.Get(email)
+	if !ok {
+		limiter = rate.NewLimiter(rate.Every(time.Minute), 1)
+		s.resendLimiters.Add(email, limiter)
+	}
+	return limiter.Allow()
+}
+
 func (s *AuthService) getAndVerifyUser(ctx context.Context, request *v1pb.LoginRequest) (*store.UserMessage, error) {
 	user, err := s.store.GetUserByEmail(ctx, request.Email)
 	if err != nil {
@@ -330,12 +405,16 @@ func (s *AuthService) getOrCreateUserWithIDP(ctx context.Context, request *v1pb.
 	if err := s.userCountGuard(ctx); err != nil {
 		return nil, err
 	}
+	// The identity provider vouches for the address, so SSO-created users are
+	// treated as email-verified from the start.
+	verifiedAt := time.Now()
 	newUser, err := s.store.CreateUser(ctx, &store.UserMessage{
-		Name:         userInfo.DisplayName,
-		Email:        email,
-		Phone:        userInfo.Phone,
-		Type:         models.PrincipalType_END_USER,
-		PasswordHash: string(passwordHash),
+		Name:            userInfo.DisplayName,
+		Email:           email,
+		Phone:           userInfo.Phone,
+		Type:            models.PrincipalType_END_USER,
+		PasswordHash:    string(passwordHash),
+		EmailVerifiedAt: &verifiedAt,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create user, error"))

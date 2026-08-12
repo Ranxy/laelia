@@ -82,6 +82,9 @@ type UserMessage struct {
 	// (enter_to_send = true) so the historic behavior is preserved until the
 	// user explicitly customizes it.
 	ChatPreferences *models.ChatPreferences
+	// EmailVerifiedAt is set once the user confirms the address via the signup
+	// verification email link. Nil means the account cannot sign in yet.
+	EmailVerifiedAt *time.Time
 }
 
 // GetResourceID returns the stable per-user resource name used to key
@@ -201,7 +204,7 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (*UserMessage,
 // service accounts are excluded so they cannot be addressed as a DM peer.
 func (s *Store) FindUsersByName(ctx context.Context, name string) ([]*UserMessage, error) {
 	rows, err := s.GetDB().QueryContext(ctx, `
-		SELECT id, name, email, type, password_hash, deleted, description, phone, created_at, avatar_s3_key
+		SELECT id, name, email, type, password_hash, deleted, description, phone, created_at, avatar_s3_key, email_verified_at
 		FROM principal
 		WHERE type = 'END_USER' AND deleted = FALSE AND name = $1
 		ORDER BY id ASC
@@ -215,8 +218,12 @@ func (s *Store) FindUsersByName(ctx context.Context, name string) ([]*UserMessag
 	for rows.Next() {
 		var u UserMessage
 		var t string
-		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &t, &u.PasswordHash, &u.MemberDeleted, &u.Description, &u.Phone, &u.CreatedAt, &u.AvatarS3Key); err != nil {
+		var emailVerifiedAt sql.NullTime
+		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &t, &u.PasswordHash, &u.MemberDeleted, &u.Description, &u.Phone, &u.CreatedAt, &u.AvatarS3Key, &emailVerifiedAt); err != nil {
 			return nil, errors.Wrap(err, "failed to scan user by name")
+		}
+		if emailVerifiedAt.Valid {
+			u.EmailVerifiedAt = &emailVerifiedAt.Time
 		}
 		users = append(users, &u)
 	}
@@ -381,7 +388,8 @@ func buildListUsersQuery(find *FindUserMessage) (string, []any) {
 		user_groups.groups,
 		principal.description,
 		principal.avatar_s3_key,
-		principal.chat_preferences
+		principal.chat_preferences,
+		principal.email_verified_at
 	FROM principal
 	INNER JOIN user_groups ON principal.id = user_groups.user_id
 	` + join + ` WHERE ` + strings.Join(where, " AND ") + ` ORDER BY type DESC, created_at ASC`
@@ -410,6 +418,7 @@ func listUserImpl(ctx context.Context, txn *sql.Tx, find *FindUserMessage) ([]*U
 		var chatPrefBytes []byte
 		var typeString string
 		var groups pq.StringArray
+		var emailVerifiedAt sql.NullTime
 		if err := rows.Scan(
 			&userMessage.ID,
 			&userMessage.MemberDeleted,
@@ -424,8 +433,12 @@ func listUserImpl(ctx context.Context, txn *sql.Tx, find *FindUserMessage) ([]*U
 			&userMessage.Description,
 			&userMessage.AvatarS3Key,
 			&chatPrefBytes,
+			&emailVerifiedAt,
 		); err != nil {
 			return nil, err
+		}
+		if emailVerifiedAt.Valid {
+			userMessage.EmailVerifiedAt = &emailVerifiedAt.Time
 		}
 		userMessage.Groups = []string(groups)
 		if typeValue, ok := models.PrincipalType_value[typeString]; ok {
@@ -479,8 +492,8 @@ func (s *Store) CreateUser(ctx context.Context, create *UserMessage) (*UserMessa
 		return nil, err
 	}
 
-	set := []string{"email", "name", "type", "password_hash", "phone", "profile", "description"}
-	args := []any{create.Email, create.Name, create.Type.String(), create.PasswordHash, create.Phone, profileBytes, create.Description}
+	set := []string{"email", "name", "type", "password_hash", "phone", "profile", "description", "email_verified_at"}
+	args := []any{create.Email, create.Name, create.Type.String(), create.PasswordHash, create.Phone, profileBytes, create.Description, create.EmailVerifiedAt}
 	placeholder := []string{}
 	for index := range set {
 		placeholder = append(placeholder, fmt.Sprintf("$%d", index+1))
@@ -507,15 +520,16 @@ func (s *Store) CreateUser(ctx context.Context, create *UserMessage) (*UserMessa
 	}
 
 	user := &UserMessage{
-		ID:           userID,
-		Email:        create.Email,
-		Name:         create.Name,
-		Type:         create.Type,
-		PasswordHash: create.PasswordHash,
-		Phone:        create.Phone,
-		CreatedAt:    create.CreatedAt,
-		Profile:      create.Profile,
-		Description:  create.Description,
+		ID:              userID,
+		Email:           create.Email,
+		Name:            create.Name,
+		Type:            create.Type,
+		PasswordHash:    create.PasswordHash,
+		Phone:           create.Phone,
+		CreatedAt:       create.CreatedAt,
+		Profile:         create.Profile,
+		Description:     create.Description,
+		EmailVerifiedAt: create.EmailVerifiedAt,
 	}
 	s.cacheActiveUser(user)
 	return user, nil

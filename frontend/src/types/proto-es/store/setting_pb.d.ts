@@ -77,6 +77,17 @@ export declare type WorkspaceProfileSetting = Message<"laelia.store.WorkspacePro
    * @generated from field: bool enable_metric_collection = 9;
    */
   enableMetricCollection: boolean;
+
+  /**
+   * Whether self-service signup must verify the email address by clicking a
+   * link sent to the inbox before the account can sign in. Only takes effect
+   * when disallow_signup is false (self-service signup enabled); admin-created
+   * users and the first workspace user are always verified. Nil means
+   * "enabled" (the default).
+   *
+   * @generated from field: optional bool require_email_verification = 10;
+   */
+  requireEmailVerification?: boolean | undefined;
 };
 
 /**
@@ -84,6 +95,64 @@ export declare type WorkspaceProfileSetting = Message<"laelia.store.WorkspacePro
  * Use `create(WorkspaceProfileSettingSchema)` to create a new message.
  */
 export declare const WorkspaceProfileSettingSchema: GenMessage<WorkspaceProfileSetting>;
+
+/**
+ * SMTPSetting holds the outbound SMTP connection details used to send
+ * transactional emails (e.g. the signup verification email). When host is
+ * empty, the mail service is considered unconfigured.
+ *
+ * @generated from message laelia.store.SMTPSetting
+ */
+export declare type SMTPSetting = Message<"laelia.store.SMTPSetting"> & {
+  /**
+   * SMTP server host, e.g. "smtp.example.com". Empty means not configured.
+   *
+   * @generated from field: string host = 1;
+   */
+  host: string;
+
+  /**
+   * SMTP server port, e.g. 587 (STARTTLS) or 465 (implicit TLS).
+   *
+   * @generated from field: int32 port = 2;
+   */
+  port: number;
+
+  /**
+   * Optional username for AUTH PLAIN. Empty means no authentication.
+   *
+   * @generated from field: string username = 3;
+   */
+  username: string;
+
+  /**
+   * Password for AUTH PLAIN. Masked on read-back.
+   *
+   * @generated from field: string password = 4;
+   */
+  password: string;
+
+  /**
+   * The From address shown in sent mail.
+   *
+   * @generated from field: string from = 5;
+   */
+  from: string;
+
+  /**
+   * use_tls enables TLS: port 465 uses implicit TLS, other ports use STARTTLS
+   * after connecting. When false, the connection is plaintext.
+   *
+   * @generated from field: bool use_tls = 6;
+   */
+  useTls: boolean;
+};
+
+/**
+ * Describes the message laelia.store.SMTPSetting.
+ * Use `create(SMTPSettingSchema)` to create a new message.
+ */
+export declare const SMTPSettingSchema: GenMessage<SMTPSetting>;
 
 /**
  * @generated from message laelia.store.PasswordRestrictionSetting

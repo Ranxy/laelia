@@ -31,6 +31,7 @@ message SettingValue {
     laelia.store.UserMcpConfigSetting user_mcp_config = 3;
     laelia.store.WorkspaceProfileSetting workspace_profile = 4;
     laelia.store.PasswordRestrictionSetting password_restriction = 5;
+    laelia.store.SMTPSetting smtp_config = 6;
   }
 }
 
@@ -134,4 +135,9 @@ message GetWorkspaceInfoResponse {
   // The allowed email suffixes (e.g. "example.com") when
   // enforce_identity_domain is set.
   repeated string domains = 3;
+
+  // Whether self-service signup must verify the email address by clicking a
+  // link before the account can sign in. Only meaningful when disallow_signup
+  // is false.
+  bool require_email_verification = 4;
 }

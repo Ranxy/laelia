@@ -7,6 +7,7 @@ import (
 	"net/mail"
 	"regexp"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/cel-go/cel"
@@ -25,6 +26,7 @@ import (
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
+	"github.com/Ranxy/laelia/backend/manager/component/mailer"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
@@ -40,16 +42,18 @@ type UserService struct {
 	stateCfg *state.State
 	iam      *iam.Manager
 	s3client *s3client.Client
+	mailer   *mailer.Sender
 }
 
 // NewUserService creates a new UserService.
-func NewUserService(store *store.Store, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager, s3clientManager *s3client.Client) *UserService {
+func NewUserService(store *store.Store, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager, s3clientManager *s3client.Client, mailerSender *mailer.Sender) *UserService {
 	return &UserService{
 		store:    store,
 		profile:  profile,
 		stateCfg: stateCfg,
 		iam:      iamManager,
 		s3client: s3clientManager,
+		mailer:   mailerSender,
 	}
 }
 
@@ -371,11 +375,20 @@ func (s *UserService) CreateUser(ctx context.Context, request *connect.Request[v
 	// disallows signup, only callers holding laelia.users.create (workspace
 	// admins) may create users. The very first end user is exempt so a fresh
 	// workspace can always bootstrap its first admin.
+	//
+	// Email verification (when enabled) applies only to anonymous
+	// self-service signup: admin-created users, service accounts, the first
+	// bootstrap user, and SSO-created users are always treated as verified.
+	// If verification is required but no SMTP server is configured, signup is
+	// rejected so an account is never created that the user cannot activate.
+	var workspaceSetting *storepb.WorkspaceProfileSetting
+	requireVerification := false
 	if principalType == storepb.PrincipalType_END_USER && !firstEndUser {
 		setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get workspace general setting"))
 		}
+		workspaceSetting = setting
 		if setting.DisallowSignup {
 			caller, ok := GetUserFromContext(ctx)
 			if !ok || caller == nil {
@@ -387,6 +400,18 @@ func (s *UserService) CreateUser(ctx context.Context, request *connect.Request[v
 			}
 			if !allowed {
 				return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("signup is disallowed, only workspace admins can create users"))
+			}
+		}
+		if caller, ok := GetUserFromContext(ctx); !ok || caller == nil {
+			requireVerification = store.RequireEmailVerification(setting)
+			if requireVerification {
+				configured, err := s.mailer.Configured(ctx)
+				if err != nil {
+					return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check SMTP configuration"))
+				}
+				if !configured {
+					return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Errorf("the workspace requires email verification but the mail service is not configured, please contact the administrator"))
+				}
 			}
 		}
 	}
@@ -440,6 +465,10 @@ func (s *UserService) CreateUser(ctx context.Context, request *connect.Request[v
 		PasswordHash: string(passwordHash),
 		Description:  request.Msg.User.Description,
 	}
+	if !requireVerification {
+		verifiedAt := time.Now()
+		userMessage.EmailVerifiedAt = &verifiedAt
+	}
 
 	user, err := s.store.CreateUser(ctx, userMessage)
 	if err != nil {
@@ -454,6 +483,20 @@ func (s *UserService) CreateUser(ctx context.Context, request *connect.Request[v
 		}
 		if _, err := s.store.PatchWorkspaceIamPolicy(ctx, updateRole); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+	}
+
+	if requireVerification {
+		// The account is created unverified; the signup completes only after
+		// the user clicks the link in the email. A send failure is logged but
+		// does not fail the request — the user can request a resend from the
+		// signup page.
+		baseURL := workspaceSetting.GetExternalUrl()
+		if baseURL == "" {
+			baseURL = request.Header().Get("Origin")
+		}
+		if err := issueVerificationEmail(ctx, s.mailer, s.store, user, baseURL); err != nil {
+			slog.Error("failed to send signup verification email", log.WithError(err), slog.String("user", user.Email))
 		}
 	}
 

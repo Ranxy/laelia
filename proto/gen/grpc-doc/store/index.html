@@ -460,6 +460,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.store.SMTPSetting"><span class="badge">M</span>SMTPSetting</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.store.UserMcpConfigSetting"><span class="badge">M</span>UserMcpConfigSetting</a>
                 </li>
               
@@ -2949,6 +2953,66 @@ stores; false for AWS virtual-host style). </p></td>
 
         
       
+        <h3 id="laelia.store.SMTPSetting">SMTPSetting</h3>
+        <p>SMTPSetting holds the outbound SMTP connection details used to send</p><p>transactional emails (e.g. the signup verification email). When host is</p><p>empty, the mail service is considered unconfigured.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>host</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>SMTP server host, e.g. &#34;smtp.example.com&#34;. Empty means not configured. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>port</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>SMTP server port, e.g. 587 (STARTTLS) or 465 (implicit TLS). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>username</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Optional username for AUTH PLAIN. Empty means no authentication. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>password</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Password for AUTH PLAIN. Masked on read-back. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>from</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The From address shown in sent mail. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>use_tls</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>use_tls enables TLS: port 465 uses implicit TLS, other ports use STARTTLS
+after connecting. When false, the connection is plaintext. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.store.UserMcpConfigSetting">UserMcpConfigSetting</h3>
         <p>UserMcpConfigSetting is the workspace-level personal MCP configuration:</p><p>whether users may configure their own personal MCP servers and enable them</p><p>on their own agents, plus the optional target IP allow/deny policy that</p><p>bounds where those servers (or all MCP servers) may connect.</p>
 
@@ -3105,6 +3169,17 @@ endpoints directly. Only http:// and https:// schemes are supported. </p></td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
                   <td><p>Whether to enable metric collection for the workspace. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>require_email_verification</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td>optional</td>
+                  <td><p>Whether self-service signup must verify the email address by clicking a
+link sent to the inbox before the account can sign in. Only takes effect
+when disallow_signup is false (self-service signup enabled); admin-created
+users and the first workspace user are always verified. Nil means
+&#34;enabled&#34; (the default). </p></td>
                 </tr>
               
             </tbody>
@@ -3269,6 +3344,12 @@ endpoints directly. Only http:// and https:// schemes are supported. </p></td>
               <tr>
                 <td>USER_MCP_CONFIG</td>
                 <td>13</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>SMTP_CONFIG</td>
+                <td>14</td>
                 <td><p></p></td>
               </tr>
             

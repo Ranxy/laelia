@@ -20,7 +20,39 @@ service AuthService {
     option (laelia.v1.allow_without_credential) = true;
     option (laelia.v1.audit) = true;
   }
+
+  // VerifyEmail completes self-service signup: the user clicked the link in
+  // the verification email and this call marks the account's email as
+  // verified so sign-in is allowed. Permissions required: None.
+  rpc VerifyEmail(VerifyEmailRequest) returns (VerifyEmailResponse) {
+    option (laelia.v1.allow_without_credential) = true;
+  }
+
+  // ResendVerificationEmail resends the signup verification email to an
+  // unverified account. The response is the same whether or not the email
+  // belongs to an unverified account so the endpoint cannot be used to probe
+  // registered addresses. Permissions required: None.
+  rpc ResendVerificationEmail(ResendVerificationEmailRequest) returns (ResendVerificationEmailResponse) {
+    option (laelia.v1.allow_without_credential) = true;
+  }
 }
+
+// VerifyEmailRequest carries the one-time token from the verification email.
+message VerifyEmailRequest {
+  string token = 1;
+}
+
+// VerifyEmailResponse is empty on success.
+message VerifyEmailResponse {}
+
+// ResendVerificationEmailRequest carries the address to resend to.
+message ResendVerificationEmailRequest {
+  string email = 1;
+}
+
+// ResendVerificationEmailResponse is empty on success. It is returned even
+// when no unverified account exists for the address.
+message ResendVerificationEmailResponse {}
 
 message LoginRequest {
   string email = 1;

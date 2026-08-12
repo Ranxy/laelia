@@ -4,6 +4,8 @@ import {
   CircleHelp,
   Eye,
   EyeOff,
+  Loader2,
+  Mail,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -52,6 +54,7 @@ export function SignUpPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const register = useAppStore((s) => s.register);
+  const resendVerificationEmail = useAppStore((s) => s.resendVerificationEmail);
 
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -63,6 +66,9 @@ export function SignUpPage() {
   const [touched, setTouched] = useState(false);
   const [signupDisallowed, setSignupDisallowed] = useState(false);
   const [allowedDomains, setAllowedDomains] = useState<string[]>([]);
+  const [requireVerification, setRequireVerification] = useState(false);
+  const [registered, setRegistered] = useState(false);
+  const [resending, setResending] = useState(false);
 
   // The signup policy is public (GetWorkspaceInfo needs no auth): when the
   // workspace disallows self-service registration, show a notice instead of
@@ -74,6 +80,7 @@ export function SignUpPage() {
       .then((res) => {
         if (cancelled) return;
         setSignupDisallowed(res.disallowSignup);
+        setRequireVerification(res.requireEmailVerification ?? false);
         if (res.enforceIdentityDomain) setAllowedDomains(res.domains ?? []);
       })
       .catch(() => {
@@ -119,7 +126,11 @@ export function SignUpPage() {
     setLoading(true);
     try {
       await register(email, name.trim(), password);
-      navigate("/", { replace: true });
+      if (requireVerification) {
+        setRegistered(true);
+      } else {
+        navigate("/", { replace: true });
+      }
     } catch (err) {
       toastManager.add({
         type: "error",
@@ -132,6 +143,67 @@ export function SignUpPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleResend() {
+    setResending(true);
+    try {
+      await resendVerificationEmail(email);
+      toastManager.add({
+        type: "success",
+        title: t("auth.sign-up.resend-sent"),
+      });
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("auth.sign-up.resend-failed"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setResending(false);
+    }
+  }
+
+  if (registered) {
+    return (
+      <div className="flex w-full max-w-sm flex-col gap-y-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-semibold text-main">Laelia</h1>
+          <p className="mt-1 text-sm text-control-light">
+            {t("auth.sign-up.verify-title")}
+          </p>
+        </div>
+        <div className="flex flex-col items-center gap-y-4 px-1 py-8 text-center">
+          <CircleCheck className="size-10 text-success" />
+          <p className="text-sm text-control">
+            {t("auth.sign-up.verify-sent", { email })}
+          </p>
+          <p className="text-xs text-control-light">
+            {t("auth.sign-up.verify-hint")}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleResend}
+            disabled={resending}
+          >
+            {resending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Mail className="size-4" />
+            )}
+            {t("auth.sign-up.resend")}
+          </Button>
+          <button
+            type="button"
+            className="text-accent hover:underline"
+            onClick={() => navigate("/auth/signin")}
+          >
+            {t("common.sign-in")}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

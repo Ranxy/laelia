@@ -4,7 +4,7 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { LlmAgentConfigSetting, PasswordRestrictionSetting, S3ConfigSetting, UserMcpConfigSetting, WorkspaceProfileSetting } from "../store/setting_pb";
+import type { LlmAgentConfigSetting, PasswordRestrictionSetting, S3ConfigSetting, SMTPSetting, UserMcpConfigSetting, WorkspaceProfileSetting } from "../store/setting_pb";
 
 /**
  * Describes the file v1/setting.proto.
@@ -83,6 +83,12 @@ export declare type SettingValue = Message<"laelia.v1.SettingValue"> & {
      */
     value: PasswordRestrictionSetting;
     case: "passwordRestriction";
+  } | {
+    /**
+     * @generated from field: laelia.store.SMTPSetting smtp_config = 6;
+     */
+    value: SMTPSetting;
+    case: "smtpConfig";
   } | { case: undefined; value?: undefined };
 };
 
@@ -284,6 +290,15 @@ export declare type GetWorkspaceInfoResponse = Message<"laelia.v1.GetWorkspaceIn
    * @generated from field: repeated string domains = 3;
    */
   domains: string[];
+
+  /**
+   * Whether self-service signup must verify the email address by clicking a
+   * link before the account can sign in. Only meaningful when disallow_signup
+   * is false.
+   *
+   * @generated from field: bool require_email_verification = 4;
+   */
+  requireEmailVerification: boolean;
 };
 
 /**

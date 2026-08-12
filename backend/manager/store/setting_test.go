@@ -51,3 +51,14 @@ func TestSettingPayloadDefaults(t *testing.T) {
 	require.Contains(t, settingPayloadDefaults, models.SettingName_WORKSPACE_PROFILE)
 	require.Contains(t, settingPayloadDefaults, models.SettingName_PASSWORD_RESTRICTION)
 }
+
+// TestRequireEmailVerification guards the nil-default semantics: an unset
+// field (nil) means verification is enabled by default.
+func TestRequireEmailVerification(t *testing.T) {
+	assert.True(t, RequireEmailVerification(nil))
+	assert.True(t, RequireEmailVerification(&models.WorkspaceProfileSetting{}))
+	assert.True(t, RequireEmailVerification(&models.WorkspaceProfileSetting{RequireEmailVerification: boolPtr(true)}))
+	assert.False(t, RequireEmailVerification(&models.WorkspaceProfileSetting{RequireEmailVerification: boolPtr(false)}))
+}
+
+func boolPtr(b bool) *bool { return &b }

@@ -5,6 +5,8 @@ import { invalidateImageBlobs } from "@/lib/image-blob-cache";
 import {
   LoginRequestSchema,
   LogoutRequestSchema,
+  ResendVerificationEmailRequestSchema,
+  VerifyEmailRequestSchema,
 } from "@/types/proto-es/v1/auth_service_pb";
 import {
   CreateUserRequestSchema,
@@ -71,7 +73,22 @@ export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
         }),
       })
     );
-    await get().login(email, password);
+    // No auto-login: when the workspace requires email verification the
+    // account is created unverified and can only sign in after the user
+    // clicks the link in the verification email. The signup page decides
+    // what to show next from GetWorkspaceInfo.require_email_verification.
+  },
+
+  async verifyEmail(token: string) {
+    await authServiceClient.verifyEmail(
+      create(VerifyEmailRequestSchema, { token })
+    );
+  },
+
+  async resendVerificationEmail(email: string) {
+    await authServiceClient.resendVerificationEmail(
+      create(ResendVerificationEmailRequestSchema, { email })
+    );
   },
 
   async fetchCurrentUser() {

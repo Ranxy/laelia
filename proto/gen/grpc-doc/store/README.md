@@ -74,6 +74,7 @@
     - [McpIpPolicy](#laelia-store-McpIpPolicy)
     - [PasswordRestrictionSetting](#laelia-store-PasswordRestrictionSetting)
     - [S3ConfigSetting](#laelia-store-S3ConfigSetting)
+    - [SMTPSetting](#laelia-store-SMTPSetting)
     - [UserMcpConfigSetting](#laelia-store-UserMcpConfigSetting)
     - [WebPushSetting](#laelia-store-WebPushSetting)
     - [WorkspaceProfileSetting](#laelia-store-WorkspaceProfileSetting)
@@ -1109,6 +1110,28 @@ considered unconfigured and upload/download endpoints reject with
 
 
 
+<a name="laelia-store-SMTPSetting"></a>
+
+### SMTPSetting
+SMTPSetting holds the outbound SMTP connection details used to send
+transactional emails (e.g. the signup verification email). When host is
+empty, the mail service is considered unconfigured.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| host | [string](#string) |  | SMTP server host, e.g. &#34;smtp.example.com&#34;. Empty means not configured. |
+| port | [int32](#int32) |  | SMTP server port, e.g. 587 (STARTTLS) or 465 (implicit TLS). |
+| username | [string](#string) |  | Optional username for AUTH PLAIN. Empty means no authentication. |
+| password | [string](#string) |  | Password for AUTH PLAIN. Masked on read-back. |
+| from | [string](#string) |  | The From address shown in sent mail. |
+| use_tls | [bool](#bool) |  | use_tls enables TLS: port 465 uses implicit TLS, other ports use STARTTLS after connecting. When false, the connection is plaintext. |
+
+
+
+
+
+
 <a name="laelia-store-UserMcpConfigSetting"></a>
 
 ### UserMcpConfigSetting
@@ -1168,6 +1191,7 @@ returned by any RPC — GetPushConfig only exposes the public key.
 | enforce_identity_domain | [bool](#bool) |  | Only user and group from the domains can be created and login. |
 | disallow_password_signin | [bool](#bool) |  | Whether to disallow password signin. (Except workspace admins) |
 | enable_metric_collection | [bool](#bool) |  | Whether to enable metric collection for the workspace. |
+| require_email_verification | [bool](#bool) | optional | Whether self-service signup must verify the email address by clicking a link sent to the inbox before the account can sign in. Only takes effect when disallow_signup is false (self-service signup enabled); admin-created users and the first workspace user are always verified. Nil means &#34;enabled&#34; (the default). |
 
 
 
@@ -1224,6 +1248,7 @@ Scope selects which MCP servers the policy applies to.
 | WEB_PUSH_CONFIG | 11 |  |
 | LLM_AGENT_CONFIG | 12 |  |
 | USER_MCP_CONFIG | 13 |  |
+| SMTP_CONFIG | 14 |  |
 
 
  

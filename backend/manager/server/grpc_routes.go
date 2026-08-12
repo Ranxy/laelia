@@ -18,6 +18,7 @@ import (
 	apiv1 "github.com/Ranxy/laelia/backend/manager/api/v1"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
+	"github.com/Ranxy/laelia/backend/manager/component/mailer"
 	"github.com/Ranxy/laelia/backend/manager/component/ratelimit"
 	"github.com/Ranxy/laelia/backend/manager/component/roomhub"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
@@ -50,8 +51,11 @@ func configureV1Routers(
 	stores.SetRoomNotifier(hub)
 
 	iamManager := iam.NewManager(stores)
-	userService := apiv1.NewUserService(stores, profile, stateCfg, iamManager, s3clientmanager)
-	authService := apiv1.NewAuthService(stores, secret, profile, stateCfg)
+	// Mailer sender: reads the SMTP setting from the setting table on every
+	// send, so admin changes take effect immediately without restart.
+	mailerSender := mailer.NewSender(stores)
+	userService := apiv1.NewUserService(stores, profile, stateCfg, iamManager, s3clientmanager, mailerSender)
+	authService := apiv1.NewAuthService(stores, secret, profile, stateCfg, mailerSender)
 	agentService := apiv1.NewAgentService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager, s3clientmanager)
 	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager, iamManager, hub)
 	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)

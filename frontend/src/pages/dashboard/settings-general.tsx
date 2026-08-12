@@ -12,12 +12,14 @@ import { SettingValueSchema } from "@/types/proto-es/v1/setting_pb";
 
 interface GeneralForm {
   allowSignup: boolean;
+  requireEmailVerification: boolean;
   enforceIdentityDomain: boolean;
   domains: string;
 }
 
 const EMPTY: GeneralForm = {
   allowSignup: true,
+  requireEmailVerification: true,
   enforceIdentityDomain: false,
   domains: "",
 };
@@ -44,6 +46,7 @@ export function SettingsGeneralPage() {
   const [loading, setLoading] = useState(true);
   const [savingSignup, setSavingSignup] = useState(false);
   const [savingDomain, setSavingDomain] = useState(false);
+  const [savingEmailVerification, setSavingEmailVerification] = useState(false);
   const [savingDomains, setSavingDomains] = useState(false);
 
   useEffect(() => {
@@ -58,6 +61,7 @@ export function SettingsGeneralPage() {
         const s = v?.case === "workspaceProfile" ? v.value : undefined;
         const next = {
           allowSignup: !(s?.disallowSignup ?? false),
+          requireEmailVerification: s?.requireEmailVerification ?? true,
           enforceIdentityDomain: s?.enforceIdentityDomain ?? false,
           domains: (s?.domains ?? []).join("\n"),
         };
@@ -85,6 +89,7 @@ export function SettingsGeneralPage() {
     const s = v?.case === "workspaceProfile" ? v.value : undefined;
     const next = {
       allowSignup: !(s?.disallowSignup ?? false),
+      requireEmailVerification: s?.requireEmailVerification ?? true,
       enforceIdentityDomain: s?.enforceIdentityDomain ?? false,
       domains: (s?.domains ?? []).join("\n"),
     };
@@ -148,6 +153,24 @@ export function SettingsGeneralPage() {
     }
   }
 
+  async function handleToggleEmailVerification(v: boolean) {
+    const prev = form.requireEmailVerification;
+    setForm((f) => ({ ...f, requireEmailVerification: v }));
+    setSavingEmailVerification(true);
+    try {
+      await saveField({ requireEmailVerification: v });
+    } catch (err) {
+      setForm((f) => ({ ...f, requireEmailVerification: prev }));
+      toastManager.add({
+        type: "error",
+        title: t("settings.general.save-failed"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setSavingEmailVerification(false);
+    }
+  }
+
   async function handleSaveDomains() {
     setSavingDomains(true);
     try {
@@ -199,6 +222,25 @@ export function SettingsGeneralPage() {
               size="md"
             />
           </div>
+
+          {form.allowSignup && (
+            <div className="flex items-center justify-between rounded-lg border border-control-border bg-background px-5 py-4 shadow-xs">
+              <div>
+                <div className="text-sm font-medium text-main">
+                  {t("settings.general.require-email-verification")}
+                </div>
+                <div className="mt-0.5 text-xs text-control-light">
+                  {t("settings.general.require-email-verification-description")}
+                </div>
+              </div>
+              <Switch
+                checked={form.requireEmailVerification}
+                onCheckedChange={handleToggleEmailVerification}
+                disabled={savingEmailVerification}
+                size="md"
+              />
+            </div>
+          )}
 
           <div className="flex items-center justify-between rounded-lg border border-control-border bg-background px-5 py-4 shadow-xs">
             <div>

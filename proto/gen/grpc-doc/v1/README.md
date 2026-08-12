@@ -135,6 +135,10 @@
     - [LoginResponse](#laelia-v1-LoginResponse)
     - [LogoutRequest](#laelia-v1-LogoutRequest)
     - [OAuth2IdentityProviderContext](#laelia-v1-OAuth2IdentityProviderContext)
+    - [ResendVerificationEmailRequest](#laelia-v1-ResendVerificationEmailRequest)
+    - [ResendVerificationEmailResponse](#laelia-v1-ResendVerificationEmailResponse)
+    - [VerifyEmailRequest](#laelia-v1-VerifyEmailRequest)
+    - [VerifyEmailResponse](#laelia-v1-VerifyEmailResponse)
   
     - [AuthService](#laelia-v1-AuthService)
   
@@ -2462,6 +2466,57 @@ preference that agents can perceive and honor when conversing.
 
 
 
+
+<a name="laelia-v1-ResendVerificationEmailRequest"></a>
+
+### ResendVerificationEmailRequest
+ResendVerificationEmailRequest carries the address to resend to.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| email | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ResendVerificationEmailResponse"></a>
+
+### ResendVerificationEmailResponse
+ResendVerificationEmailResponse is empty on success. It is returned even
+when no unverified account exists for the address.
+
+
+
+
+
+
+<a name="laelia-v1-VerifyEmailRequest"></a>
+
+### VerifyEmailRequest
+VerifyEmailRequest carries the one-time token from the verification email.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-VerifyEmailResponse"></a>
+
+### VerifyEmailResponse
+VerifyEmailResponse is empty on success.
+
+
+
+
+
  
 
  
@@ -2478,6 +2533,8 @@ preference that agents can perceive and honor when conversing.
 | ----------- | ------------ | ------------- | ------------|
 | Login | [LoginRequest](#laelia-v1-LoginRequest) | [LoginResponse](#laelia-v1-LoginResponse) | Permissions required: None |
 | Logout | [LogoutRequest](#laelia-v1-LogoutRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Permissions required: None |
+| VerifyEmail | [VerifyEmailRequest](#laelia-v1-VerifyEmailRequest) | [VerifyEmailResponse](#laelia-v1-VerifyEmailResponse) | VerifyEmail completes self-service signup: the user clicked the link in the verification email and this call marks the account&#39;s email as verified so sign-in is allowed. Permissions required: None. |
+| ResendVerificationEmail | [ResendVerificationEmailRequest](#laelia-v1-ResendVerificationEmailRequest) | [ResendVerificationEmailResponse](#laelia-v1-ResendVerificationEmailResponse) | ResendVerificationEmail resends the signup verification email to an unverified account. The response is the same whether or not the email belongs to an unverified account so the endpoint cannot be used to probe registered addresses. Permissions required: None. |
 
  
 
@@ -7594,6 +7651,7 @@ signup is offered and which email suffixes are accepted.
 | disallow_signup | [bool](#bool) |  | Whether self-service signup is disallowed. When true, users can only be created by workspace admins. |
 | enforce_identity_domain | [bool](#bool) |  | Whether the email suffix restriction is enforced for signup. |
 | domains | [string](#string) | repeated | The allowed email suffixes (e.g. &#34;example.com&#34;) when enforce_identity_domain is set. |
+| require_email_verification | [bool](#bool) |  | Whether self-service signup must verify the email address by clicking a link before the account can sign in. Only meaningful when disallow_signup is false. |
 
 
 
@@ -7633,6 +7691,7 @@ exactly one source of truth.
 | user_mcp_config | [laelia.store.UserMcpConfigSetting](#laelia-store-UserMcpConfigSetting) |  |  |
 | workspace_profile | [laelia.store.WorkspaceProfileSetting](#laelia-store-WorkspaceProfileSetting) |  |  |
 | password_restriction | [laelia.store.PasswordRestrictionSetting](#laelia-store-PasswordRestrictionSetting) |  |  |
+| smtp_config | [laelia.store.SMTPSetting](#laelia-store-SMTPSetting) |  |  |
 
 
 

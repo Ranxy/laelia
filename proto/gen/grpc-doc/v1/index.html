@@ -688,6 +688,22 @@
                   <a href="#laelia.v1.OAuth2IdentityProviderContext"><span class="badge">M</span>OAuth2IdentityProviderContext</a>
                 </li>
               
+                <li>
+                  <a href="#laelia.v1.ResendVerificationEmailRequest"><span class="badge">M</span>ResendVerificationEmailRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ResendVerificationEmailResponse"><span class="badge">M</span>ResendVerificationEmailResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.VerifyEmailRequest"><span class="badge">M</span>VerifyEmailRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.VerifyEmailResponse"><span class="badge">M</span>VerifyEmailResponse</a>
+                </li>
+              
               
               
               
@@ -6725,6 +6741,68 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.ResendVerificationEmailRequest">ResendVerificationEmailRequest</h3>
+        <p>ResendVerificationEmailRequest carries the address to resend to.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>email</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ResendVerificationEmailResponse">ResendVerificationEmailResponse</h3>
+        <p>ResendVerificationEmailResponse is empty on success. It is returned even</p><p>when no unverified account exists for the address.</p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.VerifyEmailRequest">VerifyEmailRequest</h3>
+        <p>VerifyEmailRequest carries the one-time token from the verification email.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.VerifyEmailResponse">VerifyEmailResponse</h3>
+        <p>VerifyEmailResponse is empty on success.</p>
+
+        
+
+        
+      
 
       
 
@@ -6751,6 +6829,25 @@ Format: idps/{idp} </p></td>
                 <td><a href="#laelia.v1.LogoutRequest">LogoutRequest</a></td>
                 <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
                 <td><p>Permissions required: None</p></td>
+              </tr>
+            
+              <tr>
+                <td>VerifyEmail</td>
+                <td><a href="#laelia.v1.VerifyEmailRequest">VerifyEmailRequest</a></td>
+                <td><a href="#laelia.v1.VerifyEmailResponse">VerifyEmailResponse</a></td>
+                <td><p>VerifyEmail completes self-service signup: the user clicked the link in
+the verification email and this call marks the account&#39;s email as
+verified so sign-in is allowed. Permissions required: None.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ResendVerificationEmail</td>
+                <td><a href="#laelia.v1.ResendVerificationEmailRequest">ResendVerificationEmailRequest</a></td>
+                <td><a href="#laelia.v1.ResendVerificationEmailResponse">ResendVerificationEmailResponse</a></td>
+                <td><p>ResendVerificationEmail resends the signup verification email to an
+unverified account. The response is the same whether or not the email
+belongs to an unverified account so the endpoint cannot be used to probe
+registered addresses. Permissions required: None.</p></td>
               </tr>
             
           </tbody>
@@ -17999,6 +18096,15 @@ created by workspace admins. </p></td>
 enforce_identity_domain is set. </p></td>
                 </tr>
               
+                <tr>
+                  <td>require_email_verification</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Whether self-service signup must verify the email address by clicking a
+link before the account can sign in. Only meaningful when disallow_signup
+is false. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -18080,6 +18186,13 @@ Example: &#34;settings/s3_config&#34; </p></td>
                 <tr>
                   <td>password_restriction</td>
                   <td><a href="#laelia.store.PasswordRestrictionSetting">laelia.store.PasswordRestrictionSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>smtp_config</td>
+                  <td><a href="#laelia.store.SMTPSetting">laelia.store.SMTPSetting</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>

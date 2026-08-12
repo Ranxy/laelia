@@ -33,7 +33,10 @@ CREATE TABLE principal (
     description text NOT NULL DEFAULT '',
     -- S3 object key of the user's uploaded avatar image, empty when the user has
     -- not uploaded one (frontend renders a deterministic pixel identicon instead).
-    avatar_s3_key text NOT NULL DEFAULT ''
+    avatar_s3_key text NOT NULL DEFAULT '',
+    -- NULL until the user confirms the address via the signup verification
+    -- email link; admin-created users and pre-existing users are verified.
+    email_verified_at timestamptz
 );
 
 -- Idempotent ALTER so existing databases pick up the description column when the
@@ -951,3 +954,25 @@ CREATE TABLE agent_mcp (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (agent_id, mcp_server_id)
 );
+
+-- === Email verification (self-service signup) ===
+-- NULL email_verified_at marks an unverified account created by self-service
+-- signup with email verification required; such accounts cannot sign in until
+-- the verification link is clicked. Every pre-existing and admin-created
+-- account is backfilled as verified so only new self-signups are affected.
+ALTER TABLE principal ADD COLUMN IF NOT EXISTS email_verified_at timestamptz;
+UPDATE principal SET email_verified_at = now() WHERE email_verified_at IS NULL;
+
+-- Single-use email verification tokens. Only the SHA-256 hash of the token is
+-- stored (aligned with agent_token), so a database leak cannot be used to
+-- verify arbitrary accounts.
+CREATE TABLE IF NOT EXISTS email_verification_token (
+    id bigserial PRIMARY KEY,
+    token_hash text NOT NULL UNIQUE,
+    principal_id int NOT NULL REFERENCES principal(id) ON DELETE CASCADE,
+    expires_at timestamptz NOT NULL,
+    consumed_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_email_verification_token_principal
+    ON email_verification_token(principal_id);

@@ -31,6 +31,7 @@ import {
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_PROFILE,
   SETTINGS_ROUTE_ROLES,
+  SETTINGS_ROUTE_SMTP,
   SETTINGS_ROUTE_STORAGE,
   SETTINGS_ROUTE_USERS,
 } from "../handles";
@@ -293,6 +294,14 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         lazy: () =>
           import("@/pages/dashboard/settings-general").then((m) => ({
             Component: m.SettingsGeneralPage,
+          })),
+      },
+      {
+        path: "smtp",
+        handle: { name: SETTINGS_ROUTE_SMTP },
+        lazy: () =>
+          import("@/pages/dashboard/settings-smtp").then((m) => ({
+            Component: m.SettingsSmtpPage,
           })),
       },
       {

@@ -21,6 +21,7 @@ enum SettingName {
   WEB_PUSH_CONFIG = 11;
   LLM_AGENT_CONFIG = 12;
   USER_MCP_CONFIG = 13;
+  SMTP_CONFIG = 14;
 }
 
 message WorkspaceProfileSetting {
@@ -50,6 +51,32 @@ message WorkspaceProfileSetting {
 
   // Whether to enable metric collection for the workspace.
   bool enable_metric_collection = 9;
+
+  // Whether self-service signup must verify the email address by clicking a
+  // link sent to the inbox before the account can sign in. Only takes effect
+  // when disallow_signup is false (self-service signup enabled); admin-created
+  // users and the first workspace user are always verified. Nil means
+  // "enabled" (the default).
+  optional bool require_email_verification = 10;
+}
+
+// SMTPSetting holds the outbound SMTP connection details used to send
+// transactional emails (e.g. the signup verification email). When host is
+// empty, the mail service is considered unconfigured.
+message SMTPSetting {
+  // SMTP server host, e.g. "smtp.example.com". Empty means not configured.
+  string host = 1;
+  // SMTP server port, e.g. 587 (STARTTLS) or 465 (implicit TLS).
+  int32 port = 2;
+  // Optional username for AUTH PLAIN. Empty means no authentication.
+  string username = 3;
+  // Password for AUTH PLAIN. Masked on read-back.
+  string password = 4;
+  // The From address shown in sent mail.
+  string from = 5;
+  // use_tls enables TLS: port 465 uses implicit TLS, other ports use STARTTLS
+  // after connecting. When false, the connection is plaintext.
+  bool use_tls = 6;
 }
 
 message PasswordRestrictionSetting {

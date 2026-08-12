@@ -58,7 +58,23 @@
       "email-placeholder": "you@example.com",
       "name-placeholder": "张三",
       "disallowed": "自助注册已关闭，请联系工作区管理员创建账户。",
-      "allowed-domains": "仅允许以下邮箱后缀注册：{{domains}}"
+      "allowed-domains": "仅允许以下邮箱后缀注册：{{domains}}",
+      "verify-title": "查收邮件",
+      "verify-sent": "我们已向 {{email}} 发送验证链接，点击链接即可激活账号。",
+      "verify-hint": "链接 72 小时内有效。没收到？请检查垃圾邮件或重新发送。",
+      "resend": "重新发送",
+      "resend-sent": "验证邮件已发送",
+      "resend-failed": "验证邮件发送失败"
+    },
+    "verify-email": {
+      "title": "验证邮箱",
+      "verifying": "正在验证邮箱…",
+      "success": "邮箱验证成功，现在可以登录了。",
+      "failed": "验证链接无效或已过期。",
+      "failed-hint": "输入你的邮箱以获取新的验证链接。",
+      "resend": "重新发送验证邮件",
+      "resend-sent": "验证邮件已发送",
+      "resend-failed": "验证邮件发送失败"
     }
   },
   "mobile": {
@@ -84,7 +100,8 @@
     "settings-mcp-servers": "MCP 服务",
     "settings-agents": "Agents / LLM",
     "settings-profile": "个人资料",
-    "settings-general": "常规设置"
+    "settings-general": "常规设置",
+    "settings-smtp": "SMTP"
   },
   "settings": {
     "title": "设置",
@@ -461,7 +478,26 @@
       "domains-hint": "每行一个邮箱后缀，例如 example.com",
       "saved": "常规设置已保存",
       "load-failed": "加载常规设置失败",
-      "save-failed": "保存常规设置失败"
+      "save-failed": "保存常规设置失败",
+      "require-email-verification": "要求邮箱验证",
+      "require-email-verification-description": "新用户自助注册后必须点击发送到邮箱的验证链接，才能登录。"
+    },
+    "smtp": {
+      "title": "SMTP",
+      "description": "配置用于发送注册验证邮件的邮件服务器。",
+      "host": "SMTP 服务器",
+      "host-placeholder": "smtp.example.com",
+      "port": "端口",
+      "from": "发件地址",
+      "from-placeholder": "no-reply@example.com",
+      "username": "用户名",
+      "password": "密码",
+      "password-placeholder": "••••••••",
+      "password-masked": "密码已保存；留空表示保持不变。",
+      "use-tls": "使用 TLS（465 端口隐式 TLS，其他端口 STARTTLS）",
+      "saved": "SMTP 设置已保存",
+      "load-failed": "加载 SMTP 设置失败",
+      "save-failed": "保存 SMTP 设置失败"
     }
   },
   "setup": {

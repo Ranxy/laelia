@@ -13,6 +13,71 @@ import type { EmptySchema } from "@bufbuild/protobuf/wkt";
 export declare const file_v1_auth_service: GenFile;
 
 /**
+ * VerifyEmailRequest carries the one-time token from the verification email.
+ *
+ * @generated from message laelia.v1.VerifyEmailRequest
+ */
+export declare type VerifyEmailRequest = Message<"laelia.v1.VerifyEmailRequest"> & {
+  /**
+   * @generated from field: string token = 1;
+   */
+  token: string;
+};
+
+/**
+ * Describes the message laelia.v1.VerifyEmailRequest.
+ * Use `create(VerifyEmailRequestSchema)` to create a new message.
+ */
+export declare const VerifyEmailRequestSchema: GenMessage<VerifyEmailRequest>;
+
+/**
+ * VerifyEmailResponse is empty on success.
+ *
+ * @generated from message laelia.v1.VerifyEmailResponse
+ */
+export declare type VerifyEmailResponse = Message<"laelia.v1.VerifyEmailResponse"> & {
+};
+
+/**
+ * Describes the message laelia.v1.VerifyEmailResponse.
+ * Use `create(VerifyEmailResponseSchema)` to create a new message.
+ */
+export declare const VerifyEmailResponseSchema: GenMessage<VerifyEmailResponse>;
+
+/**
+ * ResendVerificationEmailRequest carries the address to resend to.
+ *
+ * @generated from message laelia.v1.ResendVerificationEmailRequest
+ */
+export declare type ResendVerificationEmailRequest = Message<"laelia.v1.ResendVerificationEmailRequest"> & {
+  /**
+   * @generated from field: string email = 1;
+   */
+  email: string;
+};
+
+/**
+ * Describes the message laelia.v1.ResendVerificationEmailRequest.
+ * Use `create(ResendVerificationEmailRequestSchema)` to create a new message.
+ */
+export declare const ResendVerificationEmailRequestSchema: GenMessage<ResendVerificationEmailRequest>;
+
+/**
+ * ResendVerificationEmailResponse is empty on success. It is returned even
+ * when no unverified account exists for the address.
+ *
+ * @generated from message laelia.v1.ResendVerificationEmailResponse
+ */
+export declare type ResendVerificationEmailResponse = Message<"laelia.v1.ResendVerificationEmailResponse"> & {
+};
+
+/**
+ * Describes the message laelia.v1.ResendVerificationEmailResponse.
+ * Use `create(ResendVerificationEmailResponseSchema)` to create a new message.
+ */
+export declare const ResendVerificationEmailResponseSchema: GenMessage<ResendVerificationEmailResponse>;
+
+/**
  * @generated from message laelia.v1.LoginRequest
  */
 export declare type LoginRequest = Message<"laelia.v1.LoginRequest"> & {
@@ -156,6 +221,31 @@ export declare const AuthService: GenService<{
     methodKind: "unary";
     input: typeof LogoutRequestSchema;
     output: typeof EmptySchema;
+  },
+  /**
+   * VerifyEmail completes self-service signup: the user clicked the link in
+   * the verification email and this call marks the account's email as
+   * verified so sign-in is allowed. Permissions required: None.
+   *
+   * @generated from rpc laelia.v1.AuthService.VerifyEmail
+   */
+  verifyEmail: {
+    methodKind: "unary";
+    input: typeof VerifyEmailRequestSchema;
+    output: typeof VerifyEmailResponseSchema;
+  },
+  /**
+   * ResendVerificationEmail resends the signup verification email to an
+   * unverified account. The response is the same whether or not the email
+   * belongs to an unverified account so the endpoint cannot be used to probe
+   * registered addresses. Permissions required: None.
+   *
+   * @generated from rpc laelia.v1.AuthService.ResendVerificationEmail
+   */
+  resendVerificationEmail: {
+    methodKind: "unary";
+    input: typeof ResendVerificationEmailRequestSchema;
+    output: typeof ResendVerificationEmailResponseSchema;
   },
 }>;
 

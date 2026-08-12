@@ -35,6 +35,16 @@ var retryBackoff = []time.Duration{
 // while the partial indexes make each scan a cheap index range scan.
 const tickInterval = 1 * time.Second
 
+// unverifiedUserTTL is how long a self-service signup may stay unverified
+// before the account is soft-deleted (freeing the email for re-registration).
+// It matches the verification link TTL in the API layer.
+const unverifiedUserTTL = 72 * time.Hour
+
+// unverifiedScanInterval is the minimum gap between unverified-account
+// cleanups. The scan runs on the ticker, so a wall-clock guard keeps it
+// roughly daily instead of every second.
+const unverifiedScanInterval = 24 * time.Hour
+
 // Scheduler fires reminders by scanning the reminder table on a ticker. It is
 // constructed with the store (for scans and status transitions), the
 // dispatcher (to check agent connectivity and wake connected agents), and an
@@ -47,6 +57,9 @@ type Scheduler struct {
 	lifecycleCtx    context.Context
 	lifecycleCancel context.CancelFunc
 	wg              sync.WaitGroup
+
+	// lastUnverifiedScan guards the daily unverified-account cleanup.
+	lastUnverifiedScan time.Time
 }
 
 // New returns a scheduler that scans store and wakes agents via disp. The clock
@@ -71,6 +84,8 @@ func (s *Scheduler) Start() {
 	go s.runLoop(s.scanDue)
 	s.wg.Add(1)
 	go s.runLoop(s.scanRetry)
+	s.wg.Add(1)
+	go s.runLoop(s.scanUnverifiedUsers)
 }
 
 // Stop cancels the lifecycle context and waits for both loops to exit.
@@ -177,5 +192,25 @@ func (s *Scheduler) miss(ctx context.Context, r *store.Reminder) {
 	// Generate REMINDER activity for the miss notification (best-effort).
 	for _, m := range posted {
 		s.store.GenerateActivityForMessage(m, false, true)
+	}
+}
+
+// scanUnverifiedUsers soft-deletes END_USER accounts whose email was never
+// verified within unverifiedUserTTL. It runs at most once per
+// unverifiedScanInterval; the zero-value timestamp makes the first tick run
+// the scan.
+func (s *Scheduler) scanUnverifiedUsers(ctx context.Context) {
+	if s.now().Sub(s.lastUnverifiedScan) < unverifiedScanInterval {
+		return
+	}
+	s.lastUnverifiedScan = s.now()
+	before := s.now().Add(-unverifiedUserTTL)
+	deleted, err := s.store.DeleteUnverifiedUsersOlderThan(ctx, before)
+	if err != nil {
+		slog.Warn("scheduler: failed to clean up unverified users", "error", err)
+		return
+	}
+	if deleted > 0 {
+		slog.Info("scheduler: cleaned up unverified signup accounts", "deleted", deleted)
 	}
 }

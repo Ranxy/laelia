@@ -22,6 +22,14 @@ export const authRoutes: RouteObject[] = [
             Component: m.SignUpPage,
           })),
       },
+      {
+        path: "verify-email",
+        handle: { name: "auth.verify-email" },
+        lazy: () =>
+          import("@/pages/auth/verify-email").then((m) => ({
+            Component: m.VerifyEmailPage,
+          })),
+      },
     ],
   },
 ];

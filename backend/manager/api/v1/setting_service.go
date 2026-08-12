@@ -61,6 +61,7 @@ var exposedSettings = map[models.SettingName]settingMeta{
 	models.SettingName_USER_MCP_CONFIG:      {},
 	models.SettingName_WORKSPACE_PROFILE:    {adminOnly: true},
 	models.SettingName_PASSWORD_RESTRICTION: {adminOnly: true},
+	models.SettingName_SMTP_CONFIG:          {adminOnly: true},
 }
 
 // parseSettingName converts a resource name ("settings/s3_config") to the
@@ -172,6 +173,10 @@ func convertV1ToStoreSetting(name models.SettingName, value *v1pb.SettingValue) 
 		if cfg := value.GetPasswordRestriction(); cfg != nil {
 			return cfg, nil
 		}
+	case models.SettingName_SMTP_CONFIG:
+		if cfg := value.GetSmtpConfig(); cfg != nil {
+			return cfg, nil
+		}
 	default:
 	}
 	return nil, errors.Errorf("%s value is required", strings.ToLower(name.String()))
@@ -212,6 +217,13 @@ func convertStoreToSettingValue(name models.SettingName, payload proto.Message) 
 			return nil, errors.Errorf("unexpected payload type %T for setting %v", payload, name)
 		}
 		return &v1pb.SettingValue{Value: &v1pb.SettingValue_PasswordRestriction{PasswordRestriction: cfg}}, nil
+	case models.SettingName_SMTP_CONFIG:
+		cfg, ok := payload.(*models.SMTPSetting)
+		if !ok {
+			return nil, errors.Errorf("unexpected payload type %T for setting %v", payload, name)
+		}
+		cfg.Password = maskSecret(cfg.Password)
+		return &v1pb.SettingValue{Value: &v1pb.SettingValue_SmtpConfig{SmtpConfig: cfg}}, nil
 	default:
 		return nil, errors.Errorf("unsupported setting %v", name)
 	}
@@ -257,6 +269,23 @@ func (s *SettingService) prepareSettingUpdate(ctx context.Context, name models.S
 		}
 		normalizeWorkspaceGeneralSetting(setting)
 		if err := validateWorkspaceGeneralSetting(setting); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+	case models.SettingName_SMTP_CONFIG:
+		cfg, ok := payload.(*models.SMTPSetting)
+		if !ok {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("unexpected payload type %T for setting %v", payload, name))
+		}
+		// A masked password means "leave unchanged": pull the stored value so
+		// the caller doesn't have to re-enter the password to tweak the host.
+		if strings.HasPrefix(cfg.Password, secretMaskPrefix) {
+			stored, err := s.store.GetSMTPSetting(ctx)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get SMTP setting"))
+			}
+			cfg.Password = stored.Password
+		}
+		if err := validateSMTPSetting(cfg); err != nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 	default:
@@ -352,9 +381,10 @@ func (s *SettingService) GetWorkspaceInfo(ctx context.Context, _ *connect.Reques
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get workspace general setting"))
 	}
 	return connect.NewResponse(&v1pb.GetWorkspaceInfoResponse{
-		DisallowSignup:        setting.DisallowSignup,
-		EnforceIdentityDomain: setting.EnforceIdentityDomain,
-		Domains:               setting.Domains,
+		DisallowSignup:           setting.DisallowSignup,
+		EnforceIdentityDomain:    setting.EnforceIdentityDomain,
+		Domains:                  setting.Domains,
+		RequireEmailVerification: store.RequireEmailVerification(setting),
 	}), nil
 }
 
@@ -386,6 +416,20 @@ func validateWorkspaceGeneralSetting(setting *models.WorkspaceProfileSetting) er
 		if d != strings.ToLower(d) {
 			return errors.Errorf("domain %q must be lowercase", d)
 		}
+	}
+	return nil
+}
+
+// validateSMTPSetting rejects SMTP configs that could never deliver mail.
+func validateSMTPSetting(cfg *models.SMTPSetting) error {
+	if cfg.GetHost() == "" {
+		return errors.Errorf("SMTP host is required")
+	}
+	if cfg.GetFrom() == "" {
+		return errors.Errorf("SMTP from address is required")
+	}
+	if cfg.GetPort() < 0 || cfg.GetPort() > 65535 {
+		return errors.Errorf("SMTP port %d is out of range", cfg.GetPort())
 	}
 	return nil
 }

@@ -11,42 +11,70 @@ import { file_v1_user_service } from "./user_service_pb";
  * Describes the file v1/auth_service.proto.
  */
 export const file_v1_auth_service = /*@__PURE__*/
-  fileDesc("ChV2MS9hdXRoX3NlcnZpY2UucHJvdG8SCWxhZWxpYS52MSKHAQoMTG9naW5SZXF1ZXN0Eg0KBWVtYWlsGAEgASgJEhAKCHBhc3N3b3JkGAIgASgJEgsKA3dlYhgDIAEoCBIQCghpZHBfbmFtZRgEIAEoCRI3CgtpZHBfY29udGV4dBgFIAEoCzIiLmxhZWxpYS52MS5JZGVudGl0eVByb3ZpZGVyQ29udGV4dCJoChdJZGVudGl0eVByb3ZpZGVyQ29udGV4dBJCCg5vYXV0aDJfY29udGV4dBgBIAEoCzIoLmxhZWxpYS52MS5PQXV0aDJJZGVudGl0eVByb3ZpZGVyQ29udGV4dEgAQgkKB2NvbnRleHQiLQodT0F1dGgySWRlbnRpdHlQcm92aWRlckNvbnRleHQSDAoEY29kZRgBIAEoCSJdCg1Mb2dpblJlc3BvbnNlEg0KBXRva2VuGAEgASgJEh4KFnJlcXVpcmVfcmVzZXRfcGFzc3dvcmQYAyABKAgSHQoEdXNlchgEIAEoCzIPLmxhZWxpYS52MS5Vc2VyIg8KDUxvZ291dFJlcXVlc3QymQEKC0F1dGhTZXJ2aWNlEkQKBUxvZ2luEhcubGFlbGlhLnYxLkxvZ2luUmVxdWVzdBoYLmxhZWxpYS52MS5Mb2dpblJlc3BvbnNlIgiA6jABmOowARJECgZMb2dvdXQSGC5sYWVsaWEudjEuTG9nb3V0UmVxdWVzdBoWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eSIIgOowAZjqMAFCMVovZ2l0aHViLmNvbS9SYW54eS9sYWVsaWEvYmFja2VuZC9nZW5lcmF0ZWQtZ28vdjFiBnByb3RvMw", [file_google_protobuf_empty, file_v1_annotation, file_v1_user_service]);
+  fileDesc("ChV2MS9hdXRoX3NlcnZpY2UucHJvdG8SCWxhZWxpYS52MSIjChJWZXJpZnlFbWFpbFJlcXVlc3QSDQoFdG9rZW4YASABKAkiFQoTVmVyaWZ5RW1haWxSZXNwb25zZSIvCh5SZXNlbmRWZXJpZmljYXRpb25FbWFpbFJlcXVlc3QSDQoFZW1haWwYASABKAkiIQofUmVzZW5kVmVyaWZpY2F0aW9uRW1haWxSZXNwb25zZSKHAQoMTG9naW5SZXF1ZXN0Eg0KBWVtYWlsGAEgASgJEhAKCHBhc3N3b3JkGAIgASgJEgsKA3dlYhgDIAEoCBIQCghpZHBfbmFtZRgEIAEoCRI3CgtpZHBfY29udGV4dBgFIAEoCzIiLmxhZWxpYS52MS5JZGVudGl0eVByb3ZpZGVyQ29udGV4dCJoChdJZGVudGl0eVByb3ZpZGVyQ29udGV4dBJCCg5vYXV0aDJfY29udGV4dBgBIAEoCzIoLmxhZWxpYS52MS5PQXV0aDJJZGVudGl0eVByb3ZpZGVyQ29udGV4dEgAQgkKB2NvbnRleHQiLQodT0F1dGgySWRlbnRpdHlQcm92aWRlckNvbnRleHQSDAoEY29kZRgBIAEoCSJdCg1Mb2dpblJlc3BvbnNlEg0KBXRva2VuGAEgASgJEh4KFnJlcXVpcmVfcmVzZXRfcGFzc3dvcmQYAyABKAgSHQoEdXNlchgEIAEoCzIPLmxhZWxpYS52MS5Vc2VyIg8KDUxvZ291dFJlcXVlc3Qy5QIKC0F1dGhTZXJ2aWNlEkQKBUxvZ2luEhcubGFlbGlhLnYxLkxvZ2luUmVxdWVzdBoYLmxhZWxpYS52MS5Mb2dpblJlc3BvbnNlIgiA6jABmOowARJECgZMb2dvdXQSGC5sYWVsaWEudjEuTG9nb3V0UmVxdWVzdBoWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eSIIgOowAZjqMAESUgoLVmVyaWZ5RW1haWwSHS5sYWVsaWEudjEuVmVyaWZ5RW1haWxSZXF1ZXN0Gh4ubGFlbGlhLnYxLlZlcmlmeUVtYWlsUmVzcG9uc2UiBIDqMAESdgoXUmVzZW5kVmVyaWZpY2F0aW9uRW1haWwSKS5sYWVsaWEudjEuUmVzZW5kVmVyaWZpY2F0aW9uRW1haWxSZXF1ZXN0GioubGFlbGlhLnYxLlJlc2VuZFZlcmlmaWNhdGlvbkVtYWlsUmVzcG9uc2UiBIDqMAFCMVovZ2l0aHViLmNvbS9SYW54eS9sYWVsaWEvYmFja2VuZC9nZW5lcmF0ZWQtZ28vdjFiBnByb3RvMw", [file_google_protobuf_empty, file_v1_annotation, file_v1_user_service]);
+
+/**
+ * Describes the message laelia.v1.VerifyEmailRequest.
+ * Use `create(VerifyEmailRequestSchema)` to create a new message.
+ */
+export const VerifyEmailRequestSchema = /*@__PURE__*/
+  messageDesc(file_v1_auth_service, 0);
+
+/**
+ * Describes the message laelia.v1.VerifyEmailResponse.
+ * Use `create(VerifyEmailResponseSchema)` to create a new message.
+ */
+export const VerifyEmailResponseSchema = /*@__PURE__*/
+  messageDesc(file_v1_auth_service, 1);
+
+/**
+ * Describes the message laelia.v1.ResendVerificationEmailRequest.
+ * Use `create(ResendVerificationEmailRequestSchema)` to create a new message.
+ */
+export const ResendVerificationEmailRequestSchema = /*@__PURE__*/
+  messageDesc(file_v1_auth_service, 2);
+
+/**
+ * Describes the message laelia.v1.ResendVerificationEmailResponse.
+ * Use `create(ResendVerificationEmailResponseSchema)` to create a new message.
+ */
+export const ResendVerificationEmailResponseSchema = /*@__PURE__*/
+  messageDesc(file_v1_auth_service, 3);
 
 /**
  * Describes the message laelia.v1.LoginRequest.
  * Use `create(LoginRequestSchema)` to create a new message.
  */
 export const LoginRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_auth_service, 0);
+  messageDesc(file_v1_auth_service, 4);
 
 /**
  * Describes the message laelia.v1.IdentityProviderContext.
  * Use `create(IdentityProviderContextSchema)` to create a new message.
  */
 export const IdentityProviderContextSchema = /*@__PURE__*/
-  messageDesc(file_v1_auth_service, 1);
+  messageDesc(file_v1_auth_service, 5);
 
 /**
  * Describes the message laelia.v1.OAuth2IdentityProviderContext.
  * Use `create(OAuth2IdentityProviderContextSchema)` to create a new message.
  */
 export const OAuth2IdentityProviderContextSchema = /*@__PURE__*/
-  messageDesc(file_v1_auth_service, 2);
+  messageDesc(file_v1_auth_service, 6);
 
 /**
  * Describes the message laelia.v1.LoginResponse.
  * Use `create(LoginResponseSchema)` to create a new message.
  */
 export const LoginResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_auth_service, 3);
+  messageDesc(file_v1_auth_service, 7);
 
 /**
  * Describes the message laelia.v1.LogoutRequest.
  * Use `create(LogoutRequestSchema)` to create a new message.
  */
 export const LogoutRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_auth_service, 4);
+  messageDesc(file_v1_auth_service, 8);
 
 /**
  * @generated from service laelia.v1.AuthService

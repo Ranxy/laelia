@@ -9,6 +9,7 @@ import {
   Languages,
   Lock,
   LogOut,
+  Mail,
   Monitor,
   Server,
   Settings2,
@@ -81,6 +82,11 @@ function useSettingsMenuItems(): MenuItem[] {
           to: "/settings/general",
           icon: Settings2,
           label: t("sidebar.settings-general"),
+        },
+        canViewStorage && {
+          to: "/settings/smtp",
+          icon: Mail,
+          label: t("sidebar.settings-smtp"),
         },
         canViewStorage && {
           to: "/settings/agents",

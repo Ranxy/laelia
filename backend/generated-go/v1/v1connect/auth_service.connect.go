@@ -38,6 +38,11 @@ const (
 	AuthServiceLoginProcedure = "/laelia.v1.AuthService/Login"
 	// AuthServiceLogoutProcedure is the fully-qualified name of the AuthService's Logout RPC.
 	AuthServiceLogoutProcedure = "/laelia.v1.AuthService/Logout"
+	// AuthServiceVerifyEmailProcedure is the fully-qualified name of the AuthService's VerifyEmail RPC.
+	AuthServiceVerifyEmailProcedure = "/laelia.v1.AuthService/VerifyEmail"
+	// AuthServiceResendVerificationEmailProcedure is the fully-qualified name of the AuthService's
+	// ResendVerificationEmail RPC.
+	AuthServiceResendVerificationEmailProcedure = "/laelia.v1.AuthService/ResendVerificationEmail"
 )
 
 // AuthServiceClient is a client for the laelia.v1.AuthService service.
@@ -46,6 +51,15 @@ type AuthServiceClient interface {
 	Login(context.Context, *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error)
 	// Permissions required: None
 	Logout(context.Context, *connect.Request[v1.LogoutRequest]) (*connect.Response[emptypb.Empty], error)
+	// VerifyEmail completes self-service signup: the user clicked the link in
+	// the verification email and this call marks the account's email as
+	// verified so sign-in is allowed. Permissions required: None.
+	VerifyEmail(context.Context, *connect.Request[v1.VerifyEmailRequest]) (*connect.Response[v1.VerifyEmailResponse], error)
+	// ResendVerificationEmail resends the signup verification email to an
+	// unverified account. The response is the same whether or not the email
+	// belongs to an unverified account so the endpoint cannot be used to probe
+	// registered addresses. Permissions required: None.
+	ResendVerificationEmail(context.Context, *connect.Request[v1.ResendVerificationEmailRequest]) (*connect.Response[v1.ResendVerificationEmailResponse], error)
 }
 
 // NewAuthServiceClient constructs a client for the laelia.v1.AuthService service. By default, it
@@ -71,13 +85,27 @@ func NewAuthServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(authServiceMethods.ByName("Logout")),
 			connect.WithClientOptions(opts...),
 		),
+		verifyEmail: connect.NewClient[v1.VerifyEmailRequest, v1.VerifyEmailResponse](
+			httpClient,
+			baseURL+AuthServiceVerifyEmailProcedure,
+			connect.WithSchema(authServiceMethods.ByName("VerifyEmail")),
+			connect.WithClientOptions(opts...),
+		),
+		resendVerificationEmail: connect.NewClient[v1.ResendVerificationEmailRequest, v1.ResendVerificationEmailResponse](
+			httpClient,
+			baseURL+AuthServiceResendVerificationEmailProcedure,
+			connect.WithSchema(authServiceMethods.ByName("ResendVerificationEmail")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // authServiceClient implements AuthServiceClient.
 type authServiceClient struct {
-	login  *connect.Client[v1.LoginRequest, v1.LoginResponse]
-	logout *connect.Client[v1.LogoutRequest, emptypb.Empty]
+	login                   *connect.Client[v1.LoginRequest, v1.LoginResponse]
+	logout                  *connect.Client[v1.LogoutRequest, emptypb.Empty]
+	verifyEmail             *connect.Client[v1.VerifyEmailRequest, v1.VerifyEmailResponse]
+	resendVerificationEmail *connect.Client[v1.ResendVerificationEmailRequest, v1.ResendVerificationEmailResponse]
 }
 
 // Login calls laelia.v1.AuthService.Login.
@@ -90,12 +118,31 @@ func (c *authServiceClient) Logout(ctx context.Context, req *connect.Request[v1.
 	return c.logout.CallUnary(ctx, req)
 }
 
+// VerifyEmail calls laelia.v1.AuthService.VerifyEmail.
+func (c *authServiceClient) VerifyEmail(ctx context.Context, req *connect.Request[v1.VerifyEmailRequest]) (*connect.Response[v1.VerifyEmailResponse], error) {
+	return c.verifyEmail.CallUnary(ctx, req)
+}
+
+// ResendVerificationEmail calls laelia.v1.AuthService.ResendVerificationEmail.
+func (c *authServiceClient) ResendVerificationEmail(ctx context.Context, req *connect.Request[v1.ResendVerificationEmailRequest]) (*connect.Response[v1.ResendVerificationEmailResponse], error) {
+	return c.resendVerificationEmail.CallUnary(ctx, req)
+}
+
 // AuthServiceHandler is an implementation of the laelia.v1.AuthService service.
 type AuthServiceHandler interface {
 	// Permissions required: None
 	Login(context.Context, *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error)
 	// Permissions required: None
 	Logout(context.Context, *connect.Request[v1.LogoutRequest]) (*connect.Response[emptypb.Empty], error)
+	// VerifyEmail completes self-service signup: the user clicked the link in
+	// the verification email and this call marks the account's email as
+	// verified so sign-in is allowed. Permissions required: None.
+	VerifyEmail(context.Context, *connect.Request[v1.VerifyEmailRequest]) (*connect.Response[v1.VerifyEmailResponse], error)
+	// ResendVerificationEmail resends the signup verification email to an
+	// unverified account. The response is the same whether or not the email
+	// belongs to an unverified account so the endpoint cannot be used to probe
+	// registered addresses. Permissions required: None.
+	ResendVerificationEmail(context.Context, *connect.Request[v1.ResendVerificationEmailRequest]) (*connect.Response[v1.ResendVerificationEmailResponse], error)
 }
 
 // NewAuthServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -117,12 +164,28 @@ func NewAuthServiceHandler(svc AuthServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(authServiceMethods.ByName("Logout")),
 		connect.WithHandlerOptions(opts...),
 	)
+	authServiceVerifyEmailHandler := connect.NewUnaryHandler(
+		AuthServiceVerifyEmailProcedure,
+		svc.VerifyEmail,
+		connect.WithSchema(authServiceMethods.ByName("VerifyEmail")),
+		connect.WithHandlerOptions(opts...),
+	)
+	authServiceResendVerificationEmailHandler := connect.NewUnaryHandler(
+		AuthServiceResendVerificationEmailProcedure,
+		svc.ResendVerificationEmail,
+		connect.WithSchema(authServiceMethods.ByName("ResendVerificationEmail")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.AuthService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AuthServiceLoginProcedure:
 			authServiceLoginHandler.ServeHTTP(w, r)
 		case AuthServiceLogoutProcedure:
 			authServiceLogoutHandler.ServeHTTP(w, r)
+		case AuthServiceVerifyEmailProcedure:
+			authServiceVerifyEmailHandler.ServeHTTP(w, r)
+		case AuthServiceResendVerificationEmailProcedure:
+			authServiceResendVerificationEmailHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -138,4 +201,12 @@ func (UnimplementedAuthServiceHandler) Login(context.Context, *connect.Request[v
 
 func (UnimplementedAuthServiceHandler) Logout(context.Context, *connect.Request[v1.LogoutRequest]) (*connect.Response[emptypb.Empty], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AuthService.Logout is not implemented"))
+}
+
+func (UnimplementedAuthServiceHandler) VerifyEmail(context.Context, *connect.Request[v1.VerifyEmailRequest]) (*connect.Response[v1.VerifyEmailResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AuthService.VerifyEmail is not implemented"))
+}
+
+func (UnimplementedAuthServiceHandler) ResendVerificationEmail(context.Context, *connect.Request[v1.ResendVerificationEmailRequest]) (*connect.Response[v1.ResendVerificationEmailResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AuthService.ResendVerificationEmail is not implemented"))
 }

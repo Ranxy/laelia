@@ -54,6 +54,9 @@ var settingPayloadDefaults = map[models.SettingName]func() proto.Message{
 	models.SettingName_WEB_PUSH_CONFIG: func() proto.Message {
 		return &models.WebPushSetting{}
 	},
+	models.SettingName_SMTP_CONFIG: func() proto.Message {
+		return &models.SMTPSetting{}
+	},
 }
 
 // GetSettingValue reads a typed setting payload by name. A missing row yields
@@ -371,4 +374,24 @@ func listSettingV2Impl(ctx context.Context, txn *sql.Tx, find *FindSettingMessag
 	}
 
 	return settingMessages, nil
+}
+
+// RequireEmailVerification reports whether self-service signup must verify the
+// email address by clicking a link before the account can sign in. It only
+// takes effect when signup itself is enabled (disallow_signup false); a nil
+// (unset) value means enabled, which is the default.
+func RequireEmailVerification(setting *models.WorkspaceProfileSetting) bool {
+	return setting == nil || setting.RequireEmailVerification == nil || *setting.RequireEmailVerification
+}
+
+// GetSMTPSetting returns the workspace SMTP payload. An empty Host means the
+// mail service is not configured.
+func (s *Store) GetSMTPSetting(ctx context.Context) (*models.SMTPSetting, error) {
+	return getSettingPayload[*models.SMTPSetting](ctx, s, models.SettingName_SMTP_CONFIG)
+}
+
+// UpsertSMTPSetting stores the workspace SMTP payload.
+func (s *Store) UpsertSMTPSetting(ctx context.Context, cfg *models.SMTPSetting) error {
+	_, err := upsertSettingValue(ctx, s, models.SettingName_SMTP_CONFIG, cfg)
+	return err
 }

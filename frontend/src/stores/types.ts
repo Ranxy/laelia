@@ -97,6 +97,8 @@ export interface AuthSlice {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (email: string, title: string, password: string) => Promise<void>;
+  verifyEmail: (token: string) => Promise<void>;
+  resendVerificationEmail: (email: string) => Promise<void>;
   fetchCurrentUser: () => Promise<void>;
   loadSession: () => Promise<void>;
 }
