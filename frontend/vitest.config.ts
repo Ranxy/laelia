@@ -13,6 +13,16 @@ export default mergeConfig(
       environment: "jsdom",
       setupFiles: ["./src/test/setup.ts"],
       globals: true,
+      coverage: {
+        provider: "v8",
+        include: [
+          "src/stores/**",
+          "src/pages/auth/**",
+          "src/pages/dashboard/settings-*.tsx",
+          "src/router/auth-redirect.ts",
+        ],
+        exclude: ["**/*.test.*", "**/*.spec.*", "src/test/**"],
+      },
     },
   })
 );
