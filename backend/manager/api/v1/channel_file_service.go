@@ -58,7 +58,7 @@ func sniffMimeType(declared string, data []byte) string {
 // and agents call this; the caller must be a member of the conversation when
 // one is supplied.
 func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1pb.UploadFileRequest]) (*connect.Response[v1pb.File], error) {
-	user, _, err := resolveFileCaller(ctx)
+	user, agent, err := resolveFileCaller(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +108,24 @@ func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1
 			if conv.Type == store.ConversationTypeAgentDM {
 				return nil, connect.NewError(connect.CodePermissionDenied, errors.New("agent-DM conversations are agent-only; users can view but cannot upload"))
 			}
+		}
+		// Conversation-tied uploads require membership, mirroring the download
+		// side (files.download resolves the file's conversation and denies
+		// non-members). files.upload is workspace-baseline so the agent file
+		// tool can upload conversation-less blobs, so without this gate any
+		// authenticated user could spray blobs into arbitrary conversation
+		// UUIDs. Untied uploads stay workspace-baseline (downloads remain
+		// uploader-only).
+		memberType, memberID, ok := callerMemberInfo(user, agent)
+		if !ok {
+			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+		}
+		isMember, memErr := s.store.IsConversationMember(ctx, convID, memberType, memberID)
+		if memErr != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(memErr, "failed to check conversation membership"))
+		}
+		if !isMember {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only conversation members can upload files"))
 		}
 		fileRow.ConversationID = toNullUUID(convID)
 	}

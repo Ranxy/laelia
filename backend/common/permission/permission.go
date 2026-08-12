@@ -47,7 +47,9 @@ func Exists(permissions ...string) bool {
 // reminders, and files it resolves the object's owning agent / parent
 // conversation. The interceptor resolves the request's resource only for
 // these. files.upload stays workspace-baseline + handler-gated because the
-// agent file tool can upload a conversation-less blob. The review perms
+// agent file tool can upload a conversation-less blob; the UploadFile handler
+// enforces conversation membership when a conversation is supplied. The
+// review perms
 // (reviewAgentDM, reviewAll) are workspace-scope and intentionally NOT in this
 // set.
 var resourceScopedPermissions = map[Permission]bool{
