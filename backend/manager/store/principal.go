@@ -52,6 +52,10 @@ type UpdateUserMessage struct {
 	Phone           *string
 	Description     *string
 	ChatPreferences *models.ChatPreferences
+	// EmailVerifiedAt marks the account as verified. Email verification is the
+	// self-service signup path; an SSO login also vouches for the address and
+	// sets it. Nil leaves the value unchanged.
+	EmailVerifiedAt *time.Time
 }
 
 // UserMessage is the message for an user.
@@ -82,8 +86,10 @@ type UserMessage struct {
 	// (enter_to_send = true) so the historic behavior is preserved until the
 	// user explicitly customizes it.
 	ChatPreferences *models.ChatPreferences
-	// EmailVerifiedAt is set once the user confirms the address via the signup
-	// verification email link. Nil means the account cannot sign in yet.
+	// EmailVerifiedAt marks the account as verified. It is set when the user
+	// confirms the address via the signup verification email link, or when an
+	// SSO login vouches for the address. Nil means the account cannot sign in
+	// with a password yet.
 	EmailVerifiedAt *time.Time
 }
 
@@ -544,6 +550,9 @@ func (s *Store) UpdateUser(ctx context.Context, currentUser *UserMessage, patch 
 	principalSet, principalArgs := []string{}, []any{}
 	if v := patch.Delete; v != nil {
 		principalSet, principalArgs = append(principalSet, fmt.Sprintf("deleted = $%d", len(principalArgs)+1)), append(principalArgs, *v)
+	}
+	if v := patch.EmailVerifiedAt; v != nil {
+		principalSet, principalArgs = append(principalSet, fmt.Sprintf("email_verified_at = $%d", len(principalArgs)+1)), append(principalArgs, *v)
 	}
 	if v := patch.Email; v != nil {
 		principalSet, principalArgs = append(principalSet, fmt.Sprintf("email = $%d", len(principalArgs)+1)), append(principalArgs, strings.ToLower(*v))

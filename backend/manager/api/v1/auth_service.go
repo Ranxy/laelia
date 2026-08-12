@@ -383,6 +383,17 @@ func (s *AuthService) getOrCreateUserWithIDP(ctx context.Context, request *v1pb.
 				return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to undelete user"))
 			}
 		}
+		// The identity provider vouches for the address, so an SSO login marks
+		// the account verified even when it was created by self-service signup
+		// and never verified; otherwise the scheduler would soft-delete an
+		// actively used account after 72h.
+		if user.EmailVerifiedAt == nil {
+			verifiedAt := time.Now()
+			user, err = s.store.UpdateUser(ctx, user, &store.UpdateUserMessage{EmailVerifiedAt: &verifiedAt})
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to mark user verified"))
+			}
+		}
 		if userInfo.HasGroups {
 			// Sync user groups with the identity provider.
 			// The userInfo.Groups is the groups that the user belongs to in the identity provider.
