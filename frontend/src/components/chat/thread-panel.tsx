@@ -36,6 +36,7 @@ import { detectMention } from "@/composables/useMentionDetect";
 import {
   type MentionTarget,
   targetToMention,
+  useMentionLabelResolver,
   useMentionTargets,
 } from "@/composables/useMentionTargets";
 import { commandServiceClient } from "@/connect";
@@ -67,6 +68,7 @@ const ThreadReplies = memo(function ThreadReplies({
   onPreviewImage,
   debugMode,
   currentPrincipalId,
+  mentionLabel,
 }: {
   replies: ChatMessageUI[];
   loading: boolean;
@@ -81,6 +83,7 @@ const ThreadReplies = memo(function ThreadReplies({
   onPreviewImage?: (attachment: Attachment) => void;
   debugMode: boolean;
   currentPrincipalId?: string;
+  mentionLabel?: (handle: string) => string | undefined;
 }) {
   const { t } = useTranslation();
   return (
@@ -112,6 +115,7 @@ const ThreadReplies = memo(function ThreadReplies({
               streamingContent={rowProps.streamingContent}
               streamingEvents={rowProps.streamingEvents}
               onViewDetails={onViewDetails}
+              mentionLabel={mentionLabel}
               MentionBadge={MentionBadge}
               markdownCustomId="thread-chat"
               onPreviewAttachment={onPreviewAttachment}
@@ -212,6 +216,7 @@ export function ThreadPanel({
   );
 
   const mentionTargets = useMentionTargets(channelId);
+  const mentionLabel = useMentionLabelResolver(channelId);
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -482,6 +487,7 @@ export function ThreadPanel({
                 streamingContent=""
                 streamingEvents={rootMsg.events ?? EMPTY_EVENTS}
                 onViewDetails={handleViewDetails}
+                mentionLabel={mentionLabel}
                 MentionBadge={MentionBadge}
                 markdownCustomId="thread-chat"
                 onPreviewAttachment={onPreviewAttachment}
@@ -507,6 +513,7 @@ export function ThreadPanel({
             onPreviewImage={onPreviewImage}
             debugMode={currentUser?.debugMode ?? false}
             currentPrincipalId={currentUser?.handle}
+            mentionLabel={mentionLabel}
           />
         </div>
       </div>

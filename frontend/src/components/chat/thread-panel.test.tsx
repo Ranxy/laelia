@@ -48,6 +48,7 @@ vi.mock("@/composables/useMentionDetect", () => ({
 
 vi.mock("@/composables/useMentionTargets", () => ({
   useMentionTargets: () => [],
+  useMentionLabelResolver: () => () => undefined,
   targetToMention: (t: unknown) => t,
 }));
 

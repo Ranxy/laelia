@@ -137,6 +137,11 @@ export interface MessageRowProps {
   // Optional mention-aware rendering (channel chat). When provided, the row
   // renders @mentions as badges and lets the caller react to clicks.
   onMentionClick?: (type: string, id: string, name: string) => void;
+  // Maps a mention handle to its display label (display name, or
+  // "name(handle)" when the channel has same-named members). Purely cosmetic:
+  // matching and click dispatch keep using the handle. Falls back to the
+  // handle when the resolver returns undefined or is absent.
+  mentionLabel?: (handle: string) => string | undefined;
   // MentionBadge is injected (rather than imported) so the shared MessageRow
   // doesn't pull the channel-specific popup machinery into the DM chat bundle.
   MentionBadge?: typeof import("@/components/chat/mention-badge").MentionBadge;
@@ -195,6 +200,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     streamingEvents,
     onViewDetails,
     onMentionClick,
+    mentionLabel,
     MentionBadge,
     markdownCustomId,
     onOpenThread,
@@ -300,9 +306,13 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
   const agentMentionContent = useMemo(
     () =>
       MentionBadge && !isUser
-        ? contentWithMentionTags(displayContent ?? "", msg.mentions ?? [])
+        ? contentWithMentionTags(
+            displayContent ?? "",
+            msg.mentions ?? [],
+            mentionLabel
+          )
         : null,
-    [MentionBadge, isUser, displayContent, msg.mentions]
+    [MentionBadge, isUser, displayContent, msg.mentions, mentionLabel]
   );
 
   const MentionBadgeCmp = MentionBadge;
@@ -513,7 +523,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                   return (
                     <MentionBadgeCmp
                       key={`${i}-${mention.name}`}
-                      name={mention.name}
+                      name={mentionLabel?.(mention.name) ?? mention.name}
                       onClick={() =>
                         onMentionClick?.(mention.type, mention.id, mention.name)
                       }

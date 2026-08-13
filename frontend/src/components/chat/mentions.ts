@@ -75,21 +75,32 @@ function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export function mentionTagMarkdown(m: MentionRef): string {
-  const text = escapeHtml(`@${m.name}`);
-  return `<mention type="${escapeHtml(m.type)}" id="${escapeHtml(m.id)}" name="${escapeHtml(m.name)}">${text}</mention>`;
+// label is the display text shown inside the badge (the member's display
+// name, or "name(handle)" when the channel has same-named members); it is
+// purely cosmetic — matching and click dispatch still use the handle in
+// `name`. When omitted the badge falls back to the handle itself.
+export function mentionTagMarkdown(m: MentionRef, label?: string): string {
+  const text = escapeHtml(`@${label ?? m.name}`);
+  const labelAttr = label ? ` label="${escapeHtml(label)}"` : "";
+  return `<mention type="${escapeHtml(m.type)}" id="${escapeHtml(m.id)}" name="${escapeHtml(m.name)}"${labelAttr}>${text}</mention>`;
 }
 
 // Rewrites a message body so every @mention matched by splitByMentions becomes
 // an inline <mention> node, while leaving the surrounding text (and any other
 // markdown) intact. Reuses splitByMentions so the matching/dedup behavior is
-// identical to the plain-text segment path used for user messages.
+// identical to the plain-text segment path used for user messages. labelFor
+// maps a mention handle to its display label (see mentionTagMarkdown).
 export function contentWithMentionTags(
   content: string,
-  mentions: MentionRef[]
+  mentions: MentionRef[],
+  labelFor?: (handle: string) => string | undefined
 ): string {
   if (mentions.length === 0) return content;
   return splitByMentions(content, mentions)
-    .map((seg) => (seg.mention ? mentionTagMarkdown(seg.mention) : seg.text))
+    .map((seg) =>
+      seg.mention
+        ? mentionTagMarkdown(seg.mention, labelFor?.(seg.mention.name))
+        : seg.text
+    )
     .join("");
 }

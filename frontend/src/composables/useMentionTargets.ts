@@ -45,6 +45,37 @@ export function useMentionTargets(channelId?: string): MentionTarget[] {
   }, [members]);
 }
 
+// Builds a stable resolver mapping a mention handle to its display label:
+// the member's display name, or "name(handle)" when another member of the
+// same channel shares the display name (so the badge stays unambiguous).
+// Returns undefined for handles not in the roster (e.g. a member who left),
+// letting callers fall back to the raw handle.
+export function mentionLabelResolver(
+  targets: MentionTarget[]
+): (handle: string) => string | undefined {
+  const byName = new Map<string, number>();
+  for (const t of targets) {
+    byName.set(t.name, (byName.get(t.name) ?? 0) + 1);
+  }
+  const labels = new Map<string, string>();
+  for (const t of targets) {
+    labels.set(
+      t.handle,
+      (byName.get(t.name) ?? 0) > 1 ? `${t.name}(${t.handle})` : t.name
+    );
+  }
+  return (handle: string) => labels.get(handle);
+}
+
+// Stable per-conversation label resolver; recreated only when the roster
+// changes, so memoized message lists keep bailing out.
+export function useMentionLabelResolver(
+  channelId?: string
+): (handle: string) => string | undefined {
+  const targets = useMentionTargets(channelId);
+  return useMemo(() => mentionLabelResolver(targets), [targets]);
+}
+
 export function targetToMention(target: MentionTarget): Mention {
   return create(MentionSchema, {
     type: target.type,

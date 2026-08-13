@@ -40,6 +40,10 @@ function MentionChip({ node }: any) {
     }
   }
   const name = attrs.name ?? "";
+  // label is the cosmetic display text (display name, or "name(handle)" for
+  // same-named members); it never participates in matching or click dispatch,
+  // which both use the handle in `name`.
+  const label = attrs.label ?? name;
   return (
     <span
       data-mtype={attrs.type}
@@ -55,7 +59,7 @@ function MentionChip({ node }: any) {
         }
       }}
     >
-      @{name}
+      @{label}
     </span>
   );
 }

@@ -42,6 +42,7 @@ import { detectMention } from "@/composables/useMentionDetect";
 import {
   type MentionTarget,
   targetToMention,
+  useMentionLabelResolver,
   useMentionTargets,
 } from "@/composables/useMentionTargets";
 import { commandServiceClient } from "@/connect";
@@ -102,6 +103,7 @@ interface MessageListProps {
   messages: ChatMessageUI[];
   onViewDetails: (commandId: string, agentId: string) => void;
   onMentionClick: (type: string, id: string, name: string) => void;
+  mentionLabel: (handle: string) => string | undefined;
   onOpenThread: (msg: ChatMessageUI) => void;
   onPreviewAttachment: (attachment: Attachment, rootMessageId: string) => void;
   onJumpToSection: (
@@ -124,6 +126,7 @@ const MessageList = memo(function MessageList({
   messages,
   onViewDetails,
   onMentionClick,
+  mentionLabel,
   onOpenThread,
   onPreviewAttachment,
   onJumpToSection,
@@ -149,6 +152,7 @@ const MessageList = memo(function MessageList({
               streamingEvents={rowProps.streamingEvents}
               onViewDetails={onViewDetails}
               onMentionClick={onMentionClick}
+              mentionLabel={mentionLabel}
               MentionBadge={MentionBadge}
               markdownCustomId="channel-chat"
               onOpenThread={onOpenThread}
@@ -330,6 +334,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     activeThreadConversation === conversationName ? activeThreadRoot : null;
 
   const mentionTargets = useMentionTargets(channelId);
+  const mentionLabel = useMentionLabelResolver(channelId);
 
   const init = useCallback(async () => {
     if (!channelId) return;
@@ -847,6 +852,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             )}
             <MessageList
               messages={messages}
+              mentionLabel={mentionLabel}
               onViewDetails={handleViewDetails}
               onMentionClick={handleMentionClick}
               onOpenThread={handleOpenThread}

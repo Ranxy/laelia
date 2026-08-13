@@ -60,3 +60,33 @@ describe("splitByMentions parity", () => {
     ).toEqual(["a ", "@alice", " b ", "@bob", " c"]);
   });
 });
+
+describe("mentionTagMarkdown with label", () => {
+  it("emits a label attribute and renders the label as text", () => {
+    expect(mentionTagMarkdown(alice, "Alice Lee")).toBe(
+      '<mention type="user" id="u-1" name="alice" label="Alice Lee">@Alice Lee</mention>'
+    );
+  });
+
+  it("HTML-escapes the label", () => {
+    expect(mentionTagMarkdown(alice, 'A&B"<')).toBe(
+      '<mention type="user" id="u-1" name="alice" label="A&amp;B&quot;&lt;">@A&amp;B&quot;&lt;</mention>'
+    );
+  });
+});
+
+describe("contentWithMentionTags with labelFor", () => {
+  it("uses the label for each mention when provided", () => {
+    const labelFor = (handle: string) =>
+      handle === "alice" ? "Alice Lee" : undefined;
+    expect(
+      contentWithMentionTags(
+        "Hey @alice, ping @bob too.",
+        [alice, bob],
+        labelFor
+      )
+    ).toBe(
+      'Hey <mention type="user" id="u-1" name="alice" label="Alice Lee">@Alice Lee</mention>, ping <mention type="agent" id="agents/a-9" name="bob">@bob</mention> too.'
+    );
+  });
+});
