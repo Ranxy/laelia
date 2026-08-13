@@ -15,11 +15,11 @@ import (
 // are resolved in-memory. Group expansion (which needs the store) is not
 // exercised here.
 func TestGetCallerIAMPolicyBindings(t *testing.T) {
-	user := &store.UserMessage{ID: 7}
+	user := &store.UserMessage{ID: 7, Handle: "ran-user-7"}
 	agent := &store.AgentMessage{ResourceID: "agent-9"}
 	policy := &storepb.IamPolicy{
 		Bindings: []*storepb.Binding{
-			{Role: "roles/conversationMember", Members: []string{"users/7"}},
+			{Role: "roles/conversationMember", Members: []string{"users/ran-user-7"}},
 			{Role: "roles/conversationOwner", Members: []string{"allUsers"}},
 			{Role: "roles/agentEditor", Members: []string{"agents/agent-9"}},
 		},

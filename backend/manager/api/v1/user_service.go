@@ -59,33 +59,22 @@ func NewUserService(store *store.Store, profile *config.Profile, stateCfg *state
 
 // GetUser gets a user.
 func (s *UserService) GetUser(ctx context.Context, request *connect.Request[v1pb.GetUserRequest]) (*connect.Response[v1pb.User], error) {
-	userID, err := common.GetUserID(request.Msg.Name)
-	var user *store.UserMessage
+	identifier, err := common.GetUserHandle(request.Msg.Name)
 	if err != nil {
-		email, err := common.GetUserEmail(request.Msg.Name)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		u, err := s.store.GetUserByEmail(ctx, email)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get user, error: %v", err))
-		}
-		user = u
-	} else {
-		u, err := s.store.GetUserByID(ctx, userID)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get user, error: %v", err))
-		}
-		user = u
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	user, err := s.store.GetUserByIdentifier(ctx, identifier)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get user, error: %v", err))
 	}
 	if user == nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %d not found", userID))
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %q not found", identifier))
 	}
 	// The internal SYSTEM_BOT account is only reachable through ListUsers with
 	// include_system_bot set (the settings user directory); direct lookups are
 	// hidden so no other surface can resolve or display it.
 	if user.Type == storepb.PrincipalType_SYSTEM_BOT {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %d not found", userID))
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %q not found", identifier))
 	}
 	callerID, isAdmin, err := callerPhoneVisibility(ctx, s.store)
 	if err != nil {
@@ -478,7 +467,7 @@ func (s *UserService) CreateUser(ctx context.Context, request *connect.Request[v
 	if firstEndUser {
 		// The first end user should be workspace admin.
 		updateRole := &store.PatchIamPolicyMessage{
-			Member: common.FormatUserUID(user.ID),
+			Member: common.FormatUserHandle(user.Handle),
 			Roles:  []string{common.FormatRole(common.WorkspaceAdmin)},
 		}
 		if _, err := s.store.PatchWorkspaceIamPolicy(ctx, updateRole); err != nil {
@@ -557,11 +546,11 @@ func (s *UserService) UpdateUser(ctx context.Context, request *connect.Request[v
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("update_mask must be set"))
 	}
 
-	userID, err := common.GetUserID(request.Msg.User.Name)
+	identifier, err := common.GetUserHandle(request.Msg.User.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	user, err := s.store.GetUserByID(ctx, userID)
+	user, err := s.store.GetUserByIdentifier(ctx, identifier)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get user, error: %v", err))
 	}
@@ -578,13 +567,13 @@ func (s *UserService) UpdateUser(ctx context.Context, request *connect.Request[v
 				User: request.Msg.User,
 			}))
 		}
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %d not found", userID))
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %q not found", identifier))
 	}
 	if user.MemberDeleted {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %d has been deleted", userID))
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %q has been deleted", identifier))
 	}
-	if isReservedUserID(userID) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("built-in user %d cannot be modified", userID))
+	if isReservedUserID(user.ID) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("built-in user %q cannot be modified", user.Handle))
 	}
 
 	allowed, err := canUpdateUser(ctx, s.iam, caller, user)
@@ -695,25 +684,25 @@ func (s *UserService) DeleteUser(ctx context.Context, request *connect.Request[v
 	if !allowed {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("permission %q denied", permission.UsersDelete))
 	}
-	userID, err := common.GetUserID(request.Msg.Name)
+	identifier, err := common.GetUserHandle(request.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	user, err := s.store.GetUserByID(ctx, userID)
+	user, err := s.store.GetUserByIdentifier(ctx, identifier)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get user, error: %v", err))
 	}
 	if user == nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %d not found", userID))
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %q not found", identifier))
 	}
 	if user.MemberDeleted {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %d has been deleted", userID))
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %q has been deleted", identifier))
 	}
-	if caller != nil && caller.ID == userID {
+	if caller != nil && caller.ID == user.ID {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("cannot delete your own account"))
 	}
-	if isReservedUserID(userID) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("built-in user %d cannot be deleted", userID))
+	if isReservedUserID(user.ID) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("built-in user %q cannot be deleted", user.Handle))
 	}
 
 	// Check if there is still workspace admin if the current user is deleted.
@@ -752,22 +741,22 @@ func (s *UserService) UndeleteUser(ctx context.Context, request *connect.Request
 	if !allowed {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("permission %q denied", permission.UsersDelete))
 	}
-	userID, err := common.GetUserID(request.Msg.Name)
+	identifier, err := common.GetUserHandle(request.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	user, err := s.store.GetUserByID(ctx, userID)
+	user, err := s.store.GetUserByIdentifier(ctx, identifier)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get user, error: %v", err))
 	}
 	if user == nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %d not found", userID))
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %q not found", identifier))
 	}
 	if !user.MemberDeleted {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("user %d is already active", userID))
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("user %q is already active", user.Handle))
 	}
-	if isReservedUserID(userID) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("built-in user %d cannot be modified", userID))
+	if isReservedUserID(user.ID) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("built-in user %q cannot be modified", user.Handle))
 	}
 
 	user, err = s.store.UpdateUser(ctx, user, &store.UpdateUserMessage{Delete: &undeletePatch})
@@ -831,7 +820,8 @@ func convertToV1UserType(userType storepb.PrincipalType) v1pb.UserType {
 
 func convertToUser(user *store.UserMessage, maskPhone bool) *v1pb.User {
 	convertedUser := &v1pb.User{
-		Name:        common.FormatUserUID(user.ID),
+		Name:        common.FormatUserHandle(user.Handle),
+		Handle:      user.Handle,
 		State:       convertDeletedToState(user.MemberDeleted),
 		Email:       user.Email,
 		Phone:       user.Phone,
@@ -850,7 +840,7 @@ func convertToUser(user *store.UserMessage, maskPhone bool) *v1pb.User {
 		convertedUser.Phone = maskPhoneNumber(user.Phone)
 	}
 	if user.AvatarS3Key != "" {
-		convertedUser.Avatar = common.FormatUserAvatar(user.ID)
+		convertedUser.Avatar = common.FormatUserAvatar(user.Handle)
 	}
 
 	// ChatPreferences defaults to enter_to_send = true (the historic behavior)

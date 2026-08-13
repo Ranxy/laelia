@@ -48,9 +48,9 @@ export function isAvatarKnownMissing(name: string): boolean {
 }
 
 // avatarNameForUserId builds the avatar resource name for a user from their
-// decimal principal id (the {user} segment of "users/{user}").
-export function avatarNameForUserId(principalId: string): string {
-  return `users/${principalId}/avatar`;
+// mention handle (the {user} segment of "users/{user}").
+export function avatarNameForUserId(handle: string): string {
+  return `users/${handle}/avatar`;
 }
 
 // avatarNameForAgentId builds the avatar resource name for an agent from its

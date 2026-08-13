@@ -10,6 +10,9 @@ import {
 export interface MentionTarget {
   type: "user" | "agent";
   id: string;
+  /** Mention handle (e.g. "ran-user-1"); the only token the server parses. */
+  handle: string;
+  /** Display name shown in the mention popup; never used for parsing. */
   name: string;
 }
 
@@ -30,11 +33,15 @@ export function useMentionTargets(channelId?: string): MentionTarget[] {
 
   return useMemo(() => {
     if (members.length === 0) return [];
-    return members.map((m) => ({
-      type: m.memberType === 2 ? "agent" : "user",
-      id: m.memberId,
-      name: m.displayName,
-    }));
+    return members.map((m) => {
+      const handle = m.handle || m.memberId;
+      return {
+        type: m.memberType === 2 ? "agent" : "user",
+        id: m.memberId,
+        handle,
+        name: m.displayName,
+      };
+    });
   }, [members]);
 }
 
@@ -42,6 +49,6 @@ export function targetToMention(target: MentionTarget): Mention {
   return create(MentionSchema, {
     type: target.type,
     id: target.id,
-    name: target.name,
+    name: target.handle,
   });
 }

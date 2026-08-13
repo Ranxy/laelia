@@ -120,10 +120,10 @@ function MentionItem({
   active: boolean;
   onClick: () => void;
 }) {
-  const idx = target.name.toLowerCase().indexOf(query.toLowerCase());
-  const before = target.name.slice(0, idx);
-  const match = target.name.slice(idx, idx + query.length);
-  const after = target.name.slice(idx + query.length);
+  const idx = target.handle.toLowerCase().indexOf(query.toLowerCase());
+  const before = target.handle.slice(0, idx);
+  const match = target.handle.slice(idx, idx + query.length);
+  const after = target.handle.slice(idx + query.length);
 
   return (
     <button
@@ -142,10 +142,13 @@ function MentionItem({
       <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-control-bg text-xs font-medium text-control">
         {target.name.charAt(0).toUpperCase()}
       </span>
-      <span>
-        @{before}
-        <span className="font-semibold">{match}</span>
-        {after}
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate">{target.name}</span>
+        <span className="text-xs text-control-placeholder">
+          @{before}
+          <span className="font-semibold">{match}</span>
+          {after}
+        </span>
       </span>
     </button>
   );

@@ -252,11 +252,11 @@ func validateMemberExists(ctx context.Context, s *store.Store, member string) er
 	case member == common.AllUsers:
 		return nil
 	case strings.HasPrefix(member, common.UserNamePrefix):
-		userID, err := common.GetUserID(member)
+		userHandle, err := common.GetUserHandle(member)
 		if err != nil {
 			return connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid member %q", member))
 		}
-		user, err := s.GetUserByID(ctx, userID)
+		user, err := s.GetUserByHandle(ctx, userHandle)
 		if err != nil {
 			return connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to look up member %q", member))
 		}
@@ -297,7 +297,10 @@ func validateMemberExists(ctx context.Context, s *store.Store, member string) er
 // delete/leave last-admin guards); it must be 0 when no exclusion is wanted.
 func hasActiveWorkspaceAdmin(ctx context.Context, s *store.Store, policy *storepb.IamPolicy, excludeUserID int) (bool, error) {
 	workspaceAdminRole := common.FormatRole(common.WorkspaceAdmin)
-	excludedMember := common.FormatUserUID(excludeUserID)
+	excludedMember := ""
+	if excludeUserID != 0 {
+		excludedMember = resolveUserResource(ctx, s, excludeUserID)
+	}
 
 	for _, binding := range policy.GetBindings() {
 		if binding.GetRole() != workspaceAdminRole {
@@ -422,14 +425,14 @@ func findIamPolicyDeltas(oldPolicy, newPolicy *storepb.IamPolicy) []*v1pb.Bindin
 }
 
 // validateMember reports whether a binding member is a well-formed principal
-// name: allUsers, users/{uid}, groups/{email}, or agents/{rid}.
+// name: allUsers, users/{handle}, groups/{email}, or agents/{rid}.
 func validateMember(member string) error {
 	if member == common.AllUsers {
 		return nil
 	}
 	switch {
 	case strings.HasPrefix(member, common.UserNamePrefix):
-		if _, err := common.GetUserID(member); err != nil {
+		if _, err := common.GetUserHandle(member); err != nil {
 			return connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid member %q", member))
 		}
 	case strings.HasPrefix(member, common.GroupPrefix):
@@ -441,7 +444,7 @@ func validateMember(member string) error {
 			return connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid member %q", member))
 		}
 	default:
-		return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid member %q (want users/{id}, groups/{email}, agents/{id}, or allUsers)", member))
+		return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid member %q (want users/{handle}, groups/{email}, agents/{id}, or allUsers)", member))
 	}
 	return nil
 }

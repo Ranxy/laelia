@@ -13,7 +13,7 @@ vi.mock("react-i18next", () => ({
 
 const mock = vi.hoisted(() => ({
   channels: [] as Array<Record<string, unknown>>,
-  currentUser: { name: "users/42" },
+  currentUser: { name: "users/ran-user-1", handle: "ran-user-1" },
   setConversationPinned: vi.fn(),
   setConversationClosed: vi.fn(),
   toastAdd: vi.fn(),
@@ -95,7 +95,7 @@ describe("ConversationList last-message preview", () => {
       channel({
         lastMessage: "on my way",
         lastMessageSender: "Alice",
-        lastMessagePrincipalId: "42",
+        lastMessagePrincipalId: "ran-user-1",
       }),
     ];
     render(<ConversationList />);
@@ -107,7 +107,7 @@ describe("ConversationList last-message preview", () => {
       channel({
         lastMessage: "lgtm",
         lastMessageSender: "Bob",
-        lastMessagePrincipalId: "7",
+        lastMessagePrincipalId: "bob-user-1",
       }),
     ];
     render(<ConversationList />);

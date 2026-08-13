@@ -141,11 +141,12 @@ type commandStream struct {
 	// in-stream as AgentReady.agent_name so the manager can bind this AgentChannel
 	// to the agent. It is NOT used as LAELIA_AGENT — that is the bare agentID.
 	agentName string
-	// agentID is the agent's bare server-assigned UUID (the agents/{agent} tail).
-	// It keys the per-agent working dir and local state file under the machine's
-	// namespace, is passed to the executor as Request.AgentID, and — as
-	// Request.AgentResourceID — becomes LAELIA_AGENT, which the daemon and
-	// chattools use as a bare id (e.g. agents/<id>/commands/<id>).
+	// agentID is the agent's bare handle (the agents/{handle} tail, e.g.
+	// "rei-agent-1"). It keys the per-agent working dir and local state file
+	// under the machine's namespace, is passed to the executor as
+	// Request.AgentID, and — as Request.AgentResourceID — becomes
+	// LAELIA_AGENT, which the daemon and chattools use as a bare id (e.g.
+	// agents/<id>/commands/<id>).
 	agentID string
 	// machineID is the bare UUID of the machine hosting this agent. It namespaces
 	// the agent's on-disk state (~/.laelia/<machineID>/<agentID>/) and is passed

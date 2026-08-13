@@ -60,7 +60,7 @@ func (s *McpServerService) GetMcpServer(ctx context.Context, req *connect.Reques
 	if err := s.canAccessServer(ctx, user, server); err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(convertToV1McpServer(server)), nil
+	return connect.NewResponse(s.convertToV1McpServer(ctx, server)), nil
 }
 
 // ListMcpServers lists workspace MCP servers. A caller holding
@@ -85,7 +85,7 @@ func (s *McpServerService) ListMcpServers(ctx context.Context, _ *connect.Reques
 		if !ok {
 			continue
 		}
-		response.McpServers = append(response.McpServers, convertToV1McpServer(server))
+		response.McpServers = append(response.McpServers, s.convertToV1McpServer(ctx, server))
 	}
 	return connect.NewResponse(response), nil
 }
@@ -104,7 +104,7 @@ func (s *McpServerService) ListMyMcpServers(ctx context.Context, _ *connect.Requ
 	}
 	response := &v1pb.ListMcpServersResponse{}
 	for _, server := range servers {
-		response.McpServers = append(response.McpServers, convertToV1McpServer(server))
+		response.McpServers = append(response.McpServers, s.convertToV1McpServer(ctx, server))
 	}
 	return connect.NewResponse(response), nil
 }
@@ -121,7 +121,7 @@ func (s *McpServerService) ListUserMcpServers(ctx context.Context, _ *connect.Re
 	}
 	response := &v1pb.ListMcpServersResponse{}
 	for _, server := range servers {
-		response.McpServers = append(response.McpServers, convertToV1McpServer(server))
+		response.McpServers = append(response.McpServers, s.convertToV1McpServer(ctx, server))
 	}
 	return connect.NewResponse(response), nil
 }
@@ -173,7 +173,7 @@ func (s *McpServerService) CreateMcpServer(ctx context.Context, req *connect.Req
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to create mcp server"))
 		}
 		recordMcpServerChange(ctx, common.FormatMcpServerUID(created.ResourceID))
-		return connect.NewResponse(convertToV1McpServer(created)), nil
+		return connect.NewResponse(s.convertToV1McpServer(ctx, created)), nil
 	case v1pb.McpServerScope_MCP_SERVER_SCOPE_USER:
 		if err := requireUserMcpServersEnabled(ctx, s.store); err != nil {
 			return nil, err
@@ -208,7 +208,7 @@ func (s *McpServerService) CreateMcpServer(ctx context.Context, req *connect.Req
 	}
 
 	recordMcpServerChange(ctx, common.FormatMcpServerUID(created.ResourceID))
-	return connect.NewResponse(convertToV1McpServer(created)), nil
+	return connect.NewResponse(s.convertToV1McpServer(ctx, created)), nil
 }
 
 // UpdateMcpServer replaces the server's mutable fields and members (full
@@ -284,7 +284,7 @@ func (s *McpServerService) UpdateMcpServer(ctx context.Context, req *connect.Req
 	}
 
 	recordMcpServerChange(ctx, in.Name)
-	return connect.NewResponse(convertToV1McpServer(updated)), nil
+	return connect.NewResponse(s.convertToV1McpServer(ctx, updated)), nil
 }
 
 // DeleteMcpServer deletes an MCP server. Workspace servers require
@@ -354,7 +354,7 @@ func (s *McpServerService) requirePermission(ctx context.Context, user *store.Us
 
 // canUseMcpServer reports whether the caller may use a server: a caller holding
 // laelia.mcpServers.list may use any server; otherwise the caller must be a
-// member of the server's member list (users/{uid}, groups/{email|id}, or
+// member of the server's member list (users/{handle}, groups/{email|id}, or
 // allUsers). Personal servers are owner-only: neither the admin permission nor
 // membership grants access, and they are unusable while the personal-MCP
 // setting is disabled.
@@ -517,7 +517,7 @@ func validateMcpServerUpdateMask(paths []string) error {
 
 // convertToV1McpServer converts a stored server to the v1 view. Header values
 // are masked; the values themselves never cross the API.
-func convertToV1McpServer(p *store.McpServerMessage) *v1pb.McpServer {
+func (s *McpServerService) convertToV1McpServer(ctx context.Context, p *store.McpServerMessage) *v1pb.McpServer {
 	scope := v1pb.McpServerScope_MCP_SERVER_SCOPE_WORKSPACE
 	if p.OwnerID != 0 {
 		scope = v1pb.McpServerScope_MCP_SERVER_SCOPE_USER
@@ -529,7 +529,7 @@ func convertToV1McpServer(p *store.McpServerMessage) *v1pb.McpServer {
 		Members:       append([]string(nil), p.Members...),
 		CreatedAt:     timestamppb.New(p.CreatedAt),
 		UpdatedAt:     timestamppb.New(p.UpdatedAt),
-		CreatedBy:     common.FormatUserUID(p.CreatedBy),
+		CreatedBy:     resolveUserResource(ctx, s.store, p.CreatedBy),
 		ConfigVersion: p.ConfigVersion,
 		Scope:         scope,
 	}

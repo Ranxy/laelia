@@ -80,7 +80,7 @@ func (s *UserService) UploadAvatar(ctx context.Context, req *connect.Request[v1p
 
 	hash := sha256.Sum256(req.Msg.Data)
 	contentHash := hex.EncodeToString(hash[:])
-	newKey := avatarS3KeyPrefix + common.FormatUserUID(user.ID) + "/" + contentHash + "." + ext
+	newKey := avatarS3KeyPrefix + common.FormatUserHandle(user.Handle) + "/" + contentHash + "." + ext
 
 	if _, err := s3Cli.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:        aws.String(cfg.Bucket),
@@ -122,11 +122,11 @@ func (s *UserService) DownloadAvatar(ctx context.Context, req *connect.Request[v
 	if _, ok := GetUserFromContext(ctx); !ok {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
-	uid, err := common.ParseUserAvatarName(req.Msg.Name)
+	handle, err := common.ParseUserAvatarName(req.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid avatar name"))
 	}
-	user, err := s.store.GetUserByID(ctx, uid)
+	user, err := s.store.GetUserByHandle(ctx, handle)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -173,11 +173,11 @@ func (s *UserService) DeleteAvatar(ctx context.Context, req *connect.Request[v1p
 	if !ok || user == nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
-	uid, err := common.ParseUserAvatarName(req.Msg.Name)
+	handle, err := common.ParseUserAvatarName(req.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid avatar name"))
 	}
-	if uid != user.ID {
+	if handle != user.Handle {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("cannot delete another user's avatar"))
 	}
 	if user.AvatarS3Key == "" {

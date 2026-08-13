@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -38,6 +37,18 @@ type ConversationMessage struct {
 	Version   int64
 }
 
+// userMemberHandle resolves a user's handle ("ran-user-1") from the principal
+// id. Conversation member ids are stored as handles for both users and agents
+// (agents already used their resource id), so membership writes and list
+// filters compare like for like.
+func (*Store) userMemberHandle(ctx context.Context, q queryRower, principalID int) (string, error) {
+	var handle string
+	if err := q.QueryRowContext(ctx, `SELECT handle FROM principal WHERE id = $1`, principalID).Scan(&handle); err != nil {
+		return "", errors.Wrapf(err, "failed to resolve handle for principal %d", principalID)
+	}
+	return handle, nil
+}
+
 // insertDirectConversationSQL creates a direct conversation, returning the row.
 // ON CONFLICT DO NOTHING is backed by idx_conversation_dm_unique
 // (unique on (agent_id, created_by) WHERE type = 1): when two callers race to
@@ -61,7 +72,12 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 		return nil, errors.Errorf("agent %d not found", agentID)
 	}
 
-	conv, err := s.findDirectConversation(ctx, principalID, agent)
+	userHandle, err := s.userMemberHandle(ctx, s.GetDB(), principalID)
+	if err != nil {
+		return nil, err
+	}
+
+	conv, err := s.findDirectConversation(ctx, userHandle, agent)
 	if err != nil {
 		return nil, err
 	}
@@ -84,12 +100,12 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 		// race to create this DM. Roll back our (empty) tx and return the
 		// winning row, which is now committed with its members.
 		if errors.Is(err, sql.ErrNoRows) {
-			return s.findDirectConversation(ctx, principalID, agent)
+			return s.findDirectConversation(ctx, userHandle, agent)
 		}
 		return nil, errors.Wrapf(err, "failed to insert conversation")
 	}
 
-	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", principalID), MemberRoleOwner, nil); err != nil {
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, userHandle, MemberRoleOwner, nil); err != nil {
 		return nil, err
 	}
 	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeAgent, agent, MemberRoleMember, nil); err != nil {
@@ -290,6 +306,15 @@ func (s *Store) GetOrCreateUserUserDM(ctx context.Context, callerID, peerID int)
 		return conv, nil
 	}
 
+	callerHandle, err := s.userMemberHandle(ctx, s.GetDB(), callerID)
+	if err != nil {
+		return nil, err
+	}
+	peerHandle, err := s.userMemberHandle(ctx, s.GetDB(), peerID)
+	if err != nil {
+		return nil, err
+	}
+
 	tx, err := s.GetDB().BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -309,10 +334,10 @@ func (s *Store) GetOrCreateUserUserDM(ctx context.Context, callerID, peerID int)
 		return nil, errors.Wrap(err, "failed to insert user DM")
 	}
 
-	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", callerID), MemberRoleOwner, nil); err != nil {
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, callerHandle, MemberRoleOwner, nil); err != nil {
 		return nil, err
 	}
-	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", peerID), MemberRoleMember, nil); err != nil {
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, peerHandle, MemberRoleMember, nil); err != nil {
 		return nil, err
 	}
 
@@ -394,7 +419,11 @@ func (s *Store) CreateChannel(ctx context.Context, title string, ownerID int) (*
 		return nil, errors.Wrapf(err, "failed to create channel")
 	}
 
-	if err := addConversationMemberTx(ctx, tx, conv.ID, MemberTypeUser, fmt.Sprintf("%d", ownerID), MemberRoleOwner, nil); err != nil {
+	ownerHandle, err := s.userMemberHandle(ctx, tx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if err := addConversationMemberTx(ctx, tx, conv.ID, MemberTypeUser, ownerHandle, MemberRoleOwner, nil); err != nil {
 		return nil, err
 	}
 
@@ -440,6 +469,10 @@ func (s *Store) DeleteChannel(ctx context.Context, id uuid.UUID) error {
 }
 
 func (s *Store) ListUserConversations(ctx context.Context, principalID int, limit, offset int) ([]*ConversationMessage, error) {
+	userHandle, err := s.userMemberHandle(ctx, s.GetDB(), principalID)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := s.GetDB().QueryContext(ctx, `
 		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version
 		FROM conversation c
@@ -447,7 +480,7 @@ func (s *Store) ListUserConversations(ctx context.Context, principalID int, limi
 		WHERE cm.member_type = $1 AND cm.member_id = $2
 		ORDER BY c.updated_at DESC
 		LIMIT $3 OFFSET $4
-	`, MemberTypeUser, fmt.Sprintf("%d", principalID), limit, offset)
+	`, MemberTypeUser, userHandle, limit, offset)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to list user conversations")
 	}
@@ -523,7 +556,7 @@ const listUserConversationsWithUnreadSQL = `
 		  SELECT m.content, m.created_at,
 		         CASE WHEN m.sender_type = 2 THEN COALESCE(ag.name, '')
 		              ELSE COALESCE(p.name, '') END AS sender_name,
-		         CASE WHEN m.sender_type = 1 THEN m.principal_id::text ELSE '' END AS sender_principal_id
+		         CASE WHEN m.sender_type = 1 THEN COALESCE(p.handle, '') ELSE '' END AS sender_principal_id
 		  FROM chat_message m
 		  LEFT JOIN principal p ON p.id = m.principal_id
 		  LEFT JOIN agent ag ON ag.id = m.sender_agent_id
@@ -553,7 +586,11 @@ const listUserConversationsWithUnreadSQL = `
 // thread-aware relevance filter, so a thread reply never pings the left-rail
 // badge for a user who has the channel open.
 func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID int, includeClosed bool, limit, offset int) ([]*UserConversation, error) {
-	rows, err := s.GetDB().QueryContext(ctx, listUserConversationsWithUnreadSQL, MemberTypeUser, fmt.Sprintf("%d", principalID), principalID, limit, offset, includeClosed)
+	userHandle, err := s.userMemberHandle(ctx, s.GetDB(), principalID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.GetDB().QueryContext(ctx, listUserConversationsWithUnreadSQL, MemberTypeUser, userHandle, principalID, limit, offset, includeClosed)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to list user conversations with unread")
 	}
@@ -651,7 +688,11 @@ func (s *Store) ListAccessibleChannels(ctx context.Context, agentResourceID stri
 	args := []any{MemberTypeAgent, agentResourceID}
 	ownerClause := "FALSE"
 	if followOwner {
-		args = append(args, MemberTypeUser, fmt.Sprintf("%d", ownerID))
+		ownerHandle, err := s.userMemberHandle(ctx, s.GetDB(), ownerID)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, MemberTypeUser, ownerHandle)
 		ownerClause = `EXISTS (
 			SELECT 1 FROM conversation_member_meta cmo
 			WHERE cmo.conversation_id = c.id AND cmo.member_type = $3 AND cmo.member_id = $4

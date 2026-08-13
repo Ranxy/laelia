@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"time"
 
 	"connectrpc.com/connect"
@@ -35,7 +34,7 @@ func (s *CommandService) CreateChannel(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create channel"))
 	}
 
-	return connect.NewResponse(convertToV1Conversation(conv, user.Name, "", "", 1, 0, conv.Title, 0)), nil
+	return connect.NewResponse(convertToV1Conversation(conv, user.Name, user.Handle, "", "", 1, 0, conv.Title, 0)), nil
 }
 
 func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[v1pb.ListChannelsRequest]) (*connect.Response[v1pb.ListChannelsResponse], error) {
@@ -70,8 +69,10 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 		conv := uc.Conversation
 		memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 		ownerName := user.Name
+		ownerHandle := user.Handle
 		if conv.OwnerID != user.ID {
 			ownerName = resolveUserName(ctx, s.store, conv.OwnerID)
+			ownerHandle = resolveUserHandle(ctx, s.store, conv.OwnerID)
 		}
 		// For direct conversations (type=1) the title is empty in the DB; surface
 		// the agent's display name instead so the left rail can render the DM row
@@ -83,7 +84,7 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 		if conv.Type == 1 && conv.AgentID.Valid {
 			if agent, agentErr := s.store.GetAgent(ctx, int(conv.AgentID.Int32)); agentErr == nil && agent != nil && agent.Name != "" {
 				title = agent.Name
-				peerName = agent.Name
+				peerName = agent.ResourceID
 				peerResource = common.FormatAgentUID(agent.ResourceID)
 			}
 		} else if conv.Type == 4 {
@@ -93,11 +94,11 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 			// that is not the viewer.
 			if peer := s.resolveUserDMPeer(ctx, conv.ID, user.ID); peer != nil {
 				title = peer.Name
-				peerName = peer.Name
-				peerResource = common.FormatUserUID(peer.ID)
+				peerName = peer.Handle
+				peerResource = common.FormatUserHandle(peer.Handle)
 			}
 		}
-		convV1 := convertToV1Conversation(&conv, ownerName, peerName, peerResource, memberCount, uc.UnreadCount, title, 0)
+		convV1 := convertToV1Conversation(&conv, ownerName, ownerHandle, peerName, peerResource, memberCount, uc.UnreadCount, title, 0)
 		// pinned is the requesting user's per-conversation pin state; the list
 		// query already returns pinned-first, this just surfaces the flag so the
 		// frontend can render a pin indicator.
@@ -157,7 +158,7 @@ func (s *CommandService) ListChannelsForAgent(ctx context.Context, req *connect.
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve reviewAll permission"))
 	}
 	if !reviewAll {
-		viewer = &store.ConversationMemberFilter{MemberType: store.MemberTypeUser, MemberID: fmt.Sprintf("%d", user.ID)}
+		viewer = &store.ConversationMemberFilter{MemberType: store.MemberTypeUser, MemberID: user.Handle}
 	}
 
 	convs, err := s.store.ListAgentConversations(ctx, resourceID, viewer, limitPlusOne, offset.offset)
@@ -176,6 +177,7 @@ func (s *CommandService) ListChannelsForAgent(ctx context.Context, req *connect.
 		conv := uc.Conversation
 		memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 		ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
+		ownerHandle := resolveUserHandle(ctx, s.store, conv.OwnerID)
 		// For type 1 (user DM) the peer is the user, whose name is ownerName
 		// (the DM's created_by/owner is the user); the viewed agent is the
 		// single agent participant (conv.AgentID == the agent named in the
@@ -187,20 +189,21 @@ func (s *CommandService) ListChannelsForAgent(ctx context.Context, req *connect.
 		title := conv.Title
 		switch conv.Type {
 		case store.ConversationTypeDM:
-			peerName = ownerName
-			peerResource = common.FormatUserUID(conv.OwnerID)
+			peerHandle := resolveUserHandle(ctx, s.store, conv.OwnerID)
+			peerName = peerHandle
+			peerResource = common.FormatUserHandle(peerHandle)
 			title = ownerName
 		case store.ConversationTypeAgentDM:
 			peer := s.resolveAgentDMPeer(ctx, conv.ID, resourceID)
 			if peer != nil {
-				peerName = peer.Name
+				peerName = peer.ResourceID
 				peerResource = common.FormatAgentUID(peer.ResourceID)
 				title = peer.Name
 			}
 		default:
 			// type 2 channels have no peer; title is already the channel title.
 		}
-		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, peerName, peerResource, memberCount, uc.UnreadCount, title, 0))
+		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, ownerHandle, peerName, peerResource, memberCount, uc.UnreadCount, title, 0))
 	}
 
 	return connect.NewResponse(&v1pb.ListChannelsForAgentResponse{
@@ -249,9 +252,10 @@ func (s *CommandService) ListAccessibleChannels(ctx context.Context, req *connec
 		conv := uc.Conversation
 		memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 		ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
+		ownerHandle := resolveUserHandle(ctx, s.store, conv.OwnerID)
 		title, peerName, peerResource := s.resolveAccessibleDisplay(ctx, &conv, uc.IsMember, agent)
 		channels = append(channels, &v1pb.AccessibleChannel{
-			Channel:  convertToV1Conversation(&conv, ownerName, peerName, peerResource, memberCount, 0, title, 0),
+			Channel:  convertToV1Conversation(&conv, ownerName, ownerHandle, peerName, peerResource, memberCount, 0, title, 0),
 			IsMember: uc.IsMember,
 		})
 	}
@@ -277,26 +281,28 @@ func (s *CommandService) resolveAccessibleDisplay(ctx context.Context, conv *sto
 		if a, err := s.store.GetAgent(ctx, int(conv.AgentID.Int32)); err == nil && a != nil && a.Name != "" {
 			if a.ID == agent.ID {
 				// The agent's own DM: the peer is the owner user.
-				peerName = resolveUserName(ctx, s.store, conv.OwnerID)
-				peerResource = common.FormatUserUID(conv.OwnerID)
+				peerHandle := resolveUserHandle(ctx, s.store, conv.OwnerID)
+				peerName = peerHandle
+				peerResource = common.FormatUserHandle(peerHandle)
+				title = resolveUserName(ctx, s.store, conv.OwnerID)
 			} else {
 				// The owner's DM with another agent.
-				peerName = a.Name
+				peerName = a.ResourceID
 				peerResource = common.FormatAgentUID(a.ResourceID)
+				title = a.Name
 			}
-			title = peerName
 		}
 	case store.ConversationTypeAgentDM:
 		if peer := s.resolveAgentDMPeer(ctx, conv.ID, agent.ResourceID); peer != nil {
-			peerName = peer.Name
+			peerName = peer.ResourceID
 			peerResource = common.FormatAgentUID(peer.ResourceID)
-			title = peerName
+			title = peer.Name
 		}
 	case store.ConversationTypeUserDM:
 		if peer := s.resolveUserDMPeer(ctx, conv.ID, 0); peer != nil {
-			peerName = peer.Name
-			peerResource = common.FormatUserUID(peer.ID)
-			title = peerName
+			peerName = peer.Handle
+			peerResource = common.FormatUserHandle(peer.Handle)
+			title = peer.Name
 		}
 	default:
 		// Unknown conversation types have no peer or special title.
@@ -355,8 +361,9 @@ func (s *CommandService) JoinChannel(ctx context.Context, req *connect.Request[v
 
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, convUUID)
 	ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
+	ownerHandle := resolveUserHandle(ctx, s.store, conv.OwnerID)
 	return connect.NewResponse(&v1pb.JoinChannelResponse{
-		Conversation: convertToV1Conversation(conv, ownerName, "", "", memberCount, 0, conv.Title, 0),
+		Conversation: convertToV1Conversation(conv, ownerName, ownerHandle, "", "", memberCount, 0, conv.Title, 0),
 	}), nil
 }
 
@@ -373,6 +380,7 @@ func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1
 
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 	ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
+	ownerHandle := resolveUserHandle(ctx, s.store, conv.OwnerID)
 	// The DM peer depends on the viewer: the agent daemon calls GetChannel on
 	// its own DMs and must see the user (or other agent) as the peer, not
 	// itself. Detect the caller's agent and user identity and pass them down.
@@ -386,10 +394,10 @@ func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1
 	}
 	peer := s.resolvePeerForViewer(ctx, conv, viewerAgentResourceID, viewerUserID)
 	title := conv.Title
-	if peer.name != "" && conv.Type != store.ConversationTypeChannel {
+	if peer.displayName != "" && conv.Type != store.ConversationTypeChannel {
 		// DMs store no title; surface the peer name so the row matches the
 		// list endpoints (which set title = peer for DMs).
-		title = peer.name
+		title = peer.displayName
 	}
 
 	// read_version is the requesting user's per-conversation read cursor, so the
@@ -411,7 +419,7 @@ func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1
 		}
 	}
 
-	resp := convertToV1Conversation(conv, ownerName, peer.name, peer.resource, memberCount, 0, title, readVersion)
+	resp := convertToV1Conversation(conv, ownerName, ownerHandle, peer.handle, peer.resource, memberCount, 0, title, readVersion)
 	resp.Pinned = pinned
 	if viewerUserID != 0 {
 		if joinedAt, err := s.store.GetConversationJoinedAt(ctx, conv.ID, viewerUserID); err != nil {
@@ -448,8 +456,9 @@ func (s *CommandService) UpdateChannel(ctx context.Context, req *connect.Request
 
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, updated.ID)
 	ownerName := resolveUserName(ctx, s.store, updated.OwnerID)
+	ownerHandle := resolveUserHandle(ctx, s.store, updated.OwnerID)
 
-	return connect.NewResponse(convertToV1Conversation(updated, ownerName, "", "", memberCount, 0, updated.Title, 0)), nil
+	return connect.NewResponse(convertToV1Conversation(updated, ownerName, ownerHandle, "", "", memberCount, 0, updated.Title, 0)), nil
 }
 
 func (s *CommandService) DeleteChannel(ctx context.Context, req *connect.Request[v1pb.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error) {
@@ -505,6 +514,7 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 	// the same member twice is a caller bug and would silently upsert twice.
 	seen := make(map[string]bool, len(req.Msg.Members))
 	inputs := make([]store.ConversationMemberInput, 0, len(req.Msg.Members))
+	ownerHandle := resolveUserHandle(ctx, s.store, conv.OwnerID)
 	for _, m := range req.Msg.Members {
 		var expireAt *time.Time
 		if m.ExpireTime != nil {
@@ -531,15 +541,15 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 				return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("group %q not found", groupName))
 			}
 			for _, gm := range group.Payload.GetMembers() {
-				userID, uidErr := common.GetUserID(gm.GetMember())
+				userHandle, uidErr := common.GetUserHandle(gm.GetMember())
 				if uidErr != nil {
 					// Malformed member inside a group payload: skip, never fail
 					// the whole snapshot for one bad row.
 					continue
 				}
-				memberID := fmt.Sprintf("%d", userID)
+				memberID := userHandle
 				key := fmt.Sprintf("%d:%s", store.MemberTypeUser, memberID)
-				if seen[key] || memberID == fmt.Sprintf("%d", conv.OwnerID) {
+				if seen[key] || memberID == ownerHandle {
 					continue
 				}
 				existingRole, _, memErr := s.store.GetConversationMembership(ctx, convID, store.MemberTypeUser, memberID)
@@ -549,9 +559,9 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 				if existingRole != 0 {
 					continue
 				}
-				user, userErr := s.store.GetUserByID(ctx, userID)
+				user, userErr := s.store.GetUserByHandle(ctx, userHandle)
 				if userErr != nil {
-					return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(userErr, "failed to look up user %d", userID))
+					return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(userErr, "failed to look up user %s", userHandle))
 				}
 				if user == nil || user.MemberDeleted || user.Type == storepb.PrincipalType_SYSTEM_BOT {
 					continue
@@ -577,7 +587,7 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 		// who is already in the channel is a no-op at best and a privilege strip
 		// at worst, so reject it and direct the caller to
 		// UpdateChannelMemberRole for a role change.
-		if memberType == store.MemberTypeUser && memberID == fmt.Sprintf("%d", conv.OwnerID) {
+		if memberType == store.MemberTypeUser && memberID == ownerHandle {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("cannot add the channel owner as a member"))
 		}
 		existingRole, _, err := s.store.GetConversationMembership(ctx, convID, memberType, memberID)
@@ -604,13 +614,9 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 			}
 		}
 		if memberType == store.MemberTypeUser {
-			userID, uidErr := strconv.Atoi(memberID)
-			if uidErr != nil {
-				return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user member_id, must be principal id"))
-			}
-			user, userErr := s.store.GetUserByID(ctx, userID)
+			user, userErr := s.store.GetUserByHandle(ctx, memberID)
 			if userErr != nil {
-				return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(userErr, "failed to look up user %d", userID))
+				return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(userErr, "failed to look up user %s", memberID))
 			}
 			if err := validateChannelUserMember(memberID, user); err != nil {
 				return nil, err
@@ -702,8 +708,8 @@ func (s *CommandService) RemoveChannelMember(ctx context.Context, req *connect.R
 	memberID := req.Msg.MemberId
 	memberType := req.Msg.MemberType
 
-	ownerMemberID := fmt.Sprintf("%d", conv.OwnerID)
-	if memberType == store.MemberTypeUser && memberID == ownerMemberID {
+	ownerHandle := resolveUserHandle(ctx, s.store, conv.OwnerID)
+	if memberType == store.MemberTypeUser && memberID == ownerHandle {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("cannot remove the channel owner"))
 	}
 
@@ -740,11 +746,13 @@ func (s *CommandService) TransferChannelOwnership(ctx context.Context, req *conn
 	if req.Msg.MemberType != store.MemberTypeUser {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("only users can own a channel"))
 	}
-	newOwnerID := req.Msg.MemberId
-	if _, uidErr := strconv.Atoi(newOwnerID); uidErr != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user member_id, must be principal id"))
+	newOwnerUser, userErr := s.store.GetUserByHandle(ctx, req.Msg.MemberId)
+	if userErr != nil || newOwnerUser == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user member_id, must be a user handle"))
 	}
-	if newOwnerID == fmt.Sprintf("%d", conv.OwnerID) {
+	newOwnerID := newOwnerUser.Handle
+	ownerHandle := resolveUserHandle(ctx, s.store, conv.OwnerID)
+	if newOwnerID == ownerHandle {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("caller is already the owner"))
 	}
 
@@ -757,8 +765,7 @@ func (s *CommandService) TransferChannelOwnership(ctx context.Context, req *conn
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("target is not a channel member"))
 	}
 
-	newOwnerPrincipalID, _ := strconv.Atoi(newOwnerID)
-	if err := s.store.TransferChannelOwnership(ctx, convID, conv.OwnerID, newOwnerPrincipalID, newOwnerID); err != nil {
+	if err := s.store.TransferChannelOwnership(ctx, convID, ownerHandle, newOwnerID, newOwnerUser.ID); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to transfer ownership"))
 	}
 
@@ -768,8 +775,9 @@ func (s *CommandService) TransferChannelOwnership(ctx context.Context, req *conn
 	}
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, updated.ID)
 	ownerName := resolveUserName(ctx, s.store, updated.OwnerID)
+	ownerHandle = resolveUserHandle(ctx, s.store, updated.OwnerID)
 	return connect.NewResponse(&v1pb.TransferChannelOwnershipResponse{
-		Conversation: convertToV1Conversation(updated, ownerName, "", "", memberCount, 0, updated.Title, 0),
+		Conversation: convertToV1Conversation(updated, ownerName, ownerHandle, "", "", memberCount, 0, updated.Title, 0),
 	}), nil
 }
 
@@ -800,7 +808,8 @@ func (s *CommandService) UpdateChannelMemberRole(ctx context.Context, req *conne
 	}
 	memberType := req.Msg.MemberType
 	memberID := req.Msg.MemberId
-	if memberType == store.MemberTypeUser && memberID == fmt.Sprintf("%d", conv.OwnerID) {
+	ownerHandle := resolveUserHandle(ctx, s.store, conv.OwnerID)
+	if memberType == store.MemberTypeUser && memberID == ownerHandle {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("cannot change the owner's role; use transferOwnership instead"))
 	}
 
@@ -913,7 +922,10 @@ func (s *CommandService) ListThreadParticipants(ctx context.Context, req *connec
 		var memberID string
 		switch ts.SenderType {
 		case store.SenderTypeUser:
-			memberID = strconv.Itoa(ts.PrincipalID)
+			memberID = ts.Handle
+			if memberID == "" {
+				continue
+			}
 		case store.SenderTypeAgent:
 			if !ts.AgentID.Valid {
 				continue
@@ -1002,7 +1014,7 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 	// drive thread subscription and activity generation even when the client does
 	// not construct Mention structs. Self-mention (the caller's own id) is dropped.
 	parsedMentions := s.parseContentMentions(ctx, convID, req.Msg.Content, "")
-	mentions := mergeMentions(parsedMentions, req.Msg.Mentions, user.ID)
+	mentions := mergeMentions(parsedMentions, req.Msg.Mentions, user.Handle)
 
 	// Atomically bump conversation.version and write the user message with that
 	// room_version. This is the single source of truth for the room cursor. When
@@ -1010,20 +1022,22 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 	var msg *store.ChatMessage
 	if req.Msg.AsTask {
 		msg, _, err = s.store.CreateTaskMessageBumpVersion(ctx, &store.ChatMessage{
-			ConversationID: convID,
-			PrincipalID:    user.ID,
-			PrincipalName:  user.Name,
-			Role:           1, // USER
-			Content:        req.Msg.Content,
-			SenderType:     store.SenderTypeUser,
-			Mentions:       mentions,
-			Attachments:    attachments,
+			ConversationID:  convID,
+			PrincipalID:     user.ID,
+			PrincipalName:   user.Name,
+			PrincipalHandle: user.Handle,
+			Role:            1, // USER
+			Content:         req.Msg.Content,
+			SenderType:      store.SenderTypeUser,
+			Mentions:        mentions,
+			Attachments:     attachments,
 		})
 	} else {
 		msg, _, err = s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
 			ConversationID:      convID,
 			PrincipalID:         user.ID,
 			PrincipalName:       user.Name,
+			PrincipalHandle:     user.Handle,
 			Role:                1, // USER
 			Content:             req.Msg.Content,
 			SenderType:          store.SenderTypeUser,
@@ -1140,9 +1154,12 @@ func (s *CommandService) subscribeAndNotifyThread(ctx context.Context, convID, r
 			addAgent(agent.ID)
 		}
 		if m.Type == "user" && m.Id != "" {
-			if uid, err := strconv.Atoi(m.Id); err == nil {
-				addUser(uid)
+			user, err := s.store.GetUserByHandle(ctx, m.Id)
+			if err != nil || user == nil {
+				slog.Warn("failed to resolve mentioned user for thread subscription", "handle", m.Id, "error", err)
+				continue
 			}
+			addUser(user.ID)
 		}
 	}
 	if posterAgentID != nil {
@@ -1192,12 +1209,14 @@ func (s *CommandService) notifyThreadParticipants(ctx context.Context, convID, r
 	}
 }
 
-// conversationPeer carries the DM peer's display name and resource name so a
-// single resolver call can populate both Conversation.Address (from name) and
-// Conversation.Peer (from resource). Zero value (both empty) means no peer.
+// conversationPeer carries the DM peer's mention handle, display name, and
+// resource name so a single resolver call can populate Conversation.Address
+// (from handle), Conversation.Title (from displayName), and Conversation.Peer
+// (from resource). Zero value (all empty) means no peer.
 type conversationPeer struct {
-	name     string // display name, used for the "dm:@<name>" address
-	resource string // resource name e.g. "users/<id>" or "agents/<id>", used for Conversation.Peer
+	handle      string // mention handle ("ran-user-1" / "rei-agent-1"), used for the "dm:@<handle>" address
+	displayName string // display name, used for DM row titles
+	resource    string // resource name e.g. "users/<handle>" or "agents/<handle>", used for Conversation.Peer
 }
 
 // maxListPreviewLen caps the single-line last-message preview embedded in the
@@ -1206,23 +1225,24 @@ type conversationPeer struct {
 const maxListPreviewLen = 120
 
 // convertToV1Conversation is the single builder for v1 Conversation. It
-// populates Address — the name-based form agents write and read — from the
-// conversation type and a caller-resolved peerName:
-//   - type 2 (channel): "#<title>"; peerName is unused.
-//   - type 1 (user DM): "dm:@<peerName>", where peerName is the DM peer from
-//     the viewer's perspective (the agent for a user viewer, the user for an
-//     agent viewer).
-//   - type 3 (agent DM): "dm:@<peerName>", where peerName is the other agent.
+// populates Address — the handle-based form agents write and read — from the
+// conversation type and a caller-resolved peerHandle:
+//   - type 2 (channel): "#<title>"; peerHandle is unused.
+//   - type 1 (user DM): "dm:@<peerHandle>", where peerHandle is the DM peer's
+//     mention handle from the viewer's perspective (the agent for a user
+//     viewer, the user for an agent viewer).
+//   - type 3 (agent DM): "dm:@<peerHandle>", where peerHandle is the other
+//     agent's handle.
 //
-// peerResourceName is the DM peer's resource name ("users/<id>" or
-// "agents/<id>") from the viewer's perspective, surfaced on Conversation.Peer
-// so list viewers can fetch the peer's avatar without an extra member lookup.
-// Empty for channels and when no peer can be resolved.
+// peerResourceName is the DM peer's resource name ("users/<handle>" or
+// "agents/<handle>") from the viewer's perspective, surfaced on
+// Conversation.Peer so list viewers can fetch the peer's avatar without an
+// extra member lookup. Empty for channels and when no peer can be resolved.
 //
-// Callers resolve peerName/peerResourceName (they already resolve owner/title
-// for their view) so the builder stays free of lookups. Empty peerName leaves
-// a DM address empty rather than emitting a malformed "dm:@".
-func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, peerName string, peerResourceName string, memberCount int, unreadCount int32, title string, readVersion int64) *v1pb.Conversation {
+// Callers resolve peerHandle/peerResourceName (they already resolve owner/title
+// for their view) so the builder stays free of lookups. Empty peerHandle
+// leaves a DM address empty rather than emitting a malformed "dm:@".
+func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, ownerHandle string, peerName string, peerResourceName string, memberCount int, unreadCount int32, title string, readVersion int64) *v1pb.Conversation {
 	var address string
 	switch conv.Type {
 	case store.ConversationTypeChannel:
@@ -1239,7 +1259,7 @@ func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, 
 		Title:       title,
 		Type:        conv.Type,
 		MemberCount: int32(memberCount),
-		OwnerId:     fmt.Sprintf("%d", conv.OwnerID),
+		OwnerId:     ownerHandle,
 		OwnerName:   ownerName,
 		CreatedAt:   timestamppb.New(conv.CreatedAt),
 		UpdatedAt:   timestamppb.New(conv.UpdatedAt),
@@ -1260,6 +1280,34 @@ func resolveUserName(ctx context.Context, s *store.Store, principalID int) strin
 		return fmt.Sprintf("%d", principalID)
 	}
 	return u.Name
+}
+
+// resolveUserHandle returns the user's mention handle ("ran-user-1") for the
+// given principal id, or "" when the user cannot be resolved. Handles are the
+// conversation member ids for users, so owner comparisons and DM addresses use
+// them instead of the numeric principal id.
+func resolveUserHandle(ctx context.Context, s *store.Store, principalID int) string {
+	if principalID == 0 {
+		return ""
+	}
+	u, err := s.GetUserByID(ctx, principalID)
+	if err != nil || u == nil {
+		slog.Warn("failed to resolve user handle", "principalID", principalID, "error", err)
+		return ""
+	}
+	return u.Handle
+}
+
+// resolveUserResource returns the user's resource name ("users/<handle>") for
+// the given principal id, or "" when the user cannot be resolved. Used for
+// created_by/owner fields that surface a user identity on agents, machines,
+// and providers.
+func resolveUserResource(ctx context.Context, s *store.Store, principalID int) string {
+	handle := resolveUserHandle(ctx, s, principalID)
+	if handle == "" {
+		return ""
+	}
+	return common.FormatUserHandle(handle)
 }
 
 // resolveAgentDMPeer returns the other agent in a type-3 agent DM — the first
@@ -1309,7 +1357,8 @@ func (s *CommandService) resolvePeerForViewer(ctx context.Context, conv *store.C
 	case store.ConversationTypeDM:
 		if viewerAgentResourceID != "" {
 			// The agent viewer's peer is the user owner.
-			return conversationPeer{name: resolveUserName(ctx, s.store, conv.OwnerID), resource: common.FormatUserUID(conv.OwnerID)}
+			peerHandle := resolveUserHandle(ctx, s.store, conv.OwnerID)
+			return conversationPeer{handle: peerHandle, displayName: resolveUserName(ctx, s.store, conv.OwnerID), resource: common.FormatUserHandle(peerHandle)}
 		}
 		if !conv.AgentID.Valid {
 			return conversationPeer{}
@@ -1318,19 +1367,19 @@ func (s *CommandService) resolvePeerForViewer(ctx context.Context, conv *store.C
 		if err != nil || agent == nil {
 			return conversationPeer{}
 		}
-		return conversationPeer{name: agent.Name, resource: common.FormatAgentUID(agent.ResourceID)}
+		return conversationPeer{handle: agent.ResourceID, displayName: agent.Name, resource: common.FormatAgentUID(agent.ResourceID)}
 	case store.ConversationTypeAgentDM:
 		peer := s.resolveAgentDMPeer(ctx, conv.ID, viewerAgentResourceID)
 		if peer == nil {
 			return conversationPeer{}
 		}
-		return conversationPeer{name: peer.Name, resource: common.FormatAgentUID(peer.ResourceID)}
+		return conversationPeer{handle: peer.ResourceID, displayName: peer.Name, resource: common.FormatAgentUID(peer.ResourceID)}
 	case store.ConversationTypeUserDM:
 		peer := s.resolveUserDMPeer(ctx, conv.ID, viewerUserID)
 		if peer == nil {
 			return conversationPeer{}
 		}
-		return conversationPeer{name: peer.Name, resource: common.FormatUserUID(peer.ID)}
+		return conversationPeer{handle: peer.Handle, displayName: peer.Name, resource: common.FormatUserHandle(peer.Handle)}
 	}
 	return conversationPeer{}
 }
@@ -1352,15 +1401,11 @@ func (s *CommandService) resolveUserDMPeer(ctx context.Context, convID uuid.UUID
 		if m.MemberType != store.MemberTypeUser {
 			continue
 		}
-		pid, parseErr := strconv.Atoi(m.MemberID)
-		if parseErr != nil {
-			continue
-		}
-		if viewerUserID != 0 && pid == viewerUserID {
-			continue
-		}
-		user, err := s.store.GetUserByID(ctx, pid)
+		user, err := s.store.GetUserByHandle(ctx, m.MemberID)
 		if err != nil || user == nil || user.Name == "" {
+			continue
+		}
+		if viewerUserID != 0 && user.ID == viewerUserID {
 			continue
 		}
 		return user
@@ -1458,11 +1503,11 @@ func (s *CommandService) SetConversationClosed(ctx context.Context, req *connect
 
 func resolveMemberDisplayName(ctx context.Context, s *store.Store, memberType int32, memberID string) string {
 	if memberType == store.MemberTypeUser {
-		uid, err := strconv.Atoi(memberID)
-		if err != nil {
+		user, err := s.GetUserByHandle(ctx, memberID)
+		if err != nil || user == nil {
 			return memberID
 		}
-		return resolveUserName(ctx, s, uid)
+		return user.Name
 	}
 	if memberType == store.MemberTypeAgent {
 		agent, err := s.GetAgentByResourceID(ctx, memberID)
@@ -1476,7 +1521,7 @@ func resolveMemberDisplayName(ctx context.Context, s *store.Store, memberType in
 
 // resolveMemberProfile returns a member's self-description, avatar resource
 // name, and preferred language from a single user/agent lookup. For users the
-// description is User.description, the avatar is users/{id}/avatar when the
+// description is User.description, the avatar is users/{handle}/avatar when the
 // user has uploaded one (empty otherwise), and the language is the user's
 // chat_preferences preferred_language (UNSPECIFIED when unset); for agents the
 // description is the admin-authored persona_prompt, the avatar is
@@ -1486,17 +1531,13 @@ func resolveMemberDisplayName(ctx context.Context, s *store.Store, memberType in
 // converse in the member's preferred language.
 func resolveMemberProfile(ctx context.Context, s *store.Store, memberType int32, memberID string) (string, string, v1pb.PreferredLanguage) {
 	if memberType == store.MemberTypeUser {
-		uid, err := strconv.Atoi(memberID)
-		if err != nil {
-			return "", "", v1pb.PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED
-		}
-		u, err := s.GetUserByID(ctx, uid)
+		u, err := s.GetUserByHandle(ctx, memberID)
 		if err != nil || u == nil {
 			return "", "", v1pb.PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED
 		}
 		avatar := ""
 		if u.AvatarS3Key != "" {
-			avatar = common.FormatUserAvatar(u.ID)
+			avatar = common.FormatUserAvatar(u.Handle)
 		}
 		return u.Description, avatar, v1pb.PreferredLanguage(u.ChatPreferences.GetPreferredLanguage())
 	}
@@ -1522,6 +1563,7 @@ func buildChannelMember(ctx context.Context, s *store.Store, memberType int32, m
 	m := &v1pb.ChannelMember{
 		MemberType:        memberType,
 		MemberId:          memberID,
+		Handle:            memberID,
 		DisplayName:       resolveMemberDisplayName(ctx, s, memberType, memberID),
 		MemberRole:        role,
 		Description:       description,

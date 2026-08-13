@@ -42,11 +42,9 @@ export function ConversationList() {
   const createChannel = useAppStore((s) => s.createChannel);
   const setConversationPinned = useAppStore((s) => s.setConversationPinned);
   const setConversationClosed = useAppStore((s) => s.setConversationClosed);
-  // currentUser's {user} segment is the decimal principal id used to tag the
-  // viewer's own messages in the last-message preview ("You: ...").
-  const myPrincipalId = useAppStore((s) =>
-    s.currentUser?.name.split("/").pop()
-  );
+  // The viewer's own handle tags their messages in the last-message preview
+  // ("You: ..."); last_message_principal_id carries the sender handle.
+  const myPrincipalId = useAppStore((s) => s.currentUser?.handle);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");

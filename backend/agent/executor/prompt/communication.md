@@ -101,12 +101,10 @@ To address the right person or agent for a task, first perceive who is present. 
 
 **Speak the user's language.** Each user member carries a `(language: xx-XX)` tag — their preferred language for talking with agents. When you start a conversation with a user (especially a DM), write your reply in that language. If no tag is shown, pick the most appropriate language yourself (match the user's own writing when you can).
 
-**You do not construct mentions yourself — you only write `@<display_name>` in your reply content.** The manager parses the `@` token, resolves it to the conversation member by display name, and routes it (in a thread, @mentioning an agent subscribes them). Two forms:
+**You do not construct mentions yourself — you only write `@<handle>` in your reply content.** The manager parses the `@` token, resolves it to the conversation member by handle, and routes it (in a thread, @mentioning an agent subscribes them).
 
-- Bare: `@alice` — a run of letters/digits/`_`/`-`/`.` right after `@`, preceded by the start of the message or a space/punctuation. Use this for single-word names. An email like `alice@example.com` is NOT a mention.
-- Quoted: `@"UI UX"` — the name verbatim between quotes, accepted anywhere (no leading boundary needed). Use this for multi-word or spaced names, and for CJK names inline without a leading space (`转给@"张三"处理`).
-
-Match the display name the roster printed. The manager resolves case-insensitively and skips ambiguous or unknown names, so a typo just means no one is woken — verify the name against `members` output.
+- Form: `@<handle>` — a run of letters/digits/`_`/`-`/`.` right after `@`, preceded by the start of the message or a space/punctuation. An email like `alice@example.com` is NOT a mention.
+- Handles are unique and self-describing: users end in `-user-N` (e.g. `@ran-user-1`), agents in `-agent-N` (e.g. `@rei-agent-1`). The roster prints each member's handle — copy it verbatim. A typo just means no one is woken, so verify the handle against `members` output.
 
 ### Channel access
 
@@ -118,7 +116,7 @@ You can also leave a channel you are a member of (`channel leave`) — it stops 
 
 You can hand work to another agent through a direct message — the same `message send` you use for any conversation, addressed `dm:@<peer>`. The peer agent and the human both see it; the manager opens the DM if it does not exist.
 
-**Discover first.** Run `laelia-machine agent list` to see every other agent with its display name, connection state, and complete persona_prompt. Pick the peer whose persona fits the work. If two agents share a display name, address the exact one as `dm:@agents/<resource-id>` using the `[agents/<id>]` handle the roster printed.
+**Discover first.** Run `laelia-machine agent list` to see every other agent with its display name, handle, connection state, and complete persona_prompt. Pick the peer whose persona fits the work, then address it as `dm:@<handle>` (e.g. `dm:@rei-agent-1`) — handles are unique, so no disambiguation is ever needed.
 
 **Send the request, then stop.** Post the request with `laelia-machine message send dm:@<peer> --content "..." --base-version 0` (a brand-new DM starts at version 0). Delegation is **async**: end your turn after sending. The peer's reply is a normal new message in your shared DM — it wakes you on a later turn, exactly like a channel reply. **Do NOT poll, loop, or block waiting for the reply.** Reuse the same `dm:@<peer>` for the whole back-and-forth (read new replies with `message read dm:@<peer> --version <your processed_version>`, ack with `message ack dm:@<peer>` once handled).
 

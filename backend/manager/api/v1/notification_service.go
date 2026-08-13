@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"strconv"
 
 	"connectrpc.com/connect"
 	"github.com/pkg/errors"
@@ -19,14 +18,14 @@ import (
 )
 
 // pushSubscriptionNamePrefix is the resource-name form for one push
-// subscription: "users/{uid}/pushSubscriptions/{endpointKey}", where
-// endpointKey is the URL-safe base64 of the subscription endpoint. The uid is
-// the owning user's principal id.
+// subscription: "users/{handle}/pushSubscriptions/{endpointKey}", where
+// endpointKey is the URL-safe base64 of the subscription endpoint. The handle
+// is the owning user's immutable handle.
 const pushSubscriptionNamePrefix = "pushSubscriptions/"
 
 // NotificationService implements laelia.v1.NotificationService: per-user Web
 // Push subscription management. All RPCs are user-scoped — the caller's own
-// principal id is the implicit owner, mirroring ListActivities — and gated by
+// handle is the implicit owner, mirroring ListActivities — and gated by
 // the IAM interceptor on laelia.pushConfig.* / laelia.pushSubscriptions.*.
 // The handlers additionally reject agent callers and enforce name ownership
 // server-side. When Web Push is disabled (no VAPID keys), GetPushConfig reports
@@ -103,7 +102,7 @@ func (s *NotificationService) ListPushSubscriptions(ctx context.Context, _ *conn
 	resp := &v1pb.ListPushSubscriptionsResponse{}
 	for _, sub := range subs {
 		resp.PushSubscriptions = append(resp.PushSubscriptions, &v1pb.PushSubscription{
-			Name:     pushSubscriptionName(user.ID, sub.Endpoint),
+			Name:     pushSubscriptionName(user.Handle, sub.Endpoint),
 			Endpoint: sub.Endpoint,
 		})
 	}
@@ -134,7 +133,7 @@ func (s *NotificationService) CreatePushSubscription(ctx context.Context, req *c
 	}
 
 	return connect.NewResponse(&v1pb.PushSubscription{
-		Name:     pushSubscriptionName(user.ID, endpoint),
+		Name:     pushSubscriptionName(user.Handle, endpoint),
 		Endpoint: endpoint,
 	}), nil
 }
@@ -165,11 +164,11 @@ func (s *NotificationService) DeletePushSubscription(ctx context.Context, req *c
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
-// pushSubscriptionName builds "users/{uid}/pushSubscriptions/{endpointKey}",
+// pushSubscriptionName builds "users/{handle}/pushSubscriptions/{endpointKey}",
 // where endpointKey is the URL-safe base64 of the endpoint (no padding), so the
 // name is a valid single-segment resource id.
-func pushSubscriptionName(uid int, endpoint string) string {
-	return fmt.Sprintf("%s%d/%s%s", common.UserNamePrefix, uid, pushSubscriptionNamePrefix, endpointKey(endpoint))
+func pushSubscriptionName(handle string, endpoint string) string {
+	return fmt.Sprintf("%s%s/%s%s", common.UserNamePrefix, handle, pushSubscriptionNamePrefix, endpointKey(endpoint))
 }
 
 // endpointKey is the URL-safe base64 encoding of the endpoint without padding,
@@ -178,20 +177,16 @@ func endpointKey(endpoint string) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(endpoint))
 }
 
-// parsePushSubscriptionName parses "users/{uid}/pushSubscriptions/{endpointKey}"
-// into the owning user id and the decoded endpoint.
-func parsePushSubscriptionName(name string) (userID int, endpoint string, err error) {
+// parsePushSubscriptionName parses "users/{handle}/pushSubscriptions/{endpointKey}"
+// into the owning user handle and the decoded endpoint.
+func parsePushSubscriptionName(name string) (handle string, endpoint string, err error) {
 	tokens, perr := common.GetNameParentTokens(name, common.UserNamePrefix, pushSubscriptionNamePrefix)
 	if perr != nil {
-		return 0, "", connect.NewError(connect.CodeInvalidArgument, perr)
-	}
-	uid, perr := strconv.Atoi(tokens[0])
-	if perr != nil {
-		return 0, "", connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid user id in push subscription name %q", name))
+		return "", "", connect.NewError(connect.CodeInvalidArgument, perr)
 	}
 	endpointBytes, derr := base64.RawURLEncoding.DecodeString(tokens[1])
 	if derr != nil {
-		return 0, "", connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(derr, "invalid endpoint key in push subscription name %q", name))
+		return "", "", connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(derr, "invalid endpoint key in push subscription name %q", name))
 	}
-	return uid, string(endpointBytes), nil
+	return tokens[0], string(endpointBytes), nil
 }

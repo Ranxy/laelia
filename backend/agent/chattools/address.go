@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 
+	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -80,81 +81,21 @@ func resolveChannelTitle(ctx context.Context, d Deps, title string) (string, err
 }
 
 // resolveDMAddress opens or reuses a DM with the named peer. A peer given as
-// "agents/<id>" addresses an agent directly; otherwise the peer is a display
-// name resolved to an agent first and, if no agent matches, to a user. Agent-
-// first means a shared name addresses the agent. When an agent DOES match, its
-// DM is opened and the result returned verbatim — a NotFound from that create
-// (e.g. the peer was deleted between the list and the create) must NOT fall
-// through to the user path, or a same-named user would silently receive agent
-// DMs. Only "no agent matched the name" falls through to the user path.
+// "agents/<id>" addresses an agent directly; otherwise the peer must be a
+// mention handle. Handles are self-describing — the "-agent-" / "-user-"
+// suffix names the type — so no display-name disambiguation is ever needed.
 func resolveDMAddress(ctx context.Context, d Deps, peer string) (string, error) {
 	if strings.HasPrefix(peer, "agents/") {
 		return createAgentDM(ctx, d, peer)
 	}
-	match, err := findPeerAgentByName(ctx, d, peer)
-	if err != nil {
-		return "", err
+	switch {
+	case common.HandleKindOf(peer, common.HandleKindAgent):
+		return createAgentDM(ctx, d, "agents/"+peer)
+	case common.HandleKindOf(peer, common.HandleKindUser):
+		return createUserDM(ctx, d, peer)
+	default:
+		return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("%q is not a valid handle; use dm:@<handle> (e.g. dm:@ran-user-1, dm:@rei-agent-1)", peer), "Run `agent list` for agent handles or `members <address>` for user handles.")
 	}
-	if match != nil {
-		return createAgentDM(ctx, d, match.GetName())
-	}
-	return createUserDM(ctx, d, peer)
-}
-
-// findPeerAgentByName returns the single peer agent whose display name matches
-// peer, or nil when no agent matches so the caller falls through to the user
-// path. More than one match is an ambiguous-name error; a ListPeerAgents
-// failure is propagated. Splitting the lookup from the DM create lets the caller
-// own the fall-through, so a create-time NotFound after a match is not mistaken
-// for "no agent matched".
-func findPeerAgentByName(ctx context.Context, d Deps, peer string) (*v1pb.PeerAgent, error) {
-	resp, err := d.Client.ListPeerAgents(ctx, connect.NewRequest(&v1pb.ListPeerAgentsRequest{}))
-	if err != nil {
-		return nil, wrapManagerError(err)
-	}
-	var match *v1pb.PeerAgent
-	for _, a := range resp.Msg.GetAgents() {
-		if a.GetDisplayName() == peer {
-			if match != nil {
-				return nil, localError("AMBIGUOUS_PEER", fmt.Sprintf("multiple agents named %q; address one as dm:@agents/<resource-id>", peer), "Run `agent list` and use dm:@agents/<resource-id>.")
-			}
-			match = a
-		}
-	}
-	return match, nil
-}
-
-// findUserByName returns the single user whose display name (title) matches
-// name, or nil when no user matches so the caller can report a not-found. More
-// than one match is an ambiguous-name error; a ListUsers failure is propagated.
-// The UserServiceClient is optional (Deps.UserClient may be nil for callers
-// that never resolve users); a nil client is a PERMISSION_FAILED, not a panic.
-func findUserByName(ctx context.Context, d Deps, name string) (*v1pb.User, error) {
-	if d.UserClient == nil {
-		return nil, localError("PERMISSION_FAILED", "user lookup is unavailable in this context", "Use users/<id> to add a user by id.")
-	}
-	var match *v1pb.User
-	pageToken := ""
-	for {
-		resp, err := d.UserClient.ListUsers(ctx, connect.NewRequest(&v1pb.ListUsersRequest{PageToken: pageToken, PageSize: 100}))
-		if err != nil {
-			return nil, wrapManagerError(err)
-		}
-		for _, u := range resp.Msg.GetUsers() {
-			if u.GetTitle() == name {
-				if match != nil {
-					return nil, localError("AMBIGUOUS_USER", fmt.Sprintf("multiple users named %q; address one as users/<id>", name), "Run `members <address>` or use users/<id> to disambiguate.")
-				}
-				match = u
-			}
-		}
-		next := resp.Msg.GetNextPageToken()
-		if next == "" || len(resp.Msg.GetUsers()) == 0 {
-			break
-		}
-		pageToken = next
-	}
-	return match, nil
 }
 
 // createAgentDM opens or reuses the type-3 agent DM with the peer given as the
@@ -172,7 +113,7 @@ func createAgentDM(ctx context.Context, d Deps, peerAgent string) (string, error
 // manager resolves the name (NOT_FOUND for an unknown user, FailedPrecondition
 // for an ambiguous one) and creates the DM if the user exists.
 func createUserDM(ctx context.Context, d Deps, peer string) (string, error) {
-	resp, err := d.Client.GetOrCreateUserDM(ctx, connect.NewRequest(&v1pb.GetOrCreateUserDMRequest{PeerUserName: peer}))
+	resp, err := d.Client.GetOrCreateUserDM(ctx, connect.NewRequest(&v1pb.GetOrCreateUserDMRequest{PeerUserHandle: peer}))
 	if err != nil {
 		return "", wrapManagerError(err)
 	}

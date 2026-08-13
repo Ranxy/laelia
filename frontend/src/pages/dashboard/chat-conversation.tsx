@@ -298,9 +298,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const isUserDm = channel?.type === CONVERSATION_TYPE_USER_DM;
   const membershipFixed = isDm || isAgentDm || isUserDm;
   const isOwner =
-    channel && currentUser
-      ? channel.ownerId === currentUser.name.split("/").pop()
-      : false;
+    channel && currentUser ? channel.ownerId === currentUser.handle : false;
 
   // Fetch conversation metadata when the open conversation is absent from the
   // user's left-rail `channels` (notably agent-DMs, which ListChannels excludes
@@ -662,7 +660,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
       if (!mentionState) return;
       const before = input.slice(0, mentionState.startIndex);
       const after = input.slice(cursorPos);
-      const newInput = `${before}@${target.name} ${after}`;
+      const newInput = `${before}@${target.handle} ${after}`;
       setInput(newInput);
       setMentionMap((prev) => {
         if (prev.some((m) => m.id === target.id && m.type === target.type)) {
@@ -675,7 +673,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
       setTimeout(() => {
         const el = textareaRef.current;
         if (el) {
-          const newPos = mentionState.startIndex + target.name.length + 2;
+          const newPos = mentionState.startIndex + target.handle.length + 2;
           el.focus();
           el.setSelectionRange(newPos, newPos);
         }
@@ -856,7 +854,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
               onJumpToSection={handleJumpToSection}
               onPreviewImage={handlePreviewImage}
               debugMode={currentUser?.debugMode ?? false}
-              currentPrincipalId={currentUser?.name.split("/").pop()}
+              currentPrincipalId={currentUser?.handle}
               scrollRoot={scrollRef}
             />
           </div>
@@ -988,7 +986,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                           while ((m = re.exec(value)) !== null) {
                             const name = m[1];
                             const found = mentionTargets.find(
-                              (t) => t.name === name
+                              (t) => t.handle === name
                             );
                             if (found) newMap.push(found);
                           }

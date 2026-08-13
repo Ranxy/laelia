@@ -119,6 +119,7 @@ func (s *Store) CreateTaskMessageBumpVersion(ctx context.Context, msg *ChatMessa
 		ConversationID:      msg.ConversationID,
 		PrincipalID:         msg.PrincipalID,
 		PrincipalName:       msg.PrincipalName,
+		PrincipalHandle:     msg.PrincipalHandle,
 		SenderAgentID:       msg.SenderAgentID,
 		AgentResourceID:     msg.AgentResourceID,
 		Role:                msg.Role,

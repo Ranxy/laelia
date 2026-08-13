@@ -543,11 +543,11 @@ func (s *CommandService) GetOrCreateUserUserDM(ctx context.Context, req *connect
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("peer_user must not be empty"))
 	}
 
-	peerID, err := common.GetUserID(req.Msg.PeerUser)
+	peerHandle, err := common.GetUserHandle(req.Msg.PeerUser)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrap(err, "invalid peer_user"))
 	}
-	peer, err := s.store.GetUserByID(ctx, peerID)
+	peer, err := s.store.GetUserByHandle(ctx, peerHandle)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve peer user"))
 	}
@@ -929,6 +929,7 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 		msg, newVersion, createErr := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
 			ConversationID:      convUUID,
 			PrincipalID:         principalID,
+			PrincipalHandle:     resolveUserHandle(ctx, s.store, principalID),
 			SenderAgentID:       toNullInt32(int32(agent.ID)),
 			Role:                2,
 			Content:             req.Msg.Content,
@@ -1021,7 +1022,7 @@ func storeToV1ChatMessage(msg *store.ChatMessage) *v1pb.ChatMessage {
 		CreatedAt:        timestamppb.New(msg.CreatedAt),
 		SenderName:       senderName,
 		SenderType:       senderType,
-		PrincipalId:      formatPrincipalID(msg.PrincipalID),
+		PrincipalId:      msg.PrincipalHandle,
 		RoomVersion:      msg.RoomVersion,
 		Mentions:         msg.Mentions,
 		Attachments:      msg.Attachments,

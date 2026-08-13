@@ -31,6 +31,7 @@ type Store struct {
 
 	userIDCache            *lru.Cache[int, *UserMessage]
 	userEmailCache         *lru.Cache[string, *UserMessage]
+	userHandleCache        *lru.Cache[string, *UserMessage]
 	settingCache           *lru.Cache[models.SettingName, *SettingMessage]
 	policyCache            *lru.Cache[string, *PolicyMessage]
 	idpCache               *lru.Cache[string, *IdentityProviderMessage]
@@ -54,6 +55,10 @@ func New(ctx context.Context, pgURL string, enableCache bool) (*Store, error) {
 		return nil, err
 	}
 	userEmailCache, err := lru.New[string, *UserMessage](32768)
+	if err != nil {
+		return nil, err
+	}
+	userHandleCache, err := lru.New[string, *UserMessage](32768)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +108,7 @@ func New(ctx context.Context, pgURL string, enableCache bool) (*Store, error) {
 		enableCache:            enableCache,
 		userIDCache:            userIDCache,
 		userEmailCache:         userEmailCache,
+		userHandleCache:        userHandleCache,
 		settingCache:           settingCache,
 		policyCache:            policyCache,
 		idpCache:               idpCache,

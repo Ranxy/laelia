@@ -1305,6 +1305,15 @@ export declare type ChannelMember = Message<"laelia.v1.ChannelMember"> & {
    * @generated from field: laelia.v1.PreferredLanguage preferred_language = 8;
    */
   preferredLanguage: PreferredLanguage;
+
+  /**
+   * handle is the member's readable mention id ("ran-user-1" for users,
+   * "rei-agent-1" for agents), identical to member_id. Duplicated as an
+   * explicit field so consumers do not need to know member_type to render it.
+   *
+   * @generated from field: string handle = 9;
+   */
+  handle: string;
 };
 
 /**
@@ -1754,9 +1763,13 @@ export declare const ResolveChannelByTitleResponseSchema: GenMessage<ResolveChan
  */
 export declare type GetOrCreateUserDMRequest = Message<"laelia.v1.GetOrCreateUserDMRequest"> & {
   /**
-   * @generated from field: string peer_user_name = 1;
+   * peer_user_handle is the peer user's readable handle ("ran-user-1"), the
+   * value typed after "dm:@" to address the user. Resolved by handle only;
+   * display names are never used.
+   *
+   * @generated from field: string peer_user_handle = 1;
    */
-  peerUserName: string;
+  peerUserHandle: string;
 };
 
 /**
@@ -1830,6 +1843,15 @@ export declare type PeerAgent = Message<"laelia.v1.PeerAgent"> & {
    * @generated from field: string name = 1;
    */
   name: string;
+
+  /**
+   * handle is the peer agent's readable id ("rei-agent-1"), the {agent} segment
+   * of name ("agents/{handle}") and the value typed after "@" / "dm:@" to
+   * address the peer.
+   *
+   * @generated from field: string handle = 5;
+   */
+  handle: string;
 
   /**
    * @generated from field: string display_name = 2;

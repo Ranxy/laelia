@@ -269,11 +269,21 @@ export declare const UndeleteUserRequestSchema: GenMessage<UndeleteUserRequest>;
 export declare type User = Message<"laelia.v1.User"> & {
   /**
    * The name of the user.
-   * Format: users/{user}. {user} is a system-generated unique ID.
+   * Format: users/{user}. {user} is the user's readable handle (e.g.
+   * "ran-user-1"), generated at creation and immutable thereafter.
    *
    * @generated from field: string name = 1;
    */
   name: string;
+
+  /**
+   * handle is the user's human-readable, unique mention id (e.g. "ran-user-1"),
+   * the {user} segment of name ("users/{handle}") and the value typed after "@"
+   * to mention or DM this user. Always populated; mirror of principal.handle.
+   *
+   * @generated from field: string handle = 21;
+   */
+  handle: string;
 
   /**
    * @generated from field: laelia.v1.State state = 2;

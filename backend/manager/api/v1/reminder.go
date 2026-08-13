@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/common/permission"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/component/schedule"
@@ -187,7 +188,7 @@ func (s *CommandService) ListReminders(ctx context.Context, req *connect.Request
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve reviewAll permission"))
 		}
 		if !reviewAll {
-			viewer = &store.ConversationMemberFilter{MemberType: store.MemberTypeUser, MemberID: fmt.Sprintf("%d", user.ID)}
+			viewer = &store.ConversationMemberFilter{MemberType: store.MemberTypeUser, MemberID: user.Handle}
 		}
 	}
 
@@ -458,6 +459,7 @@ func (s *CommandService) postReminderSystemMessage(ctx context.Context, convID, 
 	msg, _, err := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
 		ConversationID:      convID,
 		PrincipalID:         1, // system bot (seeded principal id 1)
+		PrincipalHandle:     common.SystemBotHandle,
 		Role:                1,
 		Content:             content,
 		SenderType:          store.SenderTypeSystem,

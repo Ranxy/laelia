@@ -58,12 +58,12 @@ func TestHasGroupOwner(t *testing.T) {
 func TestIsGroupOwner(t *testing.T) {
 	group := &store.GroupMessage{
 		Payload: &storepb.GroupPayload{Members: []*storepb.GroupMember{
-			{Member: "users/7", Role: storepb.GroupMember_OWNER},
-			{Member: "users/8", Role: storepb.GroupMember_MEMBER},
+			{Member: "users/ran-user-7", Role: storepb.GroupMember_OWNER},
+			{Member: "users/ran-user-8", Role: storepb.GroupMember_MEMBER},
 		}},
 	}
-	owner := &store.UserMessage{ID: 7}
-	member := &store.UserMessage{ID: 8}
+	owner := &store.UserMessage{ID: 7, Handle: "ran-user-7"}
+	member := &store.UserMessage{ID: 8, Handle: "ran-user-8"}
 	if !isGroupOwner(owner, group) {
 		t.Fatal("expected user 7 to be owner")
 	}

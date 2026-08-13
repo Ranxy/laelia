@@ -252,9 +252,10 @@ type CommandServiceClient interface {
 	// Powers the "#<title>" address resolver.
 	ResolveChannelByTitle(context.Context, *connect.Request[v1.ResolveChannelByTitleRequest]) (*connect.Response[v1.ResolveChannelByTitleResponse], error)
 	// GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent
-	// and a named end user. Agent-callable. The peer is resolved by principal
-	// display name; ambiguous or unknown names fail. Agent-callable twin of the
-	// user-only GetOrCreateConversation. Powers the "dm:@<user>" address resolver.
+	// and a named end user. Agent-callable. The peer is resolved by the user's
+	// readable handle ("ran-user-1"); unknown handles fail. Agent-callable twin
+	// of the user-only GetOrCreateConversation. Powers the "dm:@<user>" address
+	// resolver.
 	GetOrCreateUserDM(context.Context, *connect.Request[v1.GetOrCreateUserDMRequest]) (*connect.Response[v1.GetOrCreateUserDMResponse], error)
 	// GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent DM between
 	// the calling agent and a peer agent. Agent-callable. Self-address is rejected.
@@ -1189,9 +1190,10 @@ type CommandServiceHandler interface {
 	// Powers the "#<title>" address resolver.
 	ResolveChannelByTitle(context.Context, *connect.Request[v1.ResolveChannelByTitleRequest]) (*connect.Response[v1.ResolveChannelByTitleResponse], error)
 	// GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent
-	// and a named end user. Agent-callable. The peer is resolved by principal
-	// display name; ambiguous or unknown names fail. Agent-callable twin of the
-	// user-only GetOrCreateConversation. Powers the "dm:@<user>" address resolver.
+	// and a named end user. Agent-callable. The peer is resolved by the user's
+	// readable handle ("ran-user-1"); unknown handles fail. Agent-callable twin
+	// of the user-only GetOrCreateConversation. Powers the "dm:@<user>" address
+	// resolver.
 	GetOrCreateUserDM(context.Context, *connect.Request[v1.GetOrCreateUserDMRequest]) (*connect.Response[v1.GetOrCreateUserDMResponse], error)
 	// GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent DM between
 	// the calling agent and a peer agent. Agent-callable. Self-address is rejected.

@@ -481,9 +481,10 @@ func (s *AuthService) syncUserGroups(ctx context.Context, user *store.UserMessag
 				break
 			}
 		}
+		userMember := common.FormatUserHandle(user.Handle)
 		var isGroupMember bool
 		for _, member := range groupMessage.Payload.Members {
-			if member.Member == common.FormatUserUID(user.ID) {
+			if member.Member == userMember {
 				isGroupMember = true
 				break
 			}
@@ -493,12 +494,12 @@ func (s *AuthService) syncUserGroups(ctx context.Context, user *store.UserMessag
 				// Add the user to the group.
 				groupMessage.Payload.Members = append(groupMessage.Payload.Members, &models.GroupMember{
 					Role:   models.GroupMember_MEMBER,
-					Member: common.FormatUserUID(user.ID),
+					Member: userMember,
 				})
 			} else {
 				// Remove the user from the group.
 				groupMessage.Payload.Members = slices.DeleteFunc(groupMessage.Payload.Members, func(member *models.GroupMember) bool {
-					return member.Member == common.FormatUserUID(user.ID)
+					return member.Member == userMember
 				})
 			}
 			if _, err := s.store.UpdateGroup(ctx, groupMessage.ID, &store.UpdateGroupMessage{

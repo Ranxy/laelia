@@ -378,7 +378,7 @@ export function ThreadPanel({
       if (!mentionState) return;
       const before = input.slice(0, mentionState.startIndex);
       const after = input.slice(cursorPos);
-      const newInput = `${before}@${target.name} ${after}`;
+      const newInput = `${before}@${target.handle} ${after}`;
       setInput(newInput);
       setMentionMap((prev) =>
         prev.some((m) => m.id === target.id && m.type === target.type)
@@ -390,7 +390,7 @@ export function ThreadPanel({
       setTimeout(() => {
         const el = textareaRef.current;
         if (el) {
-          const newPos = mentionState.startIndex + target.name.length + 2;
+          const newPos = mentionState.startIndex + target.handle.length + 2;
           el.focus();
           el.setSelectionRange(newPos, newPos);
         }
@@ -488,7 +488,7 @@ export function ThreadPanel({
                 onJumpToSection={onJumpToSection}
                 onPreviewImage={onPreviewImage}
                 debugMode={currentUser?.debugMode ?? false}
-                currentPrincipalId={currentUser?.name.split("/").pop()}
+                currentPrincipalId={currentUser?.handle}
                 // The root is a single message — render its markdown synchronously
                 // so opening the thread doesn't flash as it swaps the raw-text
                 // placeholder for the real markdown a frame later.
@@ -506,7 +506,7 @@ export function ThreadPanel({
             onJumpToSection={onJumpToSection}
             onPreviewImage={onPreviewImage}
             debugMode={currentUser?.debugMode ?? false}
-            currentPrincipalId={currentUser?.name.split("/").pop()}
+            currentPrincipalId={currentUser?.handle}
           />
         </div>
       </div>
@@ -609,7 +609,7 @@ export function ThreadPanel({
                     let m: RegExpExecArray | null;
                     while ((m = re.exec(value)) !== null) {
                       const found = mentionTargets.find(
-                        (t) => t.name === m![1]
+                        (t) => t.handle === m![1]
                       );
                       if (found) newMap.push(found);
                     }

@@ -60,7 +60,7 @@ export interface ChatMessageUI {
   events?: CommandEvent[];
   senderName?: string;
   senderType?: number;
-  // principalId is the decimal principal id of the message's author (the
+  // principalId is the mention handle of the message's author (the
   // {user} segment of a user's "users/{user}" resource name). Used to tell
   // the current user's own messages apart from other users' messages in shared
   // channels; absent on the optimistic placeholder created at send time.

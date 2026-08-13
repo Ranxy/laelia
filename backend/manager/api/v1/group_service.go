@@ -324,11 +324,11 @@ func (s *GroupService) callerCanManage(ctx context.Context, group *store.GroupMe
 // non-deleted user.
 func (s *GroupService) validateGroupMembers(ctx context.Context, payload *storepb.GroupPayload) error {
 	for _, m := range payload.GetMembers() {
-		userID, err := common.GetUserID(m.GetMember())
+		userHandle, err := common.GetUserHandle(m.GetMember())
 		if err != nil {
 			return connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid group member %q", m.GetMember()))
 		}
-		user, err := s.store.GetUserByID(ctx, userID)
+		user, err := s.store.GetUserByHandle(ctx, userHandle)
 		if err != nil {
 			return connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to look up group member %q", m.GetMember()))
 		}
@@ -381,7 +381,7 @@ func isGroupOwner(user *store.UserMessage, group *store.GroupMessage) bool {
 	if user == nil {
 		return false
 	}
-	userName := common.FormatUserUID(user.ID)
+	userName := common.FormatUserHandle(user.Handle)
 	for _, m := range group.Payload.GetMembers() {
 		if m.GetMember() == userName && m.GetRole() == storepb.GroupMember_OWNER {
 			return true

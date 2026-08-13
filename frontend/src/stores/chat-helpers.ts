@@ -36,8 +36,9 @@ export function toUiMessage(msg: ChatMessage): ChatMessageUI {
 
 // isOwnUserMessage reports whether a user-direction message was sent by the
 // current user, so the UI can render it as "You" and distinguish it from other
-// users' messages in shared channels. The current user's principal id is the
-// {user} segment of their "users/{user}" resource name (currentUser.name).
+// users' messages in shared channels. The current user's principal id is their
+// mention handle (currentUser.handle), which is also what the backend surfaces
+// as ChatMessage.principal_id.
 //
 // Either id can be unknown in transient states: the optimistic placeholder a
 // row is built from at send time has no principalId (the committed echo carries
@@ -57,11 +58,11 @@ export function isOwnUserMessage(
 // senderKeyForMessage returns a stable per-sender key for grouping consecutive
 // messages: the UI hides the avatar/header on continuation rows, so the key
 // must distinguish every sender that gets its own identity block. It keys
-// users by principal_id and agents by agent_id so that distinct senders who
-// share a display name are not merged into one block. The optimistic
-// placeholder created at send time carries no principalId, so it falls back to
-// senderName (and then role) — fine, since it is always the current user's and
-// dedups against the committed echo under the same id.
+// users by principal_id (the sender handle) and agents by agent_id so that
+// distinct senders who share a display name are not merged into one block. The
+// optimistic placeholder created at send time carries no principalId, so it
+// falls back to senderName (and then role) — fine, since it is always the
+// current user's and dedups against the committed echo under the same id.
 export function senderKeyForMessage(msg: ChatMessageUI): string {
   if (msg.senderType === SenderType.SYSTEM) return "system";
   if (msg.role === "user")

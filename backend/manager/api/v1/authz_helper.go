@@ -2,7 +2,6 @@ package v1
 
 import (
 	"context"
-	"fmt"
 
 	"connectrpc.com/connect"
 	"github.com/pkg/errors"
@@ -14,12 +13,12 @@ import (
 // callerMemberInfo resolves the caller (user or agent) into the
 // (memberType, memberID) pair used by conversation membership (the
 // conversation IAM policy and its meta index). Agents are members by their
-// resource ID; users by their principal ID. Used by the IAM engine's object
+// resource ID; users by their handle. Used by the IAM engine's object
 // branches and by the remaining owner-of-record handler checks.
 func callerMemberInfo(user *store.UserMessage, agent *store.AgentMessage) (memberType int32, memberID string, ok bool) {
 	switch {
 	case user != nil:
-		return store.MemberTypeUser, fmt.Sprintf("%d", user.ID), true
+		return store.MemberTypeUser, user.Handle, true
 	case agent != nil:
 		return store.MemberTypeAgent, agent.ResourceID, true
 	}

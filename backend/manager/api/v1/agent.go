@@ -253,7 +253,7 @@ func (s *AgentService) ListAgents(ctx context.Context, req *connect.Request[v1pb
 	caller, _ := GetUserFromContext(ctx)
 	canDelete := canDeleteAgentWorkspace(ctx, s.iam, caller)
 	for _, agent := range agents {
-		summary := convertToAgentSummary(agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
+		summary := convertToAgentSummary(ctx, s.store, agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
 		summary.CanDelete = canDelete || isAgentOwner(caller, agent)
 		response.Agents = append(response.Agents, summary)
 	}
@@ -382,20 +382,22 @@ func (s *AgentService) TransferAgentOwnership(ctx context.Context, req *connect.
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a workspace admin can transfer ownership"))
 	}
 
-	newOwnerID, err := common.GetUserID(req.Msg.NewOwner)
+	newOwnerHandle, err := common.GetUserHandle(req.Msg.NewOwner)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid new_owner %q: %v", req.Msg.NewOwner, err))
 	}
-	if newOwnerID == agent.OwnerID {
+	ownerHandle := resolveUserHandle(ctx, s.store, agent.OwnerID)
+	if newOwnerHandle == ownerHandle {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("new_owner is already the agent's owner"))
 	}
-	target, err := s.store.GetUserByID(ctx, newOwnerID)
+	target, err := s.store.GetUserByHandle(ctx, newOwnerHandle)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to look up new owner, error: %v", err))
 	}
 	if target == nil || target.MemberDeleted {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("new owner user %s not found", req.Msg.NewOwner))
 	}
+	newOwnerID := target.ID
 
 	updated, err := s.store.UpdateAgent(ctx, agent, &store.UpdateAgentMessage{OwnerID: &newOwnerID})
 	if err != nil {
@@ -1189,6 +1191,7 @@ func (s *AgentService) convertToAgent(ctx context.Context, agent *store.AgentMes
 
 	result := &v1pb.Agent{
 		Name:                    name,
+		Handle:                  agent.ResourceID,
 		State:                   state,
 		Title:                   agent.Name,
 		Info:                    convertToV1AgentInfo(agent.Info),
@@ -1212,15 +1215,15 @@ func (s *AgentService) convertToAgent(ctx context.Context, agent *store.AgentMes
 		result.LastTokenRotatedAt = timestamppb.New(agent.LastTokenRotatedAt)
 	}
 	if agent.CreatedBy != 0 {
-		// Creator's user resource name (users/{id}); empty for legacy agents.
-		// Display-only — authorization uses Owner.
-		result.CreatedBy = common.FormatUserUID(agent.CreatedBy)
+		// Creator's user resource name (users/{handle}); empty for legacy
+		// agents. Display-only — authorization uses Owner.
+		result.CreatedBy = resolveUserResource(ctx, s.store, agent.CreatedBy)
 	}
 	if agent.OwnerID != 0 {
-		// Owner's user resource name (users/{id}) + display name; empty for
+		// Owner's user resource name (users/{handle}) + display name; empty for
 		// legacy agents. The display name is what the agent's prompt tells it to
-		// write dm:@<owner_name> to for high-risk approvals.
-		result.Owner = common.FormatUserUID(agent.OwnerID)
+		// write dm:@<owner_handle> to for high-risk approvals.
+		result.Owner = resolveUserResource(ctx, s.store, agent.OwnerID)
 		result.OwnerName = resolveUserName(ctx, s.store, agent.OwnerID)
 	}
 	if agent.AvatarS3Key != "" {
@@ -1237,13 +1240,14 @@ func (s *AgentService) convertToAgent(ctx context.Context, agent *store.AgentMes
 // (available_providers, the rest of acp_config, capability, host info, token
 // fields, can_edit) is omitted — it is only returned by GetAgent. See
 // ListAgents for the contract rationale.
-func convertToAgentSummary(agent *store.AgentMessage, connected bool) *v1pb.AgentSummary {
+func convertToAgentSummary(ctx context.Context, s *store.Store, agent *store.AgentMessage, connected bool) *v1pb.AgentSummary {
 	state := v1pb.State_ACTIVE
 	if agent.Deleted {
 		state = v1pb.State_DELETED
 	}
 	summary := &v1pb.AgentSummary{
 		Name:                    common.FormatAgentUID(agent.ResourceID),
+		Handle:                  agent.ResourceID,
 		State:                   state,
 		Title:                   agent.Name,
 		Status:                  convertToV1AgentStatus(agent.Status, agent.Deleted, connected),
@@ -1256,16 +1260,17 @@ func convertToAgentSummary(agent *store.AgentMessage, connected bool) *v1pb.Agen
 		summary.Provider = agent.Info.AcpConfig.Provider
 		summary.Executable = agent.Info.AcpConfig.Executable
 	}
-	// Surface the creator on the summary (users/{id}) so list consumers can show
-	// it without an N+1 of GetAgent. Display-only — authorization uses Owner.
+	// Surface the creator on the summary (users/{handle}) so list consumers can
+	// show it without an N+1 of GetAgent. Display-only — authorization uses
+	// Owner.
 	if agent.CreatedBy != 0 {
-		summary.CreatedBy = common.FormatUserUID(agent.CreatedBy)
+		summary.CreatedBy = resolveUserResource(ctx, s, agent.CreatedBy)
 	}
-	// Surface the owner on the summary (users/{id}) so list consumers (the
+	// Surface the owner on the summary (users/{handle}) so list consumers (the
 	// Members page's per-user "Owned Agents" view and the channel member picker)
 	// can group agents by owner without an N+1 of GetAgent.
 	if agent.OwnerID != 0 {
-		summary.Owner = common.FormatUserUID(agent.OwnerID)
+		summary.Owner = resolveUserResource(ctx, s, agent.OwnerID)
 	}
 	return summary
 }

@@ -49,9 +49,7 @@ export function CommentsAside({
   const sendThreadMessage = useAppStore((s) => s.sendThreadMessage);
   // The {user} segment of the current user's "users/{user}" name is the
   // principal id used to tell their own comments from other users' comments.
-  const currentPrincipalId = useAppStore((s) =>
-    s.currentUser?.name.split("/").pop()
-  );
+  const currentPrincipalId = useAppStore((s) => s.currentUser?.handle);
   // Per-user chat keybinding (see chat-conversation.tsx for rationale).
   const enterToSend = useAppStore(
     (s) => s.currentUser?.chatPreferences?.enterToSend ?? true

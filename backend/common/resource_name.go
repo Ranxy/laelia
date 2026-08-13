@@ -3,7 +3,6 @@ package common
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -26,22 +25,14 @@ const (
 	McpServerNamePrefix        = "mcpServers/"
 )
 
-// GetUserID returns the user ID from a resource name.
-func GetUserID(name string) (int, error) {
-	return GetUIDFromName(name, UserNamePrefix)
-}
-
-// GetUIDFromName returns the UID from a resource name.
-func GetUIDFromName(name, prefix string) (int, error) {
-	tokens, err := GetNameParentTokens(name, prefix)
+// GetUserHandle returns the user handle (or email alias) token from a
+// users/{user} resource name, e.g. "ran-user-1" from "users/ran-user-1".
+func GetUserHandle(name string) (string, error) {
+	tokens, err := GetNameParentTokens(name, UserNamePrefix)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
-	uid, err := strconv.Atoi(tokens[0])
-	if err != nil {
-		return 0, errors.Errorf("invalid ID %q", tokens[0])
-	}
-	return uid, nil
+	return tokens[0], nil
 }
 
 // GetUserEmail returns the user email from a resource name.
@@ -139,27 +130,30 @@ func FormatUserEmail(email string) string {
 	return fmt.Sprintf("%s%s", UserNamePrefix, email)
 }
 
-func FormatUserUID(uid int) string {
-	return fmt.Sprintf("%s%d", UserNamePrefix, uid)
+// FormatUserHandle returns the users/{handle} resource name for the given
+// user handle, e.g. FormatUserHandle("ran-user-1") == "users/ran-user-1".
+func FormatUserHandle(handle string) string {
+	return fmt.Sprintf("%s%s", UserNamePrefix, handle)
 }
 
 // avatarNameSuffix is the trailing segment that turns a user resource name into
 // its avatar resource name: users/{id}/avatar.
 const avatarNameSuffix = "/avatar"
 
-// FormatUserAvatar returns the avatar resource name for a user: users/{id}/avatar.
-func FormatUserAvatar(uid int) string {
-	return fmt.Sprintf("%s%d%s", UserNamePrefix, uid, avatarNameSuffix)
+// FormatUserAvatar returns the avatar resource name for a user:
+// users/{handle}/avatar.
+func FormatUserAvatar(handle string) string {
+	return fmt.Sprintf("%s%s%s", UserNamePrefix, handle, avatarNameSuffix)
 }
 
-// ParseUserAvatarName parses an avatar resource name (users/{id}/avatar) and
-// returns the user id.
-func ParseUserAvatarName(name string) (int, error) {
+// ParseUserAvatarName parses an avatar resource name (users/{handle}/avatar)
+// and returns the user handle.
+func ParseUserAvatarName(name string) (string, error) {
 	trimmed, err := TrimSuffix(name, avatarNameSuffix)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
-	return GetUserID(trimmed)
+	return GetUserHandle(trimmed)
 }
 
 // FormatAgentAvatar returns the avatar resource name for an agent:

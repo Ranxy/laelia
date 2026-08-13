@@ -23,10 +23,15 @@ const (
 )
 
 type ChatMessage struct {
-	ID              uuid.UUID
-	ConversationID  uuid.UUID
-	PrincipalID     int
-	PrincipalName   string
+	ID             uuid.UUID
+	ConversationID uuid.UUID
+	PrincipalID    int
+	PrincipalName  string
+	// PrincipalHandle is the author's mention handle (principal.handle), joined
+	// by the read queries and set by the write paths. It is what the API
+	// surfaces as ChatMessage.principal_id so the client can compare against
+	// the current user's handle. Empty for system messages.
+	PrincipalHandle string
 	SenderAgentID   sql.NullInt32
 	AgentResourceID string
 	AgentName       string
@@ -72,7 +77,7 @@ func scanChatMessageRow(row interface {
 		&msg.ID, &msg.ConversationID, &msg.PrincipalID, &msg.PrincipalName,
 		&msg.SenderAgentID, &msg.AgentResourceID, &msg.AgentName,
 		&msg.Role, &msg.Content, &msg.CommandID, &msg.CreatedAt, &msg.RoomVersion, &msg.SenderType,
-		&mentionsBytes, &attachmentsBytes, &msg.ThreadRootMessageID,
+		&mentionsBytes, &attachmentsBytes, &msg.ThreadRootMessageID, &msg.PrincipalHandle,
 	); err != nil {
 		return nil, errors.Wrapf(err, "failed to scan chat message")
 	}
@@ -95,7 +100,7 @@ func scanChatMessageRow(row interface {
 
 const chatMessageColumns = `cm.id, cm.conversation_id, cm.principal_id, COALESCE(p.name, ''),
        cm.sender_agent_id, COALESCE(a.resource_id, ''), COALESCE(a.name, ''),
-       cm.role, cm.content, cm.command_id, cm.created_at, cm.room_version, cm.sender_type, cm.mentions, cm.attachments, cm.thread_root_message_id`
+       cm.role, cm.content, cm.command_id, cm.created_at, cm.room_version, cm.sender_type, cm.mentions, cm.attachments, cm.thread_root_message_id, COALESCE(p.handle, '')`
 
 func (s *Store) CreateChatMessage(ctx context.Context, msg *ChatMessage) (*ChatMessage, error) {
 	var id uuid.UUID
@@ -124,6 +129,7 @@ func (s *Store) CreateChatMessage(ctx context.Context, msg *ChatMessage) (*ChatM
 		ConversationID:      msg.ConversationID,
 		PrincipalID:         msg.PrincipalID,
 		PrincipalName:       msg.PrincipalName,
+		PrincipalHandle:     msg.PrincipalHandle,
 		SenderAgentID:       msg.SenderAgentID,
 		AgentResourceID:     msg.AgentResourceID,
 		Role:                msg.Role,
@@ -198,6 +204,7 @@ func (s *Store) CreateChatMessageBumpVersion(ctx context.Context, msg *ChatMessa
 		ConversationID:      msg.ConversationID,
 		PrincipalID:         msg.PrincipalID,
 		PrincipalName:       msg.PrincipalName,
+		PrincipalHandle:     msg.PrincipalHandle,
 		SenderAgentID:       msg.SenderAgentID,
 		AgentResourceID:     msg.AgentResourceID,
 		Role:                msg.Role,

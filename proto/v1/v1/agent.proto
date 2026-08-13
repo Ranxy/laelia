@@ -550,6 +550,13 @@ message Agent {
   };
 
   string name = 1;
+  // handle is the agent's human-readable, unique mention id (e.g.
+  // "rei-agent-1"), generated at creation and immutable thereafter. It is the
+  // {agent} segment of name ("agents/{handle}"), the value an agent types after
+  // "@" to mention or DM this agent, and the name of its workspace directory
+  // (~/.laelia/<machine>/<handle>/). Always populated; mirror of
+  // agent.resource_id.
+  string handle = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
   State state = 2;
   string title = 3;
   // Token field removed: tokens are no longer returned in API responses.
@@ -644,6 +651,9 @@ message Agent {
 // delete server-side while the list hides the button).
 message AgentSummary {
   string name = 1;
+  // handle is the agent's readable id ("rei-agent-1"), the {agent} segment of
+  // name. See Agent.handle. Always populated.
+  string handle = 14;
   State state = 2;
   string title = 3;
   AgentStatus status = 4;

@@ -213,8 +213,14 @@ message User {
   };
 
   // The name of the user.
-  // Format: users/{user}. {user} is a system-generated unique ID.
+  // Format: users/{user}. {user} is the user's readable handle (e.g.
+  // "ran-user-1"), generated at creation and immutable thereafter.
   string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // handle is the user's human-readable, unique mention id (e.g. "ran-user-1"),
+  // the {user} segment of name ("users/{handle}") and the value typed after "@"
+  // to mention or DM this user. Always populated; mirror of principal.handle.
+  string handle = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   State state = 2;
 

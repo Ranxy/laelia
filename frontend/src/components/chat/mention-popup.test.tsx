@@ -11,9 +11,9 @@ import type { MentionTarget } from "@/composables/useMentionTargets";
 import { MentionPopup } from "./mention-popup";
 
 const targets: MentionTarget[] = [
-  { type: "user", id: "u1", name: "alice" },
-  { type: "agent", id: "a1", name: "bot" },
-  { type: "user", id: "u2", name: "bob" },
+  { type: "user", id: "alice-user-1", handle: "alice-user-1", name: "Alice" },
+  { type: "agent", id: "bot-agent-1", handle: "bot-agent-1", name: "Bot" },
+  { type: "user", id: "bob-user-2", handle: "bob-user-2", name: "Bob" },
 ];
 
 describe("MentionPopup a11y", () => {

@@ -157,6 +157,7 @@ func (s *Store) ListUserThreadParticipants(ctx context.Context, rootID uuid.UUID
 type ThreadSender struct {
 	SenderType  int32
 	PrincipalID int
+	Handle      string // user mention handle, empty for agent senders
 	AgentID     sql.NullInt32
 }
 
@@ -167,12 +168,13 @@ type ThreadSender struct {
 // membership table.
 func (s *Store) ListThreadSenders(ctx context.Context, conversationID, rootID uuid.UUID) ([]ThreadSender, error) {
 	rows, err := s.GetDB().QueryContext(ctx, `
-		SELECT DISTINCT sender_type, principal_id, sender_agent_id
-		FROM chat_message
-		WHERE conversation_id = $2
-		  AND (id = $1 OR thread_root_message_id = $1)
-		  AND sender_type IN ($3, $4)
-		ORDER BY sender_type, principal_id, sender_agent_id
+		SELECT DISTINCT m.sender_type, m.principal_id, COALESCE(p.handle, ''), m.sender_agent_id
+		FROM chat_message m
+		LEFT JOIN principal p ON p.id = m.principal_id
+		WHERE m.conversation_id = $2
+		  AND (m.id = $1 OR m.thread_root_message_id = $1)
+		  AND m.sender_type IN ($3, $4)
+		ORDER BY m.sender_type, m.principal_id, m.sender_agent_id
 	`, rootID, conversationID, SenderTypeUser, SenderTypeAgent)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to list thread senders")
@@ -181,7 +183,7 @@ func (s *Store) ListThreadSenders(ctx context.Context, conversationID, rootID uu
 	var senders []ThreadSender
 	for rows.Next() {
 		var ts ThreadSender
-		if err := rows.Scan(&ts.SenderType, &ts.PrincipalID, &ts.AgentID); err != nil {
+		if err := rows.Scan(&ts.SenderType, &ts.PrincipalID, &ts.Handle, &ts.AgentID); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan thread sender")
 		}
 		senders = append(senders, ts)

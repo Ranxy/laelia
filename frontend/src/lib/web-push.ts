@@ -1,4 +1,5 @@
 import { notificationServiceClient } from "@/connect";
+import { useAppStore } from "@/stores";
 
 // Web Push device state is derived entirely from the server: a browser is
 // "subscribed" when its current PushSubscription endpoint appears in the
@@ -129,9 +130,10 @@ export async function disableDesktopNotifications(): Promise<void> {
   const sub = await reg.pushManager.getSubscription();
   if (!sub) return;
   const endpoint = sub.endpoint;
+  const handle = useAppStore.getState().currentUser?.handle ?? "";
   try {
     await notificationServiceClient.deletePushSubscription({
-      name: subscriptionName(endpoint),
+      name: subscriptionName(handle, endpoint),
     });
   } catch {
     // ignore — stale row cleaned by the 404/410 path on the next push attempt.
@@ -143,13 +145,13 @@ export async function disableDesktopNotifications(): Promise<void> {
   }
 }
 
-// subscriptionName builds "users/0/pushSubscriptions/{endpointKey}". The
-// server scopes the delete to the authenticated caller regardless of the
+// subscriptionName builds "users/{handle}/pushSubscriptions/{endpointKey}".
+// The server scopes the delete to the authenticated caller regardless of the
 // {user} segment (it is decorative — the caller is the only owner), so the
-// client does not need to know its own principal id. Only the endpointKey
-// (url-safe base64 of the endpoint) is used to identify the subscription.
-export function subscriptionName(endpoint: string): string {
-  return `users/0/pushSubscriptions/${endpointKey(endpoint)}`;
+// handle is only used for name consistency. Only the endpointKey (url-safe
+// base64 of the endpoint) is used to identify the subscription.
+export function subscriptionName(handle: string, endpoint: string): string {
+  return `users/${handle}/pushSubscriptions/${endpointKey(endpoint)}`;
 }
 
 function endpointKey(endpoint: string): string {

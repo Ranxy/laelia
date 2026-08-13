@@ -24,7 +24,7 @@ func validateIAMBinding(binding *storepb.Binding) bool {
 }
 
 // GetUsersByMember gets user messages by member.
-// The member should in users/{uid} or groups/{email} format.
+// The member should be in users/{handle} or groups/{email} format.
 func GetUsersByMember(ctx context.Context, stores *store.Store, member string) []*store.UserMessage {
 	var users []*store.UserMessage
 	if strings.HasPrefix(member, common.UserNamePrefix) {
@@ -53,14 +53,15 @@ func GetUsersByMember(ctx context.Context, stores *store.Store, member string) [
 }
 
 // getUserByIdentifier gets user message by identifier.
-// The identifier should in users/{uid} format.
+// The identifier should be a users/{handle} resource name (the users/{email}
+// SCIM alias is also accepted).
 func getUserByIdentifier(ctx context.Context, stores *store.Store, identifier string) *store.UserMessage {
-	userUID, err := common.GetUserID(identifier)
+	token, err := common.GetUserHandle(identifier)
 	if err != nil {
-		slog.Error("failed to parse user id", slog.String("user", identifier), log.WithError(err))
+		slog.Error("failed to parse user name", slog.String("user", identifier), log.WithError(err))
 		return nil
 	}
-	user, err := stores.GetUserByID(ctx, userUID)
+	user, err := stores.GetUserByIdentifier(ctx, token)
 	if err != nil {
 		slog.Error("failed to get user", slog.String("user", identifier), log.WithError(err))
 		return nil
@@ -77,7 +78,7 @@ func GetUserIAMPolicyBindings(ctx context.Context, stores *store.Store, user *st
 
 // GetCallerIAMPolicyBindings returns the valid bindings for the caller, which
 // may be a user OR an agent. It is the agent-aware sibling of
-// GetUserIAMPolicyBindings: a user caller matches users/{uid} members (and
+// GetUserIAMPolicyBindings: a user caller matches users/{handle} members (and
 // group-expanded members, and allUsers); an agent caller matches agents/{rid}
 // members (and allUsers). Group expansion only applies to users (groups contain
 // users, never agents). Returns nil when neither a user nor an agent is supplied.
@@ -107,7 +108,7 @@ func GetCallerIAMPolicyBindings(ctx context.Context, stores *store.Store, user *
 func callerPrincipalName(user *store.UserMessage, agent *store.AgentMessage) (string, bool) {
 	switch {
 	case user != nil:
-		return common.FormatUserUID(user.ID), true
+		return common.FormatUserHandle(user.Handle), true
 	case agent != nil:
 		return common.FormatAgentUID(agent.ResourceID), false
 	default:
@@ -137,7 +138,7 @@ func bindingContainsCaller(ctx context.Context, stores *store.Store, binding *st
 }
 
 // MemberContainsUser checks if a member (user or group) contains the specified user.
-// The member should be in users/{uid} or groups/{email} format.
+// The member should be in users/{handle} or groups/{email} format.
 func MemberContainsUser(ctx context.Context, stores *store.Store, member string, user *store.UserMessage) bool {
 	if member == common.AllUsers {
 		return true
@@ -145,12 +146,12 @@ func MemberContainsUser(ctx context.Context, stores *store.Store, member string,
 
 	// Check if member is a user
 	if strings.HasPrefix(member, common.UserNamePrefix) {
-		memberUID, err := common.GetUserID(member)
+		memberHandle, err := common.GetUserHandle(member)
 		if err != nil {
-			slog.Error("failed to parse user id", slog.String("member", member), log.WithError(err))
+			slog.Error("failed to parse user handle", slog.String("member", member), log.WithError(err))
 			return false
 		}
-		return memberUID == user.ID
+		return memberHandle == user.Handle
 	}
 
 	// Check if member is a group
@@ -164,9 +165,9 @@ func MemberContainsUser(ctx context.Context, stores *store.Store, member string,
 			slog.Error("cannot find group", slog.String("group", member))
 			return false
 		}
-		userIDFullName := common.FormatUserUID(user.ID)
+		userFullName := common.FormatUserHandle(user.Handle)
 		for _, groupMember := range group.Payload.Members {
-			if userIDFullName == groupMember.Member {
+			if userFullName == groupMember.Member {
 				return true
 			}
 		}

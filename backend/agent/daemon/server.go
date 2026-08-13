@@ -420,7 +420,7 @@ func agentResourceName(agentBareID string) string {
 }
 
 // bareAgentID strips the agents/ prefix from an agent resource name, returning
-// the bare uuid used to namespace the agent's on-disk state.
+// the bare handle used to namespace the agent's on-disk state.
 func bareAgentID(agent string) string {
 	return strings.TrimPrefix(agent, "agents/")
 }

@@ -68,7 +68,7 @@ func (s *APIProviderService) GetAPIProvider(ctx context.Context, req *connect.Re
 	if provider == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("api provider %q not found", req.Msg.Name))
 	}
-	return connect.NewResponse(convertToV1APIProvider(provider)), nil
+	return connect.NewResponse(s.convertToV1APIProvider(ctx, provider)), nil
 }
 
 // ListAPIProviders lists providers. It is handler-gated (no IAM annotation): a
@@ -95,7 +95,7 @@ func (s *APIProviderService) ListAPIProviders(ctx context.Context, _ *connect.Re
 		if !ok {
 			continue
 		}
-		response.ApiProviders = append(response.ApiProviders, convertToV1APIProvider(p))
+		response.ApiProviders = append(response.ApiProviders, s.convertToV1APIProvider(ctx, p))
 	}
 	return connect.NewResponse(response), nil
 }
@@ -138,7 +138,7 @@ func (s *APIProviderService) CreateAPIProvider(ctx context.Context, req *connect
 	}
 
 	recordAPIProviderChange(ctx, common.FormatAPIProviderUID(created.ResourceID), entryNames(created.Entries), nil)
-	return connect.NewResponse(convertToV1APIProvider(created)), nil
+	return connect.NewResponse(s.convertToV1APIProvider(ctx, created)), nil
 }
 
 // UpdateAPIProvider replaces the provider's mutable fields and its entries and
@@ -192,7 +192,7 @@ func (s *APIProviderService) UpdateAPIProvider(ctx context.Context, req *connect
 	}
 
 	recordAPIProviderChange(ctx, in.Name, entryNames(updated.Entries), removedEntryNames(current, entries))
-	return connect.NewResponse(convertToV1APIProvider(updated)), nil
+	return connect.NewResponse(s.convertToV1APIProvider(ctx, updated)), nil
 }
 
 // DeleteAPIProvider deletes a provider. Providers still referenced by an agent
@@ -252,7 +252,7 @@ func (*APIProviderService) ListAPIProviderModels(ctx context.Context, req *conne
 // canUseAPIProvider reports whether the caller may use a provider: a caller
 // holding laelia.apiProviders.list (workspace admin or an authorized manager)
 // may use any provider; otherwise the caller must be a member of the provider's
-// member list (users/{uid}, groups/{email|id}, or allUsers), expanded
+// member list (users/{handle}, groups/{email|id}, or allUsers), expanded
 // single-level like the IAM engine. Shared by the provider list and the agent
 // config validation.
 func canUseAPIProvider(ctx context.Context, iamChecker *iam.Manager, stores *store.Store, user *store.UserMessage, provider *store.APIProviderMessage) (bool, error) {
@@ -433,7 +433,7 @@ func validateAPIProviderUpdateMask(paths []string) error {
 
 // convertToV1APIProvider converts a stored provider to the v1 view. Api keys are
 // masked; the key itself never crosses the API.
-func convertToV1APIProvider(p *store.APIProviderMessage) *v1pb.ApiProvider {
+func (s *APIProviderService) convertToV1APIProvider(ctx context.Context, p *store.APIProviderMessage) *v1pb.ApiProvider {
 	out := &v1pb.ApiProvider{
 		Name:         common.FormatAPIProviderUID(p.ResourceID),
 		ProviderType: p.ProviderType,
@@ -442,7 +442,7 @@ func convertToV1APIProvider(p *store.APIProviderMessage) *v1pb.ApiProvider {
 		Description:  p.Description,
 		CreatedAt:    timestamppb.New(p.CreatedAt),
 		UpdatedAt:    timestamppb.New(p.UpdatedAt),
-		CreatedBy:    common.FormatUserUID(p.CreatedBy),
+		CreatedBy:    resolveUserResource(ctx, s.store, p.CreatedBy),
 	}
 	for _, e := range p.Entries {
 		out.Entries = append(out.Entries, &v1pb.ApiProviderEntry{

@@ -54,9 +54,7 @@ export function ChannelDetailPage() {
     myChannels.find((c) => c.name === conversationName) ?? null;
   const conv = channel ?? rosterChannel;
   const isOwner =
-    !!conv &&
-    !!currentUser?.name &&
-    conv.ownerId === currentUser.name.split("/").pop();
+    !!conv && !!currentUser?.handle && conv.ownerId === currentUser.handle;
 
   const [startingChat, setStartingChat] = useState(false);
 

@@ -19,16 +19,18 @@ import (
 )
 
 var systemBotUser = &UserMessage{
-	ID:    common.SystemBotID,
-	Name:  "SYSTEM_BOT",
-	Email: "SYSTEM_BOT@example.com",
-	Type:  models.PrincipalType_SYSTEM_BOT,
+	ID:     common.SystemBotID,
+	Handle: common.SystemBotHandle,
+	Name:   "SYSTEM_BOT",
+	Email:  "SYSTEM_BOT@example.com",
+	Type:   models.PrincipalType_SYSTEM_BOT,
 }
 
 // FindUserMessage is the message for finding users.
 type FindUserMessage struct {
 	ID          *int
 	Email       *string
+	Handle      *string
 	ShowDeleted bool
 	// ExcludeSystemBot hides the internal SYSTEM_BOT account (id=1). Only the
 	// user-service API sets it (unless the caller opts in); store-internal
@@ -61,6 +63,10 @@ type UpdateUserMessage struct {
 // UserMessage is the message for an user.
 type UserMessage struct {
 	ID int
+	// Handle is the user's human-readable, unique mention id ("ran-user-1"),
+	// generated at creation and immutable thereafter. The {user} segment of the
+	// users/{handle} resource name and the value typed after "@" to mention/DM.
+	Handle string
 	// Email must be lower case.
 	Email         string
 	Name          string
@@ -96,13 +102,18 @@ type UserMessage struct {
 // GetResourceID returns the stable per-user resource name used to key
 // context-derived identifiers such as per-user rate-limit buckets.
 func (m *UserMessage) GetResourceID() string {
-	return common.FormatUserUID(m.ID)
+	return common.FormatUserHandle(m.Handle)
 }
 
 type UserStat struct {
 	Type    models.PrincipalType
 	Deleted bool
 	Count   int
+}
+
+// queryRower abstracts *sql.DB and *sql.Tx for handle reservation.
+type queryRower interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 // GetSystemBotUser gets the system bot.
@@ -124,16 +135,20 @@ func (s *Store) GetSystemBotUser(ctx context.Context) *UserMessage {
 // deleted=FALSE), and callers must see MemberDeleted=true for deleted users,
 // which requires a fresh DB read rather than a stale cached active copy.
 func (s *Store) cacheActiveUser(user *UserMessage) {
-	if user == nil || user.MemberDeleted {
+	if user == nil || user.MemberDeleted || user.Handle == "" {
 		return
 	}
 	s.userIDCache.Add(user.ID, user)
 	s.userEmailCache.Add(user.Email, user)
+	s.userHandleCache.Add(user.Handle, user)
 }
 
 // invalidateUserCache evicts a user from both caches by its previous id/email,
 // used on delete/restore/email-change so the next lookup re-reads from the DB.
 func (s *Store) invalidateUserCache(id int, email string) {
+	if cached, ok := s.userIDCache.Get(id); ok {
+		s.userHandleCache.Remove(cached.Handle)
+	}
 	s.userIDCache.Remove(id)
 	s.userEmailCache.Remove(email)
 }
@@ -203,40 +218,34 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (*UserMessage,
 	return user, nil
 }
 
-// FindUsersByName returns active END_USER principals whose display name matches
-// `name` exactly. principal.name is not unique, so this returns a slice: the
-// caller (the "dm:@<peer>" address resolver) treats 0 matches as NOT_FOUND and
-// >1 as ambiguous. Only non-deleted end users are considered; system bots and
-// service accounts are excluded so they cannot be addressed as a DM peer.
-func (s *Store) FindUsersByName(ctx context.Context, name string) ([]*UserMessage, error) {
-	rows, err := s.GetDB().QueryContext(ctx, `
-		SELECT id, name, email, type, password_hash, deleted, description, phone, created_at, avatar_s3_key, email_verified_at
-		FROM principal
-		WHERE type = 'END_USER' AND deleted = FALSE AND name = $1
-		ORDER BY id ASC
-		LIMIT 5`, name)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to find users by name")
+// GetUserByHandle gets the user by handle ("ran-user-1"). A cache hit returns
+// the active cached copy; a miss falls back to a point query (not a full-table
+// load), which resolves soft-deleted users with MemberDeleted=true but does not
+// cache them.
+func (s *Store) GetUserByHandle(ctx context.Context, handle string) (*UserMessage, error) {
+	if v, ok := s.userHandleCache.Get(handle); ok && s.enableCache {
+		return v, nil
 	}
-	defer rows.Close()
 
-	var users []*UserMessage
-	for rows.Next() {
-		var u UserMessage
-		var t string
-		var emailVerifiedAt sql.NullTime
-		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &t, &u.PasswordHash, &u.MemberDeleted, &u.Description, &u.Phone, &u.CreatedAt, &u.AvatarS3Key, &emailVerifiedAt); err != nil {
-			return nil, errors.Wrap(err, "failed to scan user by name")
-		}
-		if emailVerifiedAt.Valid {
-			u.EmailVerifiedAt = &emailVerifiedAt.Time
-		}
-		users = append(users, &u)
+	user, err := s.findUser(ctx, &FindUserMessage{Handle: &handle, ShowDeleted: true})
+	if err != nil {
+		return nil, err
 	}
-	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "failed to iterate users by name")
+	if user == nil {
+		return nil, nil
 	}
-	return users, nil
+	s.cacheActiveUser(user)
+	return user, nil
+}
+
+// GetUserByIdentifier resolves a users/{identifier} token — a handle when the
+// token contains no '@', an email otherwise (the users/{email} SCIM lookup
+// alias). Returns nil when no principal carries that identifier.
+func (s *Store) GetUserByIdentifier(ctx context.Context, identifier string) (*UserMessage, error) {
+	if strings.Contains(identifier, "@") {
+		return s.GetUserByEmail(ctx, identifier)
+	}
+	return s.GetUserByHandle(ctx, identifier)
 }
 
 func (s *Store) StatUsers(ctx context.Context) ([]*UserStat, error) {
@@ -315,6 +324,9 @@ func buildListUsersQuery(find *FindUserMessage) (string, []any) {
 	if v := find.ID; v != nil {
 		where, args = append(where, fmt.Sprintf("principal.id = $%d", len(args)+1)), append(args, *v)
 	}
+	if v := find.Handle; v != nil {
+		where, args = append(where, fmt.Sprintf("principal.handle = $%d", len(args)+1)), append(args, *v)
+	}
 	if v := find.Email; v != nil {
 		if *v == common.AllUsers {
 			where, args = append(where, fmt.Sprintf("principal.email = $%d", len(args)+1)), append(args, *v)
@@ -358,7 +370,7 @@ func buildListUsersQuery(find *FindUserMessage) (string, []any) {
 	}
 
 	// Join the user_group table to find groups for each user.
-	// The user will be stored in the user_group.payload.members.member field, the member is in the "users/{id}" format
+	// The user will be stored in the user_group.payload.members.member field, the member is in the "users/{handle}" format
 	if strings.HasPrefix(with, "WITH") {
 		with += ","
 	} else {
@@ -386,6 +398,7 @@ func buildListUsersQuery(find *FindUserMessage) (string, []any) {
 		principal.deleted,
 		principal.email,
 		principal.name,
+		principal.handle,
 		principal.type,
 		principal.password_hash,
 		principal.phone,
@@ -430,6 +443,7 @@ func listUserImpl(ctx context.Context, txn *sql.Tx, find *FindUserMessage) ([]*U
 			&userMessage.MemberDeleted,
 			&userMessage.Email,
 			&userMessage.Name,
+			&userMessage.Handle,
 			&typeString,
 			&userMessage.PasswordHash,
 			&userMessage.Phone,
@@ -476,19 +490,17 @@ func listUserImpl(ctx context.Context, txn *sql.Tx, find *FindUserMessage) ([]*U
 	return userMessages, nil
 }
 
-// CreateUser creates an user.
+// CreateUser creates an user with a freshly generated, immutable handle
+// ("ran-user-1"): the slugified display name plus a per-slug counter. A
+// concurrent creation of a same-slug user is detected via the unique handle
+// index and retried with the next free number. The SYSTEM_BOT principal is
+// the sole exception and always gets the reserved "system-bot" handle.
 func (s *Store) CreateUser(ctx context.Context, create *UserMessage) (*UserMessage, error) {
 	// Double check the passing-in emails.
 	// We use lower-case for emails.
 	if create.Email != strings.ToLower(create.Email) {
 		return nil, errors.Errorf("emails must be lower-case when they are passed into store")
 	}
-
-	tx, err := s.GetDB().BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
 
 	if create.Profile == nil {
 		create.Profile = &models.UserProfile{}
@@ -498,47 +510,112 @@ func (s *Store) CreateUser(ctx context.Context, create *UserMessage) (*UserMessa
 		return nil, err
 	}
 
-	set := []string{"email", "name", "type", "password_hash", "phone", "profile", "description", "email_verified_at"}
-	args := []any{create.Email, create.Name, create.Type.String(), create.PasswordHash, create.Phone, profileBytes, create.Description, create.EmailVerifiedAt}
-	placeholder := []string{}
-	for index := range set {
-		placeholder = append(placeholder, fmt.Sprintf("$%d", index+1))
+	slug := common.SlugifyHandle(create.Name)
+	if slug == "" {
+		slug = "user"
 	}
 
-	var userID int
-	if err := tx.QueryRowContext(ctx, fmt.Sprintf(`
-			INSERT INTO principal (
-				%s
-			)
-			VALUES (%s)
-			RETURNING id, created_at
-		`, strings.Join(set, ","), strings.Join(placeholder, ",")),
-		args...,
-	).Scan(&userID, &create.CreatedAt); err != nil {
-		if isUniqueViolation(err) {
-			return nil, errors.Errorf("user with email %q already exists", create.Email)
+	for attempt := 0; attempt < 32; attempt++ {
+		handle := common.SystemBotHandle
+		if create.Type != models.PrincipalType_SYSTEM_BOT {
+			handle, err = s.reserveHandle(ctx, s.GetDB(), "principal", "handle", slug, common.HandleKindUser)
+			if err != nil {
+				return nil, err
+			}
 		}
-		return nil, err
-	}
 
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
+		tx, err := s.GetDB().BeginTx(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
 
-	user := &UserMessage{
-		ID:              userID,
-		Email:           create.Email,
-		Name:            create.Name,
-		Type:            create.Type,
-		PasswordHash:    create.PasswordHash,
-		Phone:           create.Phone,
-		CreatedAt:       create.CreatedAt,
-		Profile:         create.Profile,
-		Description:     create.Description,
-		EmailVerifiedAt: create.EmailVerifiedAt,
+		var userID int
+		err = tx.QueryRowContext(ctx, `
+			INSERT INTO principal (
+				handle, email, name, type, password_hash, phone, profile, description, email_verified_at
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			ON CONFLICT (handle) DO NOTHING
+			RETURNING id, created_at
+		`,
+			handle,
+			create.Email,
+			create.Name,
+			create.Type.String(),
+			create.PasswordHash,
+			create.Phone,
+			profileBytes,
+			create.Description,
+			create.EmailVerifiedAt,
+		).Scan(&userID, &create.CreatedAt)
+		if err == sql.ErrNoRows {
+			// A concurrent creation claimed the same handle; roll back and retry
+			// with the next free number.
+			if rbErr := tx.Rollback(); rbErr != nil {
+				return nil, errors.Wrap(rbErr, "failed to rollback handle collision")
+			}
+			continue
+		}
+		if err != nil {
+			_ = tx.Rollback()
+			if isUniqueViolation(err) {
+				return nil, errors.Errorf("user with email %q already exists", create.Email)
+			}
+			return nil, err
+		}
+
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+
+		user := &UserMessage{
+			ID:              userID,
+			Handle:          handle,
+			Email:           create.Email,
+			Name:            create.Name,
+			Type:            create.Type,
+			PasswordHash:    create.PasswordHash,
+			Phone:           create.Phone,
+			CreatedAt:       create.CreatedAt,
+			Profile:         create.Profile,
+			Description:     create.Description,
+			EmailVerifiedAt: create.EmailVerifiedAt,
+		}
+		s.cacheActiveUser(user)
+		return user, nil
 	}
-	s.cacheActiveUser(user)
-	return user, nil
+	return nil, errors.New("failed to allocate a unique user handle after 32 attempts")
+}
+
+// reserveHandle returns the next free "slug-kind-N" handle for the given
+// table/column by counting existing handles with the same slug prefix, then
+// verifying the candidate is still free. The count and the verification run in
+// the caller's transaction; a concurrent creation that lands between them is
+// caught by the unique index at INSERT time and retried by the caller.
+func (*Store) reserveHandle(ctx context.Context, q queryRower, table, column, slug, kind string) (string, error) {
+	prefix := likeEscape(slug) + "-" + kind + "-%"
+	for i := 0; i < 32; i++ {
+		var n int
+		if err := q.QueryRowContext(ctx, fmt.Sprintf("SELECT count(*) FROM %s WHERE %s LIKE $1 ESCAPE '\\'", table, column), prefix).Scan(&n); err != nil {
+			return "", err
+		}
+		handle := common.FormatHandle(slug, kind, n+1)
+		var one int
+		err := q.QueryRowContext(ctx, fmt.Sprintf("SELECT 1 FROM %s WHERE %s = $1", table, column), handle).Scan(&one)
+		switch {
+		case err == sql.ErrNoRows:
+			return handle, nil
+		case err != nil:
+			return "", err
+		}
+	}
+	return "", errors.Errorf("failed to reserve %s handle for slug %q after 32 attempts", kind, slug)
+}
+
+// likeEscape escapes LIKE wildcards so a slug is matched literally.
+func likeEscape(s string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return r.Replace(s)
 }
 
 // UpdateUser updates a user.

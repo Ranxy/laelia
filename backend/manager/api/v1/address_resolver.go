@@ -61,44 +61,41 @@ func (s *CommandService) ResolveChannelByTitle(ctx context.Context, req *connect
 
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 	ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
+	ownerHandle := resolveUserHandle(ctx, s.store, conv.OwnerID)
 	return connect.NewResponse(&v1pb.ResolveChannelByTitleResponse{
-		Conversation: convertToV1Conversation(conv, ownerName, "", "", memberCount, 0, conv.Title, 0),
+		Conversation: convertToV1Conversation(conv, ownerName, ownerHandle, "", "", memberCount, 0, conv.Title, 0),
 	}), nil
 }
 
 // GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent
-// and a named end user. The peer is resolved by principal display name; an
-// ambiguous (non-unique) or unknown name fails. Agent-callable twin of the
-// user-only GetOrCreateConversation. Powers the "dm:@<user>" address resolver.
+// and a named end user. The peer is resolved by mention handle; an unknown
+// handle fails. Agent-callable twin of the user-only GetOrCreateConversation.
+// Powers the "dm:@<user>" address resolver.
 func (s *CommandService) GetOrCreateUserDM(ctx context.Context, req *connect.Request[v1pb.GetOrCreateUserDMRequest]) (*connect.Response[v1pb.GetOrCreateUserDMResponse], error) {
 	agent, err := requireCallingAgent(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if req.Msg.PeerUserName == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("peer_user_name must not be empty"))
+	if req.Msg.PeerUserHandle == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("peer_user_handle must not be empty"))
 	}
 
-	users, err := s.store.FindUsersByName(ctx, req.Msg.PeerUserName)
+	peer, err := s.store.GetUserByHandle(ctx, req.Msg.PeerUserHandle)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve peer user"))
 	}
-	switch len(users) {
-	case 0:
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %q not found", req.Msg.PeerUserName))
-	case 1:
-	default:
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Errorf("user name %q is ambiguous; address by a unique name", req.Msg.PeerUserName))
+	if peer == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %q not found", req.Msg.PeerUserHandle))
 	}
 
-	conv, err := s.store.GetOrCreateDirectConversation(ctx, agent.ID, users[0].ID)
+	conv, err := s.store.GetOrCreateDirectConversation(ctx, agent.ID, peer.ID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get or create user DM"))
 	}
 
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 	return connect.NewResponse(&v1pb.GetOrCreateUserDMResponse{
-		Conversation: convertToV1Conversation(conv, users[0].Name, users[0].Name, common.FormatUserUID(users[0].ID), memberCount, 0, users[0].Name, 0),
+		Conversation: convertToV1Conversation(conv, peer.Name, peer.Handle, peer.Handle, common.FormatUserHandle(peer.Handle), memberCount, 0, peer.Name, 0),
 	}), nil
 }
 
@@ -133,7 +130,7 @@ func (s *CommandService) GetOrCreateAgentDM(ctx context.Context, req *connect.Re
 
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 	return connect.NewResponse(&v1pb.GetOrCreateAgentDMResponse{
-		Conversation: convertToV1Conversation(conv, resolveUserName(ctx, s.store, conv.OwnerID), peer.Name, common.FormatAgentUID(peer.ResourceID), memberCount, 0, peer.Name, 0),
+		Conversation: convertToV1Conversation(conv, resolveUserName(ctx, s.store, conv.OwnerID), resolveUserHandle(ctx, s.store, conv.OwnerID), peer.ResourceID, common.FormatAgentUID(peer.ResourceID), memberCount, 0, peer.Name, 0),
 	}), nil
 }
 
@@ -158,6 +155,7 @@ func (s *CommandService) ListPeerAgents(ctx context.Context, _ *connect.Request[
 		}
 		peers = append(peers, &v1pb.PeerAgent{
 			Name:          formatAgentName(a.ResourceID),
+			Handle:        a.ResourceID,
 			DisplayName:   a.Name,
 			PersonaPrompt: a.Info.GetAcpConfig().GetPersonaPrompt(),
 			// computeConnectionState returns the same enum as

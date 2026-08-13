@@ -22,6 +22,11 @@ CREATE TABLE principal (
     type text NOT NULL CHECK (type IN ('END_USER', 'SYSTEM_BOT', 'SERVICE_ACCOUNT')),
     name text NOT NULL,
     email text NOT NULL,
+    -- handle is the user's human-readable, unique mention id (e.g.
+    -- "ran-user-1"), generated at creation and immutable thereafter. The value
+    -- typed after "@" to mention or DM the user; the {user} segment of the
+    -- users/{handle} resource name.
+    handle text NOT NULL,
     password_hash text NOT NULL,
     phone text NOT NULL DEFAULT '',
     -- Stored as MFAConfig (proto/store/store/user.proto)
@@ -39,12 +44,8 @@ CREATE TABLE principal (
     email_verified_at timestamptz
 );
 
--- Idempotent ALTER so existing databases pick up the description column when the
--- schema is re-applied (fresh installs already get it from CREATE TABLE above).
-ALTER TABLE principal ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';
 
--- Idempotent ALTER for the avatar_s3_key column (see comment above).
-ALTER TABLE principal ADD COLUMN IF NOT EXISTS avatar_s3_key text NOT NULL DEFAULT '';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_principal_unique_handle ON principal(handle);
 
 -- Idempotent ALTER for the chat_preferences column. Nullable: a NULL value
 -- means "use the default" (enter_to_send = true, the historic behavior); only
@@ -131,7 +132,7 @@ CREATE TABLE user_group (
 );
 
 -- Default system account id is 1.
-INSERT INTO principal (id, type, name, email, password_hash) VALUES (1, 'SYSTEM_BOT', 'SYSTEM', 'support@example.com', '');
+INSERT INTO principal (id, type, name, email, password_hash, handle) VALUES (1, 'SYSTEM_BOT', 'SYSTEM', 'support@example.com', '', 'system-bot');
 
 ALTER SEQUENCE principal_id_seq RESTART WITH 101;
 
@@ -196,6 +197,7 @@ ALTER TABLE agent ADD COLUMN IF NOT EXISTS can_manage_channel_members boolean NO
 -- (mirrors the conversation table's created_by -> owner_id migration).
 ALTER TABLE agent ADD COLUMN IF NOT EXISTS owner_id int NOT NULL DEFAULT 0;
 UPDATE agent SET owner_id = created_by WHERE owner_id = 0;
+
 
 ALTER SEQUENCE agent_id_seq RESTART WITH 101;
 

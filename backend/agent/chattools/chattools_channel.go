@@ -116,8 +116,8 @@ func formatMemberLine(m *v1pb.ChannelMember) string {
 // this before deciding whom to @mention so the addressing is grounded in who is
 // present, each person's role, and each co-agent's persona, all in one call.
 //
-// The agent only writes @<display_name> in its reply content; the manager
-// resolves the token to the member.
+// The agent only writes @<handle> in its reply content; the manager resolves
+// the token to the member.
 func ListMembers(ctx context.Context, d Deps, in ListMembersInput) (string, error) {
 	name, err := resolveConversationAddress(ctx, d, in.Conversation)
 	if err != nil {
@@ -157,6 +157,6 @@ func formatRoster(header string, members []*v1pb.ChannelMember) string {
 	for _, m := range members {
 		text += formatMemberLine(m)
 	}
-	text += "\nTo address someone, write @<display_name> in your reply content (the manager resolves it). For a multi-word or spaced name, use @\"display name\".\n"
+	text += "\nTo address someone, write @<handle> in your reply content (the manager resolves it). Handles are unique and self-describing (e.g. @ran-user-1, @rei-agent-1).\n"
 	return text
 }

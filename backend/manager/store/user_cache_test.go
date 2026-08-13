@@ -1,6 +1,7 @@
 package store
 
 import (
+	"strconv"
 	"testing"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -20,15 +21,20 @@ func newTestUserStore(t *testing.T) *Store {
 	if err != nil {
 		t.Fatalf("new email cache: %v", err)
 	}
+	handleCache, err := lru.New[string, *UserMessage](8)
+	if err != nil {
+		t.Fatalf("new handle cache: %v", err)
+	}
 	return &Store{
-		enableCache:    true,
-		userIDCache:    idCache,
-		userEmailCache: emailCache,
+		enableCache:     true,
+		userIDCache:     idCache,
+		userEmailCache:  emailCache,
+		userHandleCache: handleCache,
 	}
 }
 
 func activeUser(id int, email string) *UserMessage {
-	return &UserMessage{ID: id, Email: email, Name: email, Type: models.PrincipalType_END_USER}
+	return &UserMessage{ID: id, Email: email, Name: email, Handle: "ran-user-" + strconv.Itoa(id), Type: models.PrincipalType_END_USER}
 }
 
 func deletedUser(id int, email string) *UserMessage {
@@ -55,20 +61,29 @@ func TestCacheActiveUser_ExcludesSoftDeleted(t *testing.T) {
 	if got, ok := s.userEmailCache.Get(active.Email); !ok || got != active {
 		t.Fatal("active user must be cached by email")
 	}
+	if got, ok := s.userHandleCache.Get(active.Handle); !ok || got != active {
+		t.Fatal("active user must be cached by handle")
+	}
 	if _, ok := s.userIDCache.Get(deleted.ID); ok {
 		t.Fatal("soft-deleted user must not be cached by id")
 	}
 	if _, ok := s.userEmailCache.Get(deleted.Email); ok {
 		t.Fatal("soft-deleted user must not be cached by email")
 	}
+	if _, ok := s.userHandleCache.Get(deleted.Handle); ok {
+		t.Fatal("soft-deleted user must not be cached by handle")
+	}
 
-	// Invalidate removes the active user from both caches.
+	// Invalidate removes the active user from all caches.
 	s.invalidateUserCache(active.ID, active.Email)
 	if _, ok := s.userIDCache.Get(active.ID); ok {
 		t.Fatal("invalidate must evict by id")
 	}
 	if _, ok := s.userEmailCache.Get(active.Email); ok {
 		t.Fatal("invalidate must evict by email")
+	}
+	if _, ok := s.userHandleCache.Get(active.Handle); ok {
+		t.Fatal("invalidate must evict by handle")
 	}
 }
 

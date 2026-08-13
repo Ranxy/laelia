@@ -28,9 +28,11 @@ export function detectMention(
 
   const query = text.slice(atIndex + 1, cursorPos);
 
+  // Matching is handle-only: the message content only ever carries @<handle>,
+  // so the popup filters by handle (display names never participate).
   const queryLower = query.toLowerCase();
   const matched = targets
-    .filter((t) => t.name.toLowerCase().includes(queryLower))
+    .filter((t) => t.handle.toLowerCase().includes(queryLower))
     .slice(0, 8);
 
   if (matched.length === 0) {

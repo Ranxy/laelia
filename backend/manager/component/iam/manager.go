@@ -11,7 +11,6 @@ package iam
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
@@ -343,7 +342,7 @@ func permSet(perms ...permission.Permission) map[permission.Permission]bool {
 func callerMemberInfo(user *store.UserMessage, agent *store.AgentMessage) (memberType int32, memberID string, ok bool) {
 	switch {
 	case user != nil:
-		return store.MemberTypeUser, fmt.Sprintf("%d", user.ID), true
+		return store.MemberTypeUser, user.Handle, true
 	case agent != nil:
 		return store.MemberTypeAgent, agent.ResourceID, true
 	default:

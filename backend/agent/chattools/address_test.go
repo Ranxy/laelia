@@ -21,7 +21,7 @@ type fakeAddrClient struct {
 	v1connect.CommandServiceClient
 
 	channels map[string]*v1pb.Conversation // title -> conversation
-	userDMs  map[string]*v1pb.Conversation // peer user name -> conversation
+	userDMs  map[string]*v1pb.Conversation // peer user handle -> conversation
 	agentDMs map[string]*v1pb.Conversation // peer agent resource name -> conversation
 	peers    []*v1pb.PeerAgent
 
@@ -44,7 +44,7 @@ func (f *fakeAddrClient) GetOrCreateUserDM(_ context.Context, req *connect.Reque
 	if e := f.callErr("GetOrCreateUserDM"); e != nil {
 		return nil, e
 	}
-	conv, ok := f.userDMs[req.Msg.GetPeerUserName()]
+	conv, ok := f.userDMs[req.Msg.GetPeerUserHandle()]
 	if !ok {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("user not found"))
 	}
@@ -77,13 +77,13 @@ func newAddrClient() *fakeAddrClient {
 			"general": {Name: "conversations/c-general", Address: "#general"},
 		},
 		userDMs: map[string]*v1pb.Conversation{
-			"alice": {Name: "conversations/dm-alice", Address: "dm:@alice"},
+			"alice-user-1": {Name: "conversations/dm-alice", Address: "dm:@alice-user-1"},
 		},
 		agentDMs: map[string]*v1pb.Conversation{
-			"agents/asuka": {Name: "conversations/adm-rei-asuka", Address: "dm:@asuka"},
+			"agents/asuka-agent-1": {Name: "conversations/adm-rei-asuka", Address: "dm:@asuka-agent-1"},
 		},
 		peers: []*v1pb.PeerAgent{
-			{Name: "agents/asuka", DisplayName: "asuka"},
+			{Name: "agents/asuka-agent-1", DisplayName: "asuka"},
 		},
 		callErr: func(string) error { return nil },
 	}
@@ -103,47 +103,50 @@ func TestResolveConversationAddress_ChannelNotFound(t *testing.T) {
 	assert.Equal(t, "NOT_FOUND_FAILED", e.Code)
 }
 
-func TestResolveConversationAddress_AgentDMByName(t *testing.T) {
-	name, err := resolveConversationAddress(context.Background(), addrDeps(newAddrClient()), "dm:@asuka")
+func TestResolveConversationAddress_AgentDMByHandle(t *testing.T) {
+	name, err := resolveConversationAddress(context.Background(), addrDeps(newAddrClient()), "dm:@asuka-agent-1")
 	require.NoError(t, err)
 	assert.Equal(t, "conversations/adm-rei-asuka", name)
 }
 
 func TestResolveConversationAddress_AgentDMByResourceID(t *testing.T) {
-	name, err := resolveConversationAddress(context.Background(), addrDeps(newAddrClient()), "dm:@agents/asuka")
+	name, err := resolveConversationAddress(context.Background(), addrDeps(newAddrClient()), "dm:@agents/asuka-agent-1")
 	require.NoError(t, err)
 	assert.Equal(t, "conversations/adm-rei-asuka", name)
 }
 
 func TestResolveConversationAddress_UserDM(t *testing.T) {
-	// "bob" is not an agent peer, so the resolver falls through to the user path.
+	// "bob-user-1" is a user handle, so the resolver takes the user path.
 	c := newAddrClient()
-	c.userDMs["bob"] = &v1pb.Conversation{Name: "conversations/dm-bob"}
-	name, err := resolveConversationAddress(context.Background(), addrDeps(c), "dm:@bob")
+	c.userDMs["bob-user-1"] = &v1pb.Conversation{Name: "conversations/dm-bob"}
+	name, err := resolveConversationAddress(context.Background(), addrDeps(c), "dm:@bob-user-1")
 	require.NoError(t, err)
 	assert.Equal(t, "conversations/dm-bob", name)
 }
 
 func TestResolveConversationAddress_UserDMNotFound(t *testing.T) {
-	// "nobody" is neither an agent nor a user.
-	_, err := resolveConversationAddress(context.Background(), addrDeps(newAddrClient()), "dm:@nobody")
+	// "nobody-user-1" is a well-formed user handle but no such user exists.
+	_, err := resolveConversationAddress(context.Background(), addrDeps(newAddrClient()), "dm:@nobody-user-1")
 	require.Error(t, err)
 	e, ok := err.(*Error)
 	require.True(t, ok)
 	assert.Equal(t, "NOT_FOUND_FAILED", e.Code)
 }
 
-func TestResolveConversationAddress_AmbiguousAgentPeer(t *testing.T) {
+func TestResolveConversationAddress_DisplayNameNotResolved(t *testing.T) {
+	// A display name is never a valid DM peer: only handles resolve. Even when
+	// a peer agent carries the display name, "dm:@asuka" is not a handle and is
+	// rejected locally.
 	c := newAddrClient()
 	c.peers = []*v1pb.PeerAgent{
-		{Name: "agents/asuka", DisplayName: "asuka"},
-		{Name: "agents/asuka2", DisplayName: "asuka"},
+		{Name: "agents/asuka-agent-1", DisplayName: "asuka"},
+		{Name: "agents/asuka-agent-2", DisplayName: "asuka"},
 	}
 	_, err := resolveConversationAddress(context.Background(), addrDeps(c), "dm:@asuka")
 	require.Error(t, err)
 	e, ok := err.(*Error)
 	require.True(t, ok)
-	assert.Equal(t, "AMBIGUOUS_PEER", e.Code)
+	assert.Equal(t, "INVALID_ARGUMENT_FAILED", e.Code)
 }
 
 func TestResolveConversationAddress_EmptyPassesThrough(t *testing.T) {
@@ -182,7 +185,7 @@ func TestSplitMessageAddress(t *testing.T) {
 		// rejection is owned by resolveConversationAddress downstream.
 		{"conversations/c-1/messages/m-2", "conversations/c-1/messages/m-2", ""},
 		{"#general:" + uuidStr, "#general", uuidStr},
-		{"dm:@alice:" + uuidStr, "dm:@alice", uuidStr},
+		{"dm:@alice-user-1:" + uuidStr, "dm:@alice-user-1", uuidStr},
 		{"conversations/c-1:" + uuidStr, "conversations/c-1", uuidStr},
 		// ':' inside a title is tolerated; only a UUID suffix splits off.
 		{"#plan:b:" + uuidStr, "#plan:b", uuidStr},
@@ -264,8 +267,9 @@ func TestResolveThreadRoot_BareRootWithConversation(t *testing.T) {
 // user path — otherwise a same-named user would silently receive agent DMs.
 func TestResolveDMAddress_AgentMatchCreateNotFoundDoesNotFallThrough(t *testing.T) {
 	c := newAddrClient()
-	// "asuka" is a peer agent; make GetOrCreateAgentDM fail with NotFound, and
-	// also seed a same-named user DM that the fall-through would wrongly return.
+	// "asuka-agent-1" is an agent handle; make GetOrCreateAgentDM fail with
+	// NotFound, and also seed a same-slug user DM that the fall-through would
+	// wrongly return.
 	c.agentDMs = nil
 	c.callErr = func(rpc string) error {
 		if rpc == "GetOrCreateAgentDM" {
@@ -273,8 +277,8 @@ func TestResolveDMAddress_AgentMatchCreateNotFoundDoesNotFallThrough(t *testing.
 		}
 		return nil
 	}
-	c.userDMs["asuka"] = &v1pb.Conversation{Name: "conversations/dm-user-asuka"}
-	_, err := resolveConversationAddress(context.Background(), addrDeps(c), "dm:@asuka")
+	c.userDMs["asuka-user-1"] = &v1pb.Conversation{Name: "conversations/dm-user-asuka"}
+	_, err := resolveConversationAddress(context.Background(), addrDeps(c), "dm:@asuka-agent-1")
 	require.Error(t, err)
 	e, ok := err.(*Error)
 	require.True(t, ok)

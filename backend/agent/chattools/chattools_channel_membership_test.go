@@ -134,46 +134,50 @@ func TestAddChannelMemberUserHandle(t *testing.T) {
 	assert.Equal(t, "5", c.lastAddReq.GetMembers()[0].GetMemberId())
 }
 
-func TestAddChannelMemberBareAgentName(t *testing.T) {
+func TestAddChannelMemberBareAgentHandle(t *testing.T) {
 	c := newMembershipClient()
-	c.peers = []*v1pb.PeerAgent{{Name: "agents/abc-123", DisplayName: "backend-bot"}}
-	c.addResp = &v1pb.AddChannelMemberResponse{Members: []*v1pb.ChannelMember{{MemberType: 2, MemberId: "abc-123", DisplayName: "backend-bot"}}}
-	_, err := AddChannelMember(context.Background(), membershipDeps(c, nil), AddChannelMemberInput{Conversation: "#general", Members: []string{"backend-bot"}})
+	c.addResp = &v1pb.AddChannelMemberResponse{Members: []*v1pb.ChannelMember{{MemberType: 2, MemberId: "backend-bot-agent-1", DisplayName: "backend-bot"}}}
+	_, err := AddChannelMember(context.Background(), membershipDeps(c, nil), AddChannelMemberInput{Conversation: "#general", Members: []string{"backend-bot-agent-1"}})
 	require.NoError(t, err)
 	require.NotNil(t, c.lastAddReq)
 	require.Len(t, c.lastAddReq.GetMembers(), 1)
 	assert.Equal(t, int32(2), c.lastAddReq.GetMembers()[0].GetMemberType())
-	assert.Equal(t, "abc-123", c.lastAddReq.GetMembers()[0].GetMemberId())
+	assert.Equal(t, "backend-bot-agent-1", c.lastAddReq.GetMembers()[0].GetMemberId())
 }
 
-func TestAddChannelMemberBareUserName(t *testing.T) {
+func TestAddChannelMemberBareUserHandle(t *testing.T) {
 	c := newMembershipClient()
-	u := &fakeUserClient{users: []*v1pb.User{{Name: "users/5", Title: "Alice"}}}
-	c.addResp = &v1pb.AddChannelMemberResponse{Members: []*v1pb.ChannelMember{{MemberType: 1, MemberId: "5", DisplayName: "Alice"}}}
-	_, err := AddChannelMember(context.Background(), membershipDeps(c, u), AddChannelMemberInput{Conversation: "#general", Members: []string{"Alice"}})
+	c.addResp = &v1pb.AddChannelMemberResponse{Members: []*v1pb.ChannelMember{{MemberType: 1, MemberId: "alice-user-1", DisplayName: "Alice"}}}
+	_, err := AddChannelMember(context.Background(), membershipDeps(c, nil), AddChannelMemberInput{Conversation: "#general", Members: []string{"alice-user-1"}})
 	require.NoError(t, err)
 	require.NotNil(t, c.lastAddReq)
 	require.Len(t, c.lastAddReq.GetMembers(), 1)
 	assert.Equal(t, int32(1), c.lastAddReq.GetMembers()[0].GetMemberType())
-	assert.Equal(t, "5", c.lastAddReq.GetMembers()[0].GetMemberId())
+	assert.Equal(t, "alice-user-1", c.lastAddReq.GetMembers()[0].GetMemberId())
 }
 
-func TestAddChannelMemberAmbiguousUser(t *testing.T) {
+func TestAddChannelMemberDisplayNameRejected(t *testing.T) {
+	// Display names no longer resolve: only handles (or agents/<id> /
+	// users/<id> resource names) are accepted, so a bare display name is an
+	// invalid argument, never an ambiguous lookup.
 	c := newMembershipClient()
 	u := &fakeUserClient{users: []*v1pb.User{{Name: "users/5", Title: "Alice"}, {Name: "users/6", Title: "Alice"}}}
 	_, err := AddChannelMember(context.Background(), membershipDeps(c, u), AddChannelMemberInput{Conversation: "#general", Members: []string{"Alice"}})
 	var e *Error
 	require.ErrorAs(t, err, &e)
-	assert.Equal(t, "AMBIGUOUS_USER", e.Code)
+	assert.Equal(t, "INVALID_ARGUMENT_FAILED", e.Code)
 }
 
-func TestAddChannelMemberUnknownName(t *testing.T) {
+func TestAddChannelMemberUnknownHandle(t *testing.T) {
+	// "nobody-user-1" is a well-formed user handle, so it passes local
+	// validation and is forwarded to the manager (which owns existence checks).
 	c := newMembershipClient()
-	u := &fakeUserClient{users: []*v1pb.User{{Name: "users/5", Title: "Alice"}}}
-	_, err := AddChannelMember(context.Background(), membershipDeps(c, u), AddChannelMemberInput{Conversation: "#general", Members: []string{"nobody"}})
-	var e *Error
-	require.ErrorAs(t, err, &e)
-	assert.Equal(t, "NOT_FOUND_FAILED", e.Code)
+	_, err := AddChannelMember(context.Background(), membershipDeps(c, nil), AddChannelMemberInput{Conversation: "#general", Members: []string{"nobody-user-1"}})
+	require.NoError(t, err)
+	require.NotNil(t, c.lastAddReq)
+	require.Len(t, c.lastAddReq.GetMembers(), 1)
+	assert.Equal(t, int32(1), c.lastAddReq.GetMembers()[0].GetMemberType())
+	assert.Equal(t, "nobody-user-1", c.lastAddReq.GetMembers()[0].GetMemberId())
 }
 
 func TestAddChannelMemberEmptyMembers(t *testing.T) {
@@ -221,14 +225,13 @@ func TestRemoveChannelMemberSuccess(t *testing.T) {
 	assert.Contains(t, out, "agents/abc-123")
 }
 
-func TestRemoveChannelMemberBareNameResolves(t *testing.T) {
+func TestRemoveChannelMemberBareHandleResolves(t *testing.T) {
 	c := newMembershipClient()
-	c.peers = []*v1pb.PeerAgent{{Name: "agents/abc-123", DisplayName: "backend-bot"}}
-	_, err := RemoveChannelMember(context.Background(), membershipDeps(c, nil), RemoveChannelMemberInput{Conversation: "#general", Members: []string{"backend-bot"}})
+	_, err := RemoveChannelMember(context.Background(), membershipDeps(c, nil), RemoveChannelMemberInput{Conversation: "#general", Members: []string{"backend-bot-agent-1"}})
 	require.NoError(t, err)
 	require.Len(t, c.removeReqs, 1)
 	assert.Equal(t, int32(2), c.removeReqs[0].GetMemberType())
-	assert.Equal(t, "abc-123", c.removeReqs[0].GetMemberId())
+	assert.Equal(t, "backend-bot-agent-1", c.removeReqs[0].GetMemberId())
 }
 
 func TestRemoveChannelMemberErrorMapped(t *testing.T) {

@@ -113,7 +113,7 @@ func (s *MachineService) CreateMachine(ctx context.Context, req *connect.Request
 	}
 
 	return connect.NewResponse(&v1pb.CreateMachineResponse{
-		Machine:           convertToMachine(created),
+		Machine:           s.convertToMachine(ctx, created),
 		RegistrationToken: registrationToken,
 	}), nil
 }
@@ -249,7 +249,7 @@ func (s *MachineService) GetMachine(ctx context.Context, req *connect.Request[v1
 	if !canSeeMachine(ctx, s.iam, caller, machine) {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
 	}
-	out := convertToMachine(machine)
+	out := s.convertToMachine(ctx, machine)
 	out.CanEdit = s.canEditMachine(ctx, caller)
 	// Visibility is granted by the create-agent rule, so a visible machine
 	// always allows agent creation for this caller.
@@ -524,7 +524,7 @@ func (s *MachineService) ListMachineAgents(ctx context.Context, req *connect.Req
 	canDelete := canDeleteAgentWorkspace(ctx, s.iam, caller)
 	resp := &v1pb.ListMachineAgentsResponse{}
 	for _, agent := range agents {
-		summary := convertToAgentSummary(agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
+		summary := convertToAgentSummary(ctx, s.store, agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
 		summary.CanDelete = canDelete || isAgentOwner(caller, agent)
 		resp.Agents = append(resp.Agents, summary)
 	}
@@ -1062,7 +1062,7 @@ func (s *MachineService) authenticateMachineRegistrationToken(tokenStr string) (
 
 // ---- converters ----
 
-func convertToMachine(m *store.MachineMessage) *v1pb.Machine {
+func (s *MachineService) convertToMachine(ctx context.Context, m *store.MachineMessage) *v1pb.Machine {
 	state := v1pb.State_ACTIVE
 	if m.Deleted {
 		state = v1pb.State_DELETED
@@ -1076,7 +1076,7 @@ func convertToMachine(m *store.MachineMessage) *v1pb.Machine {
 		CreatedAt: timestamppb.New(m.CreatedAt),
 	}
 	if m.CreatedBy != 0 {
-		out.CreatedBy = common.FormatUserUID(m.CreatedBy)
+		out.CreatedBy = resolveUserResource(ctx, s.store, m.CreatedBy)
 	}
 	return out
 }

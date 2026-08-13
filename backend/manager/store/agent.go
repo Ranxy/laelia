@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/Ranxy/laelia/backend/common"
 	models "github.com/Ranxy/laelia/backend/generated-go/store"
 )
 
@@ -296,7 +296,18 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 		return nil, err
 	}
 
-	resourceID := uuid.New().String()
+	// The agent's resource id IS its readable handle ("rei-agent-1"): slugified
+	// name plus a per-slug counter. It doubles as the mention id, the DM
+	// address suffix, and the agent's workspace directory name
+	// (~/.laelia/<machine>/<handle>/). Immutable after creation.
+	slug := common.SlugifyHandle(create.Name)
+	if slug == "" {
+		slug = "agent"
+	}
+	resourceID, err := s.reserveHandle(ctx, tx, "agent", "resource_id", slug, common.HandleKindAgent)
+	if err != nil {
+		return nil, err
+	}
 
 	// machine_id is a nullable FK; insert NULL when the agent is unbound (0)
 	// so the FK constraint is satisfied for legacy/unbound agents.
@@ -310,11 +321,12 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 	// on (a proto3 bool cannot express "unset" vs false on CreateAgent); toggle it
 	// via UpdateAgent.
 	var agentID int
-	if err := tx.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		INSERT INTO agent (
 			resource_id, name, token_version, info, status, created_by, owner_id, allow_add_to_channel, machine_id
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (resource_id) DO NOTHING
 		RETURNING id, created_at
 	`,
 		resourceID,
@@ -326,7 +338,17 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 		create.OwnerID,
 		create.AllowAddToChannel,
 		machineIDArg,
-	).Scan(&agentID, &create.CreatedAt); err != nil {
+	).Scan(&agentID, &create.CreatedAt)
+	if err == sql.ErrNoRows {
+		// A concurrent creation claimed the same handle; roll back and retry the
+		// whole reservation+insert once (the fresh transaction sees the winner).
+		if rbErr := tx.Rollback(); rbErr != nil {
+			return nil, errors.Wrap(rbErr, "failed to rollback handle collision")
+		}
+		return s.CreateAgent(ctx, create)
+	}
+	if err != nil {
+		_ = tx.Rollback()
 		return nil, err
 	}
 

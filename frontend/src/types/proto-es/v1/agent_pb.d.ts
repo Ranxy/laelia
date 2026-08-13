@@ -1156,6 +1156,18 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
   name: string;
 
   /**
+   * handle is the agent's human-readable, unique mention id (e.g.
+   * "rei-agent-1"), generated at creation and immutable thereafter. It is the
+   * {agent} segment of name ("agents/{handle}"), the value an agent types after
+   * "@" to mention or DM this agent, and the name of its workspace directory
+   * (~/.laelia/<machine>/<handle>/). Always populated; mirror of
+   * agent.resource_id.
+   *
+   * @generated from field: string handle = 22;
+   */
+  handle: string;
+
+  /**
    * @generated from field: laelia.v1.State state = 2;
    */
   state: State;
@@ -1334,6 +1346,14 @@ export declare type AgentSummary = Message<"laelia.v1.AgentSummary"> & {
    * @generated from field: string name = 1;
    */
   name: string;
+
+  /**
+   * handle is the agent's readable id ("rei-agent-1"), the {agent} segment of
+   * name. See Agent.handle. Always populated.
+   *
+   * @generated from field: string handle = 14;
+   */
+  handle: string;
 
   /**
    * @generated from field: laelia.v1.State state = 2;

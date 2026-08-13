@@ -62,7 +62,7 @@ func agentIdentityText(name string) string {
 
 You are "%[1]s". Recognize yourself, so you don't reply to your own messages or ignore messages meant for you:
 - Messages flagged is_own=true (rendered with "(YOU)" in tool output), or whose sender_name equals "%[1]s", are YOUR OWN past messages. They are context only — NEVER reply to your own messages.
-- A message containing @"%[1]s" (a @mention of your name) is directed AT YOU. Respond to it.
+- A message containing @%[1]s (a @mention of your handle) is directed AT YOU. Respond to it.
 - A message @mentioning a DIFFERENT agent's name is for that agent, not you. Stay silent unless you can genuinely add value.`, name)
 }
 

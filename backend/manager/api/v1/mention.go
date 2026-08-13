@@ -3,7 +3,6 @@ package v1
 import (
 	"context"
 	"log/slog"
-	"strconv"
 	"strings"
 	"unicode"
 
@@ -13,21 +12,21 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
-// parseContentMentions scans message content for `@<name>` tokens the agent typed
-// and resolves them to conversation members, returning structured Mentions the
-// manager then uses for thread subscription and wake routing. The agent itself does
-// not construct mentions — it only writes content-only `@someone`, and the manager
-// owns the resolution so an agent can proactively address a user or agent.
+// parseContentMentions scans message content for `@<handle>` tokens the agent
+// typed and resolves them to conversation members, returning structured
+// Mentions the manager then uses for thread subscription and wake routing. The
+// agent itself does not construct mentions — it only writes content-only
+// `@someone`, and the manager owns the resolution so an agent can proactively
+// address a user or agent.
 //
-// Token forms:
-//   - `@"display name"` — quoted, captures multi-word / spaced names verbatim.
-//   - `@name` — a bare run of letters, digits, '_', '-', '.' (e.g. `@alice`,
-//     `@张三`, `@backend-bot`). Stops at whitespace or other punctuation, so
-//     multi-word names must use the quoted form.
+// Token form:
+//   - `@handle` — a bare run of letters, digits, '_', '-', '.' (e.g.
+//     `@ran-user-1`, `@rei-agent-1`). Stops at whitespace or other
+//     punctuation.
 //
-// Matching is case-insensitive on the member display name. Ambiguous names (two
-// members sharing the same display name) are skipped to avoid misrouting. The
-// posting agent (excludeAgentResourceID) is never resolved to a self-mention.
+// Matching is exact on the member's mention handle (case-insensitive). Handles
+// are unique per type, so no ambiguity resolution is needed. The posting agent
+// (excludeAgentResourceID) is never resolved to a self-mention.
 func (s *CommandService) parseContentMentions(ctx context.Context, convID uuid.UUID, content, excludeAgentResourceID string) []*v1pb.Mention {
 	members, err := s.store.ListConversationMembers(ctx, convID)
 	if err != nil {
@@ -35,15 +34,14 @@ func (s *CommandService) parseContentMentions(ctx context.Context, convID uuid.U
 		return nil
 	}
 
-	// name -> member(s). Resolve each member's display name once and key by its
-	// lowercased form. Track ambiguity so a shared display name never misroutes.
-	byName := make(map[string][]*store.ConversationMember)
+	// handle -> member. Member ids are already the mention handles for both
+	// users and agents, so the lookup key is the member id itself.
+	byHandle := make(map[string]*store.ConversationMember, len(members))
 	for _, m := range members {
-		name := normalizeMentionName(resolveMemberDisplayName(ctx, s.store, m.MemberType, m.MemberID))
-		if name == "" {
+		if m.MemberID == "" {
 			continue
 		}
-		byName[name] = append(byName[name], m)
+		byHandle[normalizeMentionName(m.MemberID)] = m
 	}
 
 	var mentions []*v1pb.Mention
@@ -53,12 +51,11 @@ func (s *CommandService) parseContentMentions(ctx context.Context, convID uuid.U
 		if key == "" {
 			continue
 		}
-		candidates, ok := byName[key]
-		if !ok || len(candidates) != 1 {
-			// Unknown or ambiguous: do not manufacture a mention.
+		m, ok := byHandle[key]
+		if !ok {
+			// Unknown handle: do not manufacture a mention.
 			continue
 		}
-		m := candidates[0]
 		if m.MemberType == store.MemberTypeAgent && m.MemberID == excludeAgentResourceID {
 			continue
 		}
@@ -70,14 +67,14 @@ func (s *CommandService) parseContentMentions(ctx context.Context, convID uuid.U
 		mentions = append(mentions, &v1pb.Mention{
 			Type: mentionTypeString(m.MemberType),
 			Id:   m.MemberID,
-			Name: resolveMemberDisplayName(ctx, s.store, m.MemberType, m.MemberID),
+			Name: m.MemberID,
 		})
 	}
 	return mentions
 }
 
-// tokenizeMentions extracts `@<name>` and `@"name"` tokens from content, in order.
-// A `@` only starts a mention when preceded by the start of content or a boundary
+// tokenizeMentions extracts `@<handle>` tokens from content, in order. A `@`
+// only starts a mention when preceded by the start of content or a boundary
 // rune (whitespace / punctuation), so email addresses are not mistaken for
 // mentions.
 func tokenizeMentions(content string) []string {
@@ -91,29 +88,10 @@ func tokenizeMentions(content string) []string {
 			continue
 		}
 		next := runes[i+1]
-		// The quoted form `@"name"` is unambiguously a mention (no email contains
-		// `@"`), so it is accepted regardless of what precedes the `@` — this lets
-		// CJK text mention a name inline without a leading space, e.g. `转给@"张三"处理`.
-		if next == '"' {
-			end := -1
-			for j := i + 2; j < len(runes); j++ {
-				if runes[j] == '"' {
-					end = j
-					break
-				}
-			}
-			if end == -1 {
-				continue
-			}
-			if name := strings.TrimSpace(string(runes[i+2 : end])); name != "" {
-				tokens = append(tokens, name)
-			}
-			i = end
-			continue
-		}
-		// The bare form `@name` requires a boundary before the `@` (start of content,
-		// whitespace, or punctuation) so an email local-part like `alice@` is not
-		// mistaken for a mention. CJK bare mentions therefore need a leading space.
+		// The bare form `@handle` requires a boundary before the `@` (start of
+		// content, whitespace, or punctuation) so an email local-part like
+		// `alice@` is not mistaken for a mention. CJK bare mentions therefore
+		// need a leading space.
 		if i > 0 && !isMentionBoundary(runes[i-1]) {
 			continue
 		}
@@ -150,24 +128,22 @@ func mentionTypeString(memberType int32) string {
 }
 
 // mergeMentions unions server-parsed mentions (from parseContentMentions) with
-// client-supplied mentions (e.g. from a mention picker), deduping by type:id and
-// preserving the first-seen display name. selfUserID, when non-zero, drops a
-// self-mention (type=="user" with the caller's own id) so a user never @mentions
-// themself into their own activity feed. The client set is appended last so its
-// names win on dedup collision only when the server did not resolve the same
-// member — in practice the server resolves display names itself, so the two sets
-// agree.
-func mergeMentions(parsed, client []*v1pb.Mention, selfUserID int) []*v1pb.Mention {
+// client-supplied mentions (e.g. from a mention picker), deduping by type:id
+// and preserving the first-seen name. selfHandle, when non-empty, drops a
+// self-mention (type=="user" with the caller's own handle) so a user never
+// @mentions themself into their own activity feed. The client set is appended
+// last so its names win on dedup collision only when the server did not
+// resolve the same member — in practice the server resolves handles itself, so
+// the two sets agree.
+func mergeMentions(parsed, client []*v1pb.Mention, selfHandle string) []*v1pb.Mention {
 	seen := make(map[string]bool, len(parsed)+len(client))
 	out := make([]*v1pb.Mention, 0, len(parsed)+len(client))
 	add := func(m *v1pb.Mention) {
 		if m == nil {
 			return
 		}
-		if selfUserID != 0 && m.Type == "user" {
-			if uid, err := strconv.Atoi(m.Id); err == nil && uid == selfUserID {
-				return
-			}
+		if selfHandle != "" && m.Type == "user" && m.Id == selfHandle {
+			return
 		}
 		key := m.Type + ":" + m.Id
 		if seen[key] {

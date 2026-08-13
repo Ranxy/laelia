@@ -7,6 +7,7 @@ import (
 
 	"connectrpc.com/connect"
 
+	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -145,9 +146,9 @@ func RemoveChannelMember(ctx context.Context, d Deps, in RemoveChannelMemberInpu
 
 // resolveMember turns a member argument into the (member_type, member_id) pair
 // the manager's AddChannelMember expects. An explicit agents/<id> or users/<id>
-// handle is passed through; a bare display name resolves agent-first (matching
-// the DM address resolver), then to a user.
-func resolveMember(ctx context.Context, d Deps, member string) (int32, string, error) {
+// handle is passed through; a bare mention handle is dispatched by its
+// self-describing "-agent-" / "-user-" suffix.
+func resolveMember(_ context.Context, _ Deps, member string) (int32, string, error) {
 	member = strings.TrimSpace(member)
 	switch {
 	case strings.HasPrefix(member, "agents/"):
@@ -159,24 +160,14 @@ func resolveMember(ctx context.Context, d Deps, member string) (int32, string, e
 	case strings.HasPrefix(member, "users/"):
 		id := strings.TrimSpace(strings.TrimPrefix(member, "users/"))
 		if id == "" {
-			return 0, "", localError("INVALID_ARGUMENT_FAILED", "users/ requires a principal id", "Use users/<id>.")
+			return 0, "", localError("INVALID_ARGUMENT_FAILED", "users/ requires a handle", "Use users/<handle>.")
 		}
 		return memberTypeUser, id, nil
+	case common.HandleKindOf(member, common.HandleKindAgent):
+		return memberTypeAgent, member, nil
+	case common.HandleKindOf(member, common.HandleKindUser):
+		return memberTypeUser, member, nil
 	default:
-		agent, err := findPeerAgentByName(ctx, d, member)
-		if err != nil {
-			return 0, "", err
-		}
-		if agent != nil {
-			return memberTypeAgent, strings.TrimPrefix(agent.GetName(), "agents/"), nil
-		}
-		user, err := findUserByName(ctx, d, member)
-		if err != nil {
-			return 0, "", err
-		}
-		if user != nil {
-			return memberTypeUser, strings.TrimPrefix(user.GetName(), "users/"), nil
-		}
-		return 0, "", localError("NOT_FOUND_FAILED", fmt.Sprintf("no agent or user named %q", member), "Run `agent list` for agents, or use users/<id> for a user.")
+		return 0, "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("%q is not a valid handle; use agents/<id>, users/<id>, or a bare @<handle> (e.g. @ran-user-1, @rei-agent-1)", member), "Run `agent list` for agent handles or `members <address>` for user handles.")
 	}
 }

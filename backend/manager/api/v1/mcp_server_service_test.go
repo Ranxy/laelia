@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -129,7 +130,8 @@ func TestConvertToV1McpServerMasksHeaders(t *testing.T) {
 		Headers:       map[string]string{"Authorization": "secret-1234"},
 		Members:       []string{"users/101"},
 	}
-	out := convertToV1McpServer(server)
+	svc := &McpServerService{}
+	out := svc.convertToV1McpServer(context.Background(), server)
 	if out.Name != "mcpServers/abc" {
 		t.Fatalf("unexpected name %q", out.Name)
 	}

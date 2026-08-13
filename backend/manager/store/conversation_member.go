@@ -253,6 +253,10 @@ func (s *Store) UpdateConversationMemberRole(ctx context.Context, convID uuid.UU
 // per-user UI metadata, stored in conversation_member_meta — it is not
 // authorization data.
 func (s *Store) SetConversationPinned(ctx context.Context, convID uuid.UUID, principalID int, pinned bool) error {
+	memberID, err := s.userMemberHandle(ctx, s.GetDB(), principalID)
+	if err != nil {
+		return err
+	}
 	var pinnedAt any
 	if pinned {
 		pinnedAt = time.Now()
@@ -260,7 +264,7 @@ func (s *Store) SetConversationPinned(ctx context.Context, convID uuid.UUID, pri
 	res, err := s.GetDB().ExecContext(ctx, `
 		UPDATE conversation_member_meta SET pinned = $4, pinned_at = $5
 		WHERE conversation_id = $1 AND member_type = $2 AND member_id = $3
-	`, convID, MemberTypeUser, fmt.Sprintf("%d", principalID), pinned, pinnedAt)
+	`, convID, MemberTypeUser, memberID, pinned, pinnedAt)
 	if err != nil {
 		return errors.Wrapf(err, "failed to set conversation pinned")
 	}
@@ -277,11 +281,15 @@ func (s *Store) SetConversationPinned(ctx context.Context, convID uuid.UUID, pri
 // GetConversationPinned returns the requesting user's per-conversation pin
 // state. A missing membership row yields false (not a member / not pinned).
 func (s *Store) GetConversationPinned(ctx context.Context, convID uuid.UUID, principalID int) (bool, error) {
+	memberID, err := s.userMemberHandle(ctx, s.GetDB(), principalID)
+	if err != nil {
+		return false, err
+	}
 	var pinned bool
-	err := s.GetDB().QueryRowContext(ctx, `
+	err = s.GetDB().QueryRowContext(ctx, `
 		SELECT pinned FROM conversation_member_meta
 		WHERE conversation_id = $1 AND member_type = $2 AND member_id = $3
-	`, convID, MemberTypeUser, fmt.Sprintf("%d", principalID)).Scan(&pinned)
+	`, convID, MemberTypeUser, memberID).Scan(&pinned)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
@@ -300,6 +308,10 @@ func (s *Store) GetConversationPinned(ctx context.Context, convID uuid.UUID, pri
 // per-user UI metadata, stored in conversation_member_meta — it is not
 // authorization data.
 func (s *Store) SetConversationClosed(ctx context.Context, convID uuid.UUID, principalID int, closed bool) error {
+	memberID, err := s.userMemberHandle(ctx, s.GetDB(), principalID)
+	if err != nil {
+		return err
+	}
 	var closedAt any
 	if closed {
 		closedAt = time.Now()
@@ -307,7 +319,7 @@ func (s *Store) SetConversationClosed(ctx context.Context, convID uuid.UUID, pri
 	res, err := s.GetDB().ExecContext(ctx, `
 		UPDATE conversation_member_meta SET closed = $4, closed_at = $5
 		WHERE conversation_id = $1 AND member_type = $2 AND member_id = $3
-	`, convID, MemberTypeUser, fmt.Sprintf("%d", principalID), closed, closedAt)
+	`, convID, MemberTypeUser, memberID, closed, closedAt)
 	if err != nil {
 		return errors.Wrapf(err, "failed to set conversation closed")
 	}
@@ -326,11 +338,15 @@ func (s *Store) SetConversationClosed(ctx context.Context, convID uuid.UUID, pri
 // ErrConversationMemberNotFound so callers can tell "joined but unknown" from
 // "not a member".
 func (s *Store) GetConversationJoinedAt(ctx context.Context, convID uuid.UUID, principalID int) (time.Time, error) {
+	memberID, err := s.userMemberHandle(ctx, s.GetDB(), principalID)
+	if err != nil {
+		return time.Time{}, err
+	}
 	var joinedAt time.Time
-	err := s.GetDB().QueryRowContext(ctx, `
+	err = s.GetDB().QueryRowContext(ctx, `
 		SELECT joined_at FROM conversation_member_meta
 		WHERE conversation_id = $1 AND member_type = $2 AND member_id = $3
-	`, convID, MemberTypeUser, fmt.Sprintf("%d", principalID)).Scan(&joinedAt)
+	`, convID, MemberTypeUser, memberID).Scan(&joinedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return time.Time{}, ErrConversationMemberNotFound
@@ -343,11 +359,15 @@ func (s *Store) GetConversationJoinedAt(ctx context.Context, convID uuid.UUID, p
 // GetConversationClosed returns the requesting user's per-conversation close
 // state. A missing membership row yields false (not a member / not closed).
 func (s *Store) GetConversationClosed(ctx context.Context, convID uuid.UUID, principalID int) (bool, error) {
+	memberID, err := s.userMemberHandle(ctx, s.GetDB(), principalID)
+	if err != nil {
+		return false, err
+	}
 	var closed bool
-	err := s.GetDB().QueryRowContext(ctx, `
+	err = s.GetDB().QueryRowContext(ctx, `
 		SELECT closed FROM conversation_member_meta
 		WHERE conversation_id = $1 AND member_type = $2 AND member_id = $3
-	`, convID, MemberTypeUser, fmt.Sprintf("%d", principalID)).Scan(&closed)
+	`, convID, MemberTypeUser, memberID).Scan(&closed)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
@@ -358,13 +378,14 @@ func (s *Store) GetConversationClosed(ctx context.Context, convID uuid.UUID, pri
 }
 
 // TransferChannelOwnership atomically hands channel ownership from the old
-// owner (a user, identified by principal id) to a new owner: it updates the
-// denormalized conversation.owner_id, demotes the old owner to Member, and
-// promotes the new owner to Owner, all in one transaction so a crash cannot
-// leave a channel with two owners or none. The new owner must already be a
-// member (verified by the caller); newOwnerID is its member_id string and
+// owner (a user) to a new owner: it updates the denormalized
+// conversation.owner_id to the new owner's principal id, demotes the old owner
+// to Member, and promotes the new owner to Owner, all in one transaction so a
+// crash cannot leave a channel with two owners or none. The new owner must
+// already be a member (verified by the caller); both owner ids are the
+// member_id strings ("ran-user-1") used by conversation_member_meta, and
 // newOwnerPrincipalID is the user principal id written to owner_id.
-func (s *Store) TransferChannelOwnership(ctx context.Context, convID uuid.UUID, oldOwnerPrincipalID, newOwnerPrincipalID int, newOwnerID string) error {
+func (s *Store) TransferChannelOwnership(ctx context.Context, convID uuid.UUID, oldOwnerID, newOwnerID string, newOwnerPrincipalID int) error {
 	tx, err := s.GetDB().BeginTx(ctx, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to begin transfer ownership transaction")
@@ -378,7 +399,6 @@ func (s *Store) TransferChannelOwnership(ctx context.Context, convID uuid.UUID, 
 		return errors.Wrap(err, "failed to update conversation owner_id")
 	}
 
-	oldOwnerID := fmt.Sprintf("%d", oldOwnerPrincipalID)
 	if err := patchConversationMemberRolesTx(ctx, tx, convID, MemberTypeUser, oldOwnerID, []string{conversationRoleName(MemberRoleMember)}); err != nil {
 		return errors.Wrap(err, "failed to demote old owner")
 	}
@@ -398,7 +418,7 @@ func (s *Store) TransferChannelOwnership(ctx context.Context, convID uuid.UUID, 
 	return nil
 }
 
-func (s *Store) findDirectConversation(ctx context.Context, userPrincipalID int, agentResourceID string) (*ConversationMessage, error) {
+func (s *Store) findDirectConversation(ctx context.Context, userHandle, agentResourceID string) (*ConversationMessage, error) {
 	var conv ConversationMessage
 	err := s.GetDB().QueryRowContext(ctx, `
 		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version
@@ -414,7 +434,7 @@ func (s *Store) findDirectConversation(ctx context.Context, userPrincipalID int,
 		)
 		AND c.type = 1
 		LIMIT 1
-	`, MemberTypeUser, fmt.Sprintf("%d", userPrincipalID), MemberTypeAgent, agentResourceID).Scan(
+	`, MemberTypeUser, userHandle, MemberTypeAgent, agentResourceID).Scan(
 		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
 	)
 	if err != nil {

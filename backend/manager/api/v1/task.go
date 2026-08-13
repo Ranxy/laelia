@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
+	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -161,6 +162,7 @@ func (s *CommandService) CreateTask(ctx context.Context, req *connect.Request[v1
 	msg, newVersion, err := s.store.CreateTaskMessageBumpVersion(ctx, &store.ChatMessage{
 		ConversationID:  convUUID,
 		PrincipalID:     1, // system bot owns agent-posted channel messages
+		PrincipalHandle: common.SystemBotHandle,
 		SenderAgentID:   toNullInt32(int32(agent.ID)),
 		AgentResourceID: agent.ResourceID,
 		AgentName:       agent.Name,
