@@ -1411,6 +1411,57 @@
         
           
           <li>
+            <a href="#v1%2fdevice.proto">v1/device.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.v1.ApproveDeviceLoginRequest"><span class="badge">M</span>ApproveDeviceLoginRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ApproveDeviceLoginResponse"><span class="badge">M</span>ApproveDeviceLoginResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetDeviceLoginStatusRequest"><span class="badge">M</span>GetDeviceLoginStatusRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetDeviceLoginStatusResponse"><span class="badge">M</span>GetDeviceLoginStatusResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.PollDeviceLoginRequest"><span class="badge">M</span>PollDeviceLoginRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.PollDeviceLoginResponse"><span class="badge">M</span>PollDeviceLoginResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.StartDeviceLoginRequest"><span class="badge">M</span>StartDeviceLoginRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.StartDeviceLoginResponse"><span class="badge">M</span>StartDeviceLoginResponse</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#laelia.v1.DeviceLoginStatus"><span class="badge">E</span>DeviceLoginStatus</a>
+                </li>
+              
+              
+              
+                <li>
+                  <a href="#laelia.v1.DeviceService"><span class="badge">S</span>DeviceService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
             <a href="#v1%2fgroup_service.proto">v1/group_service.proto</a>
             <ul>
               
@@ -1557,14 +1608,6 @@
                 </li>
               
                 <li>
-                  <a href="#laelia.v1.CreateMachineRequest"><span class="badge">M</span>CreateMachineRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.CreateMachineResponse"><span class="badge">M</span>CreateMachineResponse</a>
-                </li>
-              
-                <li>
                   <a href="#laelia.v1.DeleteMachineRequest"><span class="badge">M</span>DeleteMachineRequest</a>
                 </li>
               
@@ -1697,11 +1740,15 @@
                 </li>
               
                 <li>
-                  <a href="#laelia.v1.RotateMachineTokenRequest"><span class="badge">M</span>RotateMachineTokenRequest</a>
+                  <a href="#laelia.v1.TransferMachineOwnershipRequest"><span class="badge">M</span>TransferMachineOwnershipRequest</a>
                 </li>
               
                 <li>
-                  <a href="#laelia.v1.RotateMachineTokenResponse"><span class="badge">M</span>RotateMachineTokenResponse</a>
+                  <a href="#laelia.v1.TransferMachineOwnershipResponse"><span class="badge">M</span>TransferMachineOwnershipResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateMachineRequest"><span class="badge">M</span>UpdateMachineRequest</a>
                 </li>
               
               
@@ -2273,6 +2320,18 @@
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>handle</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>handle is the agent&#39;s human-readable, unique mention id (e.g.
+&#34;rei-agent-1&#34;), generated at creation and immutable thereafter. It is the
+{agent} segment of name (&#34;agents/{handle}&#34;), the value an agent types after
+&#34;@&#34; to mention or DM this agent, and the name of its workspace directory
+(~/.laelia/&lt;machine&gt;/&lt;handle&gt;/). Always populated; mirror of
+agent.resource_id. </p></td>
                 </tr>
               
                 <tr>
@@ -3277,6 +3336,14 @@ sessions without an ACP executor. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>handle</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>handle is the agent&#39;s readable id (&#34;rei-agent-1&#34;), the {agent} segment of
+name. See Agent.handle. Always populated. </p></td>
                 </tr>
               
                 <tr>
@@ -6232,7 +6299,17 @@ uploading; the server enforces a hard byte cap regardless. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>The name of the user.
-Format: users/{user}. {user} is a system-generated unique ID. </p></td>
+Format: users/{user}. {user} is the user&#39;s readable handle (e.g.
+&#34;ran-user-1&#34;), generated at creation and immutable thereafter. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>handle</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>handle is the user&#39;s human-readable, unique mention id (e.g. &#34;ran-user-1&#34;),
+the {user} segment of name (&#34;users/{handle}&#34;) and the value typed after &#34;@&#34;
+to mention or DM this user. Always populated; mirror of principal.handle. </p></td>
                 </tr>
               
                 <tr>
@@ -7603,7 +7680,10 @@ agents with no recorded owner. </p></td>
                   <td>member_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>member_id is the member&#39;s stable id within the conversation: the agent&#39;s
+resource id (its handle, e.g. &#34;rei-agent-1&#34;) for agents, and the user&#39;s
+handle (e.g. &#34;ran-user-1&#34;) for users. It is the value typed after &#34;@&#34; to
+mention the member. </p></td>
                 </tr>
               
                 <tr>
@@ -7611,6 +7691,15 @@ agents with no recorded owner. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>handle</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>handle is the member&#39;s readable mention id (&#34;ran-user-1&#34; for users,
+&#34;rei-agent-1&#34; for agents), identical to member_id. Duplicated as an
+explicit field so consumers do not need to know member_type to render it. </p></td>
                 </tr>
               
                 <tr>
@@ -7956,14 +8045,13 @@ frontend can construct command-detail URLs. </p></td>
                   <td>principal_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>principal_id is the decimal id of the principal that authored this message
-(the chat_message.principal_id row). For a user message it is the sending
-user&#39;s principal id (matching the {user} segment of the &#34;users/{user}&#34;
-resource name); for an agent message it is the conversation owner&#39;s
-principal id; for a system message it is the system bot&#39;s id. The frontend
-uses it to tell the current user&#39;s own messages apart from other users&#39;
-messages in shared channels (sender_name alone is a display name and can
-collide across users). </p></td>
+                  <td><p>principal_id is the mention handle of the principal that authored this
+message (principal.handle). For a user message it is the sending user&#39;s
+handle (matching the {user} segment of the &#34;users/{user}&#34; resource name);
+for an agent message it is the conversation owner&#39;s handle; for a system
+message it is &#34;system-bot&#34;. The frontend uses it to tell the current
+user&#39;s own messages apart from other users&#39; messages in shared channels
+(sender_name alone is a display name and can collide across users). </p></td>
                 </tr>
               
             </tbody>
@@ -8851,7 +8939,9 @@ update so it never appears twice. </p></td>
                   <td>owner_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>owner_id is the owner&#39;s mention handle (e.g. &#34;ran-user-1&#34;), the same value
+the frontend compares against the current user&#39;s handle to detect
+ownership. owner_name is the owner&#39;s display name. </p></td>
                 </tr>
               
                 <tr>
@@ -8951,11 +9041,11 @@ Empty when last_message is empty. </p></td>
                   <td>last_message_principal_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>last_message_principal_id is the decimal principal id of the last_message
-author when the sender is a USER (so the frontend can render &#34;You&#34; without
+                  <td><p>last_message_principal_id is the mention handle of the last_message author
+when the sender is a USER (so the frontend can render &#34;You&#34; without
 mistaking an agent message, whose chat_message.principal_id is the
-conversation owner, for the viewer). Empty for AGENT/SYSTEM senders and when
-last_message is empty. </p></td>
+conversation owner&#39;s handle, for the viewer). Empty for AGENT/SYSTEM
+senders and when last_message is empty. </p></td>
                 </tr>
               
                 <tr>
@@ -9787,10 +9877,12 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
             <tbody>
               
                 <tr>
-                  <td>peer_user_name</td>
+                  <td>peer_user_handle</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>peer_user_handle is the peer user&#39;s readable handle (&#34;ran-user-1&#34;), the
+value typed after &#34;dm:@&#34; to address the user. Resolved by handle only;
+display names are never used. </p></td>
                 </tr>
               
             </tbody>
@@ -11342,14 +11434,17 @@ ask the agent daemon to re-probe installed LLM agent providers </p></td>
                   <td>id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>id is the member&#39;s id: the agent resource id for agents, the user handle
+for users. </p></td>
                 </tr>
               
                 <tr>
                   <td>name</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>name is the member&#39;s handle (&#34;ran-user-1&#34; / &#34;rei-agent-1&#34;), the value
+typed after &#34;@&#34; in message content. Mentions in content are resolved by
+this handle alone; display names never participate in mention resolution. </p></td>
                 </tr>
               
             </tbody>
@@ -11416,6 +11511,15 @@ source of truth. Empty means a normal channel-message wake. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>handle</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>handle is the peer agent&#39;s readable id (&#34;rei-agent-1&#34;), the {agent} segment
+of name (&#34;agents/{handle}&#34;) and the value typed after &#34;@&#34; / &#34;dm:@&#34; to
+address the peer. </p></td>
                 </tr>
               
                 <tr>
@@ -13535,9 +13639,10 @@ Powers the &#34;#&lt;title&gt;&#34; address resolver.</p></td>
                 <td><a href="#laelia.v1.GetOrCreateUserDMRequest">GetOrCreateUserDMRequest</a></td>
                 <td><a href="#laelia.v1.GetOrCreateUserDMResponse">GetOrCreateUserDMResponse</a></td>
                 <td><p>GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent
-and a named end user. Agent-callable. The peer is resolved by principal
-display name; ambiguous or unknown names fail. Agent-callable twin of the
-user-only GetOrCreateConversation. Powers the &#34;dm:@&lt;user&gt;&#34; address resolver.</p></td>
+and a named end user. Agent-callable. The peer is resolved by the user&#39;s
+readable handle (&#34;ran-user-1&#34;); unknown handles fail. Agent-callable twin
+of the user-only GetOrCreateConversation. Powers the &#34;dm:@&lt;user&gt;&#34; address
+resolver.</p></td>
               </tr>
             
               <tr>
@@ -13954,6 +14059,456 @@ UNREAD.</p></td>
                 <td><a href="#laelia.v1.MarkActivityDoneResponse">MarkActivityDoneResponse</a></td>
                 <td><p>MarkActivityDone marks a single activity item DONE for the authenticated
 user, hiding it from All and Unread. The caller&#39;s own id must own the row.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="v1/device.proto">v1/device.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.v1.ApproveDeviceLoginRequest">ApproveDeviceLoginRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>user_code</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ApproveDeviceLoginResponse">ApproveDeviceLoginResponse</h3>
+        <p>ApproveDeviceLoginResponse is empty; the approval page reflects the result</p><p>via GetDeviceLoginStatus polling.</p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.GetDeviceLoginStatusRequest">GetDeviceLoginStatusRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>user_code</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetDeviceLoginStatusResponse">GetDeviceLoginStatusResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#laelia.v1.DeviceLoginStatus">DeviceLoginStatus</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>user_code</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>hostname</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>os</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>arch</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reauth_existing</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>True when the CLI supplied an existing machine id (re-auth flow). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Existing machine title when reauth_existing. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>denial_reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Human-readable reason; set on DENIED. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>ip</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>IP address of the device as seen by the manager when the session
+started; shown on the approval page so the user can verify the device. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_owner</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Owner handle of the existing machine when reauth_existing; shown on the
+approval page so the user can verify who controls the machine. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.PollDeviceLoginRequest">PollDeviceLoginRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>device_code</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.PollDeviceLoginResponse">PollDeviceLoginResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#laelia.v1.DeviceLoginStatus">DeviceLoginStatus</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Machine resource id; set on APPROVED (the machine to register or re-auth). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Machine title; set on APPROVED. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>refresh_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Refresh token minted at approval; set once on APPROVED and retrievable
+within the post-approval grace window so a crashed CLI can recover. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>denial_reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Human-readable reason; set on DENIED (e.g. the machine belongs to
+another user and re-auth requires its owner or a workspace admin). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.StartDeviceLoginRequest">StartDeviceLoginRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>hostname</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Host name of the machine; becomes the machine title on first-time
+registration. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>os</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>arch</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>ip</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>fingerprint</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Client-generated host fingerprint (hostname:os:arch hash); bound to the
+minted refresh token. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Existing machine resource id when re-authenticating a machine that
+already registered on this host; empty for first-time registration. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.StartDeviceLoginResponse">StartDeviceLoginResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>device_code</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>High-entropy bearer secret the CLI presents to PollDeviceLogin; never
+displayed. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>user_code</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>8-character code (XXXX-XXXX) displayed on the device screen and typed
+into the approval page URL. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>verification_path</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Relative verification path, e.g. &#34;/login/device?user_code=XXXX-XXXX&#34;.
+The CLI composes the full URL from its configured manager URL. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>expires_in</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>Seconds until the session expires (600). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>interval</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>Minimum poll interval in seconds (5). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="laelia.v1.DeviceLoginStatus">DeviceLoginStatus</h3>
+        <p>DeviceLoginStatus is the state of a device login session.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>DEVICE_LOGIN_STATUS_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>DEVICE_LOGIN_STATUS_PENDING</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>DEVICE_LOGIN_STATUS_APPROVED</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>DEVICE_LOGIN_STATUS_EXPIRED</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>DEVICE_LOGIN_STATUS_DENIED</td>
+                <td>4</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+        <h3 id="laelia.v1.DeviceService">DeviceService</h3>
+        <p>DeviceService implements the OAuth2-style device code flow that replaces</p><p>bootstrap-token machine registration. The machine CLI calls StartDeviceLogin</p><p>(it has no credential yet), prints the verification URL + user code, and</p><p>polls PollDeviceLogin until a logged-in user approves on the public</p><p>/login/device page. On approval the manager mints the machine's refresh</p><p>token (creating the machine row on first-time setup) and the CLI persists it</p><p>locally.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>StartDeviceLogin</td>
+                <td><a href="#laelia.v1.StartDeviceLoginRequest">StartDeviceLoginRequest</a></td>
+                <td><a href="#laelia.v1.StartDeviceLoginResponse">StartDeviceLoginResponse</a></td>
+                <td><p>StartDeviceLogin begins a device login. No credential is required; the
+call is rate-limited per source IP. The CLI passes its host info and,
+when re-authenticating an already-registered machine, the existing
+machine&#39;s resource id so approval re-auths that machine instead of
+creating a duplicate.</p></td>
+              </tr>
+            
+              <tr>
+                <td>PollDeviceLogin</td>
+                <td><a href="#laelia.v1.PollDeviceLoginRequest">PollDeviceLoginRequest</a></td>
+                <td><a href="#laelia.v1.PollDeviceLoginResponse">PollDeviceLoginResponse</a></td>
+                <td><p>PollDeviceLogin returns the session status. The device_code is the
+bearer secret; the server enforces a minimum poll interval.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetDeviceLoginStatus</td>
+                <td><a href="#laelia.v1.GetDeviceLoginStatusRequest">GetDeviceLoginStatusRequest</a></td>
+                <td><a href="#laelia.v1.GetDeviceLoginStatusResponse">GetDeviceLoginStatusResponse</a></td>
+                <td><p>GetDeviceLoginStatus backs the public approval page; the user_code is
+what the device screen displays. Returns only non-secret device info.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ApproveDeviceLogin</td>
+                <td><a href="#laelia.v1.ApproveDeviceLoginRequest">ApproveDeviceLoginRequest</a></td>
+                <td><a href="#laelia.v1.ApproveDeviceLoginResponse">ApproveDeviceLoginResponse</a></td>
+                <td><p>ApproveDeviceLogin approves a pending device login. Any logged-in user
+may approve a new machine; re-authentication of an existing machine is
+restricted to its creator or a workspace admin (the session is marked
+DENIED with a reason otherwise). Audited.</p></td>
               </tr>
             
           </tbody>
@@ -14948,13 +15503,6 @@ policy or &#34;agents/{agent}&#34; for an agent policy. </p></td>
             <tbody>
               
                 <tr>
-                  <td>registration_token</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>first connection or after refresh failure </p></td>
-                </tr>
-              
-                <tr>
                   <td>info</td>
                   <td><a href="#laelia.v1.MachineInfo">MachineInfo</a></td>
                   <td></td>
@@ -14986,29 +15534,8 @@ policy or &#34;agents/{agent}&#34; for an agent policy. </p></td>
             <tbody>
               
                 <tr>
-                  <td>access_token</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>15-minute validity </p></td>
-                </tr>
-              
-                <tr>
-                  <td>refresh_token</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>24-hour validity, single-use rotation </p></td>
-                </tr>
-              
-                <tr>
                   <td>session_id</td>
                   <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>access_token_expires_at</td>
-                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -15026,61 +15553,6 @@ policy or &#34;agents/{agent}&#34; for an agent policy. </p></td>
                   <td>repeated</td>
                   <td><p>The full set of agents this machine must host. The machine app opens one
 AgentChannel per entry immediately after connect (and on every reconnect). </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.CreateMachineRequest">CreateMachineRequest</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>machine</td>
-                  <td><a href="#laelia.v1.Machine">Machine</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.CreateMachineResponse">CreateMachineResponse</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>machine</td>
-                  <td><a href="#laelia.v1.Machine">Machine</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>registration_token</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>7-day validity, single-use on first connect </p></td>
                 </tr>
               
             </tbody>
@@ -15901,6 +16373,13 @@ Machine-scoped: every agent hosted on this machine selects from this list. </p><
                 </tr>
               
                 <tr>
+                  <td>created_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
                   <td>can_edit</td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
@@ -16307,7 +16786,7 @@ the machine&#39;s creator or a holder of laelia.machines.delete. </p></td>
 
         
       
-        <h3 id="laelia.v1.RotateMachineTokenRequest">RotateMachineTokenRequest</h3>
+        <h3 id="laelia.v1.TransferMachineOwnershipRequest">TransferMachineOwnershipRequest</h3>
         <p></p>
 
         
@@ -16325,8 +16804,39 @@ the machine&#39;s creator or a holder of laelia.machines.delete. </p></td>
                 </tr>
               
                 <tr>
+                  <td>new_owner</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>New owner&#39;s user resource name (users/{id}). </p></td>
+                </tr>
+              
+                <tr>
                   <td>reason</td>
                   <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>audit purpose </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.TransferMachineOwnershipResponse">TransferMachineOwnershipResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>machine</td>
+                  <td><a href="#laelia.v1.Machine">Machine</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -16338,7 +16848,7 @@ the machine&#39;s creator or a holder of laelia.machines.delete. </p></td>
 
         
       
-        <h3 id="laelia.v1.RotateMachineTokenResponse">RotateMachineTokenResponse</h3>
+        <h3 id="laelia.v1.UpdateMachineRequest">UpdateMachineRequest</h3>
         <p></p>
 
         
@@ -16349,10 +16859,17 @@ the machine&#39;s creator or a holder of laelia.machines.delete. </p></td>
             <tbody>
               
                 <tr>
-                  <td>registration_token</td>
+                  <td>name</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>New machine title. Empty means &#34;leave unchanged&#34;. </p></td>
                 </tr>
               
             </tbody>
@@ -16410,19 +16927,12 @@ the machine&#39;s creator or a holder of laelia.machines.delete. </p></td>
 
       
         <h3 id="laelia.v1.MachineService">MachineService</h3>
-        <p>MachineService manages machines (a long-lived agent-application process a</p><p>user runs once on a host) and serves the machine-side authentication RPCs the</p><p>machine app calls to register itself. A machine authenticates once with a</p><p>registration token and then hosts one or more agents, each running its own</p><p>AgentChannel over the machine's access token.</p><p>========== Management APIs (IAM auth, admin only) ==========</p>
+        <p>MachineService manages machines (a long-lived agent-application process a</p><p>user runs once on a host) and serves the machine-side authentication RPCs</p><p>the machine app calls to connect. A machine authenticates through the</p><p>device-code flow (DeviceService): the manager mints its refresh token at</p><p>approval time and the machine reconnects with access tokens issued by</p><p>RefreshMachineToken. Each machine hosts one or more agents, each running its</p><p>own AgentChannel over the machine's access token.</p><p>========== Management APIs (IAM auth, admin only) ==========</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
           </thead>
           <tbody>
-            
-              <tr>
-                <td>CreateMachine</td>
-                <td><a href="#laelia.v1.CreateMachineRequest">CreateMachineRequest</a></td>
-                <td><a href="#laelia.v1.CreateMachineResponse">CreateMachineResponse</a></td>
-                <td><p></p></td>
-              </tr>
             
               <tr>
                 <td>ListMachines</td>
@@ -16448,14 +16958,25 @@ no permission annotation so the creator short-circuit can run.</p></td>
               </tr>
             
               <tr>
-                <td>RotateMachineToken</td>
-                <td><a href="#laelia.v1.RotateMachineTokenRequest">RotateMachineTokenRequest</a></td>
-                <td><a href="#laelia.v1.RotateMachineTokenResponse">RotateMachineTokenResponse</a></td>
-                <td><p>Token rotation: generate a new registration token; the machine app must
-re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.
-Authorized in the handler for the machine&#39;s creator or a holder of
-laelia.machines.edit (workspace-scope); no permission annotation so the
-creator short-circuit can run.</p></td>
+                <td>UpdateMachine</td>
+                <td><a href="#laelia.v1.UpdateMachineRequest">UpdateMachineRequest</a></td>
+                <td><a href="#laelia.v1.Machine">Machine</a></td>
+                <td><p>UpdateMachine renames a machine (title). Authorized in the handler for
+the machine&#39;s creator or a holder of laelia.machines.edit
+(workspace-scope); no permission annotation so the creator short-circuit
+can run.</p></td>
+              </tr>
+            
+              <tr>
+                <td>TransferMachineOwnership</td>
+                <td><a href="#laelia.v1.TransferMachineOwnershipRequest">TransferMachineOwnershipRequest</a></td>
+                <td><a href="#laelia.v1.TransferMachineOwnershipResponse">TransferMachineOwnershipResponse</a></td>
+                <td><p>TransferMachineOwnership reassigns the machine to another user. The new
+owner then controls the machine and may approve its re-authentication.
+The machine keeps running; its tokens are not revoked. Authorized in the
+handler for the machine&#39;s creator or a holder of laelia.machines.edit
+(workspace-scope); no permission annotation so the creator short-circuit
+can run.</p></td>
               </tr>
             
               <tr>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAuthPath, resolveAuthRedirect } from "./auth-redirect";
+import { isAuthPath, isPublicPath, resolveAuthRedirect } from "./auth-redirect";
 
 describe("resolveAuthRedirect", () => {
   it("does not redirect while the session is still loading", () => {
@@ -68,6 +68,28 @@ describe("resolveAuthRedirect", () => {
       })
     ).toBeNull();
   });
+
+  it("lets a logged-out user reach the public device-login page", () => {
+    expect(
+      resolveAuthRedirect({
+        sessionLoaded: true,
+        isLoggedIn: false,
+        pathname: "/login/device",
+        search: "?user_code=0RBM-CK57",
+      })
+    ).toBeNull();
+  });
+
+  it("does not bounce a logged-in user off the device-login page", () => {
+    expect(
+      resolveAuthRedirect({
+        sessionLoaded: true,
+        isLoggedIn: true,
+        pathname: "/login/device",
+        search: "?user_code=0RBM-CK57",
+      })
+    ).toBeNull();
+  });
 });
 
 describe("isAuthPath", () => {
@@ -79,5 +101,17 @@ describe("isAuthPath", () => {
   it("rejects non-auth paths", () => {
     expect(isAuthPath("/agents/x/chat")).toBe(false);
     expect(isAuthPath("/")).toBe(false);
+  });
+});
+
+describe("isPublicPath", () => {
+  it("recognizes the device-login path", () => {
+    expect(isPublicPath("/login/device")).toBe(true);
+    expect(isPublicPath("/login/device?user_code=XXXX-XXXX")).toBe(true);
+  });
+
+  it("rejects other paths", () => {
+    expect(isPublicPath("/auth/signin")).toBe(false);
+    expect(isPublicPath("/machines")).toBe(false);
   });
 });

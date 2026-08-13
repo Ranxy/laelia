@@ -16,209 +16,202 @@ import { file_v1_common } from "./common_pb";
  * Describes the file v1/machine.proto.
  */
 export const file_v1_machine = /*@__PURE__*/
-  fileDesc("ChB2MS9tYWNoaW5lLnByb3RvEglsYWVsaWEudjEiQAoUQ3JlYXRlTWFjaGluZVJlcXVlc3QSKAoHbWFjaGluZRgBIAEoCzISLmxhZWxpYS52MS5NYWNoaW5lQgPgQQIiWAoVQ3JlYXRlTWFjaGluZVJlc3BvbnNlEiMKB21hY2hpbmUYASABKAsyEi5sYWVsaWEudjEuTWFjaGluZRIaChJyZWdpc3RyYXRpb25fdG9rZW4YAiABKAkiUQoZUm90YXRlTWFjaGluZVRva2VuUmVxdWVzdBIkCgRuYW1lGAEgASgJQhbgQQL6QRAKDmxhZWxpYS9NYWNoaW5lEg4KBnJlYXNvbhgCIAEoCSI4ChpSb3RhdGVNYWNoaW5lVG9rZW5SZXNwb25zZRIaChJyZWdpc3RyYXRpb25fdG9rZW4YASABKAkiUQoZUmV2b2tlTWFjaGluZVRva2VuUmVxdWVzdBIkCgRuYW1lGAEgASgJQhbgQQL6QRAKDmxhZWxpYS9NYWNoaW5lEg4KBnJlYXNvbhgCIAEoCSIcChpSZXZva2VNYWNoaW5lVG9rZW5SZXNwb25zZSJVCh1Gb3JjZURpc2Nvbm5lY3RNYWNoaW5lUmVxdWVzdBIkCgRuYW1lGAEgASgJQhbgQQL6QRAKDmxhZWxpYS9NYWNoaW5lEg4KBnJlYXNvbhgCIAEoCSJnChhMaXN0TWFjaGluZUFnZW50c1JlcXVlc3QSJAoEbmFtZRgBIAEoCUIW4EEC+kEQCg5sYWVsaWEvTWFjaGluZRIRCglwYWdlX3NpemUYAiABKAUSEgoKcGFnZV90b2tlbhgDIAEoCSJdChlMaXN0TWFjaGluZUFnZW50c1Jlc3BvbnNlEicKBmFnZW50cxgBIAMoCzIXLmxhZWxpYS52MS5BZ2VudFN1bW1hcnkSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIkYKHlJlZnJlc2hNYWNoaW5lUHJvdmlkZXJzUmVxdWVzdBIkCgRuYW1lGAEgASgJQhbgQQL6QRAKDmxhZWxpYS9NYWNoaW5lIlIKH1JlZnJlc2hNYWNoaW5lUHJvdmlkZXJzUmVzcG9uc2USLwoJcHJvdmlkZXJzGAEgAygLMhwubGFlbGlhLnYxLkFnZW50UHJvdmlkZXJJbmZvIkQKHExpc3RNYWNoaW5lV29ya3NwYWNlc1JlcXVlc3QSJAoEbmFtZRgBIAEoCUIW4EEC+kEQCg5sYWVsaWEvTWFjaGluZSJXCh1MaXN0TWFjaGluZVdvcmtzcGFjZXNSZXNwb25zZRI2Cgp3b3Jrc3BhY2VzGAEgAygLMiIubGFlbGlhLnYxLk1hY2hpbmVXb3Jrc3BhY2VTdW1tYXJ5Im4KFUNvbm5lY3RNYWNoaW5lUmVxdWVzdBIaChJyZWdpc3RyYXRpb25fdG9rZW4YASABKAkSJAoEaW5mbxgCIAEoCzIWLmxhZWxpYS52MS5NYWNoaW5lSW5mbxITCgtmaW5nZXJwcmludBgDIAEoCSL9AQoWQ29ubmVjdE1hY2hpbmVSZXNwb25zZRIUCgxhY2Nlc3NfdG9rZW4YASABKAkSFQoNcmVmcmVzaF90b2tlbhgCIAEoCRISCgpzZXNzaW9uX2lkGAMgASgJEjsKF2FjY2Vzc190b2tlbl9leHBpcmVzX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCg5pbml0aWFsX3N0YXR1cxgFIAEoCzIYLmxhZWxpYS52MS5NYWNoaW5lU3RhdHVzEjMKD2Fzc2lnbmVkX2FnZW50cxgGIAMoCzIaLmxhZWxpYS52MS5BZ2VudEFzc2lnbm1lbnQiRQoXTWFjaGluZUhlYXJ0YmVhdFJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCRIWCg5wcmV2aW91c19ub25jZRgCIAEoCSK4AQoYTWFjaGluZUhlYXJ0YmVhdFJlc3BvbnNlEhIKCm5leHRfbm9uY2UYASABKAkSNQoRbmV4dF9oZWFydGJlYXRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhQKDGFjY2Vzc190b2tlbhgDIAEoCRI7ChdhY2Nlc3NfdG9rZW5fZXhwaXJlc19hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiPgoYTWFjaGluZURpc2Nvbm5lY3RSZXF1ZXN0EhIKCnNlc3Npb25faWQYASABKAkSDgoGcmVhc29uGAIgASgJIkgKGlJlZnJlc2hNYWNoaW5lVG9rZW5SZXF1ZXN0EhUKDXJlZnJlc2hfdG9rZW4YASABKAkSEwoLZmluZ2VycHJpbnQYAiABKAkihwEKG1JlZnJlc2hNYWNoaW5lVG9rZW5SZXNwb25zZRIUCgxhY2Nlc3NfdG9rZW4YASABKAkSFQoNcmVmcmVzaF90b2tlbhgCIAEoCRI7ChdhY2Nlc3NfdG9rZW5fZXhwaXJlc19hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiUgoTTGlzdE1hY2hpbmVzUmVxdWVzdBIRCglwYWdlX3NpemUYASABKAUSEgoKcGFnZV90b2tlbhgCIAEoCRIUCgxzaG93X2RlbGV0ZWQYAyABKAgiXAoUTGlzdE1hY2hpbmVzUmVzcG9uc2USKwoIbWFjaGluZXMYASADKAsyGS5sYWVsaWEudjEuTWFjaGluZVN1bW1hcnkSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjkKEUdldE1hY2hpbmVSZXF1ZXN0EiQKBG5hbWUYASABKAlCFuBBAvpBEAoObGFlbGlhL01hY2hpbmUiPAoURGVsZXRlTWFjaGluZVJlcXVlc3QSJAoEbmFtZRgBIAEoCUIW4EEC+kEQCg5sYWVsaWEvTWFjaGluZSK9AwoHTWFjaGluZRIMCgRuYW1lGAEgASgJEh8KBXN0YXRlGAIgASgOMhAubGFlbGlhLnYxLlN0YXRlEg0KBXRpdGxlGAMgASgJEiQKBGluZm8YBSABKAsyFi5sYWVsaWEudjEuTWFjaGluZUluZm8SKAoGc3RhdHVzGAYgASgLMhgubGFlbGlhLnYxLk1hY2hpbmVTdGF0dXMSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoGbGFiZWxzGAggAygLMh4ubGFlbGlhLnYxLk1hY2hpbmUuTGFiZWxzRW50cnkSFwoKY3JlYXRlZF9ieRgLIAEoCUID4EEDEhUKCGNhbl9lZGl0GAwgASgIQgPgQQMSHQoQY2FuX2NyZWF0ZV9hZ2VudBgNIAEoCEID4EEDEhcKCmNhbl9tYW5hZ2UYDiABKAhCA+BBAxotCgtMYWJlbHNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBOifqQSQKDmxhZWxpYS9NYWNoaW5lEhJtYWNoaW5lcy97bWFjaGluZX1KBAgEEAUi7wEKDk1hY2hpbmVTdW1tYXJ5EgwKBG5hbWUYASABKAkSHwoFc3RhdGUYAiABKA4yEC5sYWVsaWEudjEuU3RhdGUSDQoFdGl0bGUYAyABKAkSKAoGc3RhdHVzGAQgASgLMhgubGFlbGlhLnYxLk1hY2hpbmVTdGF0dXMSEwoLYWdlbnRfY291bnQYBSABKAUSFwoKY3JlYXRlZF9ieRgGIAEoCUID4EEDEhUKCGNhbl9lZGl0GAcgASgIQgPgQQMSFwoKY2FuX21hbmFnZRgIIAEoCEID4EEDEhcKCmNhbl9kZWxldGUYCSABKAhCA+BBAyKkAgoLTWFjaGluZUluZm8SEAoIaG9zdG5hbWUYAiABKAkSCgoCb3MYAyABKAkSDAoEYXJjaBgEIAEoCRIKCgJpcBgFIAEoCRIPCgd2ZXJzaW9uGAYgASgJEjIKBmxhYmVscxgHIAMoCzIiLmxhZWxpYS52MS5NYWNoaW5lSW5mby5MYWJlbHNFbnRyeRIuCgpjYXBhYmlsaXR5GAggASgLMhoubGFlbGlhLnYxLkFnZW50Q2FwYWJpbGl0eRI5ChNhdmFpbGFibGVfcHJvdmlkZXJzGAkgAygLMhwubGFlbGlhLnYxLkFnZW50UHJvdmlkZXJJbmZvGi0KC0xhYmVsc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEizAIKDU1hY2hpbmVTdGF0dXMSNwoFc3RhdGUYASABKA4yKC5sYWVsaWEudjEuTWFjaGluZVN0YXR1cy5Db25uZWN0aW9uU3RhdGUSNwoTbGFzdF9oZWFydGJlYXRfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMgoOY29ubmVjdGVkX3RpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhUKDWVycm9yX21lc3NhZ2UYBCABKAkSGQoRYWN0aXZlX3Nlc3Npb25faWQYBSABKAkiYwoPQ29ubmVjdGlvblN0YXRlEiAKHENPTk5FQ1RJT05fU1RBVEVfVU5TUEVDSUZJRUQQABIKCgZPTkxJTkUQARILCgdPRkZMSU5FEAISCQoFRVJST1IQAxIKCgZLSUNLRUQQBCJwCg9BZ2VudEFzc2lnbm1lbnQSEgoKYWdlbnRfbmFtZRgBIAEoCRIaChJhZ2VudF9kaXNwbGF5X25hbWUYAiABKAkSLQoKYWNwX2NvbmZpZxgDIAEoCzIZLmxhZWxpYS52MS5BZ2VudEFDUENvbmZpZyLJAgoUTWFjaGluZVN0cmVhbU1lc3NhZ2USMAoNbWFjaGluZV9yZWFkeRgBIAEoCzIXLmxhZWxpYS52MS5NYWNoaW5lUmVhZHlIABIfCgRwaW5nGAIgASgLMg8ubGFlbGlhLnYxLlBpbmdIABI+ChRwcm92aWRlcnNfZGlzY292ZXJlZBgDIAEoCzIeLmxhZWxpYS52MS5Qcm92aWRlcnNEaXNjb3ZlcmVkSAASPwoRZGlzY29ubmVjdF9ub3RpY2UYBCABKAsyIi5sYWVsaWEudjEuTWFjaGluZURpc2Nvbm5lY3ROb3RpY2VIABJSCh9tYWNoaW5lX3dvcmtzcGFjZV9zY2FuX3Jlc3BvbnNlGAUgASgLMicubGFlbGlhLnYxLk1hY2hpbmVXb3Jrc3BhY2VTY2FuUmVzcG9uc2VIAEIJCgdtZXNzYWdlIsEDChtNYW5hZ2VyTWFjaGluZVN0cmVhbU1lc3NhZ2USNgoQYWdlbnRfYXNzaWdubWVudBgBIAEoCzIaLmxhZWxpYS52MS5BZ2VudEFzc2lnbm1lbnRIABIuCgxyZW1vdmVfYWdlbnQYAiABKAsyFi5sYWVsaWEudjEuUmVtb3ZlQWdlbnRIABI7ChNhZ2VudF9jb25maWdfdXBkYXRlGAMgASgLMhwubGFlbGlhLnYxLkFnZW50Q29uZmlnVXBkYXRlSAASOgoSZGlzY292ZXJfcHJvdmlkZXJzGAQgASgLMhwubGFlbGlhLnYxLkRpc2NvdmVyUHJvdmlkZXJzSAASHwoEcG9uZxgFIAEoCzIPLmxhZWxpYS52MS5Qb25nSAASQwoXcmVsb2FkX2FnZW50X2Fzc2lnbm1lbnQYBiABKAsyIC5sYWVsaWEudjEuUmVsb2FkQWdlbnRBc3NpZ25tZW50SAASUAoebWFjaGluZV93b3Jrc3BhY2Vfc2Nhbl9yZXF1ZXN0GAcgASgLMiYubGFlbGlhLnYxLk1hY2hpbmVXb3Jrc3BhY2VTY2FuUmVxdWVzdEgAQgkKB21lc3NhZ2UiIgoMTWFjaGluZVJlYWR5EhIKCnNlc3Npb25faWQYASABKAkiIQoLUmVtb3ZlQWdlbnQSEgoKYWdlbnRfbmFtZRgBIAEoCSJWChFBZ2VudENvbmZpZ1VwZGF0ZRISCgphZ2VudF9uYW1lGAEgASgJEi0KCmFjcF9jb25maWcYAiABKAsyGS5sYWVsaWEudjEuQWdlbnRBQ1BDb25maWciKQoXTWFjaGluZURpc2Nvbm5lY3ROb3RpY2USDgoGcmVhc29uGAEgASgJIlsKFVJlbG9hZEFnZW50QXNzaWdubWVudBISCgphZ2VudF9uYW1lGAEgASgJEi4KCmFzc2lnbm1lbnQYAiABKAsyGi5sYWVsaWEudjEuQWdlbnRBc3NpZ25tZW50IjEKG01hY2hpbmVXb3Jrc3BhY2VTY2FuUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJIpIBChdNYWNoaW5lV29ya3NwYWNlU3VtbWFyeRIWCg5kaXJlY3RvcnlfbmFtZRgBIAEoCRIYChB0b3RhbF9zaXplX2J5dGVzGAIgASgDEjEKDWxhc3RfbW9kaWZpZWQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmZpbGVfY291bnQYBCABKAMiagocTWFjaGluZVdvcmtzcGFjZVNjYW5SZXNwb25zZRISCgpyZXF1ZXN0X2lkGAEgASgJEjYKCndvcmtzcGFjZXMYAiADKAsyIi5sYWVsaWEudjEuTWFjaGluZVdvcmtzcGFjZVN1bW1hcnky7QsKDk1hY2hpbmVTZXJ2aWNlEnYKDUNyZWF0ZU1hY2hpbmUSHy5sYWVsaWEudjEuQ3JlYXRlTWFjaGluZVJlcXVlc3QaIC5sYWVsaWEudjEuQ3JlYXRlTWFjaGluZVJlc3BvbnNlIiKK6jAWbGFlbGlhLm1hY2hpbmVzLmNyZWF0ZZDqMAGY6jABEmwKDExpc3RNYWNoaW5lcxIeLmxhZWxpYS52MS5MaXN0TWFjaGluZXNSZXF1ZXN0Gh8ubGFlbGlhLnYxLkxpc3RNYWNoaW5lc1Jlc3BvbnNlIhuK6jATbGFlbGlhLm1hY2hpbmVzLmdldJDqMAESYgoKR2V0TWFjaGluZRIcLmxhZWxpYS52MS5HZXRNYWNoaW5lUmVxdWVzdBoSLmxhZWxpYS52MS5NYWNoaW5lIiLaQQRuYW1liuowE2xhZWxpYS5tYWNoaW5lcy5nZXSQ6jABElIKDURlbGV0ZU1hY2hpbmUSHy5sYWVsaWEudjEuRGVsZXRlTWFjaGluZVJlcXVlc3QaFi5nb29nbGUucHJvdG9idWYuRW1wdHkiCJDqMAGY6jABEmsKElJvdGF0ZU1hY2hpbmVUb2tlbhIkLmxhZWxpYS52MS5Sb3RhdGVNYWNoaW5lVG9rZW5SZXF1ZXN0GiUubGFlbGlhLnYxLlJvdGF0ZU1hY2hpbmVUb2tlblJlc3BvbnNlIgiQ6jABmOowARJrChJSZXZva2VNYWNoaW5lVG9rZW4SJC5sYWVsaWEudjEuUmV2b2tlTWFjaGluZVRva2VuUmVxdWVzdBolLmxhZWxpYS52MS5SZXZva2VNYWNoaW5lVG9rZW5SZXNwb25zZSIIkOowAZjqMAESZAoWRm9yY2VEaXNjb25uZWN0TWFjaGluZRIoLmxhZWxpYS52MS5Gb3JjZURpc2Nvbm5lY3RNYWNoaW5lUmVxdWVzdBoWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eSIIkOowAZjqMAESewoRTGlzdE1hY2hpbmVBZ2VudHMSIy5sYWVsaWEudjEuTGlzdE1hY2hpbmVBZ2VudHNSZXF1ZXN0GiQubGFlbGlhLnYxLkxpc3RNYWNoaW5lQWdlbnRzUmVzcG9uc2UiG4rqMBNsYWVsaWEubWFjaGluZXMuZ2V0kOowARJ6ChdSZWZyZXNoTWFjaGluZVByb3ZpZGVycxIpLmxhZWxpYS52MS5SZWZyZXNoTWFjaGluZVByb3ZpZGVyc1JlcXVlc3QaKi5sYWVsaWEudjEuUmVmcmVzaE1hY2hpbmVQcm92aWRlcnNSZXNwb25zZSIIkOowAZjqMAESdAoVTGlzdE1hY2hpbmVXb3Jrc3BhY2VzEicubGFlbGlhLnYxLkxpc3RNYWNoaW5lV29ya3NwYWNlc1JlcXVlc3QaKC5sYWVsaWEudjEuTGlzdE1hY2hpbmVXb3Jrc3BhY2VzUmVzcG9uc2UiCJDqMAGY6jABEl8KDkNvbm5lY3RNYWNoaW5lEiAubGFlbGlhLnYxLkNvbm5lY3RNYWNoaW5lUmVxdWVzdBohLmxhZWxpYS52MS5Db25uZWN0TWFjaGluZVJlc3BvbnNlIgiQ6jACmOowARJhChBNYWNoaW5lSGVhcnRiZWF0EiIubGFlbGlhLnYxLk1hY2hpbmVIZWFydGJlYXRSZXF1ZXN0GiMubGFlbGlhLnYxLk1hY2hpbmVIZWFydGJlYXRSZXNwb25zZSIEkOowAhJaChFNYWNoaW5lRGlzY29ubmVjdBIjLmxhZWxpYS52MS5NYWNoaW5lRGlzY29ubmVjdFJlcXVlc3QaFi5nb29nbGUucHJvdG9idWYuRW1wdHkiCJDqMAKY6jABEm4KE1JlZnJlc2hNYWNoaW5lVG9rZW4SJS5sYWVsaWEudjEuUmVmcmVzaE1hY2hpbmVUb2tlblJlcXVlc3QaJi5sYWVsaWEudjEuUmVmcmVzaE1hY2hpbmVUb2tlblJlc3BvbnNlIgiQ6jACmOowATJ1ChRNYWNoaW5lU3RyZWFtU2VydmljZRJdCg5NYWNoaW5lQ2hhbm5lbBIfLmxhZWxpYS52MS5NYWNoaW5lU3RyZWFtTWVzc2FnZRomLmxhZWxpYS52MS5NYW5hZ2VyTWFjaGluZVN0cmVhbU1lc3NhZ2UoATABQjFaL2dpdGh1Yi5jb20vUmFueHkvbGFlbGlhL2JhY2tlbmQvZ2VuZXJhdGVkLWdvL3YxYgZwcm90bzM", [file_google_api_client, file_google_api_field_behavior, file_google_api_resource, file_google_protobuf_empty, file_google_protobuf_timestamp, file_v1_agent, file_v1_annotation, file_v1_command, file_v1_common]);
+  fileDesc("ChB2MS9tYWNoaW5lLnByb3RvEglsYWVsaWEudjEiSwoUVXBkYXRlTWFjaGluZVJlcXVlc3QSJAoEbmFtZRgBIAEoCUIW4EEC+kEQCg5sYWVsaWEvTWFjaGluZRINCgV0aXRsZRgCIAEoCSJvCh9UcmFuc2Zlck1hY2hpbmVPd25lcnNoaXBSZXF1ZXN0EiQKBG5hbWUYASABKAlCFuBBAvpBEAoObGFlbGlhL01hY2hpbmUSFgoJbmV3X293bmVyGAIgASgJQgPgQQISDgoGcmVhc29uGAMgASgJIkcKIFRyYW5zZmVyTWFjaGluZU93bmVyc2hpcFJlc3BvbnNlEiMKB21hY2hpbmUYASABKAsyEi5sYWVsaWEudjEuTWFjaGluZSJRChlSZXZva2VNYWNoaW5lVG9rZW5SZXF1ZXN0EiQKBG5hbWUYASABKAlCFuBBAvpBEAoObGFlbGlhL01hY2hpbmUSDgoGcmVhc29uGAIgASgJIhwKGlJldm9rZU1hY2hpbmVUb2tlblJlc3BvbnNlIlUKHUZvcmNlRGlzY29ubmVjdE1hY2hpbmVSZXF1ZXN0EiQKBG5hbWUYASABKAlCFuBBAvpBEAoObGFlbGlhL01hY2hpbmUSDgoGcmVhc29uGAIgASgJImcKGExpc3RNYWNoaW5lQWdlbnRzUmVxdWVzdBIkCgRuYW1lGAEgASgJQhbgQQL6QRAKDmxhZWxpYS9NYWNoaW5lEhEKCXBhZ2Vfc2l6ZRgCIAEoBRISCgpwYWdlX3Rva2VuGAMgASgJIl0KGUxpc3RNYWNoaW5lQWdlbnRzUmVzcG9uc2USJwoGYWdlbnRzGAEgAygLMhcubGFlbGlhLnYxLkFnZW50U3VtbWFyeRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiRgoeUmVmcmVzaE1hY2hpbmVQcm92aWRlcnNSZXF1ZXN0EiQKBG5hbWUYASABKAlCFuBBAvpBEAoObGFlbGlhL01hY2hpbmUiUgofUmVmcmVzaE1hY2hpbmVQcm92aWRlcnNSZXNwb25zZRIvCglwcm92aWRlcnMYASADKAsyHC5sYWVsaWEudjEuQWdlbnRQcm92aWRlckluZm8iRAocTGlzdE1hY2hpbmVXb3Jrc3BhY2VzUmVxdWVzdBIkCgRuYW1lGAEgASgJQhbgQQL6QRAKDmxhZWxpYS9NYWNoaW5lIlcKHUxpc3RNYWNoaW5lV29ya3NwYWNlc1Jlc3BvbnNlEjYKCndvcmtzcGFjZXMYASADKAsyIi5sYWVsaWEudjEuTWFjaGluZVdvcmtzcGFjZVN1bW1hcnkiUgoVQ29ubmVjdE1hY2hpbmVSZXF1ZXN0EiQKBGluZm8YASABKAsyFi5sYWVsaWEudjEuTWFjaGluZUluZm8SEwoLZmluZ2VycHJpbnQYAiABKAkikwEKFkNvbm5lY3RNYWNoaW5lUmVzcG9uc2USEgoKc2Vzc2lvbl9pZBgBIAEoCRIwCg5pbml0aWFsX3N0YXR1cxgCIAEoCzIYLmxhZWxpYS52MS5NYWNoaW5lU3RhdHVzEjMKD2Fzc2lnbmVkX2FnZW50cxgDIAMoCzIaLmxhZWxpYS52MS5BZ2VudEFzc2lnbm1lbnQiRQoXTWFjaGluZUhlYXJ0YmVhdFJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCRIWCg5wcmV2aW91c19ub25jZRgCIAEoCSK4AQoYTWFjaGluZUhlYXJ0YmVhdFJlc3BvbnNlEhIKCm5leHRfbm9uY2UYASABKAkSNQoRbmV4dF9oZWFydGJlYXRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhQKDGFjY2Vzc190b2tlbhgDIAEoCRI7ChdhY2Nlc3NfdG9rZW5fZXhwaXJlc19hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiPgoYTWFjaGluZURpc2Nvbm5lY3RSZXF1ZXN0EhIKCnNlc3Npb25faWQYASABKAkSDgoGcmVhc29uGAIgASgJIkgKGlJlZnJlc2hNYWNoaW5lVG9rZW5SZXF1ZXN0EhUKDXJlZnJlc2hfdG9rZW4YASABKAkSEwoLZmluZ2VycHJpbnQYAiABKAkihwEKG1JlZnJlc2hNYWNoaW5lVG9rZW5SZXNwb25zZRIUCgxhY2Nlc3NfdG9rZW4YASABKAkSFQoNcmVmcmVzaF90b2tlbhgCIAEoCRI7ChdhY2Nlc3NfdG9rZW5fZXhwaXJlc19hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiUgoTTGlzdE1hY2hpbmVzUmVxdWVzdBIRCglwYWdlX3NpemUYASABKAUSEgoKcGFnZV90b2tlbhgCIAEoCRIUCgxzaG93X2RlbGV0ZWQYAyABKAgiXAoUTGlzdE1hY2hpbmVzUmVzcG9uc2USKwoIbWFjaGluZXMYASADKAsyGS5sYWVsaWEudjEuTWFjaGluZVN1bW1hcnkSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjkKEUdldE1hY2hpbmVSZXF1ZXN0EiQKBG5hbWUYASABKAlCFuBBAvpBEAoObGFlbGlhL01hY2hpbmUiPAoURGVsZXRlTWFjaGluZVJlcXVlc3QSJAoEbmFtZRgBIAEoCUIW4EEC+kEQCg5sYWVsaWEvTWFjaGluZSK9AwoHTWFjaGluZRIMCgRuYW1lGAEgASgJEh8KBXN0YXRlGAIgASgOMhAubGFlbGlhLnYxLlN0YXRlEg0KBXRpdGxlGAMgASgJEiQKBGluZm8YBSABKAsyFi5sYWVsaWEudjEuTWFjaGluZUluZm8SKAoGc3RhdHVzGAYgASgLMhgubGFlbGlhLnYxLk1hY2hpbmVTdGF0dXMSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoGbGFiZWxzGAggAygLMh4ubGFlbGlhLnYxLk1hY2hpbmUuTGFiZWxzRW50cnkSFwoKY3JlYXRlZF9ieRgLIAEoCUID4EEDEhUKCGNhbl9lZGl0GAwgASgIQgPgQQMSHQoQY2FuX2NyZWF0ZV9hZ2VudBgNIAEoCEID4EEDEhcKCmNhbl9tYW5hZ2UYDiABKAhCA+BBAxotCgtMYWJlbHNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBOifqQSQKDmxhZWxpYS9NYWNoaW5lEhJtYWNoaW5lcy97bWFjaGluZX1KBAgEEAUinwIKDk1hY2hpbmVTdW1tYXJ5EgwKBG5hbWUYASABKAkSHwoFc3RhdGUYAiABKA4yEC5sYWVsaWEudjEuU3RhdGUSDQoFdGl0bGUYAyABKAkSKAoGc3RhdHVzGAQgASgLMhgubGFlbGlhLnYxLk1hY2hpbmVTdGF0dXMSEwoLYWdlbnRfY291bnQYBSABKAUSFwoKY3JlYXRlZF9ieRgGIAEoCUID4EEDEi4KCmNyZWF0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhUKCGNhbl9lZGl0GAcgASgIQgPgQQMSFwoKY2FuX21hbmFnZRgIIAEoCEID4EEDEhcKCmNhbl9kZWxldGUYCSABKAhCA+BBAyKkAgoLTWFjaGluZUluZm8SEAoIaG9zdG5hbWUYAiABKAkSCgoCb3MYAyABKAkSDAoEYXJjaBgEIAEoCRIKCgJpcBgFIAEoCRIPCgd2ZXJzaW9uGAYgASgJEjIKBmxhYmVscxgHIAMoCzIiLmxhZWxpYS52MS5NYWNoaW5lSW5mby5MYWJlbHNFbnRyeRIuCgpjYXBhYmlsaXR5GAggASgLMhoubGFlbGlhLnYxLkFnZW50Q2FwYWJpbGl0eRI5ChNhdmFpbGFibGVfcHJvdmlkZXJzGAkgAygLMhwubGFlbGlhLnYxLkFnZW50UHJvdmlkZXJJbmZvGi0KC0xhYmVsc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEizAIKDU1hY2hpbmVTdGF0dXMSNwoFc3RhdGUYASABKA4yKC5sYWVsaWEudjEuTWFjaGluZVN0YXR1cy5Db25uZWN0aW9uU3RhdGUSNwoTbGFzdF9oZWFydGJlYXRfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMgoOY29ubmVjdGVkX3RpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhUKDWVycm9yX21lc3NhZ2UYBCABKAkSGQoRYWN0aXZlX3Nlc3Npb25faWQYBSABKAkiYwoPQ29ubmVjdGlvblN0YXRlEiAKHENPTk5FQ1RJT05fU1RBVEVfVU5TUEVDSUZJRUQQABIKCgZPTkxJTkUQARILCgdPRkZMSU5FEAISCQoFRVJST1IQAxIKCgZLSUNLRUQQBCJwCg9BZ2VudEFzc2lnbm1lbnQSEgoKYWdlbnRfbmFtZRgBIAEoCRIaChJhZ2VudF9kaXNwbGF5X25hbWUYAiABKAkSLQoKYWNwX2NvbmZpZxgDIAEoCzIZLmxhZWxpYS52MS5BZ2VudEFDUENvbmZpZyLJAgoUTWFjaGluZVN0cmVhbU1lc3NhZ2USMAoNbWFjaGluZV9yZWFkeRgBIAEoCzIXLmxhZWxpYS52MS5NYWNoaW5lUmVhZHlIABIfCgRwaW5nGAIgASgLMg8ubGFlbGlhLnYxLlBpbmdIABI+ChRwcm92aWRlcnNfZGlzY292ZXJlZBgDIAEoCzIeLmxhZWxpYS52MS5Qcm92aWRlcnNEaXNjb3ZlcmVkSAASPwoRZGlzY29ubmVjdF9ub3RpY2UYBCABKAsyIi5sYWVsaWEudjEuTWFjaGluZURpc2Nvbm5lY3ROb3RpY2VIABJSCh9tYWNoaW5lX3dvcmtzcGFjZV9zY2FuX3Jlc3BvbnNlGAUgASgLMicubGFlbGlhLnYxLk1hY2hpbmVXb3Jrc3BhY2VTY2FuUmVzcG9uc2VIAEIJCgdtZXNzYWdlIsEDChtNYW5hZ2VyTWFjaGluZVN0cmVhbU1lc3NhZ2USNgoQYWdlbnRfYXNzaWdubWVudBgBIAEoCzIaLmxhZWxpYS52MS5BZ2VudEFzc2lnbm1lbnRIABIuCgxyZW1vdmVfYWdlbnQYAiABKAsyFi5sYWVsaWEudjEuUmVtb3ZlQWdlbnRIABI7ChNhZ2VudF9jb25maWdfdXBkYXRlGAMgASgLMhwubGFlbGlhLnYxLkFnZW50Q29uZmlnVXBkYXRlSAASOgoSZGlzY292ZXJfcHJvdmlkZXJzGAQgASgLMhwubGFlbGlhLnYxLkRpc2NvdmVyUHJvdmlkZXJzSAASHwoEcG9uZxgFIAEoCzIPLmxhZWxpYS52MS5Qb25nSAASQwoXcmVsb2FkX2FnZW50X2Fzc2lnbm1lbnQYBiABKAsyIC5sYWVsaWEudjEuUmVsb2FkQWdlbnRBc3NpZ25tZW50SAASUAoebWFjaGluZV93b3Jrc3BhY2Vfc2Nhbl9yZXF1ZXN0GAcgASgLMiYubGFlbGlhLnYxLk1hY2hpbmVXb3Jrc3BhY2VTY2FuUmVxdWVzdEgAQgkKB21lc3NhZ2UiIgoMTWFjaGluZVJlYWR5EhIKCnNlc3Npb25faWQYASABKAkiIQoLUmVtb3ZlQWdlbnQSEgoKYWdlbnRfbmFtZRgBIAEoCSJWChFBZ2VudENvbmZpZ1VwZGF0ZRISCgphZ2VudF9uYW1lGAEgASgJEi0KCmFjcF9jb25maWcYAiABKAsyGS5sYWVsaWEudjEuQWdlbnRBQ1BDb25maWciKQoXTWFjaGluZURpc2Nvbm5lY3ROb3RpY2USDgoGcmVhc29uGAEgASgJIlsKFVJlbG9hZEFnZW50QXNzaWdubWVudBISCgphZ2VudF9uYW1lGAEgASgJEi4KCmFzc2lnbm1lbnQYAiABKAsyGi5sYWVsaWEudjEuQWdlbnRBc3NpZ25tZW50IjEKG01hY2hpbmVXb3Jrc3BhY2VTY2FuUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJIpIBChdNYWNoaW5lV29ya3NwYWNlU3VtbWFyeRIWCg5kaXJlY3RvcnlfbmFtZRgBIAEoCRIYChB0b3RhbF9zaXplX2J5dGVzGAIgASgDEjEKDWxhc3RfbW9kaWZpZWQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmZpbGVfY291bnQYBCABKAMiagocTWFjaGluZVdvcmtzcGFjZVNjYW5SZXNwb25zZRISCgpyZXF1ZXN0X2lkGAEgASgJEjYKCndvcmtzcGFjZXMYAiADKAsyIi5sYWVsaWEudjEuTWFjaGluZVdvcmtzcGFjZVN1bW1hcnky1wsKDk1hY2hpbmVTZXJ2aWNlEmwKDExpc3RNYWNoaW5lcxIeLmxhZWxpYS52MS5MaXN0TWFjaGluZXNSZXF1ZXN0Gh8ubGFlbGlhLnYxLkxpc3RNYWNoaW5lc1Jlc3BvbnNlIhuK6jATbGFlbGlhLm1hY2hpbmVzLmdldJDqMAESYgoKR2V0TWFjaGluZRIcLmxhZWxpYS52MS5HZXRNYWNoaW5lUmVxdWVzdBoSLmxhZWxpYS52MS5NYWNoaW5lIiLaQQRuYW1liuowE2xhZWxpYS5tYWNoaW5lcy5nZXSQ6jABElIKDURlbGV0ZU1hY2hpbmUSHy5sYWVsaWEudjEuRGVsZXRlTWFjaGluZVJlcXVlc3QaFi5nb29nbGUucHJvdG9idWYuRW1wdHkiCJDqMAGY6jABEk4KDVVwZGF0ZU1hY2hpbmUSHy5sYWVsaWEudjEuVXBkYXRlTWFjaGluZVJlcXVlc3QaEi5sYWVsaWEudjEuTWFjaGluZSIIkOowAZjqMAESfQoYVHJhbnNmZXJNYWNoaW5lT3duZXJzaGlwEioubGFlbGlhLnYxLlRyYW5zZmVyTWFjaGluZU93bmVyc2hpcFJlcXVlc3QaKy5sYWVsaWEudjEuVHJhbnNmZXJNYWNoaW5lT3duZXJzaGlwUmVzcG9uc2UiCJDqMAGY6jABEmsKElJldm9rZU1hY2hpbmVUb2tlbhIkLmxhZWxpYS52MS5SZXZva2VNYWNoaW5lVG9rZW5SZXF1ZXN0GiUubGFlbGlhLnYxLlJldm9rZU1hY2hpbmVUb2tlblJlc3BvbnNlIgiQ6jABmOowARJkChZGb3JjZURpc2Nvbm5lY3RNYWNoaW5lEigubGFlbGlhLnYxLkZvcmNlRGlzY29ubmVjdE1hY2hpbmVSZXF1ZXN0GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IgiQ6jABmOowARJ7ChFMaXN0TWFjaGluZUFnZW50cxIjLmxhZWxpYS52MS5MaXN0TWFjaGluZUFnZW50c1JlcXVlc3QaJC5sYWVsaWEudjEuTGlzdE1hY2hpbmVBZ2VudHNSZXNwb25zZSIbiuowE2xhZWxpYS5tYWNoaW5lcy5nZXSQ6jABEnoKF1JlZnJlc2hNYWNoaW5lUHJvdmlkZXJzEikubGFlbGlhLnYxLlJlZnJlc2hNYWNoaW5lUHJvdmlkZXJzUmVxdWVzdBoqLmxhZWxpYS52MS5SZWZyZXNoTWFjaGluZVByb3ZpZGVyc1Jlc3BvbnNlIgiQ6jABmOowARJ0ChVMaXN0TWFjaGluZVdvcmtzcGFjZXMSJy5sYWVsaWEudjEuTGlzdE1hY2hpbmVXb3Jrc3BhY2VzUmVxdWVzdBooLmxhZWxpYS52MS5MaXN0TWFjaGluZVdvcmtzcGFjZXNSZXNwb25zZSIIkOowAZjqMAESXwoOQ29ubmVjdE1hY2hpbmUSIC5sYWVsaWEudjEuQ29ubmVjdE1hY2hpbmVSZXF1ZXN0GiEubGFlbGlhLnYxLkNvbm5lY3RNYWNoaW5lUmVzcG9uc2UiCJDqMAKY6jABEmEKEE1hY2hpbmVIZWFydGJlYXQSIi5sYWVsaWEudjEuTWFjaGluZUhlYXJ0YmVhdFJlcXVlc3QaIy5sYWVsaWEudjEuTWFjaGluZUhlYXJ0YmVhdFJlc3BvbnNlIgSQ6jACEloKEU1hY2hpbmVEaXNjb25uZWN0EiMubGFlbGlhLnYxLk1hY2hpbmVEaXNjb25uZWN0UmVxdWVzdBoWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eSIIkOowApjqMAESbgoTUmVmcmVzaE1hY2hpbmVUb2tlbhIlLmxhZWxpYS52MS5SZWZyZXNoTWFjaGluZVRva2VuUmVxdWVzdBomLmxhZWxpYS52MS5SZWZyZXNoTWFjaGluZVRva2VuUmVzcG9uc2UiCJDqMAKY6jABMnUKFE1hY2hpbmVTdHJlYW1TZXJ2aWNlEl0KDk1hY2hpbmVDaGFubmVsEh8ubGFlbGlhLnYxLk1hY2hpbmVTdHJlYW1NZXNzYWdlGiYubGFlbGlhLnYxLk1hbmFnZXJNYWNoaW5lU3RyZWFtTWVzc2FnZSgBMAFCMVovZ2l0aHViLmNvbS9SYW54eS9sYWVsaWEvYmFja2VuZC9nZW5lcmF0ZWQtZ28vdjFiBnByb3RvMw", [file_google_api_client, file_google_api_field_behavior, file_google_api_resource, file_google_protobuf_empty, file_google_protobuf_timestamp, file_v1_agent, file_v1_annotation, file_v1_command, file_v1_common]);
 
 /**
- * Describes the message laelia.v1.CreateMachineRequest.
- * Use `create(CreateMachineRequestSchema)` to create a new message.
+ * Describes the message laelia.v1.UpdateMachineRequest.
+ * Use `create(UpdateMachineRequestSchema)` to create a new message.
  */
-export const CreateMachineRequestSchema = /*@__PURE__*/
+export const UpdateMachineRequestSchema = /*@__PURE__*/
   messageDesc(file_v1_machine, 0);
 
 /**
- * Describes the message laelia.v1.CreateMachineResponse.
- * Use `create(CreateMachineResponseSchema)` to create a new message.
+ * Describes the message laelia.v1.TransferMachineOwnershipRequest.
+ * Use `create(TransferMachineOwnershipRequestSchema)` to create a new message.
  */
-export const CreateMachineResponseSchema = /*@__PURE__*/
+export const TransferMachineOwnershipRequestSchema = /*@__PURE__*/
   messageDesc(file_v1_machine, 1);
 
 /**
- * Describes the message laelia.v1.RotateMachineTokenRequest.
- * Use `create(RotateMachineTokenRequestSchema)` to create a new message.
+ * Describes the message laelia.v1.TransferMachineOwnershipResponse.
+ * Use `create(TransferMachineOwnershipResponseSchema)` to create a new message.
  */
-export const RotateMachineTokenRequestSchema = /*@__PURE__*/
+export const TransferMachineOwnershipResponseSchema = /*@__PURE__*/
   messageDesc(file_v1_machine, 2);
-
-/**
- * Describes the message laelia.v1.RotateMachineTokenResponse.
- * Use `create(RotateMachineTokenResponseSchema)` to create a new message.
- */
-export const RotateMachineTokenResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 3);
 
 /**
  * Describes the message laelia.v1.RevokeMachineTokenRequest.
  * Use `create(RevokeMachineTokenRequestSchema)` to create a new message.
  */
 export const RevokeMachineTokenRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 4);
+  messageDesc(file_v1_machine, 3);
 
 /**
  * Describes the message laelia.v1.RevokeMachineTokenResponse.
  * Use `create(RevokeMachineTokenResponseSchema)` to create a new message.
  */
 export const RevokeMachineTokenResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 5);
+  messageDesc(file_v1_machine, 4);
 
 /**
  * Describes the message laelia.v1.ForceDisconnectMachineRequest.
  * Use `create(ForceDisconnectMachineRequestSchema)` to create a new message.
  */
 export const ForceDisconnectMachineRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 6);
+  messageDesc(file_v1_machine, 5);
 
 /**
  * Describes the message laelia.v1.ListMachineAgentsRequest.
  * Use `create(ListMachineAgentsRequestSchema)` to create a new message.
  */
 export const ListMachineAgentsRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 7);
+  messageDesc(file_v1_machine, 6);
 
 /**
  * Describes the message laelia.v1.ListMachineAgentsResponse.
  * Use `create(ListMachineAgentsResponseSchema)` to create a new message.
  */
 export const ListMachineAgentsResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 8);
+  messageDesc(file_v1_machine, 7);
 
 /**
  * Describes the message laelia.v1.RefreshMachineProvidersRequest.
  * Use `create(RefreshMachineProvidersRequestSchema)` to create a new message.
  */
 export const RefreshMachineProvidersRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 9);
+  messageDesc(file_v1_machine, 8);
 
 /**
  * Describes the message laelia.v1.RefreshMachineProvidersResponse.
  * Use `create(RefreshMachineProvidersResponseSchema)` to create a new message.
  */
 export const RefreshMachineProvidersResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 10);
+  messageDesc(file_v1_machine, 9);
 
 /**
  * Describes the message laelia.v1.ListMachineWorkspacesRequest.
  * Use `create(ListMachineWorkspacesRequestSchema)` to create a new message.
  */
 export const ListMachineWorkspacesRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 11);
+  messageDesc(file_v1_machine, 10);
 
 /**
  * Describes the message laelia.v1.ListMachineWorkspacesResponse.
  * Use `create(ListMachineWorkspacesResponseSchema)` to create a new message.
  */
 export const ListMachineWorkspacesResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 12);
+  messageDesc(file_v1_machine, 11);
 
 /**
  * Describes the message laelia.v1.ConnectMachineRequest.
  * Use `create(ConnectMachineRequestSchema)` to create a new message.
  */
 export const ConnectMachineRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 13);
+  messageDesc(file_v1_machine, 12);
 
 /**
  * Describes the message laelia.v1.ConnectMachineResponse.
  * Use `create(ConnectMachineResponseSchema)` to create a new message.
  */
 export const ConnectMachineResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 14);
+  messageDesc(file_v1_machine, 13);
 
 /**
  * Describes the message laelia.v1.MachineHeartbeatRequest.
  * Use `create(MachineHeartbeatRequestSchema)` to create a new message.
  */
 export const MachineHeartbeatRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 15);
+  messageDesc(file_v1_machine, 14);
 
 /**
  * Describes the message laelia.v1.MachineHeartbeatResponse.
  * Use `create(MachineHeartbeatResponseSchema)` to create a new message.
  */
 export const MachineHeartbeatResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 16);
+  messageDesc(file_v1_machine, 15);
 
 /**
  * Describes the message laelia.v1.MachineDisconnectRequest.
  * Use `create(MachineDisconnectRequestSchema)` to create a new message.
  */
 export const MachineDisconnectRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 17);
+  messageDesc(file_v1_machine, 16);
 
 /**
  * Describes the message laelia.v1.RefreshMachineTokenRequest.
  * Use `create(RefreshMachineTokenRequestSchema)` to create a new message.
  */
 export const RefreshMachineTokenRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 18);
+  messageDesc(file_v1_machine, 17);
 
 /**
  * Describes the message laelia.v1.RefreshMachineTokenResponse.
  * Use `create(RefreshMachineTokenResponseSchema)` to create a new message.
  */
 export const RefreshMachineTokenResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 19);
+  messageDesc(file_v1_machine, 18);
 
 /**
  * Describes the message laelia.v1.ListMachinesRequest.
  * Use `create(ListMachinesRequestSchema)` to create a new message.
  */
 export const ListMachinesRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 20);
+  messageDesc(file_v1_machine, 19);
 
 /**
  * Describes the message laelia.v1.ListMachinesResponse.
  * Use `create(ListMachinesResponseSchema)` to create a new message.
  */
 export const ListMachinesResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 21);
+  messageDesc(file_v1_machine, 20);
 
 /**
  * Describes the message laelia.v1.GetMachineRequest.
  * Use `create(GetMachineRequestSchema)` to create a new message.
  */
 export const GetMachineRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 22);
+  messageDesc(file_v1_machine, 21);
 
 /**
  * Describes the message laelia.v1.DeleteMachineRequest.
  * Use `create(DeleteMachineRequestSchema)` to create a new message.
  */
 export const DeleteMachineRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 23);
+  messageDesc(file_v1_machine, 22);
 
 /**
  * Describes the message laelia.v1.Machine.
  * Use `create(MachineSchema)` to create a new message.
  */
 export const MachineSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 24);
+  messageDesc(file_v1_machine, 23);
 
 /**
  * Describes the message laelia.v1.MachineSummary.
  * Use `create(MachineSummarySchema)` to create a new message.
  */
 export const MachineSummarySchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 25);
+  messageDesc(file_v1_machine, 24);
 
 /**
  * Describes the message laelia.v1.MachineInfo.
  * Use `create(MachineInfoSchema)` to create a new message.
  */
 export const MachineInfoSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 26);
+  messageDesc(file_v1_machine, 25);
 
 /**
  * Describes the message laelia.v1.MachineStatus.
  * Use `create(MachineStatusSchema)` to create a new message.
  */
 export const MachineStatusSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 27);
+  messageDesc(file_v1_machine, 26);
 
 /**
  * Describes the enum laelia.v1.MachineStatus.ConnectionState.
  */
 export const MachineStatus_ConnectionStateSchema = /*@__PURE__*/
-  enumDesc(file_v1_machine, 27, 0);
+  enumDesc(file_v1_machine, 26, 0);
 
 /**
  * @generated from enum laelia.v1.MachineStatus.ConnectionState
@@ -231,84 +224,86 @@ export const MachineStatus_ConnectionState = /*@__PURE__*/
  * Use `create(AgentAssignmentSchema)` to create a new message.
  */
 export const AgentAssignmentSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 28);
+  messageDesc(file_v1_machine, 27);
 
 /**
  * Describes the message laelia.v1.MachineStreamMessage.
  * Use `create(MachineStreamMessageSchema)` to create a new message.
  */
 export const MachineStreamMessageSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 29);
+  messageDesc(file_v1_machine, 28);
 
 /**
  * Describes the message laelia.v1.ManagerMachineStreamMessage.
  * Use `create(ManagerMachineStreamMessageSchema)` to create a new message.
  */
 export const ManagerMachineStreamMessageSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 30);
+  messageDesc(file_v1_machine, 29);
 
 /**
  * Describes the message laelia.v1.MachineReady.
  * Use `create(MachineReadySchema)` to create a new message.
  */
 export const MachineReadySchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 31);
+  messageDesc(file_v1_machine, 30);
 
 /**
  * Describes the message laelia.v1.RemoveAgent.
  * Use `create(RemoveAgentSchema)` to create a new message.
  */
 export const RemoveAgentSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 32);
+  messageDesc(file_v1_machine, 31);
 
 /**
  * Describes the message laelia.v1.AgentConfigUpdate.
  * Use `create(AgentConfigUpdateSchema)` to create a new message.
  */
 export const AgentConfigUpdateSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 33);
+  messageDesc(file_v1_machine, 32);
 
 /**
  * Describes the message laelia.v1.MachineDisconnectNotice.
  * Use `create(MachineDisconnectNoticeSchema)` to create a new message.
  */
 export const MachineDisconnectNoticeSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 34);
+  messageDesc(file_v1_machine, 33);
 
 /**
  * Describes the message laelia.v1.ReloadAgentAssignment.
  * Use `create(ReloadAgentAssignmentSchema)` to create a new message.
  */
 export const ReloadAgentAssignmentSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 35);
+  messageDesc(file_v1_machine, 34);
 
 /**
  * Describes the message laelia.v1.MachineWorkspaceScanRequest.
  * Use `create(MachineWorkspaceScanRequestSchema)` to create a new message.
  */
 export const MachineWorkspaceScanRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 36);
+  messageDesc(file_v1_machine, 35);
 
 /**
  * Describes the message laelia.v1.MachineWorkspaceSummary.
  * Use `create(MachineWorkspaceSummarySchema)` to create a new message.
  */
 export const MachineWorkspaceSummarySchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 37);
+  messageDesc(file_v1_machine, 36);
 
 /**
  * Describes the message laelia.v1.MachineWorkspaceScanResponse.
  * Use `create(MachineWorkspaceScanResponseSchema)` to create a new message.
  */
 export const MachineWorkspaceScanResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_machine, 38);
+  messageDesc(file_v1_machine, 37);
 
 /**
  * MachineService manages machines (a long-lived agent-application process a
- * user runs once on a host) and serves the machine-side authentication RPCs the
- * machine app calls to register itself. A machine authenticates once with a
- * registration token and then hosts one or more agents, each running its own
- * AgentChannel over the machine's access token.
+ * user runs once on a host) and serves the machine-side authentication RPCs
+ * the machine app calls to connect. A machine authenticates through the
+ * device-code flow (DeviceService): the manager mints its refresh token at
+ * approval time and the machine reconnects with access tokens issued by
+ * RefreshMachineToken. Each machine hosts one or more agents, each running its
+ * own AgentChannel over the machine's access token.
  *
  * ========== Management APIs (IAM auth, admin only) ==========
  *

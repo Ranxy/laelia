@@ -10,7 +10,6 @@ func TestIsNeverVisibleEntry(t *testing.T) {
 		{".aws", true},
 		{".gnupg", true},
 		{".ssh", true},
-		{"machine-token-abc", true},
 		{".git", false},
 		{".env", false},
 		{"token.json", false},

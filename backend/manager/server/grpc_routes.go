@@ -16,6 +16,7 @@ import (
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
 	apiv1 "github.com/Ranxy/laelia/backend/manager/api/v1"
+	"github.com/Ranxy/laelia/backend/manager/component/device"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/component/mailer"
@@ -51,6 +52,11 @@ func configureV1Routers(
 	stores.SetRoomNotifier(hub)
 
 	iamManager := iam.NewManager(stores)
+	// Device login sessions: in-memory store for the device-code flow. The
+	// sweeper runs for the server's lifetime and purges expired/denied
+	// sessions.
+	deviceStore := device.New()
+	deviceStore.StartSweeper(ctx)
 	// Mailer sender: reads the SMTP setting from the setting table on every
 	// send, so admin changes take effect immediately without restart.
 	mailerSender := mailer.NewSender(stores)
@@ -60,6 +66,7 @@ func configureV1Routers(
 	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager, iamManager, hub)
 	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)
 	machineService := apiv1.NewMachineService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager)
+	deviceService := apiv1.NewDeviceService(deviceStore, stores, secret, profile, iamManager)
 	machineStreamService := apiv1.NewMachineStreamService(stores, cmdDispatcher)
 	settingService := apiv1.NewSettingService(stores, s3clientmanager, profile, iamManager)
 	roleService := apiv1.NewRoleService(stores)
@@ -148,6 +155,8 @@ func configureV1Routers(
 	connectHandlers[agentCmdPath] = agentCmdHandler
 	machinePath, machineHandler := v1connect.NewMachineServiceHandler(machineService, handlerOpts)
 	connectHandlers[machinePath] = machineHandler
+	devicePath, deviceHandler := v1connect.NewDeviceServiceHandler(deviceService, handlerOpts)
+	connectHandlers[devicePath] = deviceHandler
 	machineStreamPath, machineStreamHandler := v1connect.NewMachineStreamServiceHandler(machineStreamService, handlerOpts)
 	connectHandlers[machineStreamPath] = machineStreamHandler
 	settingPath, settingHandler := v1connect.NewSettingServiceHandler(settingService, handlerOpts)
@@ -182,6 +191,7 @@ func configureV1Routers(
 			v1connect.CommandServiceName,
 			v1connect.AgentStreamServiceName,
 			v1connect.MachineServiceName,
+			v1connect.DeviceServiceName,
 			v1connect.MachineStreamServiceName,
 			v1connect.SettingServiceName,
 			v1connect.RoleServiceName,

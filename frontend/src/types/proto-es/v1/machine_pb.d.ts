@@ -15,80 +15,73 @@ import type { DiscoverProviders, Ping, Pong, ProvidersDiscovered } from "./comma
 export declare const file_v1_machine: GenFile;
 
 /**
- * @generated from message laelia.v1.CreateMachineRequest
+ * @generated from message laelia.v1.UpdateMachineRequest
  */
-export declare type CreateMachineRequest = Message<"laelia.v1.CreateMachineRequest"> & {
-  /**
-   * @generated from field: laelia.v1.Machine machine = 1;
-   */
-  machine?: Machine | undefined;
-};
-
-/**
- * Describes the message laelia.v1.CreateMachineRequest.
- * Use `create(CreateMachineRequestSchema)` to create a new message.
- */
-export declare const CreateMachineRequestSchema: GenMessage<CreateMachineRequest>;
-
-/**
- * @generated from message laelia.v1.CreateMachineResponse
- */
-export declare type CreateMachineResponse = Message<"laelia.v1.CreateMachineResponse"> & {
-  /**
-   * @generated from field: laelia.v1.Machine machine = 1;
-   */
-  machine?: Machine | undefined;
-
-  /**
-   * 7-day validity, single-use on first connect
-   *
-   * @generated from field: string registration_token = 2;
-   */
-  registrationToken: string;
-};
-
-/**
- * Describes the message laelia.v1.CreateMachineResponse.
- * Use `create(CreateMachineResponseSchema)` to create a new message.
- */
-export declare const CreateMachineResponseSchema: GenMessage<CreateMachineResponse>;
-
-/**
- * @generated from message laelia.v1.RotateMachineTokenRequest
- */
-export declare type RotateMachineTokenRequest = Message<"laelia.v1.RotateMachineTokenRequest"> & {
+export declare type UpdateMachineRequest = Message<"laelia.v1.UpdateMachineRequest"> & {
   /**
    * @generated from field: string name = 1;
    */
   name: string;
 
   /**
-   * @generated from field: string reason = 2;
+   * New machine title. Empty means "leave unchanged".
+   *
+   * @generated from field: string title = 2;
+   */
+  title: string;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateMachineRequest.
+ * Use `create(UpdateMachineRequestSchema)` to create a new message.
+ */
+export declare const UpdateMachineRequestSchema: GenMessage<UpdateMachineRequest>;
+
+/**
+ * @generated from message laelia.v1.TransferMachineOwnershipRequest
+ */
+export declare type TransferMachineOwnershipRequest = Message<"laelia.v1.TransferMachineOwnershipRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * New owner's user resource name (users/{id}).
+   *
+   * @generated from field: string new_owner = 2;
+   */
+  newOwner: string;
+
+  /**
+   * audit purpose
+   *
+   * @generated from field: string reason = 3;
    */
   reason: string;
 };
 
 /**
- * Describes the message laelia.v1.RotateMachineTokenRequest.
- * Use `create(RotateMachineTokenRequestSchema)` to create a new message.
+ * Describes the message laelia.v1.TransferMachineOwnershipRequest.
+ * Use `create(TransferMachineOwnershipRequestSchema)` to create a new message.
  */
-export declare const RotateMachineTokenRequestSchema: GenMessage<RotateMachineTokenRequest>;
+export declare const TransferMachineOwnershipRequestSchema: GenMessage<TransferMachineOwnershipRequest>;
 
 /**
- * @generated from message laelia.v1.RotateMachineTokenResponse
+ * @generated from message laelia.v1.TransferMachineOwnershipResponse
  */
-export declare type RotateMachineTokenResponse = Message<"laelia.v1.RotateMachineTokenResponse"> & {
+export declare type TransferMachineOwnershipResponse = Message<"laelia.v1.TransferMachineOwnershipResponse"> & {
   /**
-   * @generated from field: string registration_token = 1;
+   * @generated from field: laelia.v1.Machine machine = 1;
    */
-  registrationToken: string;
+  machine?: Machine | undefined;
 };
 
 /**
- * Describes the message laelia.v1.RotateMachineTokenResponse.
- * Use `create(RotateMachineTokenResponseSchema)` to create a new message.
+ * Describes the message laelia.v1.TransferMachineOwnershipResponse.
+ * Use `create(TransferMachineOwnershipResponseSchema)` to create a new message.
  */
-export declare const RotateMachineTokenResponseSchema: GenMessage<RotateMachineTokenResponse>;
+export declare const TransferMachineOwnershipResponseSchema: GenMessage<TransferMachineOwnershipResponse>;
 
 /**
  * @generated from message laelia.v1.RevokeMachineTokenRequest
@@ -260,21 +253,14 @@ export declare const ListMachineWorkspacesResponseSchema: GenMessage<ListMachine
  */
 export declare type ConnectMachineRequest = Message<"laelia.v1.ConnectMachineRequest"> & {
   /**
-   * first connection or after refresh failure
-   *
-   * @generated from field: string registration_token = 1;
-   */
-  registrationToken: string;
-
-  /**
-   * @generated from field: laelia.v1.MachineInfo info = 2;
+   * @generated from field: laelia.v1.MachineInfo info = 1;
    */
   info?: MachineInfo | undefined;
 
   /**
    * client-generated connection fingerprint (hostname:os:arch)
    *
-   * @generated from field: string fingerprint = 3;
+   * @generated from field: string fingerprint = 2;
    */
   fingerprint: string;
 };
@@ -290,31 +276,12 @@ export declare const ConnectMachineRequestSchema: GenMessage<ConnectMachineReque
  */
 export declare type ConnectMachineResponse = Message<"laelia.v1.ConnectMachineResponse"> & {
   /**
-   * 15-minute validity
-   *
-   * @generated from field: string access_token = 1;
-   */
-  accessToken: string;
-
-  /**
-   * 24-hour validity, single-use rotation
-   *
-   * @generated from field: string refresh_token = 2;
-   */
-  refreshToken: string;
-
-  /**
-   * @generated from field: string session_id = 3;
+   * @generated from field: string session_id = 1;
    */
   sessionId: string;
 
   /**
-   * @generated from field: google.protobuf.Timestamp access_token_expires_at = 4;
-   */
-  accessTokenExpiresAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: laelia.v1.MachineStatus initial_status = 5;
+   * @generated from field: laelia.v1.MachineStatus initial_status = 2;
    */
   initialStatus?: MachineStatus | undefined;
 
@@ -322,7 +289,7 @@ export declare type ConnectMachineResponse = Message<"laelia.v1.ConnectMachineRe
    * The full set of agents this machine must host. The machine app opens one
    * AgentChannel per entry immediately after connect (and on every reconnect).
    *
-   * @generated from field: repeated laelia.v1.AgentAssignment assigned_agents = 6;
+   * @generated from field: repeated laelia.v1.AgentAssignment assigned_agents = 3;
    */
   assignedAgents: AgentAssignment[];
 };
@@ -657,6 +624,11 @@ export declare type MachineSummary = Message<"laelia.v1.MachineSummary"> & {
    * @generated from field: string created_by = 6;
    */
   createdBy: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 10;
+   */
+  createdAt?: Timestamp | undefined;
 
   /**
    * can_edit reports whether the current caller holds laelia.machines.edit
@@ -1145,24 +1117,18 @@ export declare const MachineWorkspaceScanResponseSchema: GenMessage<MachineWorks
 
 /**
  * MachineService manages machines (a long-lived agent-application process a
- * user runs once on a host) and serves the machine-side authentication RPCs the
- * machine app calls to register itself. A machine authenticates once with a
- * registration token and then hosts one or more agents, each running its own
- * AgentChannel over the machine's access token.
+ * user runs once on a host) and serves the machine-side authentication RPCs
+ * the machine app calls to connect. A machine authenticates through the
+ * device-code flow (DeviceService): the manager mints its refresh token at
+ * approval time and the machine reconnects with access tokens issued by
+ * RefreshMachineToken. Each machine hosts one or more agents, each running its
+ * own AgentChannel over the machine's access token.
  *
  * ========== Management APIs (IAM auth, admin only) ==========
  *
  * @generated from service laelia.v1.MachineService
  */
 export declare const MachineService: GenService<{
-  /**
-   * @generated from rpc laelia.v1.MachineService.CreateMachine
-   */
-  createMachine: {
-    methodKind: "unary";
-    input: typeof CreateMachineRequestSchema;
-    output: typeof CreateMachineResponseSchema;
-  },
   /**
    * @generated from rpc laelia.v1.MachineService.ListMachines
    */
@@ -1192,18 +1158,32 @@ export declare const MachineService: GenService<{
     output: typeof EmptySchema;
   },
   /**
-   * Token rotation: generate a new registration token; the machine app must
-   * re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.
-   * Authorized in the handler for the machine's creator or a holder of
-   * laelia.machines.edit (workspace-scope); no permission annotation so the
-   * creator short-circuit can run.
+   * UpdateMachine renames a machine (title). Authorized in the handler for
+   * the machine's creator or a holder of laelia.machines.edit
+   * (workspace-scope); no permission annotation so the creator short-circuit
+   * can run.
    *
-   * @generated from rpc laelia.v1.MachineService.RotateMachineToken
+   * @generated from rpc laelia.v1.MachineService.UpdateMachine
    */
-  rotateMachineToken: {
+  updateMachine: {
     methodKind: "unary";
-    input: typeof RotateMachineTokenRequestSchema;
-    output: typeof RotateMachineTokenResponseSchema;
+    input: typeof UpdateMachineRequestSchema;
+    output: typeof MachineSchema;
+  },
+  /**
+   * TransferMachineOwnership reassigns the machine to another user. The new
+   * owner then controls the machine and may approve its re-authentication.
+   * The machine keeps running; its tokens are not revoked. Authorized in the
+   * handler for the machine's creator or a holder of laelia.machines.edit
+   * (workspace-scope); no permission annotation so the creator short-circuit
+   * can run.
+   *
+   * @generated from rpc laelia.v1.MachineService.TransferMachineOwnership
+   */
+  transferMachineOwnership: {
+    methodKind: "unary";
+    input: typeof TransferMachineOwnershipRequestSchema;
+    output: typeof TransferMachineOwnershipResponseSchema;
   },
   /**
    * Token revocation: revoke all tokens for the machine. Authorized in the

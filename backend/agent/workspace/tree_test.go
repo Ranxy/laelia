@@ -17,7 +17,7 @@ func TestListSortsAndFilters(t *testing.T) {
 	mustMkdir(t, root, ".env")
 	mustWrite(t, root, "z.txt", "z")
 	mustWrite(t, root, "a.txt", "a")
-	mustWrite(t, root, "machine-token-1", "secret")
+	mustWrite(t, root, ".secret-file", "x")
 
 	entries, err := List(root, "", false)
 	if err != nil {

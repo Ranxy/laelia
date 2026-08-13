@@ -15,6 +15,7 @@ import {
   COMMAND_ROUTE_LIST,
   HUMAN_ROUTE_DETAIL,
   MACHINE_ROUTE_LIST,
+  MACHINE_ROUTE_NEW,
   MACHINE_ROUTE_PROFILE,
   MACHINE_ROUTE_WORKSPACE,
   MEMBERS_ROUTE,
@@ -223,6 +224,16 @@ export const dashboardChildrenRoutes: RouteObject[] = [
             element: (
               <m.SelectionEmptyState messageKey="machine.no-selection" />
             ),
+          })),
+      },
+      {
+        // Must be declared before :machineId so "new" is not captured as a
+        // machine resource id.
+        path: "new",
+        handle: { name: MACHINE_ROUTE_NEW },
+        lazy: () =>
+          import("@/pages/dashboard/machine-new").then((m) => ({
+            Component: m.MachineNewPage,
           })),
       },
       {

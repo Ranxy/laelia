@@ -15,18 +15,14 @@ import "v1/common.proto";
 option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
 
 // MachineService manages machines (a long-lived agent-application process a
-// user runs once on a host) and serves the machine-side authentication RPCs the
-// machine app calls to register itself. A machine authenticates once with a
-// registration token and then hosts one or more agents, each running its own
-// AgentChannel over the machine's access token.
+// user runs once on a host) and serves the machine-side authentication RPCs
+// the machine app calls to connect. A machine authenticates through the
+// device-code flow (DeviceService): the manager mints its refresh token at
+// approval time and the machine reconnects with access tokens issued by
+// RefreshMachineToken. Each machine hosts one or more agents, each running its
+// own AgentChannel over the machine's access token.
 service MachineService {
   // ========== Management APIs (IAM auth, admin only) ==========
-
-  rpc CreateMachine(CreateMachineRequest) returns (CreateMachineResponse) {
-    option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.machines.create";
-    option (laelia.v1.audit) = true;
-  }
 
   rpc ListMachines(ListMachinesRequest) returns (ListMachinesResponse) {
     option (laelia.v1.auth_method) = IAM;
@@ -47,12 +43,22 @@ service MachineService {
     option (laelia.v1.audit) = true;
   }
 
-  // Token rotation: generate a new registration token; the machine app must
-  // re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.
-  // Authorized in the handler for the machine's creator or a holder of
-  // laelia.machines.edit (workspace-scope); no permission annotation so the
-  // creator short-circuit can run.
-  rpc RotateMachineToken(RotateMachineTokenRequest) returns (RotateMachineTokenResponse) {
+  // UpdateMachine renames a machine (title). Authorized in the handler for
+  // the machine's creator or a holder of laelia.machines.edit
+  // (workspace-scope); no permission annotation so the creator short-circuit
+  // can run.
+  rpc UpdateMachine(UpdateMachineRequest) returns (Machine) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
+  // TransferMachineOwnership reassigns the machine to another user. The new
+  // owner then controls the machine and may approve its re-authentication.
+  // The machine keeps running; its tokens are not revoked. Authorized in the
+  // handler for the machine's creator or a holder of laelia.machines.edit
+  // (workspace-scope); no permission annotation so the creator short-circuit
+  // can run.
+  rpc TransferMachineOwnership(TransferMachineOwnershipRequest) returns (TransferMachineOwnershipResponse) {
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -138,30 +144,34 @@ service MachineStreamService {
 
 // ========== Request/Response Messages ==========
 
-// --- Create Machine ---
+// --- Update Machine ---
 
-message CreateMachineRequest {
-  Machine machine = 1 [(google.api.field_behavior) = REQUIRED];
-}
-
-message CreateMachineResponse {
-  Machine machine = 1;
-  string registration_token = 2; // 7-day validity, single-use on first connect
-}
-
-// --- Token Management ---
-
-message RotateMachineTokenRequest {
+message UpdateMachineRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "laelia/Machine"}
   ];
-  string reason = 2;
+  // New machine title. Empty means "leave unchanged".
+  string title = 2;
 }
 
-message RotateMachineTokenResponse {
-  string registration_token = 1;
+// --- Ownership Transfer ---
+
+message TransferMachineOwnershipRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Machine"}
+  ];
+  // New owner's user resource name (users/{id}).
+  string new_owner = 2 [(google.api.field_behavior) = REQUIRED];
+  string reason = 3; // audit purpose
 }
+
+message TransferMachineOwnershipResponse {
+  Machine machine = 1;
+}
+
+// --- Token Management ---
 
 message RevokeMachineTokenRequest {
   string name = 1 [
@@ -226,20 +236,16 @@ message ListMachineWorkspacesResponse {
 // --- Machine Connection ---
 
 message ConnectMachineRequest {
-  string registration_token = 1; // first connection or after refresh failure
-  MachineInfo info = 2;
-  string fingerprint = 3; // client-generated connection fingerprint (hostname:os:arch)
+  MachineInfo info = 1;
+  string fingerprint = 2; // client-generated connection fingerprint (hostname:os:arch)
 }
 
 message ConnectMachineResponse {
-  string access_token = 1; // 15-minute validity
-  string refresh_token = 2; // 24-hour validity, single-use rotation
-  string session_id = 3;
-  google.protobuf.Timestamp access_token_expires_at = 4;
-  MachineStatus initial_status = 5;
+  string session_id = 1;
+  MachineStatus initial_status = 2;
   // The full set of agents this machine must host. The machine app opens one
   // AgentChannel per entry immediately after connect (and on every reconnect).
-  repeated AgentAssignment assigned_agents = 6;
+  repeated AgentAssignment assigned_agents = 3;
 }
 
 // --- Machine Heartbeat ---
@@ -348,6 +354,7 @@ message MachineSummary {
   int32 agent_count = 5;
   // Creator's user resource name (users/{id}).
   string created_by = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp created_at = 10;
 
   // can_edit reports whether the current caller holds laelia.machines.edit
   // (workspace-scope).

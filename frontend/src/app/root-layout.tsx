@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { isAuthPath, resolveAuthRedirect } from "@/router/auth-redirect";
+import {
+  isAuthPath,
+  isPublicPath,
+  resolveAuthRedirect,
+} from "@/router/auth-redirect";
 import { useAppStore } from "@/stores";
 
 export function RootLayout() {
@@ -44,7 +48,12 @@ export function RootLayout() {
 
   // While a redirect is pending for a logged-out user on a protected route,
   // render nothing instead of <Outlet/> so the protected page never flashes.
-  if (!isLoggedIn && !isAuthPath(location.pathname)) {
+  // Public routes (e.g. the device-login approval page) stay renderable.
+  if (
+    !isLoggedIn &&
+    !isAuthPath(location.pathname) &&
+    !isPublicPath(location.pathname)
+  ) {
     return null;
   }
 

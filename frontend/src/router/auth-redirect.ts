@@ -18,6 +18,14 @@ export function isAuthPath(pathname: string): boolean {
   return pathname.startsWith("/auth/");
 }
 
+// isPublicPath reports whether a route is reachable by both logged-in and
+// logged-out users. The device-login approval page (/login/device) is public:
+// a logged-out user must be able to open the URL from the machine's terminal
+// and sign in there, while a logged-in user must not be bounced off it.
+export function isPublicPath(pathname: string): boolean {
+  return pathname.startsWith("/login/device");
+}
+
 /**
  * Returns the target URL to navigate to, or `null` when no redirect is needed.
  *
@@ -31,6 +39,11 @@ export function isAuthPath(pathname: string): boolean {
 export function resolveAuthRedirect(input: AuthRedirectInput): string | null {
   const { sessionLoaded, isLoggedIn, pathname, search } = input;
   if (!sessionLoaded) {
+    return null;
+  }
+
+  // Public routes are exempt from the guard in both directions.
+  if (isPublicPath(pathname)) {
     return null;
   }
 

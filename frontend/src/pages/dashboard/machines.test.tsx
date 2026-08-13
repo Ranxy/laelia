@@ -11,14 +11,12 @@ import { MachinesPage } from "./machines";
 
 const mock = vi.hoisted(() => ({
   listMachines: vi.fn(),
-  createMachine: vi.fn(),
   deleteMachine: vi.fn(),
 }));
 
 vi.mock("@/connect", () => ({
   machineServiceClient: {
     listMachines: mock.listMachines,
-    createMachine: mock.createMachine,
     deleteMachine: mock.deleteMachine,
   },
 }));
@@ -52,6 +50,7 @@ function renderPage() {
     <MemoryRouter initialEntries={["/machines"]}>
       <Routes>
         <Route path="/machines" element={<MachinesPage />}>
+          <Route path="new" element={<div data-testid="new-page" />} />
           <Route path=":machineId" element={<div data-testid="detail" />} />
         </Route>
       </Routes>
@@ -69,7 +68,6 @@ beforeEach(() => {
     machinesLoading: false,
   });
   mock.listMachines.mockReset();
-  mock.createMachine.mockReset();
   mock.deleteMachine.mockReset();
 });
 
@@ -126,37 +124,7 @@ describe("machines", () => {
     expect(screen.getByTestId("detail")).toBeInTheDocument();
   });
 
-  it("creates a machine and shows the registration token", async () => {
-    mock.listMachines.mockResolvedValue({ machines: [], nextPageToken: "" });
-    mock.createMachine.mockResolvedValue({
-      machine: machine("machines/m9", "New box"),
-      registrationToken: "tok-123",
-    });
-
-    renderPage();
-    await screen.findByText("common.no-data");
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "machine.create" })[0]
-    );
-
-    const input = await screen.findByLabelText("machine.field-name");
-    fireEvent.change(input, { target: { value: "New box" } });
-    fireEvent.click(screen.getByRole("button", { name: "common.create" }));
-
-    await waitFor(() => expect(mock.createMachine).toHaveBeenCalledTimes(1));
-    const req = mock.createMachine.mock.calls[0][0] as {
-      machine: { title: string };
-    };
-    expect(req.machine.title).toBe("New box");
-    expect(
-      await screen.findByText("machine.created-title")
-    ).toBeInTheDocument();
-    // The token is masked for display; the bootstrap command is shown.
-    expect(screen.getByText(/laelia-machine run/)).toBeInTheDocument();
-    expect(screen.getByText(/tok-12/)).toBeInTheDocument();
-  });
-
-  it("disables the create button until a name is entered", async () => {
+  it("navigates to the create-machine waiting page", async () => {
     mock.listMachines.mockResolvedValue({ machines: [], nextPageToken: "" });
 
     renderPage();
@@ -165,12 +133,7 @@ describe("machines", () => {
       screen.getAllByRole("button", { name: "machine.create" })[0]
     );
 
-    const create = await screen.findByRole("button", { name: "common.create" });
-    expect(create).toBeDisabled();
-
-    const input = screen.getByLabelText("machine.field-name");
-    fireEvent.change(input, { target: { value: "New box" } });
-    expect(create).toBeEnabled();
+    expect(await screen.findByTestId("new-page")).toBeInTheDocument();
   });
 
   it("deletes a machine after confirmation", async () => {

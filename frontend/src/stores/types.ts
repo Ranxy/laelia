@@ -39,7 +39,6 @@ import type {
   Machine,
   MachineSummary,
   MachineWorkspaceSummary,
-  RotateMachineTokenResponse,
 } from "@/types/proto-es/v1/machine_pb";
 import type { McpServer } from "@/types/proto-es/v1/mcp_pb";
 import type {
@@ -256,8 +255,9 @@ export interface AgentSlice {
 }
 
 // MachineSlice owns the machine roster and the machine-management mutations.
-// A machine authenticates once (registration token) and hosts every agent bound
-// to it; token rotate/revoke and provider discovery are machine-scoped.
+// A machine authenticates via the device-code flow (no bootstrap token) and
+// hosts every agent bound to it; rename/transfer, revoke and provider
+// discovery are machine-scoped.
 export interface MachineSlice {
   machines: MachineSummary[];
   machinesLoading: boolean;
@@ -271,15 +271,13 @@ export interface MachineSlice {
     opts?: { silent?: boolean }
   ) => Promise<{ nextPageToken: string } | undefined>;
   getMachine: (name: string) => Promise<Machine | undefined>;
-  createMachine: (
-    title: string,
-    labels?: Record<string, string>
-  ) => Promise<{ machine?: Machine; registrationToken: string }>;
-  deleteMachine: (name: string) => Promise<void>;
-  rotateMachineToken: (
+  updateMachine: (name: string, title: string) => Promise<Machine>;
+  transferMachineOwnership: (
     name: string,
+    newOwner: string,
     reason?: string
-  ) => Promise<RotateMachineTokenResponse>;
+  ) => Promise<void>;
+  deleteMachine: (name: string) => Promise<void>;
   revokeMachineToken: (name: string, reason?: string) => Promise<void>;
   forceDisconnectMachine: (name: string, reason?: string) => Promise<void>;
   refreshMachineProviders: (name: string) => Promise<AgentProviderInfo[]>;

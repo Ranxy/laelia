@@ -1,10 +1,10 @@
 // Package client hosts the machine app's manager-facing client. A machine
-// authenticates once (machine registration → access + refresh token) and then
-// hosts many agents: it holds one MachineChannel control stream for roster
-// changes + provider discovery, and opens one AgentChannel per assigned agent
-// for that agent's drain loop. All agents share the machine's access token and
-// a single local daemon socket; the daemon routes each CLI call to the agent
-// named in LAELIA_AGENT.
+// authenticates via the device-code flow (laelia-machine setup), which mints
+// its refresh token; the client then hosts many agents: it holds one
+// MachineChannel control stream for roster changes + provider discovery, and
+// opens one AgentChannel per assigned agent for that agent's drain loop. All
+// agents share the machine's access token and a single local daemon socket;
+// the daemon routes each CLI call to the agent named in LAELIA_AGENT.
 package client
 
 import (
@@ -25,13 +25,11 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 	"golang.org/x/net/http2"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/Ranxy/laelia/backend/agent/credential"
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -67,16 +65,19 @@ const (
 // process; it owns the machine auth credentials, the shared local daemon, the
 // MachineChannel control stream, and the set of per-agent runners.
 type MachineClient struct {
-	managerURL     string
-	httpClient     *http.Client
-	streamClient   *http.Client
-	machineClient  v1connect.MachineServiceClient
-	credential     *credential.Manager
-	machineID      string // bare uuid, parsed from the registration token
-	binaryDir      string
-	daemon         *daemonsrv.Server
-	backoff        *ExponentialBackoff
-	machineVersion string
+	managerURL    string
+	httpClient    *http.Client
+	streamClient  *http.Client
+	machineClient v1connect.MachineServiceClient
+	// refreshToken is the machine's durable credential, loaded from the local
+	// state file at construction and replaced on rolling renewal. Guarded by mu.
+	refreshToken     string
+	saveRefreshToken func(string) // persists a rolling renewal to the state file
+	machineID        string       // bare uuid of the registered machine
+	binaryDir        string
+	daemon           *daemonsrv.Server
+	backoff          *ExponentialBackoff
+	machineVersion   string
 
 	mu          sync.RWMutex
 	connState   ConnState
@@ -130,11 +131,12 @@ func (eb *ExponentialBackoff) Reset() {
 	eb.attempt = 0
 }
 
-// New creates a MachineClient. token is the machine registration token printed
-// by CreateMachine; its JWT sub carries the machine's resource id, which keys
-// the on-disk refresh-token file (~/.laelia/machine-token-<id>) and the daemon
-// socket dir (~/.laelia/<id>/).
-func New(managerURL, token string, insecure bool, allowHTTP bool) (*MachineClient, error) {
+// New creates a MachineClient for the machine identified by machineID
+// (bare uuid). refreshToken is the machine's durable credential loaded from
+// the local state file; saveRefreshToken persists a rolling renewal back to
+// that file. The daemon socket and per-agent workspace dirs live under
+// ~/.laelia/.
+func New(managerURL, machineID, refreshToken string, insecure bool, allowHTTP bool, saveRefreshToken func(string)) (*MachineClient, error) {
 	managerURL = strings.TrimRight(managerURL, "/")
 
 	if strings.HasPrefix(managerURL, "http://") {
@@ -144,12 +146,6 @@ func New(managerURL, token string, insecure bool, allowHTTP bool) (*MachineClien
 		slog.Warn("plain HTTP connection enabled, traffic will not be encrypted")
 	}
 
-	machineID, err := parseResourceIDFromBootstrapToken(token)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse machine identity from registration token")
-	}
-	tokenDir := filepath.Join(os.Getenv("HOME"), ".laelia")
-	tokenFile := filepath.Join(tokenDir, "machine-token-"+machineID)
 	httpClient := &http.Client{Timeout: defaultConnectTimeout}
 
 	// Separate HTTP client for the bidi streams (MachineChannel + each
@@ -202,65 +198,41 @@ func New(managerURL, token string, insecure bool, allowHTTP bool) (*MachineClien
 	}
 
 	return &MachineClient{
-		managerURL:     managerURL,
-		httpClient:     httpClient,
-		streamClient:   streamClient,
-		machineClient:  v1connect.NewMachineServiceClient(httpClient, managerURL),
-		credential:     credential.New(tokenFile, token),
-		machineID:      machineID,
-		binaryDir:      binaryDir,
-		backoff:        NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
-		runners:        make(map[string]*agentRunner),
-		machineVersion: "0.2.0",
+		managerURL:       managerURL,
+		httpClient:       httpClient,
+		streamClient:     streamClient,
+		machineClient:    v1connect.NewMachineServiceClient(httpClient, managerURL),
+		refreshToken:     refreshToken,
+		saveRefreshToken: saveRefreshToken,
+		machineID:        machineID,
+		binaryDir:        binaryDir,
+		backoff:          NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
+		runners:          make(map[string]*agentRunner),
+		machineVersion:   "0.2.0",
 	}, nil
 }
 
-// Connect authenticates the machine. The refresh token is the machine's
-// durable reconnection credential: the registration (bootstrap) token is
-// single-use and consumed on the first successful ConnectMachine, so once a
-// refresh token exists we reconnect through it. On success it stores the new
-// credentials and spawns a runner for every agent in the response's
+// Connect authenticates the machine with its refresh token (the durable
+// credential minted by the device-code approval). On success it stores the
+// new access token and spawns a runner for every agent in the response's
 // assigned_agents list.
 func (c *MachineClient) Connect(ctx context.Context, info *v1pb.MachineInfo) error {
 	c.mu.Lock()
 	c.connState = StateConnecting
 	c.mu.Unlock()
 
-	fingerprint := computeFingerprint(info)
+	fingerprint := ComputeFingerprint(info.Hostname, info.Os, info.Arch)
 
-	// Once a refresh token has been persisted, reconnect through it: the
-	// single-use registration token is already consumed by this point.
-	refreshToken := c.credential.LoadRefreshToken()
-	if refreshToken != "" {
-		err := c.connectViaRefresh(ctx, info, fingerprint, refreshToken)
-		if err == nil {
-			return nil
-		}
-		if !isPermanentAuthFailure(err) {
-			// Transient (network/server) failure: keep the refresh token and let
-			// the Run loop back off and retry. Falling back to the (consumed)
-			// registration token would only yield "registration token is not
-			// active" — a permanent-looking failure that would stop the machine
-			// on a mere blip (e.g. a manager restart).
-			c.mu.Lock()
-			c.connState = StateDisconnected
-			c.mu.Unlock()
-			return err
-		}
-		// Permanent auth failure: the refresh token is dead — expired, or its
-		// family was revoked / its version was bumped because an admin rotated
-		// the token. Drop the stale refresh token and fall back to the
-		// registration token the app was launched with. After a rotation that
-		// is a fresh, unused bootstrap; without rotation it is the already
-		// consumed bootstrap, so the registration path fails too and the Run
-		// loop bails (admin must rotate) — which is the correct outcome.
-		slog.Info("machine refresh token rejected; falling back to registration token", "error", err)
-		c.credential.DeleteRefreshToken()
+	c.mu.RLock()
+	refreshToken := c.refreshToken
+	c.mu.RUnlock()
+	if refreshToken == "" {
+		c.mu.Lock()
+		c.connState = StateDisconnected
+		c.mu.Unlock()
+		return errors.New("no refresh token; run `laelia-machine setup` to authenticate")
 	}
-
-	// First-ever connect (no refresh token) or recovery after a rotation: use
-	// the registration token. This is the only path that consumes it.
-	return c.connectViaRegistration(ctx, info, fingerprint, c.credential.BootstrapToken())
+	return c.connectViaRefresh(ctx, info, fingerprint, refreshToken)
 }
 
 // connectViaRefresh reconnects using the persisted refresh token. The refresh
@@ -270,13 +242,14 @@ func (c *MachineClient) Connect(ctx context.Context, info *v1pb.MachineInfo) err
 // lost refresh response (e.g. a manager hard-killed mid-request) is safely
 // retryable: the same token is presented again and the server does not treat
 // the retry as theft. Only when the server returns a non-empty RefreshToken
-// (a rolling renewal) do we persist the replacement; otherwise we keep the
-// existing token. The access token returned by the refresh response is the
-// machine's bearer credential for the control stream + heartbeat; ConnectMachine
-// on this path returns no access token (it only mints on the bootstrap path),
-// so applyConnectResponse keeps the refresh-minted one.
+// (a rolling renewal) do we replace the in-memory token and persist it via
+// the saveRefreshToken callback; otherwise we keep the existing token. The
+// access token returned by the refresh response is the machine's bearer
+// credential for the control stream + heartbeat; ConnectMachine on this path
+// returns no access token, so applyConnectResponse keeps the refresh-minted
+// one.
 func (c *MachineClient) connectViaRefresh(ctx context.Context, info *v1pb.MachineInfo, fingerprint, refreshToken string) error {
-	refreshResp, err := c.refreshToken(ctx, refreshToken, fingerprint)
+	refreshResp, err := c.refreshMachineToken(ctx, refreshToken, fingerprint)
 	if err != nil {
 		c.mu.Lock()
 		c.connState = StateDisconnected
@@ -285,13 +258,16 @@ func (c *MachineClient) connectViaRefresh(ctx context.Context, info *v1pb.Machin
 	}
 	c.mu.Lock()
 	c.accessToken = refreshResp.AccessToken
-	c.mu.Unlock()
 	// Persist a replacement only when the server actually minted one (rolling
 	// renewal near expiry). On the common reconnect the server reuses the same
 	// refresh token and returns "" — saving that would wipe the durable
 	// credential (the bug that made every manager restart unrecoverable).
 	if refreshResp.RefreshToken != "" {
-		c.credential.SaveRefreshToken(refreshResp.RefreshToken)
+		c.refreshToken = refreshResp.RefreshToken
+	}
+	c.mu.Unlock()
+	if refreshResp.RefreshToken != "" && c.saveRefreshToken != nil {
+		c.saveRefreshToken(refreshResp.RefreshToken)
 	}
 
 	resp, err := c.connectWithAccessToken(ctx, info, fingerprint)
@@ -307,46 +283,22 @@ func (c *MachineClient) connectViaRefresh(ctx context.Context, info *v1pb.Machin
 	return nil
 }
 
-// connectViaRegistration performs the first-ever connect with the single-use
-// registration token. ConnectMachine mints the initial access + refresh tokens
-// (the refresh token is persisted by connectWithRegistrationToken).
-func (c *MachineClient) connectViaRegistration(ctx context.Context, info *v1pb.MachineInfo, fingerprint, registrationToken string) error {
-	resp, err := c.connectWithRegistrationToken(ctx, registrationToken, info, fingerprint)
-	if err != nil {
-		c.mu.Lock()
-		c.connState = StateDisconnected
-		c.mu.Unlock()
-		return errors.Wrapf(err, "failed to connect to manager")
-	}
-	c.applyConnectResponse(resp)
-	slog.Info("connected to manager via registration token", "agents", len(resp.AssignedAgents))
-	c.spawnAssignedAgents(ctx, resp.AssignedAgents)
-	return nil
-}
-
 // applyConnectResponse records the session from a successful ConnectMachine.
-// The access token is only overwritten when ConnectMachine actually mints one
-// (the bootstrap path); on the reconnect path ConnectMachine returns no access
-// token, so we keep the refresh-minted token already stored by the caller. The
-// refresh token is persisted by the caller via the credential manager.
+// The access token is the refresh-minted one already stored by the caller;
+// ConnectMachine itself returns no token.
 func (c *MachineClient) applyConnectResponse(resp *v1pb.ConnectMachineResponse) {
 	c.mu.Lock()
 	c.connState = StateConnected
 	c.sessionID = resp.SessionId
-	if resp.AccessToken != "" {
-		c.accessToken = resp.AccessToken
-	}
 	c.mu.Unlock()
 	c.backoff.Reset()
 }
 
 // isPermanentAuthFailure reports whether err means the machine's credentials
-// are permanently rejected and retrying cannot help. This is only reached with
-// a refresh-path error (the durable credential) or a first-connect registration
-// error: a revoked/rotated token family, a consumed registration token with no
-// refresh token, a token-version mismatch, or a deleted machine. Transient
-// network or server errors (e.g. 502 while the manager restarts) return false
-// so the normal backoff retry continues and the machine auto-reconnects.
+// are permanently rejected and retrying cannot help: a revoked/rotated token
+// family, a token-version mismatch, or a deleted machine. Transient network or
+// server errors (e.g. 502 while the manager restarts) return false so the
+// normal backoff retry continues and the machine auto-reconnects.
 func isPermanentAuthFailure(err error) bool {
 	var ce *connect.Error
 	if !errors.As(err, &ce) {
@@ -357,26 +309,6 @@ func isPermanentAuthFailure(err error) bool {
 		return true
 	}
 	return false
-}
-
-func (c *MachineClient) connectWithRegistrationToken(ctx context.Context, registrationToken string, info *v1pb.MachineInfo, fingerprint string) (*v1pb.ConnectMachineResponse, error) {
-	req := connect.NewRequest(&v1pb.ConnectMachineRequest{
-		RegistrationToken: registrationToken,
-		Info:              info,
-		Fingerprint:       fingerprint,
-	})
-	resp, err := c.machineClient.ConnectMachine(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	// ConnectMachine mints a refresh token only on the bootstrap (registration)
-	// path; on the access-token reconnect path it returns "". Persisting that
-	// empty value would overwrite the durable refresh token on disk and make
-	// the next reconnect unrecoverable — so only persist a non-empty token.
-	if resp.Msg.RefreshToken != "" {
-		c.credential.SaveRefreshToken(resp.Msg.RefreshToken)
-	}
-	return resp.Msg, nil
 }
 
 func (c *MachineClient) connectWithAccessToken(ctx context.Context, info *v1pb.MachineInfo, fingerprint string) (*v1pb.ConnectMachineResponse, error) {
@@ -394,17 +326,10 @@ func (c *MachineClient) connectWithAccessToken(ctx context.Context, info *v1pb.M
 	if err != nil {
 		return nil, err
 	}
-	// ConnectMachine mints a refresh token only on the bootstrap (registration)
-	// path; on the access-token reconnect path it returns "". Persisting that
-	// empty value would overwrite the durable refresh token on disk and make
-	// the next reconnect unrecoverable — so only persist a non-empty token.
-	if resp.Msg.RefreshToken != "" {
-		c.credential.SaveRefreshToken(resp.Msg.RefreshToken)
-	}
 	return resp.Msg, nil
 }
 
-func (c *MachineClient) refreshToken(ctx context.Context, refreshToken, fingerprint string) (*v1pb.RefreshMachineTokenResponse, error) {
+func (c *MachineClient) refreshMachineToken(ctx context.Context, refreshToken, fingerprint string) (*v1pb.RefreshMachineTokenResponse, error) {
 	req := connect.NewRequest(&v1pb.RefreshMachineTokenRequest{
 		RefreshToken: refreshToken,
 		Fingerprint:  fingerprint,
@@ -459,11 +384,10 @@ func (c *MachineClient) Disconnect(ctx context.Context) error {
 
 	_, err := c.machineClient.MachineDisconnect(ctx, req)
 
-	// Keep the persisted refresh token: the registration token is single-use
-	// (consumed on first connect), so the refresh token is the only credential
-	// that can reconnect after a restart or transient failure. Permanent
-	// decommission is handled server-side via Rotate/RevokeMachineToken, which
-	// revoke the family and bump the token version.
+	// Keep the persisted refresh token: it is the only credential that can
+	// reconnect after a restart or transient failure. Permanent decommission
+	// is handled server-side via RevokeMachineToken, which revokes the family
+	// and bumps the token version.
 	c.mu.Lock()
 	c.connState = StateDisconnected
 	c.mu.Unlock()
@@ -528,16 +452,14 @@ func (c *MachineClient) Run(ctx context.Context) error {
 
 		if err := c.Connect(ctx, info); err != nil {
 			// A permanent credential failure — the refresh token family was
-			// revoked/rotated, the token version mismatched, the machine was
-			// deleted, or the single-use registration token is consumed with no
-			// refresh token to fall back on — will never succeed by retrying.
-			// The admin must rotate the token and restart the machine app with
-			// the new registration token. A transient failure (e.g. 502 while the
-			// manager restarts) is not permanent: back off and retry so the
-			// machine auto-reconnects once the manager is back.
+			// revoked/rotated, the token version mismatched, or the machine was
+			// deleted — will never succeed by retrying. The user must re-run
+			// `laelia-machine setup` to re-authenticate. A transient failure
+			// (e.g. 502 while the manager restarts) is not permanent: back off
+			// and retry so the machine auto-reconnects once the manager is back.
 			if isPermanentAuthFailure(err) {
-				slog.Error("machine credentials are no longer valid; an admin must rotate the token and restart with the new registration token", "error", err)
-				return errors.Wrap(err, "machine credentials rejected by manager; stopping (rotate token and restart)")
+				slog.Error("machine credentials are no longer valid; run `laelia-machine setup` to re-authenticate", "error", err)
+				return errors.Wrap(err, "machine credentials rejected by manager; run `laelia-machine setup` to re-authenticate")
 			}
 			slog.Error("connect failed", "error", err)
 			if err := c.backoff.Wait(ctx); err != nil {
@@ -612,8 +534,11 @@ func (c *MachineClient) disconnectWithTimeout() {
 	cancel()
 }
 
-func computeFingerprint(info *v1pb.MachineInfo) string {
-	data := fmt.Sprintf("%s:%s:%s", info.Hostname, info.Os, info.Arch)
+// ComputeFingerprint returns the host fingerprint (hostname:os:arch hash)
+// that binds machine refresh tokens to this device. setup and the connect
+// path must agree on it, so it is exported for the CLI.
+func ComputeFingerprint(hostname, osName, arch string) string {
+	data := fmt.Sprintf("%s:%s:%s", hostname, osName, arch)
 	h := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(h[:])[:16]
 }
@@ -691,6 +616,12 @@ func discoveredToProto(in []provider.Discovered, at time.Time) []*v1pb.AgentProv
 	return out
 }
 
+// OutboundIP returns the machine's best-effort outbound IP ("" when it
+// cannot be determined). Exported for the CLI's device-login flow.
+func OutboundIP() string {
+	return getOutboundIP()
+}
+
 func getOutboundIP() string {
 	// Best-effort: bound the dial so a missing default route cannot stall
 	// startup. The UDP "dial" only selects a source address; no packets flow.
@@ -704,20 +635,6 @@ func getOutboundIP() string {
 		return ""
 	}
 	return localAddr.IP.String()
-}
-
-func parseResourceIDFromBootstrapToken(tokenStr string) (string, error) {
-	parser := jwt.Parser{}
-	claims := jwt.MapClaims{}
-	_, _, err := parser.ParseUnverified(tokenStr, claims)
-	if err != nil {
-		return "", errors.Wrap(err, "invalid registration token format")
-	}
-	sub, ok := claims["sub"].(string)
-	if !ok || sub == "" {
-		return "", errors.New("registration token missing sub claim")
-	}
-	return sub, nil
 }
 
 // bareAgentID strips the agents/ prefix from a full agent resource name,

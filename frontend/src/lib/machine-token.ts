@@ -1,10 +1,8 @@
-import { formatToken, getManagerURL } from "./agent-token";
+import { getManagerURL } from "./agent-token";
 
-// buildMachineRunCommand assembles the full machine bootstrap command for
-// copy-to-clipboard. A machine authenticates once with its registration token;
-// the machine app then hosts every agent bound to it (no per-agent token).
-export function buildMachineRunCommand(token: string, masked = true): string {
-  return `laelia-machine run --manager ${getManagerURL()} --token ${
-    masked ? formatToken(token) : token
-  }`;
+// buildMachineSetupCommand assembles the device-code setup command shown on
+// the create-machine waiting page. The machine authenticates via the OAuth2
+// device flow, so no token is embedded in the command.
+export function buildMachineSetupCommand(): string {
+  return `laelia-machine --manager ${getManagerURL()} setup`;
 }

@@ -32,4 +32,16 @@ export const authRoutes: RouteObject[] = [
       },
     ],
   },
+  {
+    // Public device-login approval page. It lives outside /auth so the URL
+    // printed by `laelia-machine setup` is short; the auth guard exempts it
+    // in both directions (see router/auth-redirect.ts isPublicPath).
+    path: "login/device",
+    element: <SplashLayout />,
+    handle: { name: "auth.device-login" },
+    lazy: () =>
+      import("@/pages/auth/device-login").then((m) => ({
+        Component: m.DeviceLoginPage,
+      })),
+  },
 ];

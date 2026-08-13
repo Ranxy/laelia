@@ -36,9 +36,6 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// MachineServiceCreateMachineProcedure is the fully-qualified name of the MachineService's
-	// CreateMachine RPC.
-	MachineServiceCreateMachineProcedure = "/laelia.v1.MachineService/CreateMachine"
 	// MachineServiceListMachinesProcedure is the fully-qualified name of the MachineService's
 	// ListMachines RPC.
 	MachineServiceListMachinesProcedure = "/laelia.v1.MachineService/ListMachines"
@@ -48,9 +45,12 @@ const (
 	// MachineServiceDeleteMachineProcedure is the fully-qualified name of the MachineService's
 	// DeleteMachine RPC.
 	MachineServiceDeleteMachineProcedure = "/laelia.v1.MachineService/DeleteMachine"
-	// MachineServiceRotateMachineTokenProcedure is the fully-qualified name of the MachineService's
-	// RotateMachineToken RPC.
-	MachineServiceRotateMachineTokenProcedure = "/laelia.v1.MachineService/RotateMachineToken"
+	// MachineServiceUpdateMachineProcedure is the fully-qualified name of the MachineService's
+	// UpdateMachine RPC.
+	MachineServiceUpdateMachineProcedure = "/laelia.v1.MachineService/UpdateMachine"
+	// MachineServiceTransferMachineOwnershipProcedure is the fully-qualified name of the
+	// MachineService's TransferMachineOwnership RPC.
+	MachineServiceTransferMachineOwnershipProcedure = "/laelia.v1.MachineService/TransferMachineOwnership"
 	// MachineServiceRevokeMachineTokenProcedure is the fully-qualified name of the MachineService's
 	// RevokeMachineToken RPC.
 	MachineServiceRevokeMachineTokenProcedure = "/laelia.v1.MachineService/RevokeMachineToken"
@@ -85,19 +85,24 @@ const (
 
 // MachineServiceClient is a client for the laelia.v1.MachineService service.
 type MachineServiceClient interface {
-	CreateMachine(context.Context, *connect.Request[v1.CreateMachineRequest]) (*connect.Response[v1.CreateMachineResponse], error)
 	ListMachines(context.Context, *connect.Request[v1.ListMachinesRequest]) (*connect.Response[v1.ListMachinesResponse], error)
 	GetMachine(context.Context, *connect.Request[v1.GetMachineRequest]) (*connect.Response[v1.Machine], error)
 	// DeleteMachine soft-deletes a machine. Authorized in the handler for the
 	// machine's creator or a holder of laelia.machines.delete (workspace-scope);
 	// no permission annotation so the creator short-circuit can run.
 	DeleteMachine(context.Context, *connect.Request[v1.DeleteMachineRequest]) (*connect.Response[emptypb.Empty], error)
-	// Token rotation: generate a new registration token; the machine app must
-	// re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.
-	// Authorized in the handler for the machine's creator or a holder of
-	// laelia.machines.edit (workspace-scope); no permission annotation so the
-	// creator short-circuit can run.
-	RotateMachineToken(context.Context, *connect.Request[v1.RotateMachineTokenRequest]) (*connect.Response[v1.RotateMachineTokenResponse], error)
+	// UpdateMachine renames a machine (title). Authorized in the handler for
+	// the machine's creator or a holder of laelia.machines.edit
+	// (workspace-scope); no permission annotation so the creator short-circuit
+	// can run.
+	UpdateMachine(context.Context, *connect.Request[v1.UpdateMachineRequest]) (*connect.Response[v1.Machine], error)
+	// TransferMachineOwnership reassigns the machine to another user. The new
+	// owner then controls the machine and may approve its re-authentication.
+	// The machine keeps running; its tokens are not revoked. Authorized in the
+	// handler for the machine's creator or a holder of laelia.machines.edit
+	// (workspace-scope); no permission annotation so the creator short-circuit
+	// can run.
+	TransferMachineOwnership(context.Context, *connect.Request[v1.TransferMachineOwnershipRequest]) (*connect.Response[v1.TransferMachineOwnershipResponse], error)
 	// Token revocation: revoke all tokens for the machine. Authorized in the
 	// handler for the machine's creator or a holder of laelia.machines.edit
 	// (workspace-scope); no permission annotation so the creator short-circuit
@@ -143,12 +148,6 @@ func NewMachineServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 	baseURL = strings.TrimRight(baseURL, "/")
 	machineServiceMethods := v1.File_v1_machine_proto.Services().ByName("MachineService").Methods()
 	return &machineServiceClient{
-		createMachine: connect.NewClient[v1.CreateMachineRequest, v1.CreateMachineResponse](
-			httpClient,
-			baseURL+MachineServiceCreateMachineProcedure,
-			connect.WithSchema(machineServiceMethods.ByName("CreateMachine")),
-			connect.WithClientOptions(opts...),
-		),
 		listMachines: connect.NewClient[v1.ListMachinesRequest, v1.ListMachinesResponse](
 			httpClient,
 			baseURL+MachineServiceListMachinesProcedure,
@@ -167,10 +166,16 @@ func NewMachineServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(machineServiceMethods.ByName("DeleteMachine")),
 			connect.WithClientOptions(opts...),
 		),
-		rotateMachineToken: connect.NewClient[v1.RotateMachineTokenRequest, v1.RotateMachineTokenResponse](
+		updateMachine: connect.NewClient[v1.UpdateMachineRequest, v1.Machine](
 			httpClient,
-			baseURL+MachineServiceRotateMachineTokenProcedure,
-			connect.WithSchema(machineServiceMethods.ByName("RotateMachineToken")),
+			baseURL+MachineServiceUpdateMachineProcedure,
+			connect.WithSchema(machineServiceMethods.ByName("UpdateMachine")),
+			connect.WithClientOptions(opts...),
+		),
+		transferMachineOwnership: connect.NewClient[v1.TransferMachineOwnershipRequest, v1.TransferMachineOwnershipResponse](
+			httpClient,
+			baseURL+MachineServiceTransferMachineOwnershipProcedure,
+			connect.WithSchema(machineServiceMethods.ByName("TransferMachineOwnership")),
 			connect.WithClientOptions(opts...),
 		),
 		revokeMachineToken: connect.NewClient[v1.RevokeMachineTokenRequest, v1.RevokeMachineTokenResponse](
@@ -232,25 +237,20 @@ func NewMachineServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 
 // machineServiceClient implements MachineServiceClient.
 type machineServiceClient struct {
-	createMachine           *connect.Client[v1.CreateMachineRequest, v1.CreateMachineResponse]
-	listMachines            *connect.Client[v1.ListMachinesRequest, v1.ListMachinesResponse]
-	getMachine              *connect.Client[v1.GetMachineRequest, v1.Machine]
-	deleteMachine           *connect.Client[v1.DeleteMachineRequest, emptypb.Empty]
-	rotateMachineToken      *connect.Client[v1.RotateMachineTokenRequest, v1.RotateMachineTokenResponse]
-	revokeMachineToken      *connect.Client[v1.RevokeMachineTokenRequest, v1.RevokeMachineTokenResponse]
-	forceDisconnectMachine  *connect.Client[v1.ForceDisconnectMachineRequest, emptypb.Empty]
-	listMachineAgents       *connect.Client[v1.ListMachineAgentsRequest, v1.ListMachineAgentsResponse]
-	refreshMachineProviders *connect.Client[v1.RefreshMachineProvidersRequest, v1.RefreshMachineProvidersResponse]
-	listMachineWorkspaces   *connect.Client[v1.ListMachineWorkspacesRequest, v1.ListMachineWorkspacesResponse]
-	connectMachine          *connect.Client[v1.ConnectMachineRequest, v1.ConnectMachineResponse]
-	machineHeartbeat        *connect.Client[v1.MachineHeartbeatRequest, v1.MachineHeartbeatResponse]
-	machineDisconnect       *connect.Client[v1.MachineDisconnectRequest, emptypb.Empty]
-	refreshMachineToken     *connect.Client[v1.RefreshMachineTokenRequest, v1.RefreshMachineTokenResponse]
-}
-
-// CreateMachine calls laelia.v1.MachineService.CreateMachine.
-func (c *machineServiceClient) CreateMachine(ctx context.Context, req *connect.Request[v1.CreateMachineRequest]) (*connect.Response[v1.CreateMachineResponse], error) {
-	return c.createMachine.CallUnary(ctx, req)
+	listMachines             *connect.Client[v1.ListMachinesRequest, v1.ListMachinesResponse]
+	getMachine               *connect.Client[v1.GetMachineRequest, v1.Machine]
+	deleteMachine            *connect.Client[v1.DeleteMachineRequest, emptypb.Empty]
+	updateMachine            *connect.Client[v1.UpdateMachineRequest, v1.Machine]
+	transferMachineOwnership *connect.Client[v1.TransferMachineOwnershipRequest, v1.TransferMachineOwnershipResponse]
+	revokeMachineToken       *connect.Client[v1.RevokeMachineTokenRequest, v1.RevokeMachineTokenResponse]
+	forceDisconnectMachine   *connect.Client[v1.ForceDisconnectMachineRequest, emptypb.Empty]
+	listMachineAgents        *connect.Client[v1.ListMachineAgentsRequest, v1.ListMachineAgentsResponse]
+	refreshMachineProviders  *connect.Client[v1.RefreshMachineProvidersRequest, v1.RefreshMachineProvidersResponse]
+	listMachineWorkspaces    *connect.Client[v1.ListMachineWorkspacesRequest, v1.ListMachineWorkspacesResponse]
+	connectMachine           *connect.Client[v1.ConnectMachineRequest, v1.ConnectMachineResponse]
+	machineHeartbeat         *connect.Client[v1.MachineHeartbeatRequest, v1.MachineHeartbeatResponse]
+	machineDisconnect        *connect.Client[v1.MachineDisconnectRequest, emptypb.Empty]
+	refreshMachineToken      *connect.Client[v1.RefreshMachineTokenRequest, v1.RefreshMachineTokenResponse]
 }
 
 // ListMachines calls laelia.v1.MachineService.ListMachines.
@@ -268,9 +268,14 @@ func (c *machineServiceClient) DeleteMachine(ctx context.Context, req *connect.R
 	return c.deleteMachine.CallUnary(ctx, req)
 }
 
-// RotateMachineToken calls laelia.v1.MachineService.RotateMachineToken.
-func (c *machineServiceClient) RotateMachineToken(ctx context.Context, req *connect.Request[v1.RotateMachineTokenRequest]) (*connect.Response[v1.RotateMachineTokenResponse], error) {
-	return c.rotateMachineToken.CallUnary(ctx, req)
+// UpdateMachine calls laelia.v1.MachineService.UpdateMachine.
+func (c *machineServiceClient) UpdateMachine(ctx context.Context, req *connect.Request[v1.UpdateMachineRequest]) (*connect.Response[v1.Machine], error) {
+	return c.updateMachine.CallUnary(ctx, req)
+}
+
+// TransferMachineOwnership calls laelia.v1.MachineService.TransferMachineOwnership.
+func (c *machineServiceClient) TransferMachineOwnership(ctx context.Context, req *connect.Request[v1.TransferMachineOwnershipRequest]) (*connect.Response[v1.TransferMachineOwnershipResponse], error) {
+	return c.transferMachineOwnership.CallUnary(ctx, req)
 }
 
 // RevokeMachineToken calls laelia.v1.MachineService.RevokeMachineToken.
@@ -320,19 +325,24 @@ func (c *machineServiceClient) RefreshMachineToken(ctx context.Context, req *con
 
 // MachineServiceHandler is an implementation of the laelia.v1.MachineService service.
 type MachineServiceHandler interface {
-	CreateMachine(context.Context, *connect.Request[v1.CreateMachineRequest]) (*connect.Response[v1.CreateMachineResponse], error)
 	ListMachines(context.Context, *connect.Request[v1.ListMachinesRequest]) (*connect.Response[v1.ListMachinesResponse], error)
 	GetMachine(context.Context, *connect.Request[v1.GetMachineRequest]) (*connect.Response[v1.Machine], error)
 	// DeleteMachine soft-deletes a machine. Authorized in the handler for the
 	// machine's creator or a holder of laelia.machines.delete (workspace-scope);
 	// no permission annotation so the creator short-circuit can run.
 	DeleteMachine(context.Context, *connect.Request[v1.DeleteMachineRequest]) (*connect.Response[emptypb.Empty], error)
-	// Token rotation: generate a new registration token; the machine app must
-	// re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.
-	// Authorized in the handler for the machine's creator or a holder of
-	// laelia.machines.edit (workspace-scope); no permission annotation so the
-	// creator short-circuit can run.
-	RotateMachineToken(context.Context, *connect.Request[v1.RotateMachineTokenRequest]) (*connect.Response[v1.RotateMachineTokenResponse], error)
+	// UpdateMachine renames a machine (title). Authorized in the handler for
+	// the machine's creator or a holder of laelia.machines.edit
+	// (workspace-scope); no permission annotation so the creator short-circuit
+	// can run.
+	UpdateMachine(context.Context, *connect.Request[v1.UpdateMachineRequest]) (*connect.Response[v1.Machine], error)
+	// TransferMachineOwnership reassigns the machine to another user. The new
+	// owner then controls the machine and may approve its re-authentication.
+	// The machine keeps running; its tokens are not revoked. Authorized in the
+	// handler for the machine's creator or a holder of laelia.machines.edit
+	// (workspace-scope); no permission annotation so the creator short-circuit
+	// can run.
+	TransferMachineOwnership(context.Context, *connect.Request[v1.TransferMachineOwnershipRequest]) (*connect.Response[v1.TransferMachineOwnershipResponse], error)
 	// Token revocation: revoke all tokens for the machine. Authorized in the
 	// handler for the machine's creator or a holder of laelia.machines.edit
 	// (workspace-scope); no permission annotation so the creator short-circuit
@@ -374,12 +384,6 @@ type MachineServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewMachineServiceHandler(svc MachineServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	machineServiceMethods := v1.File_v1_machine_proto.Services().ByName("MachineService").Methods()
-	machineServiceCreateMachineHandler := connect.NewUnaryHandler(
-		MachineServiceCreateMachineProcedure,
-		svc.CreateMachine,
-		connect.WithSchema(machineServiceMethods.ByName("CreateMachine")),
-		connect.WithHandlerOptions(opts...),
-	)
 	machineServiceListMachinesHandler := connect.NewUnaryHandler(
 		MachineServiceListMachinesProcedure,
 		svc.ListMachines,
@@ -398,10 +402,16 @@ func NewMachineServiceHandler(svc MachineServiceHandler, opts ...connect.Handler
 		connect.WithSchema(machineServiceMethods.ByName("DeleteMachine")),
 		connect.WithHandlerOptions(opts...),
 	)
-	machineServiceRotateMachineTokenHandler := connect.NewUnaryHandler(
-		MachineServiceRotateMachineTokenProcedure,
-		svc.RotateMachineToken,
-		connect.WithSchema(machineServiceMethods.ByName("RotateMachineToken")),
+	machineServiceUpdateMachineHandler := connect.NewUnaryHandler(
+		MachineServiceUpdateMachineProcedure,
+		svc.UpdateMachine,
+		connect.WithSchema(machineServiceMethods.ByName("UpdateMachine")),
+		connect.WithHandlerOptions(opts...),
+	)
+	machineServiceTransferMachineOwnershipHandler := connect.NewUnaryHandler(
+		MachineServiceTransferMachineOwnershipProcedure,
+		svc.TransferMachineOwnership,
+		connect.WithSchema(machineServiceMethods.ByName("TransferMachineOwnership")),
 		connect.WithHandlerOptions(opts...),
 	)
 	machineServiceRevokeMachineTokenHandler := connect.NewUnaryHandler(
@@ -460,16 +470,16 @@ func NewMachineServiceHandler(svc MachineServiceHandler, opts ...connect.Handler
 	)
 	return "/laelia.v1.MachineService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case MachineServiceCreateMachineProcedure:
-			machineServiceCreateMachineHandler.ServeHTTP(w, r)
 		case MachineServiceListMachinesProcedure:
 			machineServiceListMachinesHandler.ServeHTTP(w, r)
 		case MachineServiceGetMachineProcedure:
 			machineServiceGetMachineHandler.ServeHTTP(w, r)
 		case MachineServiceDeleteMachineProcedure:
 			machineServiceDeleteMachineHandler.ServeHTTP(w, r)
-		case MachineServiceRotateMachineTokenProcedure:
-			machineServiceRotateMachineTokenHandler.ServeHTTP(w, r)
+		case MachineServiceUpdateMachineProcedure:
+			machineServiceUpdateMachineHandler.ServeHTTP(w, r)
+		case MachineServiceTransferMachineOwnershipProcedure:
+			machineServiceTransferMachineOwnershipHandler.ServeHTTP(w, r)
 		case MachineServiceRevokeMachineTokenProcedure:
 			machineServiceRevokeMachineTokenHandler.ServeHTTP(w, r)
 		case MachineServiceForceDisconnectMachineProcedure:
@@ -497,10 +507,6 @@ func NewMachineServiceHandler(svc MachineServiceHandler, opts ...connect.Handler
 // UnimplementedMachineServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedMachineServiceHandler struct{}
 
-func (UnimplementedMachineServiceHandler) CreateMachine(context.Context, *connect.Request[v1.CreateMachineRequest]) (*connect.Response[v1.CreateMachineResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineService.CreateMachine is not implemented"))
-}
-
 func (UnimplementedMachineServiceHandler) ListMachines(context.Context, *connect.Request[v1.ListMachinesRequest]) (*connect.Response[v1.ListMachinesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineService.ListMachines is not implemented"))
 }
@@ -513,8 +519,12 @@ func (UnimplementedMachineServiceHandler) DeleteMachine(context.Context, *connec
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineService.DeleteMachine is not implemented"))
 }
 
-func (UnimplementedMachineServiceHandler) RotateMachineToken(context.Context, *connect.Request[v1.RotateMachineTokenRequest]) (*connect.Response[v1.RotateMachineTokenResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineService.RotateMachineToken is not implemented"))
+func (UnimplementedMachineServiceHandler) UpdateMachine(context.Context, *connect.Request[v1.UpdateMachineRequest]) (*connect.Response[v1.Machine], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineService.UpdateMachine is not implemented"))
+}
+
+func (UnimplementedMachineServiceHandler) TransferMachineOwnership(context.Context, *connect.Request[v1.TransferMachineOwnershipRequest]) (*connect.Response[v1.TransferMachineOwnershipResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineService.TransferMachineOwnership is not implemented"))
 }
 
 func (UnimplementedMachineServiceHandler) RevokeMachineToken(context.Context, *connect.Request[v1.RevokeMachineTokenRequest]) (*connect.Response[v1.RevokeMachineTokenResponse], error) {

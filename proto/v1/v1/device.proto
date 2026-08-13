@@ -1,0 +1,138 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/field_behavior.proto";
+import "v1/annotation.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+// DeviceService implements the OAuth2-style device code flow that replaces
+// bootstrap-token machine registration. The machine CLI calls StartDeviceLogin
+// (it has no credential yet), prints the verification URL + user code, and
+// polls PollDeviceLogin until a logged-in user approves on the public
+// /login/device page. On approval the manager mints the machine's refresh
+// token (creating the machine row on first-time setup) and the CLI persists it
+// locally.
+service DeviceService {
+  // StartDeviceLogin begins a device login. No credential is required; the
+  // call is rate-limited per source IP. The CLI passes its host info and,
+  // when re-authenticating an already-registered machine, the existing
+  // machine's resource id so approval re-auths that machine instead of
+  // creating a duplicate.
+  rpc StartDeviceLogin(StartDeviceLoginRequest) returns (StartDeviceLoginResponse) {
+    option (laelia.v1.allow_without_credential) = true;
+  }
+
+  // PollDeviceLogin returns the session status. The device_code is the
+  // bearer secret; the server enforces a minimum poll interval.
+  rpc PollDeviceLogin(PollDeviceLoginRequest) returns (PollDeviceLoginResponse) {
+    option (laelia.v1.allow_without_credential) = true;
+  }
+
+  // GetDeviceLoginStatus backs the public approval page; the user_code is
+  // what the device screen displays. Returns only non-secret device info.
+  rpc GetDeviceLoginStatus(GetDeviceLoginStatusRequest) returns (GetDeviceLoginStatusResponse) {
+    option (laelia.v1.allow_without_credential) = true;
+  }
+
+  // ApproveDeviceLogin approves a pending device login. Any logged-in user
+  // may approve a new machine; re-authentication of an existing machine is
+  // restricted to its creator or a workspace admin (the session is marked
+  // DENIED with a reason otherwise). Audited.
+  rpc ApproveDeviceLogin(ApproveDeviceLoginRequest) returns (ApproveDeviceLoginResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+}
+
+// DeviceLoginStatus is the state of a device login session.
+enum DeviceLoginStatus {
+  DEVICE_LOGIN_STATUS_UNSPECIFIED = 0;
+  DEVICE_LOGIN_STATUS_PENDING = 1;
+  DEVICE_LOGIN_STATUS_APPROVED = 2;
+  DEVICE_LOGIN_STATUS_EXPIRED = 3;
+  DEVICE_LOGIN_STATUS_DENIED = 4;
+}
+
+message StartDeviceLoginRequest {
+  // Host name of the machine; becomes the machine title on first-time
+  // registration.
+  string hostname = 1;
+  string os = 2;
+  string arch = 3;
+  string ip = 4;
+  string version = 5;
+  // Client-generated host fingerprint (hostname:os:arch hash); bound to the
+  // minted refresh token.
+  string fingerprint = 6;
+  // Existing machine resource id when re-authenticating a machine that
+  // already registered on this host; empty for first-time registration.
+  string machine_id = 7;
+}
+
+message StartDeviceLoginResponse {
+  // High-entropy bearer secret the CLI presents to PollDeviceLogin; never
+  // displayed.
+  string device_code = 1;
+  // 8-character code (XXXX-XXXX) displayed on the device screen and typed
+  // into the approval page URL.
+  string user_code = 2;
+  // Relative verification path, e.g. "/login/device?user_code=XXXX-XXXX".
+  // The CLI composes the full URL from its configured manager URL.
+  string verification_path = 3;
+  // Seconds until the session expires (600).
+  int32 expires_in = 4;
+  // Minimum poll interval in seconds (5).
+  int32 interval = 5;
+}
+
+message PollDeviceLoginRequest {
+  string device_code = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message PollDeviceLoginResponse {
+  DeviceLoginStatus status = 1;
+  // Machine resource id; set on APPROVED (the machine to register or re-auth).
+  string machine_id = 2;
+  // Machine title; set on APPROVED.
+  string machine_title = 3;
+  // Refresh token minted at approval; set once on APPROVED and retrievable
+  // within the post-approval grace window so a crashed CLI can recover.
+  string refresh_token = 4;
+  // Human-readable reason; set on DENIED (e.g. the machine belongs to
+  // another user and re-auth requires its owner or a workspace admin).
+  string denial_reason = 5;
+}
+
+message GetDeviceLoginStatusRequest {
+  string user_code = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetDeviceLoginStatusResponse {
+  DeviceLoginStatus status = 1;
+  string user_code = 2;
+  string hostname = 3;
+  string os = 4;
+  string arch = 5;
+  // True when the CLI supplied an existing machine id (re-auth flow).
+  bool reauth_existing = 6;
+  // Existing machine title when reauth_existing.
+  string machine_title = 7;
+  // Human-readable reason; set on DENIED.
+  string denial_reason = 8;
+  // IP address of the device as seen by the manager when the session
+  // started; shown on the approval page so the user can verify the device.
+  string ip = 9;
+  // Owner handle of the existing machine when reauth_existing; shown on the
+  // approval page so the user can verify who controls the machine.
+  string machine_owner = 10;
+}
+
+message ApproveDeviceLoginRequest {
+  string user_code = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// ApproveDeviceLoginResponse is empty; the approval page reflects the result
+// via GetDeviceLoginStatus polling.
+message ApproveDeviceLoginResponse {}

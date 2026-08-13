@@ -59,6 +59,7 @@ type UpdateMachineMessage struct {
 	LastTokenRotatedAt *time.Time
 	Delete             *bool
 	AvatarS3Key        *string
+	CreatedBy          *int
 }
 
 func (s *Store) GetMachine(ctx context.Context, id int) (*MachineMessage, error) {
@@ -280,6 +281,77 @@ func (s *Store) CreateMachine(ctx context.Context, create *MachineMessage) (*Mac
 	return machine, nil
 }
 
+// CreateMachineWithToken creates a machine with the given resource id and
+// mints its first refresh token in one transaction, so the device approval
+// can never leave a machine row without a credential (which would strand it:
+// the CLI only learns the refresh token from the approval result). The caller
+// generates the resource id so the refresh token JWT can be signed with it
+// before the transaction. Returns the created machine.
+func (s *Store) CreateMachineWithToken(ctx context.Context, resourceID string, create *MachineMessage, token *MachineTokenMessage) (*MachineMessage, error) {
+	tx, err := s.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if create.Info == nil {
+		create.Info = &models.MachineInfo{}
+	}
+	infoBytes, err := json.Marshal(create.Info)
+	if err != nil {
+		return nil, err
+	}
+	if create.Status == nil {
+		create.Status = &models.MachineStatus{}
+	}
+	statusBytes, err := json.Marshal(create.Status)
+	if err != nil {
+		return nil, err
+	}
+
+	var machineID int
+	if err := tx.QueryRowContext(ctx, `
+		INSERT INTO machine (
+			resource_id, name, token_version, info, status, created_by
+		)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, created_at
+	`,
+		resourceID,
+		create.Name,
+		create.TokenVersion,
+		infoBytes,
+		statusBytes,
+		create.CreatedBy,
+	).Scan(&machineID, &create.CreatedAt); err != nil {
+		return nil, err
+	}
+
+	token.MachineID = machineID
+	token.TokenFamily = resourceID
+	if err := insertMachineTokenTx(ctx, tx, token); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	machine := &MachineMessage{
+		ID:           machineID,
+		ResourceID:   resourceID,
+		Name:         create.Name,
+		TokenVersion: create.TokenVersion,
+		CreatedAt:    create.CreatedAt,
+		Info:         create.Info,
+		Status:       create.Status,
+		CreatedBy:    create.CreatedBy,
+	}
+	s.machineIDCache.Add(machine.ID, machine)
+	s.machineResourceIDCache.Add(machine.ResourceID, machine)
+	return machine, nil
+}
+
 func (s *Store) UpdateMachine(ctx context.Context, current *MachineMessage, patch *UpdateMachineMessage) (*MachineMessage, error) {
 	sets, args := []string{}, []any{}
 	if v := patch.ResourceID; v != nil {
@@ -313,6 +385,9 @@ func (s *Store) UpdateMachine(ctx context.Context, current *MachineMessage, patc
 	}
 	if v := patch.AvatarS3Key; v != nil {
 		sets, args = append(sets, fmt.Sprintf("avatar_s3_key = $%d", len(args)+1)), append(args, *v)
+	}
+	if v := patch.CreatedBy; v != nil {
+		sets, args = append(sets, fmt.Sprintf("created_by = $%d", len(args)+1)), append(args, *v)
 	}
 
 	if len(sets) == 0 {

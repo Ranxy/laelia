@@ -24,7 +24,6 @@ const mock = vi.hoisted(() => ({
   fetchUsers: vi.fn(),
   listPiModels: vi.fn(),
   refreshMachineProviders: vi.fn(),
-  rotateMachineToken: vi.fn(),
   revokeMachineToken: vi.fn(),
   forceDisconnectMachine: vi.fn(),
   createAgent: vi.fn(),
@@ -32,7 +31,7 @@ const mock = vi.hoisted(() => ({
   getMachineIamPolicy: vi.fn(),
   setMachineIamPolicy: vi.fn(),
   listGroups: vi.fn(),
-  buildMachineRunCommand: vi.fn(),
+  transferMachineOwnership: vi.fn(),
 }));
 
 vi.mock("@/connect", () => ({
@@ -49,7 +48,7 @@ vi.mock("@/lib/use-is-desktop", () => ({
 }));
 
 vi.mock("@/lib/machine-token", () => ({
-  buildMachineRunCommand: mock.buildMachineRunCommand,
+  buildMachineSetupCommand: () => "SETUP-CMD",
 }));
 
 vi.mock("@/components/connection-badge", () => ({
@@ -153,9 +152,9 @@ function seedStore(overrides?: {
     fetchUsers: mock.fetchUsers,
     listPiModels: mock.listPiModels,
     refreshMachineProviders: mock.refreshMachineProviders,
-    rotateMachineToken: mock.rotateMachineToken,
     revokeMachineToken: mock.revokeMachineToken,
     forceDisconnectMachine: mock.forceDisconnectMachine,
+    transferMachineOwnership: mock.transferMachineOwnership,
     createAgent: mock.createAgent,
     deleteAgent: mock.deleteAgent,
   } as never);
@@ -203,7 +202,6 @@ beforeEach(() => {
   mock.fetchUsers.mockReset();
   mock.listPiModels.mockReset();
   mock.refreshMachineProviders.mockReset();
-  mock.rotateMachineToken.mockReset();
   mock.revokeMachineToken.mockReset();
   mock.forceDisconnectMachine.mockReset();
   mock.createAgent.mockReset();
@@ -211,7 +209,7 @@ beforeEach(() => {
   mock.getMachineIamPolicy.mockReset();
   mock.setMachineIamPolicy.mockReset();
   mock.listGroups.mockReset();
-  mock.buildMachineRunCommand.mockReset();
+  mock.transferMachineOwnership.mockReset();
   mock.getSetting.mockResolvedValue({
     value: {
       value: { allowUserSelfProvidedKeys: true },
@@ -227,7 +225,6 @@ beforeEach(() => {
     { id: "deepseek-chat", name: "DeepSeek Chat" },
   ] as PiModel[]);
   mock.refreshMachineProviders.mockResolvedValue([]);
-  mock.rotateMachineToken.mockResolvedValue({ registrationToken: "tok-123" });
   mock.revokeMachineToken.mockResolvedValue(undefined);
   mock.forceDisconnectMachine.mockResolvedValue(undefined);
   mock.createAgent.mockResolvedValue(undefined);
@@ -241,7 +238,7 @@ beforeEach(() => {
     etag: "etag-2",
   });
   mock.listGroups.mockResolvedValue({ groups: [] });
-  mock.buildMachineRunCommand.mockReturnValue("RUN-CMD");
+  mock.transferMachineOwnership.mockResolvedValue(undefined);
   Object.defineProperty(navigator, "clipboard", {
     value: { writeText: vi.fn().mockResolvedValue(undefined) },
     configurable: true,
@@ -292,46 +289,11 @@ describe("MachineProfilePage", () => {
     ).toBeGreaterThan(0);
     // Token controls are hidden for non-managers.
     expect(
-      screen.queryByRole("button", { name: "machine.rotate-token" })
+      screen.queryByRole("button", { name: "machine.revoke-token" })
     ).not.toBeInTheDocument();
   });
 
-  it("rotates the registration token and shows the run command", async () => {
-    renderPage();
-
-    fireEvent.click(
-      await screen.findByRole("button", { name: "machine.rotate-token" })
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "machine.rotate-token" })
-    );
-
-    await waitFor(() => {
-      expect(mock.rotateMachineToken).toHaveBeenCalledWith("machines/m1");
-    });
-    expect(await screen.findByText("RUN-CMD")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "common.copy" }));
-    await waitFor(() => {
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("RUN-CMD");
-    });
-  });
-
-  it("surfaces the rotate error inside the confirm dialog", async () => {
-    mock.rotateMachineToken.mockRejectedValue(new Error("boom"));
-    renderPage();
-
-    fireEvent.click(
-      await screen.findByRole("button", { name: "machine.rotate-token" })
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "machine.rotate-token" })
-    );
-
-    expect((await screen.findAllByText("boom")).length).toBeGreaterThan(0);
-  });
-
-  it("revokes the registration token after confirmation", async () => {
+  it("revokes the machine token after confirmation", async () => {
     renderPage();
 
     fireEvent.click(
@@ -343,6 +305,42 @@ describe("MachineProfilePage", () => {
 
     await waitFor(() => {
       expect(mock.revokeMachineToken).toHaveBeenCalledWith("machines/m1");
+    });
+  });
+
+  it("transfers ownership after the two-step confirm", async () => {
+    seedStore({
+      users: [
+        { name: "users/1", title: "Alice" },
+        { name: "users/2", title: "Bob" },
+      ],
+    });
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "machine.transfer-owner" })
+    );
+    await screen.findByText("machine.transfer-owner-title");
+
+    // Pick the target user (users/2) via the select.
+    const trigger = screen.getByRole("combobox");
+    fireEvent.click(trigger);
+    const item = await screen.findByText("Bob");
+    fireEvent.pointerDown(item);
+    fireEvent.pointerUp(item);
+    fireEvent.click(item);
+
+    fireEvent.click(screen.getByRole("button", { name: "common.next" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "machine.transfer-owner-confirm" })
+    );
+
+    await waitFor(() => {
+      expect(mock.transferMachineOwnership).toHaveBeenCalledWith(
+        "machines/m1",
+        "users/2",
+        ""
+      );
     });
   });
 

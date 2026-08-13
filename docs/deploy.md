@@ -133,37 +133,47 @@ Notes:
 
 ## 4. Start machine hosts
 
-In the manager UI, go to Machines and create a machine. The dialog shows a
-registration token exactly once — copy it; the token is single-use.
+Machines authenticate with the manager through an OAuth2-style **device code
+flow** — there are no registration tokens. In the manager UI, go to Machines
+and click *Create Machine*: the page shows the command to run on the host and
+waits for the machine to appear. On the host, run:
 
 ```bash
 docker run -d --name laelia-machine \
   --restart unless-stopped \
   -e LAELIA_MANAGER_URL='https://laelia.example.com' \
-  -e LAELIA_TOKEN='<registration-token>' \
   -v laelia-machine-data:/home/laelia \
   laelia/machine:local
 ```
+
+The entrypoint runs `laelia-machine setup --no-browser`: it prints an approval
+URL (e.g. `https://laelia.example.com/login/device?user_code=XXXX-XXXX`) to the
+container logs, waits for a logged-in user to open it and approve, then runs
+the machine in the foreground. On later restarts the saved login is validated
+automatically ("already logged in") and the machine starts directly.
 
 Environment variables:
 
 | Variable | Description |
 | --- | --- |
 | `LAELIA_MANAGER_URL` | Manager base URL. For `http://` URLs the entrypoint automatically adds `--allow-http`. |
-| `LAELIA_TOKEN` | Machine registration token from the UI. |
 | `LAELIA_INSECURE` | `true` to skip TLS certificate verification (self-signed setups; development only). |
 | `LAELIA_DEBUG` | `true` for debug logging. |
 
 The machine makes outbound connections only; no port needs to be published.
-Mount a volume at `/home/laelia` so agent workspaces, the persisted refresh
-token, and the materialized pi runtime survive container restarts. Mount the
-whole home directory (rather than a not-yet-existing `.laelia` subdirectory) so
-the files stay owned by the image's unprivileged user. If you prefer a bind
-mount, create the directory and `chown 1001:1001` it first.
+Mount a volume at `/home/laelia` so agent workspaces, the persisted login
+state (`~/.laelia/machine.json`), and the materialized pi runtime survive
+container restarts. Mount the whole home directory (rather than a
+not-yet-existing `.laelia` subdirectory) so the files stay owned by the
+image's unprivileged user. If you prefer a bind mount, create the directory
+and `chown 1001:1001` it first.
 
-If the container is recreated without the volume, the single-use registration
-token is already consumed; rotate the machine token in the UI and start the
-container with the new token.
+If the container is recreated without the volume, the login state is lost:
+the machine re-runs the device flow and registers a brand-new machine (the
+old machine row stays on the manager, offline). To re-authenticate an
+existing machine instead, keep the volume and, if its login was revoked, run
+`laelia-machine setup` on the host again and approve with the machine's owner
+or a workspace admin.
 
 Machine-manager channels are bidirectional and require HTTP/2. When the manager
 is behind a reverse proxy, the proxy must forward HTTP/2 (see below); otherwise

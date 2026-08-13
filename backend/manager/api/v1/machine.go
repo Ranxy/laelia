@@ -2,7 +2,6 @@ package v1
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -45,9 +44,11 @@ const machineRefreshRotateWindow = 10 * 24 * time.Hour
 
 // MachineService implements MachineService: management RPCs (admin/IAM) for
 // machines and the machine-side authentication RPCs the machine app calls to
-// register itself and stay connected. A machine authenticates once with a
-// registration token (bootstrap) and then hosts one or more agents, each
-// running its own AgentChannel over the machine's access token.
+// stay connected. A machine authenticates through the device-code flow
+// (DeviceService): the manager mints its refresh token at approval time and
+// the machine reconnects with access tokens issued by RefreshMachineToken.
+// Each machine hosts one or more agents, each running its own AgentChannel
+// over the machine's access token.
 type MachineService struct {
 	v1connect.UnimplementedMachineServiceHandler
 	store      *store.Store
@@ -67,55 +68,6 @@ func NewMachineService(s *store.Store, secret string, profile *config.Profile, s
 		dispatcher: d,
 		iam:        iamManager,
 	}
-}
-
-func (s *MachineService) CreateMachine(ctx context.Context, req *connect.Request[v1pb.CreateMachineRequest]) (*connect.Response[v1pb.CreateMachineResponse], error) {
-	if req.Msg.Machine == nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("machine must be set"))
-	}
-	if req.Msg.Machine.Title == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("machine title must be set"))
-	}
-
-	creatorID := 0
-	if user, _ := GetUserFromContext(ctx); user != nil {
-		creatorID = user.ID
-	}
-
-	created, err := s.store.CreateMachine(ctx, &store.MachineMessage{
-		Name:         req.Msg.Machine.Title,
-		TokenVersion: 1,
-		Info:         &storepb.MachineInfo{},
-		Status:       &storepb.MachineStatus{},
-		CreatedBy:    creatorID,
-	})
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to create machine, error: %v", err))
-	}
-
-	// Mint a single-use registration (bootstrap) token the machine app presents
-	// on first connect. Mirrors agent bootstrap: 7-day validity, consumed once
-	// ConnectMachine succeeds.
-	registrationToken, err := auth.GenerateMachineToken(created.Name, created.ResourceID, created.TokenVersion, auth.TokenTypeBootstrap, s.profile.Mode, s.secret, bootstrapTokenDuration)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate machine token, error: %v", err))
-	}
-	if err := s.store.CreateMachineToken(ctx, &store.MachineTokenMessage{
-		MachineID:   created.ID,
-		TokenHash:   hashToken(registrationToken),
-		TokenType:   storepb.MachineTokenType_MACHINE_BOOTSTRAP,
-		TokenFamily: created.ResourceID,
-		State:       storepb.MachineTokenState_MACHINE_TOKEN_ACTIVE,
-		ExpiresAt:   time.Now().Add(bootstrapTokenDuration),
-		CreatedBy:   "system",
-	}); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store machine token, error: %v", err))
-	}
-
-	return connect.NewResponse(&v1pb.CreateMachineResponse{
-		Machine:           s.convertToMachine(ctx, created),
-		RegistrationToken: registrationToken,
-	}), nil
 }
 
 func (s *MachineService) ListMachines(ctx context.Context, req *connect.Request[v1pb.ListMachinesRequest]) (*connect.Response[v1pb.ListMachinesResponse], error) {
@@ -180,7 +132,7 @@ func (s *MachineService) ListMachines(ctx context.Context, req *connect.Request[
 	canDelete := canDeleteMachineByPermission(ctx, s.iam, caller)
 	resp := &v1pb.ListMachinesResponse{NextPageToken: nextPageToken}
 	for _, m := range page {
-		summary := convertToMachineSummary(m, agentCounts[m.ID])
+		summary := s.convertToMachineSummary(ctx, m, agentCounts[m.ID])
 		summary.CanEdit = canEdit
 		summary.CanManage = canEdit || isMachineCreator(caller, m)
 		summary.CanDelete = canDelete || isMachineCreator(caller, m)
@@ -341,11 +293,11 @@ func (s *MachineService) DeleteMachine(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
-// RotateMachineToken bumps the machine's token_version, revokes every machine
-// token, terminates all sessions, and mints a fresh single-use registration
-// token. The machine app must re-ConnectMachine with the new registration token
-// and re-open all its agent runners; in-flight commands fail in the grace window.
-func (s *MachineService) RotateMachineToken(ctx context.Context, req *connect.Request[v1pb.RotateMachineTokenRequest]) (*connect.Response[v1pb.RotateMachineTokenResponse], error) {
+// UpdateMachine renames a machine (title). Authorized for the machine's
+// creator or a holder of laelia.machines.edit (workspace-scope), matching
+// DeleteMachine. Used by the frontend confirm/rename step of the device-code
+// create-machine flow.
+func (s *MachineService) UpdateMachine(ctx context.Context, req *connect.Request[v1pb.UpdateMachineRequest]) (*connect.Response[v1pb.Machine], error) {
 	resourceID, err := common.GetMachineResourceID(req.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
@@ -359,56 +311,80 @@ func (s *MachineService) RotateMachineToken(ctx context.Context, req *connect.Re
 	}
 	user, _ := GetUserFromContext(ctx)
 	if !isMachineAdmin(ctx, s.iam, user, machine) {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can rotate this machine's token"))
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can update this machine"))
 	}
 
-	newTokenVersion := machine.TokenVersion + 1
-	newTokenFamily := fmt.Sprintf("%s:v%d", machine.ResourceID, newTokenVersion)
-
-	registrationToken, err := auth.GenerateMachineTokenWithFamily(machine.Name, machine.ResourceID, newTokenVersion, auth.TokenTypeBootstrap, newTokenFamily, s.profile.Mode, s.secret, bootstrapTokenDuration)
+	patch := &store.UpdateMachineMessage{}
+	if req.Msg.Title != "" {
+		patch.Name = &req.Msg.Title
+	}
+	if patch.Name == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("title must be set"))
+	}
+	updated, err := s.store.UpdateMachine(ctx, machine, patch)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate machine token, error: %v", err))
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update machine, error: %v", err))
+	}
+	out := s.convertToMachine(ctx, updated)
+	out.CanEdit = true // caller just proved edit authorization
+	out.CanManage = true
+	return connect.NewResponse(out), nil
+}
+
+// TransferMachineOwnership reassigns the machine to another user. The caller
+// must be the machine's creator or a workspace admin; the transfer is
+// unilateral and effective immediately. The machine keeps running and its
+// tokens are NOT revoked — the new owner simply gains control (including the
+// right to approve the machine's re-authentication). Mirrors
+// TransferAgentOwnership.
+func (s *MachineService) TransferMachineOwnership(ctx context.Context, req *connect.Request[v1pb.TransferMachineOwnershipRequest]) (*connect.Response[v1pb.TransferMachineOwnershipResponse], error) {
+	resourceID, err := common.GetMachineResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	machine, err := s.store.GetMachineByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get machine, error: %v", err))
+	}
+	if machine == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !isMachineAdmin(ctx, s.iam, user, machine) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can transfer ownership"))
 	}
 
-	// Bump the version (invalidates old tokens), revoke every existing token,
-	// and store the new bootstrap — atomically, in one transaction. A failure
-	// leaves the machine on its current credentials so it is never tokenless;
-	// the admin can retry. Session teardown + dispatcher unregister below are
-	// best-effort and outside the transaction.
-	nowRotated := time.Now()
-	if _, err := s.store.RotateMachineTokens(ctx, machine, newTokenVersion, nowRotated, &store.MachineTokenMessage{
-		MachineID:   machine.ID,
-		TokenHash:   hashToken(registrationToken),
-		TokenType:   storepb.MachineTokenType_MACHINE_BOOTSTRAP,
-		TokenFamily: newTokenFamily,
-		State:       storepb.MachineTokenState_MACHINE_TOKEN_ACTIVE,
-		ExpiresAt:   time.Now().Add(bootstrapTokenDuration),
-		CreatedBy:   "system",
-	}); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to rotate machine tokens, error: %v", err))
+	newOwnerHandle, err := common.GetUserHandle(req.Msg.NewOwner)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid new_owner %q: %v", req.Msg.NewOwner, err))
 	}
+	ownerHandle := resolveUserHandle(ctx, s.store, machine.CreatedBy)
+	if newOwnerHandle == ownerHandle {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("new_owner is already the machine's owner"))
+	}
+	target, err := s.store.GetUserByHandle(ctx, newOwnerHandle)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to look up new owner, error: %v", err))
+	}
+	if target == nil || target.MemberDeleted {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("new owner user %s not found", req.Msg.NewOwner))
+	}
+	newOwnerID := target.ID
 
-	terminateReason := "token_rotated"
-	if req.Msg.Reason != "" {
-		terminateReason = req.Msg.Reason
+	updated, err := s.store.UpdateMachine(ctx, machine, &store.UpdateMachineMessage{CreatedBy: &newOwnerID})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to transfer machine ownership, error: %v", err))
 	}
-	if err := s.store.TerminateAllMachineSessions(ctx, machine.ID, terminateReason); err != nil {
-		// non-fatal: the version bump + token revocation already invalidate the
-		// old connection; a stale session row is cosmetic.
-		slog.Info("non-fatal failure terminating sessions during token rotation", "machineID", machine.ID, "error", err)
-	}
-	if s.dispatcher != nil {
-		s.dispatcher.UnregisterMachine(machine.ID)
-	}
-
-	return connect.NewResponse(&v1pb.RotateMachineTokenResponse{
-		RegistrationToken: registrationToken,
-	}), nil
+	out := s.convertToMachine(ctx, updated)
+	out.CanEdit = true // caller just proved edit authorization
+	out.CanManage = true
+	return connect.NewResponse(&v1pb.TransferMachineOwnershipResponse{Machine: out}), nil
 }
 
 // RevokeMachineToken bumps the token_version and revokes every token + session
-// without issuing a new registration token. The machine app cannot reconnect
-// until an admin rotates the token again.
+// without issuing a new token. The machine cannot reconnect until its owner
+// re-runs `laelia-machine setup` on the host (device re-auth of the existing
+// machine).
 func (s *MachineService) RevokeMachineToken(ctx context.Context, req *connect.Request[v1pb.RevokeMachineTokenRequest]) (*connect.Response[v1pb.RevokeMachineTokenResponse], error) {
 	resourceID, err := common.GetMachineResourceID(req.Msg.Name)
 	if err != nil {
@@ -627,43 +603,15 @@ func (s *MachineService) ListMachineWorkspaces(ctx context.Context, req *connect
 	}
 }
 
-// ConnectMachine is the machine app's first (registration token) or subsequent
-// (access token) connection. On success it mints the machine's access + refresh
-// tokens (bootstrap path only), creates a machine session, marks the machine
-// ONLINE, and returns the full list of agents the machine must host — the
-// machine app opens one AgentChannel per entry immediately and on every
-// reconnect.
+// ConnectMachine registers a machine session. The machine authenticates via
+// its access token (minted by RefreshMachineToken from the refresh token the
+// device approval issued); there is no bootstrap/registration path anymore.
+// The response carries the session id, the machine's initial status, and the
+// full agent roster the machine app must host.
 func (s *MachineService) ConnectMachine(ctx context.Context, req *connect.Request[v1pb.ConnectMachineRequest]) (*connect.Response[v1pb.ConnectMachineResponse], error) {
 	machine, ok := GetMachineFromContext(ctx)
-	tokenFamily := ""
-	bootstrapTokenID := 0
 	if !ok || machine == nil {
-		if req.Msg.RegistrationToken == "" {
-			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("machine not authenticated and no registration token provided"))
-		}
-		authResult, err := s.authenticateMachineRegistrationToken(req.Msg.RegistrationToken)
-		if err != nil {
-			return nil, err
-		}
-		machine = authResult.machine
-		tokenFamily = authResult.tokenFamily
-		bootstrapTokenID = authResult.tokenID
-		// Consume the single-use registration token atomically BEFORE any
-		// state mutation. The conditional UPDATE (state=ACTIVE → CONSUMED) is
-		// the serialization point: two concurrent ConnectMachine calls with the
-		// same registration token race here, and only the winner (rows-affected
-		// == 1) proceeds to mint tokens and create a session. The loser gets
-		// Unauthenticated and must not have created a session.
-		consumed, err := s.store.ConsumeMachineToken(ctx, bootstrapTokenID)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to consume registration token, error: %v", err))
-		}
-		if !consumed {
-			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("registration token is no longer active (consumed or revoked)"))
-		}
-	}
-	if tokenFamily == "" {
-		tokenFamily = machine.ResourceID
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("machine not authenticated"))
 	}
 
 	sessionID := generateRandomString(sessionIDLength)
@@ -709,46 +657,13 @@ func (s *MachineService) ConnectMachine(ctx context.Context, req *connect.Reques
 	if err := s.store.CreateMachineSession(ctx, &store.MachineSessionMessage{
 		SessionID:   sessionID,
 		MachineID:   machine.ID,
-		TokenFamily: tokenFamily,
+		TokenFamily: machine.ResourceID,
 		State:       "ACTIVE",
 		SourceIP:    sourceIP,
 		Fingerprint: req.Msg.Fingerprint,
 		ConnectedAt: now,
 	}); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to create machine session, error: %v", err))
-	}
-
-	// Mint the machine's initial access + refresh tokens only on the bootstrap
-	// (first connect) path. On reconnect the machine authenticated via an
-	// access token it already holds from RefreshMachineToken.
-	accessToken := ""
-	refreshToken := ""
-	accessTokenExpiresAt := time.Time{}
-	if bootstrapTokenID != 0 {
-		accessToken, err = auth.GenerateMachineTokenWithSession(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeAccess, sessionID, s.profile.Mode, s.secret, accessTokenDuration)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate access token, error: %v", err))
-		}
-		refreshToken, err = auth.GenerateMachineTokenWithSession(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeRefresh, "", s.profile.Mode, s.secret, machineRefreshTokenDuration)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate refresh token, error: %v", err))
-		}
-		if err := s.store.CreateMachineToken(ctx, &store.MachineTokenMessage{
-			MachineID:   machine.ID,
-			TokenHash:   hashToken(refreshToken),
-			TokenType:   storepb.MachineTokenType_MACHINE_REFRESH,
-			TokenFamily: tokenFamily,
-			State:       storepb.MachineTokenState_MACHINE_TOKEN_ACTIVE,
-			Fingerprint: req.Msg.Fingerprint,
-			ExpiresAt:   time.Now().Add(machineRefreshTokenDuration),
-		}); err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store refresh token, error: %v", err))
-		}
-		accessTokenExpiresAt = time.Now().Add(accessTokenDuration)
-
-		// The registration token was already consumed atomically at the top of
-		// ConnectMachine (the single-use serialization point); nothing to do
-		// here on success.
 	}
 
 	// Resync the full agent roster: the machine app opens an AgentChannel for
@@ -758,17 +673,11 @@ func (s *MachineService) ConnectMachine(ctx context.Context, req *connect.Reques
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to list assigned agents"))
 	}
 
-	resp := &v1pb.ConnectMachineResponse{
+	return connect.NewResponse(&v1pb.ConnectMachineResponse{
 		SessionId:      sessionID,
 		InitialStatus:  convertToV1MachineStatus(updated.Status, updated.Deleted),
 		AssignedAgents: assigned,
-	}
-	if accessToken != "" {
-		resp.AccessToken = accessToken
-		resp.RefreshToken = refreshToken
-		resp.AccessTokenExpiresAt = timestamppb.New(accessTokenExpiresAt)
-	}
-	return connect.NewResponse(resp), nil
+	}), nil
 }
 
 // buildAssignedAgents returns the AgentAssignment for every agent bound to the
@@ -896,7 +805,7 @@ func (s *MachineService) MachineDisconnect(ctx context.Context, req *connect.Req
 // expiry does the server mint a replacement (rolling renewal), leaving the
 // old token to expire on its own. Theft is detected by fingerprint binding
 // (rejected if presented from a different machine) and by token-version
-// mismatch (an admin RotateMachineToken bumps the version and revokes the
+// mismatch (a device-approval rotation bumps the version and revokes the
 // family); a CONSUMED/REVOKED token still triggers family revocation as a
 // safety net.
 func (s *MachineService) RefreshMachineToken(ctx context.Context, req *connect.Request[v1pb.RefreshMachineTokenRequest]) (*connect.Response[v1pb.RefreshMachineTokenResponse], error) {
@@ -1009,57 +918,6 @@ func machineRefreshReuseAction(state storepb.MachineTokenState) refreshAction {
 	}
 }
 
-type machineRegistrationAuthResult struct {
-	machine     *store.MachineMessage
-	tokenFamily string
-	tokenID     int
-}
-
-// authenticateMachineRegistrationToken verifies a registration (bootstrap)
-// token presented to ConnectMachine: JWT signature, token_type=BOOTSTRAP, the
-// machine exists + is not deleted + token_version matches, and the stored token
-// row is ACTIVE and not expired. Mirrors authenticateBootstrapToken.
-func (s *MachineService) authenticateMachineRegistrationToken(tokenStr string) (*machineRegistrationAuthResult, error) {
-	claims, err := auth.ParseMachineToken(tokenStr, s.secret)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Wrap(err, "invalid registration token"))
-	}
-	if claims.TokenType != auth.TokenTypeBootstrap {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Errorf("expected registration token, got %s", claims.TokenType))
-	}
-
-	machine, err := s.store.GetMachineByResourceID(context.Background(), claims.Subject)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to find machine: %v", err))
-	}
-	if machine == nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Errorf("machine %s not found", claims.Subject))
-	}
-	if machine.Deleted {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Errorf("machine %s has been deactivated", claims.Subject))
-	}
-	if machine.TokenVersion != claims.TokenVersion {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("machine token version mismatch"))
-	}
-
-	storedToken, err := s.store.GetMachineTokenByHash(context.Background(), hashToken(tokenStr))
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to look up token: %v", err))
-	}
-	if storedToken == nil || storedToken.State != storepb.MachineTokenState_MACHINE_TOKEN_ACTIVE {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("registration token is not active"))
-	}
-	if time.Now().After(storedToken.ExpiresAt) {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("registration token expired"))
-	}
-
-	tokenFamily := claims.TokenFamily
-	if tokenFamily == "" {
-		tokenFamily = claims.Subject
-	}
-	return &machineRegistrationAuthResult{machine: machine, tokenFamily: tokenFamily, tokenID: storedToken.ID}, nil
-}
-
 // ---- converters ----
 
 func (s *MachineService) convertToMachine(ctx context.Context, m *store.MachineMessage) *v1pb.Machine {
@@ -1081,18 +939,23 @@ func (s *MachineService) convertToMachine(ctx context.Context, m *store.MachineM
 	return out
 }
 
-func convertToMachineSummary(m *store.MachineMessage, agentCount int) *v1pb.MachineSummary {
+func (s *MachineService) convertToMachineSummary(ctx context.Context, m *store.MachineMessage, agentCount int) *v1pb.MachineSummary {
 	state := v1pb.State_ACTIVE
 	if m.Deleted {
 		state = v1pb.State_DELETED
 	}
-	return &v1pb.MachineSummary{
+	out := &v1pb.MachineSummary{
 		Name:       common.FormatMachineUID(m.ResourceID),
 		State:      state,
 		Title:      m.Name,
 		Status:     convertToV1MachineStatus(m.Status, m.Deleted),
 		AgentCount: int32(agentCount),
+		CreatedAt:  timestamppb.New(m.CreatedAt),
 	}
+	if m.CreatedBy != 0 {
+		out.CreatedBy = resolveUserResource(ctx, s.store, m.CreatedBy)
+	}
+	return out
 }
 
 func convertToV1MachineInfo(info *storepb.MachineInfo) *v1pb.MachineInfo {

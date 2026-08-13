@@ -58,4 +58,4 @@ docker build -f ./scripts/Dockerfile \
 echo ""
 echo "Images:"
 echo "  laelia/manager:${VERSION}  (run with LAELIA_PG_URL pointing at PostgreSQL)"
-echo "  laelia/machine:${VERSION}  (run with LAELIA_MANAGER_URL and LAELIA_TOKEN)"
+echo "  laelia/machine:${VERSION}  (run with LAELIA_MANAGER_URL; approve the device login printed to the logs)"

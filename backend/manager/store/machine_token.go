@@ -42,13 +42,13 @@ func (s *Store) CreateMachineToken(ctx context.Context, token *MachineTokenMessa
 }
 
 // RotateMachineTokens atomically bumps the machine's token_version, revokes
-// every existing machine token, and stores a new bootstrap (registration)
-// token — all in one transaction. On failure nothing changes, so the machine
-// keeps its previous, still-valid credentials and the admin can retry. This
-// avoids the window where the version was bumped and old tokens revoked
-// before the new bootstrap was persisted (which would leave the machine unable
-// to reconnect). Returns the refreshed machine.
-func (s *Store) RotateMachineTokens(ctx context.Context, current *MachineMessage, newVersion int, rotatedAt time.Time, newBootstrap *MachineTokenMessage) (*MachineMessage, error) {
+// every existing machine token, and stores a new token (a refresh token in the
+// device-code flow) — all in one transaction. On failure nothing changes, so
+// the machine keeps its previous, still-valid credentials and the caller can
+// retry. This avoids the window where the version was bumped and old tokens
+// revoked before the new token was persisted (which would leave the machine
+// unable to reconnect). Returns the refreshed machine.
+func (s *Store) RotateMachineTokens(ctx context.Context, current *MachineMessage, newVersion int, rotatedAt time.Time, newToken *MachineTokenMessage) (*MachineMessage, error) {
 	tx, err := s.GetDB().BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -68,15 +68,7 @@ func (s *Store) RotateMachineTokens(ctx context.Context, current *MachineMessage
 		return nil, err
 	}
 
-	tokenType := machineTokenTypeToString(newBootstrap.TokenType)
-	state := machineTokenStateToString(newBootstrap.State)
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO machine_token (
-			machine_id, token_hash, token_type, token_family, state,
-			fingerprint, source_ip, expires_at, created_by
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, newBootstrap.MachineID, newBootstrap.TokenHash, tokenType, newBootstrap.TokenFamily, state,
-		newBootstrap.Fingerprint, newBootstrap.SourceIP, newBootstrap.ExpiresAt, newBootstrap.CreatedBy); err != nil {
+	if err := insertMachineTokenTx(ctx, tx, newToken); err != nil {
 		return nil, err
 	}
 
@@ -93,6 +85,21 @@ func (s *Store) RotateMachineTokens(ctx context.Context, current *MachineMessage
 	s.machineIDCache.Add(machine.ID, machine)
 	s.machineResourceIDCache.Add(machine.ResourceID, machine)
 	return machine, nil
+}
+
+// insertMachineTokenTx inserts a machine token row inside the caller's
+// transaction.
+func insertMachineTokenTx(ctx context.Context, tx *sql.Tx, token *MachineTokenMessage) error {
+	tokenType := machineTokenTypeToString(token.TokenType)
+	state := machineTokenStateToString(token.State)
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO machine_token (
+			machine_id, token_hash, token_type, token_family, state,
+			fingerprint, source_ip, expires_at, created_by
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`, token.MachineID, token.TokenHash, tokenType, token.TokenFamily, state,
+		token.Fingerprint, token.SourceIP, token.ExpiresAt, token.CreatedBy)
+	return err
 }
 
 func (s *Store) GetMachineTokenByHash(ctx context.Context, tokenHash string) (*MachineTokenMessage, error) {

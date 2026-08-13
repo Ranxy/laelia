@@ -40,9 +40,8 @@ var secretFilePatterns = []*regexp.Regexp{
 
 // neverVisibleHiddenNames are entries hidden even when the caller asks for
 // hidden files: generic high-sensitivity credential directories an LLM agent
-// may create inside its working dir, plus laelia's own machine credential file
-// prefix (machine-token-<id>) as defense in depth — the token file itself lives
-// outside the browsable roots.
+// may create inside its working dir. The machine's own credential file
+// (~/.laelia/machine.json) lives outside the browsable roots.
 var neverVisibleHiddenNames = map[string]bool{
 	".aws": true, ".gnupg": true, ".ssh": true,
 }
@@ -50,7 +49,7 @@ var neverVisibleHiddenNames = map[string]bool{
 // isNeverVisibleEntry reports whether a single path segment is never shown,
 // regardless of the includeHidden flag.
 func isNeverVisibleEntry(name string) bool {
-	return neverVisibleHiddenNames[name] || strings.HasPrefix(name, "machine-token-")
+	return neverVisibleHiddenNames[name]
 }
 
 func pathParts(rel string) []string {

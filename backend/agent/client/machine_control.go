@@ -188,9 +188,9 @@ func (c *MachineClient) handleDiscoverProviders(ctx context.Context, send func(*
 }
 
 // handleMachineWorkspaceScan summarizes every per-agent workspace directory
-// under ~/.laelia/<machineID>/ and replies. Machine credentials
-// (machine-token-<id>) live directly under ~/.laelia/, outside the scanned
-// root, so they are never reported.
+// under ~/.laelia/<machineID>/ and replies. The machine state file
+// (~/.laelia/machine.json) lives directly under ~/.laelia/, outside the
+// scanned root, so it is never reported.
 func (c *MachineClient) handleMachineWorkspaceScan(_ context.Context, send func(*v1pb.MachineStreamMessage) error, req *v1pb.MachineWorkspaceScanRequest) {
 	if req == nil {
 		return

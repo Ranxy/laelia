@@ -13,6 +13,7 @@ export const CHAT_ROUTE_DETAIL = "chat.detail";
 export const ACTIVITY_ROUTE = "activity";
 export const ACTIVITY_ROUTE_DETAIL = "activity.detail";
 export const MACHINE_ROUTE_LIST = "machine.list";
+export const MACHINE_ROUTE_NEW = "machine.new";
 export const MACHINE_ROUTE_PROFILE = "machine.profile";
 export const MACHINE_ROUTE_WORKSPACE = "machine.workspace";
 export const MEMBERS_ROUTE = "members";

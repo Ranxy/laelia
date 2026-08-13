@@ -6,14 +6,13 @@ import type {
 } from "@/types/proto-es/v1/agent_pb";
 import type { MachineSummary } from "@/types/proto-es/v1/machine_pb";
 import {
-  CreateMachineRequestSchema,
   DeleteMachineRequestSchema,
   ForceDisconnectMachineRequestSchema,
-  MachineSchema,
   MachineSummarySchema,
   RefreshMachineProvidersRequestSchema,
   RevokeMachineTokenRequestSchema,
-  RotateMachineTokenRequestSchema,
+  TransferMachineOwnershipRequestSchema,
+  UpdateMachineRequestSchema,
 } from "@/types/proto-es/v1/machine_pb";
 import type { AppSliceCreator, MachineSlice } from "./types";
 
@@ -58,13 +57,32 @@ export const createMachineSlice: AppSliceCreator<MachineSlice> = (
     }
   },
 
-  async createMachine(title: string, labels?: Record<string, string>) {
-    const res = await machineServiceClient.createMachine(
-      create(CreateMachineRequestSchema, {
-        machine: create(MachineSchema, { title, labels }),
+  async updateMachine(name: string, title: string) {
+    const res = await machineServiceClient.updateMachine(
+      create(UpdateMachineRequestSchema, { name, title })
+    );
+    // Keep the local roster in sync so the machines list and the detail
+    // header show the new title immediately instead of after a refetch.
+    set((state) => ({
+      machines: state.machines.map((m) =>
+        m.name === name ? create(MachineSummarySchema, { ...m, title }) : m
+      ),
+    }));
+    return res;
+  },
+
+  async transferMachineOwnership(
+    name: string,
+    newOwner: string,
+    reason?: string
+  ) {
+    await machineServiceClient.transferMachineOwnership(
+      create(TransferMachineOwnershipRequestSchema, {
+        name,
+        newOwner,
+        reason: reason ?? "",
       })
     );
-    return res;
   },
 
   async deleteMachine(name: string) {
@@ -74,12 +92,6 @@ export const createMachineSlice: AppSliceCreator<MachineSlice> = (
     set((state) => ({
       machines: state.machines.filter((m) => m.name !== name),
     }));
-  },
-
-  async rotateMachineToken(name: string, reason?: string) {
-    return machineServiceClient.rotateMachineToken(
-      create(RotateMachineTokenRequestSchema, { name, reason: reason ?? "" })
-    );
   },
 
   async revokeMachineToken(name: string, reason?: string) {

@@ -714,11 +714,18 @@ export declare type Mention = Message<"laelia.v1.Mention"> & {
   type: string;
 
   /**
+   * id is the member's id: the agent resource id for agents, the user handle
+   * for users.
+   *
    * @generated from field: string id = 2;
    */
   id: string;
 
   /**
+   * name is the member's handle ("ran-user-1" / "rei-agent-1"), the value
+   * typed after "@" in message content. Mentions in content are resolved by
+   * this handle alone; display names never participate in mention resolution.
+   *
    * @generated from field: string name = 3;
    */
   name: string;
@@ -1063,14 +1070,13 @@ export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
   agentId: string;
 
   /**
-   * principal_id is the decimal id of the principal that authored this message
-   * (the chat_message.principal_id row). For a user message it is the sending
-   * user's principal id (matching the {user} segment of the "users/{user}"
-   * resource name); for an agent message it is the conversation owner's
-   * principal id; for a system message it is the system bot's id. The frontend
-   * uses it to tell the current user's own messages apart from other users'
-   * messages in shared channels (sender_name alone is a display name and can
-   * collide across users).
+   * principal_id is the mention handle of the principal that authored this
+   * message (principal.handle). For a user message it is the sending user's
+   * handle (matching the {user} segment of the "users/{user}" resource name);
+   * for an agent message it is the conversation owner's handle; for a system
+   * message it is "system-bot". The frontend uses it to tell the current
+   * user's own messages apart from other users' messages in shared channels
+   * (sender_name alone is a display name and can collide across users).
    *
    * @generated from field: string principal_id = 18;
    */
@@ -1108,6 +1114,10 @@ export declare type Conversation = Message<"laelia.v1.Conversation"> & {
   memberCount: number;
 
   /**
+   * owner_id is the owner's mention handle (e.g. "ran-user-1"), the same value
+   * the frontend compares against the current user's handle to detect
+   * ownership. owner_name is the owner's display name.
+   *
    * @generated from field: string owner_id = 5;
    */
   ownerId: string;
@@ -1200,11 +1210,11 @@ export declare type Conversation = Message<"laelia.v1.Conversation"> & {
   lastMessageSender: string;
 
   /**
-   * last_message_principal_id is the decimal principal id of the last_message
-   * author when the sender is a USER (so the frontend can render "You" without
+   * last_message_principal_id is the mention handle of the last_message author
+   * when the sender is a USER (so the frontend can render "You" without
    * mistaking an agent message, whose chat_message.principal_id is the
-   * conversation owner, for the viewer). Empty for AGENT/SYSTEM senders and when
-   * last_message is empty.
+   * conversation owner's handle, for the viewer). Empty for AGENT/SYSTEM
+   * senders and when last_message is empty.
    *
    * @generated from field: string last_message_principal_id = 17;
    */
@@ -1258,6 +1268,11 @@ export declare type ChannelMember = Message<"laelia.v1.ChannelMember"> & {
   memberType: number;
 
   /**
+   * member_id is the member's stable id within the conversation: the agent's
+   * resource id (its handle, e.g. "rei-agent-1") for agents, and the user's
+   * handle (e.g. "ran-user-1") for users. It is the value typed after "@" to
+   * mention the member.
+   *
    * @generated from field: string member_id = 2;
    */
   memberId: string;
@@ -1266,6 +1281,15 @@ export declare type ChannelMember = Message<"laelia.v1.ChannelMember"> & {
    * @generated from field: string display_name = 3;
    */
   displayName: string;
+
+  /**
+   * handle is the member's readable mention id ("ran-user-1" for users,
+   * "rei-agent-1" for agents), identical to member_id. Duplicated as an
+   * explicit field so consumers do not need to know member_type to render it.
+   *
+   * @generated from field: string handle = 9;
+   */
+  handle: string;
 
   /**
    * @generated from field: int32 member_role = 4;
@@ -1305,15 +1329,6 @@ export declare type ChannelMember = Message<"laelia.v1.ChannelMember"> & {
    * @generated from field: laelia.v1.PreferredLanguage preferred_language = 8;
    */
   preferredLanguage: PreferredLanguage;
-
-  /**
-   * handle is the member's readable mention id ("ran-user-1" for users,
-   * "rei-agent-1" for agents), identical to member_id. Duplicated as an
-   * explicit field so consumers do not need to know member_type to render it.
-   *
-   * @generated from field: string handle = 9;
-   */
-  handle: string;
 };
 
 /**
@@ -5275,9 +5290,10 @@ export declare const CommandService: GenService<{
   },
   /**
    * GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent
-   * and a named end user. Agent-callable. The peer is resolved by principal
-   * display name; ambiguous or unknown names fail. Agent-callable twin of the
-   * user-only GetOrCreateConversation. Powers the "dm:@<user>" address resolver.
+   * and a named end user. Agent-callable. The peer is resolved by the user's
+   * readable handle ("ran-user-1"); unknown handles fail. Agent-callable twin
+   * of the user-only GetOrCreateConversation. Powers the "dm:@<user>" address
+   * resolver.
    *
    * @generated from rpc laelia.v1.CommandService.GetOrCreateUserDM
    */

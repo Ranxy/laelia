@@ -317,6 +317,20 @@
     - [AgentStreamService](#laelia-v1-AgentStreamService)
     - [CommandService](#laelia-v1-CommandService)
   
+- [v1/device.proto](#v1_device-proto)
+    - [ApproveDeviceLoginRequest](#laelia-v1-ApproveDeviceLoginRequest)
+    - [ApproveDeviceLoginResponse](#laelia-v1-ApproveDeviceLoginResponse)
+    - [GetDeviceLoginStatusRequest](#laelia-v1-GetDeviceLoginStatusRequest)
+    - [GetDeviceLoginStatusResponse](#laelia-v1-GetDeviceLoginStatusResponse)
+    - [PollDeviceLoginRequest](#laelia-v1-PollDeviceLoginRequest)
+    - [PollDeviceLoginResponse](#laelia-v1-PollDeviceLoginResponse)
+    - [StartDeviceLoginRequest](#laelia-v1-StartDeviceLoginRequest)
+    - [StartDeviceLoginResponse](#laelia-v1-StartDeviceLoginResponse)
+  
+    - [DeviceLoginStatus](#laelia-v1-DeviceLoginStatus)
+  
+    - [DeviceService](#laelia-v1-DeviceService)
+  
 - [v1/group_service.proto](#v1_group_service-proto)
     - [BatchGetGroupsRequest](#laelia-v1-BatchGetGroupsRequest)
     - [BatchGetGroupsResponse](#laelia-v1-BatchGetGroupsResponse)
@@ -356,8 +370,6 @@
     - [AgentConfigUpdate](#laelia-v1-AgentConfigUpdate)
     - [ConnectMachineRequest](#laelia-v1-ConnectMachineRequest)
     - [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse)
-    - [CreateMachineRequest](#laelia-v1-CreateMachineRequest)
-    - [CreateMachineResponse](#laelia-v1-CreateMachineResponse)
     - [DeleteMachineRequest](#laelia-v1-DeleteMachineRequest)
     - [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest)
     - [GetMachineRequest](#laelia-v1-GetMachineRequest)
@@ -391,8 +403,9 @@
     - [RemoveAgent](#laelia-v1-RemoveAgent)
     - [RevokeMachineTokenRequest](#laelia-v1-RevokeMachineTokenRequest)
     - [RevokeMachineTokenResponse](#laelia-v1-RevokeMachineTokenResponse)
-    - [RotateMachineTokenRequest](#laelia-v1-RotateMachineTokenRequest)
-    - [RotateMachineTokenResponse](#laelia-v1-RotateMachineTokenResponse)
+    - [TransferMachineOwnershipRequest](#laelia-v1-TransferMachineOwnershipRequest)
+    - [TransferMachineOwnershipResponse](#laelia-v1-TransferMachineOwnershipResponse)
+    - [UpdateMachineRequest](#laelia-v1-UpdateMachineRequest)
   
     - [MachineStatus.ConnectionState](#laelia-v1-MachineStatus-ConnectionState)
   
@@ -622,6 +635,7 @@ RiskLevel is the risk level.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
+| handle | [string](#string) |  | handle is the agent&#39;s human-readable, unique mention id (e.g. &#34;rei-agent-1&#34;), generated at creation and immutable thereafter. It is the {agent} segment of name (&#34;agents/{handle}&#34;), the value an agent types after &#34;@&#34; to mention or DM this agent, and the name of its workspace directory (~/.laelia/&lt;machine&gt;/&lt;handle&gt;/). Always populated; mirror of agent.resource_id. |
 | state | [State](#laelia-v1-State) |  |  |
 | title | [string](#string) |  |  |
 | info | [AgentInfo](#laelia-v1-AgentInfo) |  |  |
@@ -948,6 +962,7 @@ delete server-side while the list hides the button).
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
+| handle | [string](#string) |  | handle is the agent&#39;s readable id (&#34;rei-agent-1&#34;), the {agent} segment of name. See Agent.handle. Always populated. |
 | state | [State](#laelia-v1-State) |  |  |
 | title | [string](#string) |  |  |
 | status | [AgentStatus](#laelia-v1-AgentStatus) |  |  |
@@ -2285,7 +2300,8 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name of the user. Format: users/{user}. {user} is a system-generated unique ID. |
+| name | [string](#string) |  | The name of the user. Format: users/{user}. {user} is the user&#39;s readable handle (e.g. &#34;ran-user-1&#34;), generated at creation and immutable thereafter. |
+| handle | [string](#string) |  | handle is the user&#39;s human-readable, unique mention id (e.g. &#34;ran-user-1&#34;), the {user} segment of name (&#34;users/{handle}&#34;) and the value typed after &#34;@&#34; to mention or DM this user. Always populated; mirror of principal.handle. |
 | state | [State](#laelia-v1-State) |  |  |
 | email | [string](#string) |  |  |
 | title | [string](#string) |  |  |
@@ -2871,8 +2887,9 @@ the agent uses to anchor its execution events and link any posted replies.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | member_type | [int32](#int32) |  |  |
-| member_id | [string](#string) |  |  |
+| member_id | [string](#string) |  | member_id is the member&#39;s stable id within the conversation: the agent&#39;s resource id (its handle, e.g. &#34;rei-agent-1&#34;) for agents, and the user&#39;s handle (e.g. &#34;ran-user-1&#34;) for users. It is the value typed after &#34;@&#34; to mention the member. |
 | display_name | [string](#string) |  |  |
+| handle | [string](#string) |  | handle is the member&#39;s readable mention id (&#34;ran-user-1&#34; for users, &#34;rei-agent-1&#34; for agents), identical to member_id. Duplicated as an explicit field so consumers do not need to know member_type to render it. |
 | member_role | [int32](#int32) |  |  |
 | joined_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | description | [string](#string) |  | description is the member&#39;s self-description: for users it is User.description, for agents it is the agent&#39;s full persona_prompt (from AgentACPConfig). Surfaced inline in the roster so an agent can perceive who is in a channel/thread — and each co-agent&#39;s persona — in a single lookup, and decide whom to address. |
@@ -2967,7 +2984,7 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | thread_reply_count | [int32](#int32) |  | thread_reply_count is the number of replies in the thread rooted at this message. Only meaningful for root messages (thread_root empty); the frontend uses it to render the reply-count badge on the root message in the main channel list. Always 0 for thread replies. |
 | task | [TaskInfo](#laelia-v1-TaskInfo) |  | task is set when this message is a task (a row exists in the task table for this message id). Populated by ListConversationMessages / ListThreadMessages for root messages; absent for non-task messages and thread replies. |
 | agent_id | [string](#string) |  | agent_id is the agent resource ID (&#34;agents/{id}&#34;) that owns the command referenced by command_id. Populated when the sender is an agent so the frontend can construct command-detail URLs. |
-| principal_id | [string](#string) |  | principal_id is the decimal id of the principal that authored this message (the chat_message.principal_id row). For a user message it is the sending user&#39;s principal id (matching the {user} segment of the &#34;users/{user}&#34; resource name); for an agent message it is the conversation owner&#39;s principal id; for a system message it is the system bot&#39;s id. The frontend uses it to tell the current user&#39;s own messages apart from other users&#39; messages in shared channels (sender_name alone is a display name and can collide across users). |
+| principal_id | [string](#string) |  | principal_id is the mention handle of the principal that authored this message (principal.handle). For a user message it is the sending user&#39;s handle (matching the {user} segment of the &#34;users/{user}&#34; resource name); for an agent message it is the conversation owner&#39;s handle; for a system message it is &#34;system-bot&#34;. The frontend uses it to tell the current user&#39;s own messages apart from other users&#39; messages in shared channels (sender_name alone is a display name and can collide across users). |
 
 
 
@@ -3292,7 +3309,7 @@ window. usage_ratio is used/size.
 | title | [string](#string) |  |  |
 | type | [int32](#int32) |  |  |
 | member_count | [int32](#int32) |  |  |
-| owner_id | [string](#string) |  |  |
+| owner_id | [string](#string) |  | owner_id is the owner&#39;s mention handle (e.g. &#34;ran-user-1&#34;), the same value the frontend compares against the current user&#39;s handle to detect ownership. owner_name is the owner&#39;s display name. |
 | owner_name | [string](#string) |  |  |
 | created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | updated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
@@ -3303,7 +3320,7 @@ window. usage_ratio is used/size.
 | pinned | [bool](#bool) |  | pinned is the requesting user&#39;s per-conversation pin state (conversation_member.pinned). Pinned channels/DMs stay at the top of the left-rail list regardless of last message time. Per-user: each viewer has their own pins. Populated by ListChannels and GetChannel for a user viewer. |
 | last_message | [string](#string) |  | last_message is a single-line, truncated preview of the newest main-channel message (thread replies excluded, mirroring the main message list and the unread count). Populated by ListChannels; empty when the conversation has no main-channel messages yet. |
 | last_message_sender | [string](#string) |  | last_message_sender is the display name of the last_message author: the principal name for USER/SYSTEM senders, the agent name for AGENT senders. Empty when last_message is empty. |
-| last_message_principal_id | [string](#string) |  | last_message_principal_id is the decimal principal id of the last_message author when the sender is a USER (so the frontend can render &#34;You&#34; without mistaking an agent message, whose chat_message.principal_id is the conversation owner, for the viewer). Empty for AGENT/SYSTEM senders and when last_message is empty. |
+| last_message_principal_id | [string](#string) |  | last_message_principal_id is the mention handle of the last_message author when the sender is a USER (so the frontend can render &#34;You&#34; without mistaking an agent message, whose chat_message.principal_id is the conversation owner&#39;s handle, for the viewer). Empty for AGENT/SYSTEM senders and when last_message is empty. |
 | last_message_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | last_message_at is the send time of last_message. Unset when the conversation has no main-channel messages yet. |
 | closed | [bool](#bool) |  | closed is the requesting user&#39;s per-conversation close state (conversation_member_meta.closed). A closed conversation is hidden from the user&#39;s left-rail list; the first new main-channel message (thread replies excluded) clears the flag, so it reappears automatically. Per-user: each viewer has their own close state. Populated by GetChannel for a user viewer; ListChannels only returns closed conversations when the caller asks with include_closed. |
 | joined_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | joined_at is the time the requesting user joined this conversation (conversation_member_meta.joined_at). Populated by GetChannel for a user viewer; unset for non-user callers. Lets the channel detail page show &#34;joined at&#34; without an extra member lookup. |
@@ -3742,7 +3759,7 @@ is the agent-callable twin of the user-only GetOrCreateConversation.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| peer_user_name | [string](#string) |  |  |
+| peer_user_handle | [string](#string) |  | peer_user_handle is the peer user&#39;s readable handle (&#34;ran-user-1&#34;), the value typed after &#34;dm:@&#34; to address the user. Resolved by handle only; display names are never used. |
 
 
 
@@ -4596,8 +4613,8 @@ server value.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | type | [string](#string) |  |  |
-| id | [string](#string) |  |  |
-| name | [string](#string) |  |  |
+| id | [string](#string) |  | id is the member&#39;s id: the agent resource id for agents, the user handle for users. |
+| name | [string](#string) |  | name is the member&#39;s handle (&#34;ran-user-1&#34; / &#34;rei-agent-1&#34;), the value typed after &#34;@&#34; in message content. Mentions in content are resolved by this handle alone; display names never participate in mention resolution. |
 
 
 
@@ -4637,6 +4654,7 @@ which excludes the caller.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
+| handle | [string](#string) |  | handle is the peer agent&#39;s readable id (&#34;rei-agent-1&#34;), the {agent} segment of name (&#34;agents/{handle}&#34;) and the value typed after &#34;@&#34; / &#34;dm:@&#34; to address the peer. |
 | display_name | [string](#string) |  |  |
 | persona_prompt | [string](#string) |  |  |
 | connection_state | [AgentStatus.ConnectionState](#laelia-v1-AgentStatus-ConnectionState) |  |  |
@@ -5570,7 +5588,7 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | GetOrCreateConversation | [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest) | [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse) |  |
 | GetOrCreateUserUserDM | [GetOrCreateUserUserDMRequest](#laelia-v1-GetOrCreateUserUserDMRequest) | [GetOrCreateUserUserDMResponse](#laelia-v1-GetOrCreateUserUserDMResponse) | GetOrCreateUserUserDM opens (or reuses) the type-4 user-to-user DM between the calling user and a peer user. User-only. The peer is resolved by user resource name (&#34;users/&lt;id&gt;&#34;); self-address is rejected; the pair is canonicalized by the store. User-user twin of GetOrCreateConversation. |
 | ResolveChannelByTitle | [ResolveChannelByTitleRequest](#laelia-v1-ResolveChannelByTitleRequest) | [ResolveChannelByTitleResponse](#laelia-v1-ResolveChannelByTitleResponse) | ResolveChannelByTitle looks up the unique channel (type 2) with the given title, returning NOT_FOUND when absent (it never creates one). Agent- callable: no auth_method annotation, identity from GetAgentFromContext. Powers the &#34;#&lt;title&gt;&#34; address resolver. |
-| GetOrCreateUserDM | [GetOrCreateUserDMRequest](#laelia-v1-GetOrCreateUserDMRequest) | [GetOrCreateUserDMResponse](#laelia-v1-GetOrCreateUserDMResponse) | GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent and a named end user. Agent-callable. The peer is resolved by principal display name; ambiguous or unknown names fail. Agent-callable twin of the user-only GetOrCreateConversation. Powers the &#34;dm:@&lt;user&gt;&#34; address resolver. |
+| GetOrCreateUserDM | [GetOrCreateUserDMRequest](#laelia-v1-GetOrCreateUserDMRequest) | [GetOrCreateUserDMResponse](#laelia-v1-GetOrCreateUserDMResponse) | GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent and a named end user. Agent-callable. The peer is resolved by the user&#39;s readable handle (&#34;ran-user-1&#34;); unknown handles fail. Agent-callable twin of the user-only GetOrCreateConversation. Powers the &#34;dm:@&lt;user&gt;&#34; address resolver. |
 | GetOrCreateAgentDM | [GetOrCreateAgentDMRequest](#laelia-v1-GetOrCreateAgentDMRequest) | [GetOrCreateAgentDMResponse](#laelia-v1-GetOrCreateAgentDMResponse) | GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent DM between the calling agent and a peer agent. Agent-callable. Self-address is rejected. The peer is resolved by agent resource name (&#34;agents/&lt;id&gt;&#34;); the pair is canonicalized by the store. Powers the &#34;dm:@&lt;agent&gt;&#34; address resolver. |
 | ListPeerAgents | [ListPeerAgentsRequest](#laelia-v1-ListPeerAgentsRequest) | [ListPeerAgentsResponse](#laelia-v1-ListPeerAgentsResponse) | ListPeerAgents returns every other agent (the caller excluded) with the display name, persona, and connection state an agent needs to decide whom to address. Agent-callable. Powers the &#34;agent list&#34; discovery tool. |
 | ListConversationMessages | [ListConversationMessagesRequest](#laelia-v1-ListConversationMessagesRequest) | [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse) |  |
@@ -5621,6 +5639,195 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | ListFiles | [ListFilesRequest](#laelia-v1-ListFilesRequest) | [ListFilesResponse](#laelia-v1-ListFilesResponse) | ListFiles returns the files attached to a conversation. The caller must be a member. |
 | ListActivities | [ListActivitiesRequest](#laelia-v1-ListActivitiesRequest) | [ListActivitiesResponse](#laelia-v1-ListActivitiesResponse) | ListActivities returns the authenticated user&#39;s activity feed: chat messages relevant to them, tagged with category flags (mention/task/reminder/thread). The caller&#39;s own id is the implicit filter; default read_state_filter is UNREAD. |
 | MarkActivityDone | [MarkActivityDoneRequest](#laelia-v1-MarkActivityDoneRequest) | [MarkActivityDoneResponse](#laelia-v1-MarkActivityDoneResponse) | MarkActivityDone marks a single activity item DONE for the authenticated user, hiding it from All and Unread. The caller&#39;s own id must own the row. |
+
+ 
+
+
+
+<a name="v1_device-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/device.proto
+
+
+
+<a name="laelia-v1-ApproveDeviceLoginRequest"></a>
+
+### ApproveDeviceLoginRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| user_code | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ApproveDeviceLoginResponse"></a>
+
+### ApproveDeviceLoginResponse
+ApproveDeviceLoginResponse is empty; the approval page reflects the result
+via GetDeviceLoginStatus polling.
+
+
+
+
+
+
+<a name="laelia-v1-GetDeviceLoginStatusRequest"></a>
+
+### GetDeviceLoginStatusRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| user_code | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetDeviceLoginStatusResponse"></a>
+
+### GetDeviceLoginStatusResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| status | [DeviceLoginStatus](#laelia-v1-DeviceLoginStatus) |  |  |
+| user_code | [string](#string) |  |  |
+| hostname | [string](#string) |  |  |
+| os | [string](#string) |  |  |
+| arch | [string](#string) |  |  |
+| reauth_existing | [bool](#bool) |  | True when the CLI supplied an existing machine id (re-auth flow). |
+| machine_title | [string](#string) |  | Existing machine title when reauth_existing. |
+| denial_reason | [string](#string) |  | Human-readable reason; set on DENIED. |
+| ip | [string](#string) |  | IP address of the device as seen by the manager when the session started; shown on the approval page so the user can verify the device. |
+| machine_owner | [string](#string) |  | Owner handle of the existing machine when reauth_existing; shown on the approval page so the user can verify who controls the machine. |
+
+
+
+
+
+
+<a name="laelia-v1-PollDeviceLoginRequest"></a>
+
+### PollDeviceLoginRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| device_code | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-PollDeviceLoginResponse"></a>
+
+### PollDeviceLoginResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| status | [DeviceLoginStatus](#laelia-v1-DeviceLoginStatus) |  |  |
+| machine_id | [string](#string) |  | Machine resource id; set on APPROVED (the machine to register or re-auth). |
+| machine_title | [string](#string) |  | Machine title; set on APPROVED. |
+| refresh_token | [string](#string) |  | Refresh token minted at approval; set once on APPROVED and retrievable within the post-approval grace window so a crashed CLI can recover. |
+| denial_reason | [string](#string) |  | Human-readable reason; set on DENIED (e.g. the machine belongs to another user and re-auth requires its owner or a workspace admin). |
+
+
+
+
+
+
+<a name="laelia-v1-StartDeviceLoginRequest"></a>
+
+### StartDeviceLoginRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| hostname | [string](#string) |  | Host name of the machine; becomes the machine title on first-time registration. |
+| os | [string](#string) |  |  |
+| arch | [string](#string) |  |  |
+| ip | [string](#string) |  |  |
+| version | [string](#string) |  |  |
+| fingerprint | [string](#string) |  | Client-generated host fingerprint (hostname:os:arch hash); bound to the minted refresh token. |
+| machine_id | [string](#string) |  | Existing machine resource id when re-authenticating a machine that already registered on this host; empty for first-time registration. |
+
+
+
+
+
+
+<a name="laelia-v1-StartDeviceLoginResponse"></a>
+
+### StartDeviceLoginResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| device_code | [string](#string) |  | High-entropy bearer secret the CLI presents to PollDeviceLogin; never displayed. |
+| user_code | [string](#string) |  | 8-character code (XXXX-XXXX) displayed on the device screen and typed into the approval page URL. |
+| verification_path | [string](#string) |  | Relative verification path, e.g. &#34;/login/device?user_code=XXXX-XXXX&#34;. The CLI composes the full URL from its configured manager URL. |
+| expires_in | [int32](#int32) |  | Seconds until the session expires (600). |
+| interval | [int32](#int32) |  | Minimum poll interval in seconds (5). |
+
+
+
+
+
+ 
+
+
+<a name="laelia-v1-DeviceLoginStatus"></a>
+
+### DeviceLoginStatus
+DeviceLoginStatus is the state of a device login session.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| DEVICE_LOGIN_STATUS_UNSPECIFIED | 0 |  |
+| DEVICE_LOGIN_STATUS_PENDING | 1 |  |
+| DEVICE_LOGIN_STATUS_APPROVED | 2 |  |
+| DEVICE_LOGIN_STATUS_EXPIRED | 3 |  |
+| DEVICE_LOGIN_STATUS_DENIED | 4 |  |
+
+
+ 
+
+ 
+
+
+<a name="laelia-v1-DeviceService"></a>
+
+### DeviceService
+DeviceService implements the OAuth2-style device code flow that replaces
+bootstrap-token machine registration. The machine CLI calls StartDeviceLogin
+(it has no credential yet), prints the verification URL &#43; user code, and
+polls PollDeviceLogin until a logged-in user approves on the public
+/login/device page. On approval the manager mints the machine&#39;s refresh
+token (creating the machine row on first-time setup) and the CLI persists it
+locally.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| StartDeviceLogin | [StartDeviceLoginRequest](#laelia-v1-StartDeviceLoginRequest) | [StartDeviceLoginResponse](#laelia-v1-StartDeviceLoginResponse) | StartDeviceLogin begins a device login. No credential is required; the call is rate-limited per source IP. The CLI passes its host info and, when re-authenticating an already-registered machine, the existing machine&#39;s resource id so approval re-auths that machine instead of creating a duplicate. |
+| PollDeviceLogin | [PollDeviceLoginRequest](#laelia-v1-PollDeviceLoginRequest) | [PollDeviceLoginResponse](#laelia-v1-PollDeviceLoginResponse) | PollDeviceLogin returns the session status. The device_code is the bearer secret; the server enforces a minimum poll interval. |
+| GetDeviceLoginStatus | [GetDeviceLoginStatusRequest](#laelia-v1-GetDeviceLoginStatusRequest) | [GetDeviceLoginStatusResponse](#laelia-v1-GetDeviceLoginStatusResponse) | GetDeviceLoginStatus backs the public approval page; the user_code is what the device screen displays. Returns only non-secret device info. |
+| ApproveDeviceLogin | [ApproveDeviceLoginRequest](#laelia-v1-ApproveDeviceLoginRequest) | [ApproveDeviceLoginResponse](#laelia-v1-ApproveDeviceLoginResponse) | ApproveDeviceLogin approves a pending device login. Any logged-in user may approve a new machine; re-authentication of an existing machine is restricted to its creator or a workspace admin (the session is marked DENIED with a reason otherwise). Audited. |
 
  
 
@@ -6130,7 +6337,6 @@ in full in ConnectMachineResponse.assigned_agents on (re)connect.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| registration_token | [string](#string) |  | first connection or after refresh failure |
 | info | [MachineInfo](#laelia-v1-MachineInfo) |  |  |
 | fingerprint | [string](#string) |  | client-generated connection fingerprint (hostname:os:arch) |
 
@@ -6147,43 +6353,9 @@ in full in ConnectMachineResponse.assigned_agents on (re)connect.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| access_token | [string](#string) |  | 15-minute validity |
-| refresh_token | [string](#string) |  | 24-hour validity, single-use rotation |
 | session_id | [string](#string) |  |  |
-| access_token_expires_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | initial_status | [MachineStatus](#laelia-v1-MachineStatus) |  |  |
 | assigned_agents | [AgentAssignment](#laelia-v1-AgentAssignment) | repeated | The full set of agents this machine must host. The machine app opens one AgentChannel per entry immediately after connect (and on every reconnect). |
-
-
-
-
-
-
-<a name="laelia-v1-CreateMachineRequest"></a>
-
-### CreateMachineRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| machine | [Machine](#laelia-v1-Machine) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-CreateMachineResponse"></a>
-
-### CreateMachineResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| machine | [Machine](#laelia-v1-Machine) |  |  |
-| registration_token | [string](#string) |  | 7-day validity, single-use on first connect |
 
 
 
@@ -6545,6 +6717,7 @@ the count of agents bound to the machine.
 | status | [MachineStatus](#laelia-v1-MachineStatus) |  |  |
 | agent_count | [int32](#int32) |  |  |
 | created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}). |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | can_edit | [bool](#bool) |  | can_edit reports whether the current caller holds laelia.machines.edit (workspace-scope). |
 | can_manage | [bool](#bool) |  | can_manage reports whether the current caller may manage this machine&#39;s IAM policy (the machine&#39;s creator or a workspace admin). |
 | can_delete | [bool](#bool) |  | can_delete reports whether the current caller may delete this machine: the machine&#39;s creator or a holder of laelia.machines.delete. |
@@ -6747,31 +6920,48 @@ after a config or display-name change, or to re-establish a runner).
 
 
 
-<a name="laelia-v1-RotateMachineTokenRequest"></a>
+<a name="laelia-v1-TransferMachineOwnershipRequest"></a>
 
-### RotateMachineTokenRequest
+### TransferMachineOwnershipRequest
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
-| reason | [string](#string) |  |  |
+| new_owner | [string](#string) |  | New owner&#39;s user resource name (users/{id}). |
+| reason | [string](#string) |  | audit purpose |
 
 
 
 
 
 
-<a name="laelia-v1-RotateMachineTokenResponse"></a>
+<a name="laelia-v1-TransferMachineOwnershipResponse"></a>
 
-### RotateMachineTokenResponse
+### TransferMachineOwnershipResponse
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| registration_token | [string](#string) |  |  |
+| machine | [Machine](#laelia-v1-Machine) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateMachineRequest"></a>
+
+### UpdateMachineRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| title | [string](#string) |  | New machine title. Empty means &#34;leave unchanged&#34;. |
 
 
 
@@ -6803,20 +6993,22 @@ after a config or display-name change, or to re-establish a runner).
 
 ### MachineService
 MachineService manages machines (a long-lived agent-application process a
-user runs once on a host) and serves the machine-side authentication RPCs the
-machine app calls to register itself. A machine authenticates once with a
-registration token and then hosts one or more agents, each running its own
-AgentChannel over the machine&#39;s access token.
+user runs once on a host) and serves the machine-side authentication RPCs
+the machine app calls to connect. A machine authenticates through the
+device-code flow (DeviceService): the manager mints its refresh token at
+approval time and the machine reconnects with access tokens issued by
+RefreshMachineToken. Each machine hosts one or more agents, each running its
+own AgentChannel over the machine&#39;s access token.
 
 ========== Management APIs (IAM auth, admin only) ==========
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| CreateMachine | [CreateMachineRequest](#laelia-v1-CreateMachineRequest) | [CreateMachineResponse](#laelia-v1-CreateMachineResponse) |  |
 | ListMachines | [ListMachinesRequest](#laelia-v1-ListMachinesRequest) | [ListMachinesResponse](#laelia-v1-ListMachinesResponse) |  |
 | GetMachine | [GetMachineRequest](#laelia-v1-GetMachineRequest) | [Machine](#laelia-v1-Machine) |  |
 | DeleteMachine | [DeleteMachineRequest](#laelia-v1-DeleteMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | DeleteMachine soft-deletes a machine. Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.delete (workspace-scope); no permission annotation so the creator short-circuit can run. |
-| RotateMachineToken | [RotateMachineTokenRequest](#laelia-v1-RotateMachineTokenRequest) | [RotateMachineTokenResponse](#laelia-v1-RotateMachineTokenResponse) | Token rotation: generate a new registration token; the machine app must re-ConnectMachine with it. Old tokens are revoked and all sessions dropped. Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
+| UpdateMachine | [UpdateMachineRequest](#laelia-v1-UpdateMachineRequest) | [Machine](#laelia-v1-Machine) | UpdateMachine renames a machine (title). Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
+| TransferMachineOwnership | [TransferMachineOwnershipRequest](#laelia-v1-TransferMachineOwnershipRequest) | [TransferMachineOwnershipResponse](#laelia-v1-TransferMachineOwnershipResponse) | TransferMachineOwnership reassigns the machine to another user. The new owner then controls the machine and may approve its re-authentication. The machine keeps running; its tokens are not revoked. Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
 | RevokeMachineToken | [RevokeMachineTokenRequest](#laelia-v1-RevokeMachineTokenRequest) | [RevokeMachineTokenResponse](#laelia-v1-RevokeMachineTokenResponse) | Token revocation: revoke all tokens for the machine. Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
 | ForceDisconnectMachine | [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Force-disconnects a machine: terminate all its sessions and fail all in-flight commands for every agent hosted on it. Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
 | ListMachineAgents | [ListMachineAgentsRequest](#laelia-v1-ListMachineAgentsRequest) | [ListMachineAgentsResponse](#laelia-v1-ListMachineAgentsResponse) | List the agents hosted on a machine. |

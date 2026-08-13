@@ -24,6 +24,8 @@ type Config struct {
 	HeartbeatBurst int
 	LoginRate      float64
 	LoginBurst     int
+	DeviceRate     float64
+	DeviceBurst    int
 	APIRate        float64
 	APIBurst       int
 	TrustProxy     bool
@@ -39,9 +41,16 @@ func DefaultConfig() Config {
 		HeartbeatBurst: 10,
 		LoginRate:      5.0 / 60.0,
 		LoginBurst:     3,
-		APIRate:        1000.0 / 60.0,
-		APIBurst:       100,
-		TrustProxy:     false,
+		// Device flow: anonymous per-IP bucket for StartDeviceLogin /
+		// PollDeviceLogin / GetDeviceLoginStatus. The CLI polls every 5s and
+		// the approval page every 3s, so the bucket must be generous enough
+		// that a handful of concurrent flows never trip 429s, while still
+		// bounding a single source's fan-out.
+		DeviceRate:  1.0,
+		DeviceBurst: 30,
+		APIRate:     1000.0 / 60.0,
+		APIBurst:    100,
+		TrustProxy:  false,
 	}
 }
 
@@ -52,6 +61,8 @@ type RateLimiter struct {
 	agentLimiters    *lru.Cache[string, *rate.Limiter] // heartbeat bucket
 	agentAPILimiters *lru.Cache[string, *rate.Limiter] // agent API call bucket
 	userLimiters     *lru.Cache[string, *rate.Limiter]
+	deviceLimiters   *lru.Cache[string, *rate.Limiter] // device flow bucket
+	loginLimiters    *lru.Cache[string, *rate.Limiter] // password login bucket
 	mu               sync.Mutex
 }
 
@@ -72,6 +83,14 @@ func New(cfg Config) (*RateLimiter, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create user rate limiter cache")
 	}
+	deviceCache, err := lru.New[string, *rate.Limiter](10000)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create device rate limiter cache")
+	}
+	loginCache, err := lru.New[string, *rate.Limiter](10000)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create login rate limiter cache")
+	}
 
 	return &RateLimiter{
 		cfg:              cfg,
@@ -80,6 +99,8 @@ func New(cfg Config) (*RateLimiter, error) {
 		agentLimiters:    agentCache,
 		agentAPILimiters: agentAPICache,
 		userLimiters:     userCache,
+		deviceLimiters:   deviceCache,
+		loginLimiters:    loginCache,
 	}, nil
 }
 
@@ -106,8 +127,13 @@ func (rl *RateLimiter) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 					return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("heartbeat rate limit exceeded"))
 				}
 			}
+		case isDeviceProcedure(procedure):
+			limiter := rl.getDeviceLimiter(sourceIP)
+			if !limiter.Allow() {
+				return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("device login rate limit exceeded"))
+			}
 		case isLoginProcedure(procedure):
-			limiter := rl.getIPLimiter(sourceIP)
+			limiter := rl.getLoginLimiter(sourceIP)
 			if !limiter.Allow() {
 				return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("login rate limit exceeded"))
 			}
@@ -196,6 +222,37 @@ func (rl *RateLimiter) getAgentAPILimiter(agentID string) *rate.Limiter {
 	return limiter
 }
 
+// getDeviceLimiter returns the per-IP device-flow bucket. The device RPCs
+// are anonymous (the CLI has no credential yet), so they are keyed on the
+// source IP like the login bucket.
+func (rl *RateLimiter) getDeviceLimiter(ip string) *rate.Limiter {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	if limiter, ok := rl.deviceLimiters.Get(ip); ok {
+		return limiter
+	}
+	limiter := rate.NewLimiter(rate.Limit(rl.cfg.DeviceRate), rl.cfg.DeviceBurst)
+	rl.deviceLimiters.Add(ip, limiter)
+	return limiter
+}
+
+// getLoginLimiter returns the per-IP password-login bucket (LoginRate/
+// LoginBurst), separate from the connect and device buckets so a burst of
+// failed password attempts cannot throttle agent registration or the device
+// flow (and vice versa).
+func (rl *RateLimiter) getLoginLimiter(ip string) *rate.Limiter {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	if limiter, ok := rl.loginLimiters.Get(ip); ok {
+		return limiter
+	}
+	limiter := rate.NewLimiter(rate.Limit(rl.cfg.LoginRate), rl.cfg.LoginBurst)
+	rl.loginLimiters.Add(ip, limiter)
+	return limiter
+}
+
 func (rl *RateLimiter) getUserLimiter(userID string) *rate.Limiter {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -241,8 +298,19 @@ func isHeartbeatProcedure(procedure string) bool {
 	return strings.HasSuffix(procedure, "AgentHeartbeat")
 }
 
+// isLoginProcedure matches only the real password login RPC. A suffix match
+// on "Login" would also catch the device-flow RPCs (StartDeviceLogin,
+// PollDeviceLogin, ApproveDeviceLogin), routing them into the tiny login
+// bucket and leaving the CLI stuck in "login rate limit exceeded" while it
+// polls for approval.
 func isLoginProcedure(procedure string) bool {
-	return strings.HasSuffix(procedure, "Login")
+	return procedure == "/laelia.v1.AuthService/Login"
+}
+
+func isDeviceProcedure(procedure string) bool {
+	return strings.HasSuffix(procedure, "StartDeviceLogin") ||
+		strings.HasSuffix(procedure, "PollDeviceLogin") ||
+		strings.HasSuffix(procedure, "GetDeviceLoginStatus")
 }
 
 func extractIdentifier(ctx context.Context, key common.ContextKey) string {

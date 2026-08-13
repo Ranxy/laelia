@@ -44,10 +44,12 @@ const (
 )
 
 // Server is the local loopback daemon. A machine runs ONE daemon for all its
-// hosted agents: the socket lives at ~/.laelia/<machineID>/daemon.sock and the
-// daemon routes each request to the agent named in LAELIA_AGENT (injected into
-// every ACP subprocess). It is constructed once per machine process and lives
-// for the whole machine lifetime.
+// hosted agents: the socket lives at the well-known ~/.laelia/daemon.sock
+// (one daemon per computer, so a second laelia-machine process can detect the
+// live socket and refuse to start) and the daemon routes each request to the
+// agent named in LAELIA_AGENT (injected into every ACP subprocess). It is
+// constructed once per machine process and lives for the whole machine
+// lifetime.
 type Server struct {
 	managerURL        string
 	machineResourceID string
@@ -88,15 +90,16 @@ type Server struct {
 	userClients   map[string]v1connect.UserServiceClient
 }
 
-// New creates a daemon bound to a unix socket at
-// ~/.laelia/<machineResourceID>/daemon.sock. getToken returns the current
+// New creates a daemon bound to the well-known unix socket
+// ~/.laelia/daemon.sock. machineResourceID still keys the per-agent workspace
+// dirs (~/.laelia/<machineID>/<agentID>/). getToken returns the current
 // machine access token (rotated by heartbeat), shared by every hosted agent.
 func New(managerURL, machineResourceID string, getToken func() string, httpClient *http.Client) (*Server, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, errors.Wrap(err, "resolve home dir")
 	}
-	socketPath := filepath.Join(home, ".laelia", machineResourceID, "daemon.sock")
+	socketPath := DefaultSocketPath()
 
 	token := make([]byte, 32)
 	if _, err := rand.Read(token); err != nil {
@@ -125,7 +128,18 @@ func New(managerURL, machineResourceID string, getToken func() string, httpClien
 	}, nil
 }
 
-func (s *Server) SocketPath() string   { return s.socketPath }
+func (s *Server) SocketPath() string { return s.socketPath }
+
+// DefaultSocketPath returns the well-known daemon socket location
+// (~/.laelia/daemon.sock). setup/run probe it to detect an already-running
+// laelia-machine before starting a second instance.
+func DefaultSocketPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join(os.Getenv("HOME"), ".laelia", "daemon.sock")
+	}
+	return filepath.Join(home, ".laelia", "daemon.sock")
+}
 func (s *Server) SessionToken() string { return s.sessionToken }
 
 // BatchDeps returns a Deps for the agent identified by agentBareID (the bare
@@ -1144,7 +1158,7 @@ func (s *Server) ensureStaleSocket() error {
 	conn, err := net.DialTimeout("unix", s.socketPath, 500*time.Millisecond)
 	if err == nil {
 		_ = conn.Close()
-		return errors.Errorf("daemon socket %q is live; another laelia-machine daemon is already running for this machine", s.socketPath)
+		return errors.Errorf("daemon socket %q is live; another laelia-machine daemon is already running", s.socketPath)
 	}
 	// No listener: remove the stale file (or no-op if it is already gone) so
 	// the subsequent net.Listen succeeds.

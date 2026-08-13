@@ -2,12 +2,14 @@ package ratelimit
 
 import (
 	"context"
+	"net/http/httptest"
 	"testing"
 
 	"connectrpc.com/connect"
 
 	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
+	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
 
 // newTestLimiter builds a RateLimiter whose per-IP bucket exhausts after a
@@ -194,5 +196,120 @@ func TestRateLimit_AgentAPICallKeysOnAgent(t *testing.T) {
 		if err != nil {
 			t.Fatalf("agent API call %d should pass under the agent bucket, got %v", i, err)
 		}
+	}
+}
+
+// stubDeviceService implements DeviceServiceHandler with a successful
+// PollDeviceLogin so the rate limiter can be exercised end-to-end.
+type stubDeviceService struct {
+	v1connect.UnimplementedDeviceServiceHandler
+}
+
+func (*stubDeviceService) PollDeviceLogin(_ context.Context, _ *connect.Request[v1pb.PollDeviceLoginRequest]) (*connect.Response[v1pb.PollDeviceLoginResponse], error) {
+	return connect.NewResponse(&v1pb.PollDeviceLoginResponse{
+		Status: v1pb.DeviceLoginStatus_DEVICE_LOGIN_STATUS_PENDING,
+	}), nil
+}
+
+// stubAuthService implements AuthServiceHandler with a successful Login.
+type stubAuthService struct {
+	v1connect.UnimplementedAuthServiceHandler
+}
+
+func (*stubAuthService) Login(_ context.Context, _ *connect.Request[v1pb.LoginRequest]) (*connect.Response[v1pb.LoginResponse], error) {
+	return connect.NewResponse(&v1pb.LoginResponse{}), nil
+}
+
+// newDeviceFlowLimiter builds a RateLimiter whose login bucket exhausts after
+// a single call while the device bucket is generous, so a PollDeviceLogin
+// burst can only pass if it is routed to the device bucket.
+func newDeviceFlowLimiter(t *testing.T) *RateLimiter {
+	t.Helper()
+	cfg := Config{
+		GlobalRate:     1000,
+		GlobalBurst:    1000,
+		ConnectRate:    1.0 / 60.0,
+		ConnectBurst:   1,
+		HeartbeatRate:  1000,
+		HeartbeatBurst: 5,
+		LoginRate:      1,
+		LoginBurst:     1,
+		DeviceRate:     1000,
+		DeviceBurst:    100,
+		APIRate:        1000,
+		APIBurst:       5,
+		TrustProxy:     false,
+	}
+	rl, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	return rl
+}
+
+// TestProcedureClassification is a regression test for the bug where the
+// device-flow RPCs (whose names end in "Login") were classified as password
+// login procedures and throttled by the tiny login bucket, leaving the CLI
+// stuck in "login rate limit exceeded" while polling for approval.
+func TestProcedureClassification(t *testing.T) {
+	cases := []struct {
+		procedure string
+		login     bool
+		device    bool
+	}{
+		{"/laelia.v1.AuthService/Login", true, false},
+		{"/laelia.v1.DeviceService/StartDeviceLogin", false, true},
+		{"/laelia.v1.DeviceService/PollDeviceLogin", false, true},
+		{"/laelia.v1.DeviceService/GetDeviceLoginStatus", false, true},
+		{"/laelia.v1.DeviceService/ApproveDeviceLogin", false, false},
+		{"/laelia.v1.AgentService/AgentHeartbeat", false, false},
+	}
+	for _, tc := range cases {
+		if got := isLoginProcedure(tc.procedure); got != tc.login {
+			t.Errorf("isLoginProcedure(%q) = %v, want %v", tc.procedure, got, tc.login)
+		}
+		if got := isDeviceProcedure(tc.procedure); got != tc.device {
+			t.Errorf("isDeviceProcedure(%q) = %v, want %v", tc.procedure, got, tc.device)
+		}
+	}
+}
+
+// TestRateLimit_DevicePollUsesDeviceBucket is a regression test for the bug
+// where PollDeviceLogin was classified as a login procedure (its RPC name
+// ends in "Login") and throttled by the tiny login bucket, so the CLI's 5s
+// polling loop got stuck in "login rate limit exceeded" forever. Polls from
+// the same IP must pass under the generous device bucket even though the
+// login bucket (burst 1) is exhausted.
+func TestRateLimit_DevicePollUsesDeviceBucket(t *testing.T) {
+	rl := newDeviceFlowLimiter(t)
+	_, handler := v1connect.NewDeviceServiceHandler(&stubDeviceService{}, connect.WithInterceptors(connect.UnaryInterceptorFunc(rl.WrapUnary)))
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := v1connect.NewDeviceServiceClient(server.Client(), server.URL)
+	for i := 1; i <= 4; i++ {
+		if _, err := client.PollDeviceLogin(context.Background(), connect.NewRequest(&v1pb.PollDeviceLoginRequest{DeviceCode: "code"})); err != nil {
+			t.Fatalf("poll %d should pass under the device bucket, got %v", i, err)
+		}
+	}
+}
+
+// TestRateLimit_LoginUsesLoginBucket verifies the real password Login RPC is
+// still throttled by the login bucket (burst 1): the second attempt from the
+// same IP is rejected with ResourceExhausted.
+func TestRateLimit_LoginUsesLoginBucket(t *testing.T) {
+	rl := newDeviceFlowLimiter(t)
+	_, handler := v1connect.NewAuthServiceHandler(&stubAuthService{}, connect.WithInterceptors(connect.UnaryInterceptorFunc(rl.WrapUnary)))
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := v1connect.NewAuthServiceClient(server.Client(), server.URL)
+	if _, err := client.Login(context.Background(), connect.NewRequest(&v1pb.LoginRequest{})); err != nil {
+		t.Fatalf("first login should pass, got %v", err)
+	}
+	if _, err := client.Login(context.Background(), connect.NewRequest(&v1pb.LoginRequest{})); err == nil {
+		t.Fatal("second login should be rate-limited by the login bucket, got nil")
+	} else if code := connect.CodeOf(err); code != connect.CodeResourceExhausted {
+		t.Fatalf("expected ResourceExhausted, got %s: %v", code, err)
 	}
 }
