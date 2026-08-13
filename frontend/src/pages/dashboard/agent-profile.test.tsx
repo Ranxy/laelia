@@ -257,8 +257,10 @@ describe("AgentProfilePage", () => {
 
     expect(await screen.findByText("Alpha")).toBeInTheDocument();
     expect(screen.getByText("agent.detail-name")).toBeInTheDocument();
-    expect(screen.getByText("agent.detail-handle")).toBeInTheDocument();
+    // The handle rides along with the name (like the human profile), never as
+    // a separate labeled field.
     expect(screen.getByText("@a1")).toBeInTheDocument();
+    expect(screen.queryByText("agent.detail-handle")).toBeNull();
     expect(screen.getByText("agent.detail-status")).toBeInTheDocument();
     expect(screen.getByText("agent.lifecycle.ready")).toBeInTheDocument();
     // Machine link navigates to the machine profile.
