@@ -88,6 +88,7 @@ function acpConfig(overrides?: Record<string, unknown>): AgentACPConfig {
 function agent(overrides?: Partial<Agent>): Agent {
   return {
     name: "agents/a1",
+    handle: "a1",
     state: 0,
     title: "Alpha",
     info: {
@@ -256,6 +257,8 @@ describe("AgentProfilePage", () => {
 
     expect(await screen.findByText("Alpha")).toBeInTheDocument();
     expect(screen.getByText("agent.detail-name")).toBeInTheDocument();
+    expect(screen.getByText("agent.detail-handle")).toBeInTheDocument();
+    expect(screen.getByText("@a1")).toBeInTheDocument();
     expect(screen.getByText("agent.detail-status")).toBeInTheDocument();
     expect(screen.getByText("agent.lifecycle.ready")).toBeInTheDocument();
     // Machine link navigates to the machine profile.

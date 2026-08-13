@@ -690,6 +690,7 @@ export function AgentProfilePage() {
             <Card title={t("agent.profile.section-identity")}>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
                 <Field label={t("agent.detail-name")}>{agent.title}</Field>
+                <Field label={t("agent.detail-handle")}>@{agent.handle}</Field>
                 <Field label={t("agent.detail-status")}>
                   <ConnectionBadge state={agent.status?.state} />
                 </Field>
