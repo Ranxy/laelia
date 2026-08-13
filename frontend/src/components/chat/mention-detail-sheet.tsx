@@ -86,6 +86,13 @@ export function MentionDetailSheet({
   }, [open, type, id]);
 
   const entityLabel = type === "agent" ? "Agent" : "User";
+  // The mention's `name` is the handle; once the entity loads, prefer its
+  // display title (and its canonical handle) so the sheet never shows the
+  // handle where a display name belongs.
+  const displayName =
+    type === "agent" ? (agent?.title ?? name) : (user?.title ?? name);
+  const handle =
+    type === "agent" ? (agent?.handle ?? name) : (user?.handle ?? name);
 
   // Opens (or reuses) the user↔agent DM and jumps to the chat surface, the
   // same flow as the agent detail page's "Chat" action.
@@ -138,11 +145,9 @@ export function MentionDetailSheet({
               </div>
               <div className="flex flex-col gap-0.5 min-w-0">
                 <span className="text-sm font-medium text-main truncate">
-                  {name}
+                  {displayName}
                 </span>
-                <span className="text-xs text-control-light">
-                  {entityLabel}
-                </span>
+                <span className="text-xs text-control-light">@{handle}</span>
               </div>
             </div>
 
@@ -154,7 +159,8 @@ export function MentionDetailSheet({
             ) : (
               <div className="rounded-xs border border-control-border bg-background p-3">
                 <div className="flex flex-col divide-y divide-control-border/50">
-                  <DetailRow label="Name">{name}</DetailRow>
+                  <DetailRow label="Name">{displayName}</DetailRow>
+                  <DetailRow label="Handle">@{handle}</DetailRow>
                   <DetailRow label="Type">{entityLabel}</DetailRow>
 
                   {type === "agent" && agent && (

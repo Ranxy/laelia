@@ -10,8 +10,18 @@ const mock = vi.hoisted(() => ({
   getOrCreateConversation: vi.fn(),
   fetchChannels: vi.fn(),
   toastAdd: vi.fn(),
-  agent: { name: "agents/alpha", status: { state: 1 } },
-  user: { name: "users/1", email: "alice@example.com" },
+  agent: {
+    name: "agents/alpha",
+    title: "Alpha Agent",
+    handle: "alpha",
+    status: { state: 1 },
+  },
+  user: {
+    name: "users/1",
+    title: "Alice Lee",
+    handle: "alice-user-1",
+    email: "alice@example.com",
+  },
 }));
 
 vi.mock("react-router-dom", () => ({
@@ -102,7 +112,9 @@ describe("MentionDetailSheet actions", () => {
       />
     );
 
-    expect((await screen.findAllByText("Alice")).length).toBeGreaterThan(0);
+    // The sheet shows the display title (header + Name row), never the handle.
+    expect((await screen.findAllByText("Alice Lee")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("@alice-user-1").length).toBeGreaterThan(0);
     expect(screen.queryByText("chat.send-message")).toBeNull();
     expect(screen.queryByText("chat.view-details")).toBeNull();
   });
