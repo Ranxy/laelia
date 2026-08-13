@@ -132,6 +132,12 @@ const (
 	// CommandServicePostMessageProcedure is the fully-qualified name of the CommandService's
 	// PostMessage RPC.
 	CommandServicePostMessageProcedure = "/laelia.v1.CommandService/PostMessage"
+	// CommandServiceAddReactionProcedure is the fully-qualified name of the CommandService's
+	// AddReaction RPC.
+	CommandServiceAddReactionProcedure = "/laelia.v1.CommandService/AddReaction"
+	// CommandServiceRemoveReactionProcedure is the fully-qualified name of the CommandService's
+	// RemoveReaction RPC.
+	CommandServiceRemoveReactionProcedure = "/laelia.v1.CommandService/RemoveReaction"
 	// CommandServiceConvertMessageToTaskProcedure is the fully-qualified name of the CommandService's
 	// ConvertMessageToTask RPC.
 	CommandServiceConvertMessageToTaskProcedure = "/laelia.v1.CommandService/ConvertMessageToTask"
@@ -304,6 +310,17 @@ type CommandServiceClient interface {
 	ListThreadParticipants(context.Context, *connect.Request[v1.ListThreadParticipantsRequest]) (*connect.Response[v1.ListThreadParticipantsResponse], error)
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.ChatMessage], error)
 	PostMessage(context.Context, *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error)
+	// AddReaction places the caller's emoji reaction on a message (idempotent:
+	// re-adding your own emoji is a no-op). A reaction is lightweight feedback —
+	// it never bumps the conversation's room version, wakes agents, counts as
+	// unread, or generates activity. Caller must be a member of the message's
+	// conversation.
+	AddReaction(context.Context, *connect.Request[v1.AddReactionRequest]) (*connect.Response[v1.AddReactionResponse], error)
+	// RemoveReaction removes the caller's own emoji reaction from a message
+	// (idempotent: removing an emoji the caller did not place is a no-op).
+	// Removing an emoji that exists but was placed by someone else is
+	// PERMISSION_DENIED — only the reactor removes its own reaction.
+	RemoveReaction(context.Context, *connect.Request[v1.RemoveReactionRequest]) (*connect.Response[v1.RemoveReactionResponse], error)
 	// ConvertMessageToTask turns an existing top-level message into a task by
 	// attaching task metadata (number, status=TODO, no assignee). Any channel
 	// member (user or agent) may convert. Emits a system notification row.
@@ -606,6 +623,18 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("PostMessage")),
 			connect.WithClientOptions(opts...),
 		),
+		addReaction: connect.NewClient[v1.AddReactionRequest, v1.AddReactionResponse](
+			httpClient,
+			baseURL+CommandServiceAddReactionProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("AddReaction")),
+			connect.WithClientOptions(opts...),
+		),
+		removeReaction: connect.NewClient[v1.RemoveReactionRequest, v1.RemoveReactionResponse](
+			httpClient,
+			baseURL+CommandServiceRemoveReactionProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("RemoveReaction")),
+			connect.WithClientOptions(opts...),
+		),
 		convertMessageToTask: connect.NewClient[v1.ConvertMessageToTaskRequest, v1.ConvertMessageToTaskResponse](
 			httpClient,
 			baseURL+CommandServiceConvertMessageToTaskProcedure,
@@ -823,6 +852,8 @@ type commandServiceClient struct {
 	listThreadParticipants    *connect.Client[v1.ListThreadParticipantsRequest, v1.ListThreadParticipantsResponse]
 	sendMessage               *connect.Client[v1.SendMessageRequest, v1.ChatMessage]
 	postMessage               *connect.Client[v1.PostMessageRequest, v1.PostMessageResponse]
+	addReaction               *connect.Client[v1.AddReactionRequest, v1.AddReactionResponse]
+	removeReaction            *connect.Client[v1.RemoveReactionRequest, v1.RemoveReactionResponse]
 	convertMessageToTask      *connect.Client[v1.ConvertMessageToTaskRequest, v1.ConvertMessageToTaskResponse]
 	listTasks                 *connect.Client[v1.ListTasksRequest, v1.ListTasksResponse]
 	listTaskCounts            *connect.Client[v1.ListTaskCountsRequest, v1.ListTaskCountsResponse]
@@ -1013,6 +1044,16 @@ func (c *commandServiceClient) SendMessage(ctx context.Context, req *connect.Req
 // PostMessage calls laelia.v1.CommandService.PostMessage.
 func (c *commandServiceClient) PostMessage(ctx context.Context, req *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error) {
 	return c.postMessage.CallUnary(ctx, req)
+}
+
+// AddReaction calls laelia.v1.CommandService.AddReaction.
+func (c *commandServiceClient) AddReaction(ctx context.Context, req *connect.Request[v1.AddReactionRequest]) (*connect.Response[v1.AddReactionResponse], error) {
+	return c.addReaction.CallUnary(ctx, req)
+}
+
+// RemoveReaction calls laelia.v1.CommandService.RemoveReaction.
+func (c *commandServiceClient) RemoveReaction(ctx context.Context, req *connect.Request[v1.RemoveReactionRequest]) (*connect.Response[v1.RemoveReactionResponse], error) {
+	return c.removeReaction.CallUnary(ctx, req)
 }
 
 // ConvertMessageToTask calls laelia.v1.CommandService.ConvertMessageToTask.
@@ -1242,6 +1283,17 @@ type CommandServiceHandler interface {
 	ListThreadParticipants(context.Context, *connect.Request[v1.ListThreadParticipantsRequest]) (*connect.Response[v1.ListThreadParticipantsResponse], error)
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.ChatMessage], error)
 	PostMessage(context.Context, *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error)
+	// AddReaction places the caller's emoji reaction on a message (idempotent:
+	// re-adding your own emoji is a no-op). A reaction is lightweight feedback —
+	// it never bumps the conversation's room version, wakes agents, counts as
+	// unread, or generates activity. Caller must be a member of the message's
+	// conversation.
+	AddReaction(context.Context, *connect.Request[v1.AddReactionRequest]) (*connect.Response[v1.AddReactionResponse], error)
+	// RemoveReaction removes the caller's own emoji reaction from a message
+	// (idempotent: removing an emoji the caller did not place is a no-op).
+	// Removing an emoji that exists but was placed by someone else is
+	// PERMISSION_DENIED — only the reactor removes its own reaction.
+	RemoveReaction(context.Context, *connect.Request[v1.RemoveReactionRequest]) (*connect.Response[v1.RemoveReactionResponse], error)
 	// ConvertMessageToTask turns an existing top-level message into a task by
 	// attaching task metadata (number, status=TODO, no assignee). Any channel
 	// member (user or agent) may convert. Emits a system notification row.
@@ -1540,6 +1592,18 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("PostMessage")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceAddReactionHandler := connect.NewUnaryHandler(
+		CommandServiceAddReactionProcedure,
+		svc.AddReaction,
+		connect.WithSchema(commandServiceMethods.ByName("AddReaction")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceRemoveReactionHandler := connect.NewUnaryHandler(
+		CommandServiceRemoveReactionProcedure,
+		svc.RemoveReaction,
+		connect.WithSchema(commandServiceMethods.ByName("RemoveReaction")),
+		connect.WithHandlerOptions(opts...),
+	)
 	commandServiceConvertMessageToTaskHandler := connect.NewUnaryHandler(
 		CommandServiceConvertMessageToTaskProcedure,
 		svc.ConvertMessageToTask,
@@ -1786,6 +1850,10 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceSendMessageHandler.ServeHTTP(w, r)
 		case CommandServicePostMessageProcedure:
 			commandServicePostMessageHandler.ServeHTTP(w, r)
+		case CommandServiceAddReactionProcedure:
+			commandServiceAddReactionHandler.ServeHTTP(w, r)
+		case CommandServiceRemoveReactionProcedure:
+			commandServiceRemoveReactionHandler.ServeHTTP(w, r)
 		case CommandServiceConvertMessageToTaskProcedure:
 			commandServiceConvertMessageToTaskHandler.ServeHTTP(w, r)
 		case CommandServiceListTasksProcedure:
@@ -1981,6 +2049,14 @@ func (UnimplementedCommandServiceHandler) SendMessage(context.Context, *connect.
 
 func (UnimplementedCommandServiceHandler) PostMessage(context.Context, *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.PostMessage is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) AddReaction(context.Context, *connect.Request[v1.AddReactionRequest]) (*connect.Response[v1.AddReactionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.AddReaction is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) RemoveReaction(context.Context, *connect.Request[v1.RemoveReactionRequest]) (*connect.Response[v1.RemoveReactionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.RemoveReaction is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) ConvertMessageToTask(context.Context, *connect.Request[v1.ConvertMessageToTaskRequest]) (*connect.Response[v1.ConvertMessageToTaskResponse], error) {

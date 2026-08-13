@@ -33,6 +33,7 @@ import type {
   CommandOutput,
   Conversation,
   Mention,
+  Reaction,
   Reminder,
 } from "@/types/proto-es/v1/command_pb";
 import type {
@@ -81,6 +82,10 @@ export interface ChatMessageUI {
   // last-read position: the first message whose room_version exceeds the
   // requesting user's read cursor. Absent on the optimistic send placeholder.
   roomVersion?: bigint;
+  // reactions are this message's emoji reactions, aggregated per emoji with a
+  // caller-relative `reacted` flag (whether the current user reacted). Drives
+  // the reaction bar under the message; empty/absent when there are none.
+  reactions?: Reaction[];
 }
 
 // TaskInfoUI is the UI mirror of laelia.v1.TaskInfo attached to a task root
@@ -358,6 +363,15 @@ export interface ChatSlice {
     instruction: string,
     conversationId?: string
   ) => Promise<ChatMessage>;
+  // toggleReaction adds (or, if the caller already reacted, removes) the
+  // caller's emoji reaction on a message in a conversation, then updates the
+  // local message's reactions from the server's response. Lightweight: it
+  // never bumps the room version or wakes agents.
+  toggleReaction: (
+    conversation: string,
+    messageId: string,
+    emoji: string
+  ) => Promise<void>;
 }
 
 // ChannelSlice owns channel conversations: the channel roster, per-conversation

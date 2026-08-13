@@ -115,6 +115,7 @@ interface MessageListProps {
   debugMode: boolean;
   currentPrincipalId?: string;
   scrollRoot: React.RefObject<HTMLDivElement | null>;
+  onToggleReaction: (msg: ChatMessageUI, emoji: string) => void;
 }
 
 // MessageList is memoized so typing in the composer (which re-renders the
@@ -134,6 +135,7 @@ const MessageList = memo(function MessageList({
   debugMode,
   currentPrincipalId,
   scrollRoot,
+  onToggleReaction,
 }: MessageListProps) {
   return (
     <div className="flex flex-col gap-4 px-6 pt-6 pb-4">
@@ -162,6 +164,7 @@ const MessageList = memo(function MessageList({
               debugMode={debugMode}
               currentPrincipalId={currentPrincipalId}
               scrollRoot={scrollRoot}
+              onToggleReaction={onToggleReaction}
               // For small/medium chats, render markdown synchronously on first
               // paint so entering the conversation doesn't flash as each visible
               // row swaps its inline raw-text placeholder for block markdown a
@@ -190,6 +193,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const startWatchingChannel = useAppStore((s) => s.startWatchingChannel);
   const stopWatchingChannel = useAppStore((s) => s.stopWatchingChannel);
   const markConversationRead = useAppStore((s) => s.markConversationRead);
+  const toggleReaction = useAppStore((s) => s.toggleReaction);
   const currentUser = useAppStore((s) => s.currentUser);
   // Per-user chat keybinding: Enter sends (default) or, when the user has
   // inverted it in Settings, Shift+Enter sends. Reactive so a settings change
@@ -660,6 +664,16 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     []
   );
 
+  // Toggle the caller's reaction on a message in the current conversation.
+  // Stable across renders so MessageList's memo is not defeated.
+  const handleToggleReaction = useCallback(
+    (msg: ChatMessageUI, emoji: string) => {
+      if (!conversationName) return;
+      void toggleReaction(conversationName, msg.id, emoji);
+    },
+    [conversationName, toggleReaction]
+  );
+
   const handleMentionSelect = useCallback(
     (target: MentionTarget) => {
       if (!mentionState) return;
@@ -862,6 +876,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
               debugMode={currentUser?.debugMode ?? false}
               currentPrincipalId={currentUser?.handle}
               scrollRoot={scrollRef}
+              onToggleReaction={handleToggleReaction}
             />
           </div>
 

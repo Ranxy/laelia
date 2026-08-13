@@ -326,6 +326,62 @@ message ListFilesResponse {
   repeated File files = 1;
 }
 
+// Reaction is one emoji's aggregate on a message: the emoji, how many distinct
+// reactors placed it, who they are (display names), and whether the caller
+// itself placed it (caller-relative, mirroring ChatMessage.is_own). Populated
+// by ListConversationMessages / ListThreadMessages and returned by
+// AddReaction / RemoveReaction.
+message Reaction {
+  string emoji = 1;
+  int32 count = 2;
+  repeated string reactors = 3;
+  bool reacted = 4;
+}
+
+// AddReactionRequest / RemoveReactionRequest add or remove the caller's emoji
+// reaction on a message. Both are idempotent: adding an emoji the caller
+// already placed, or removing one they did not place, succeeds as a no-op and
+// returns the message's current aggregate. Removing an emoji that exists but
+// was placed by someone else is PERMISSION_DENIED (only the reactor removes
+// its own reaction). A reaction is lightweight feedback: it never bumps the
+// conversation's room version, never wakes agents, never counts as unread, and
+// never generates conversation activity.
+message AddReactionRequest {
+  // message is the resource name of the message to react to
+  // ("conversations/{c}/messages/{m}"). Annotated as a Conversation resource
+  // reference so the IAM interceptor resolves the parent conversation (the
+  // resolver normalizes the child message path to its parent) and checks the
+  // caller's conversations.send permission on it.
+  string message = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
+  // emoji is a single emoji (no whitespace), validated server-side.
+  string emoji = 2 [(google.api.field_behavior) = REQUIRED];
+}
+message AddReactionResponse {
+  string message = 1;
+  // reactions is the updated aggregate for the message after the add.
+  repeated Reaction reactions = 2;
+}
+
+message RemoveReactionRequest {
+  // message is the resource name of the message to unreact
+  // ("conversations/{c}/messages/{m}"). Annotated as a Conversation resource
+  // reference so the IAM interceptor checks conversations.send on the parent
+  // conversation (see AddReactionRequest).
+  string message = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
+  string emoji = 2 [(google.api.field_behavior) = REQUIRED];
+}
+message RemoveReactionResponse {
+  string message = 1;
+  // reactions is the updated aggregate for the message after the removal.
+  repeated Reaction reactions = 2;
+}
+
 message ChatMessage {
   string name = 1;
   string conversation = 2;
@@ -374,6 +430,12 @@ message ChatMessage {
   // user's own messages apart from other users' messages in shared channels
   // (sender_name alone is a display name and can collide across users).
   string principal_id = 18;
+  // reactions is this message's current emoji reactions, aggregated per emoji
+  // (emoji, count, reactors, and whether the caller reacted). Populated by
+  // ListConversationMessages / ListThreadMessages; empty when the message has
+  // no reactions. A reaction is lightweight feedback and never bumps the room
+  // version.
+  repeated Reaction reactions = 19;
 }
 
 message Conversation {
@@ -1632,6 +1694,27 @@ service CommandService {
   rpc PostMessage(PostMessageRequest) returns (PostMessageResponse) {
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.send";
+  }
+
+  // AddReaction places the caller's emoji reaction on a message (idempotent:
+  // re-adding your own emoji is a no-op). A reaction is lightweight feedback —
+  // it never bumps the conversation's room version, wakes agents, counts as
+  // unread, or generates activity. Caller must be a member of the message's
+  // conversation.
+  rpc AddReaction(AddReactionRequest) returns (AddReactionResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.send";
+    option (laelia.v1.audit) = true;
+  }
+
+  // RemoveReaction removes the caller's own emoji reaction from a message
+  // (idempotent: removing an emoji the caller did not place is a no-op).
+  // Removing an emoji that exists but was placed by someone else is
+  // PERMISSION_DENIED — only the reactor removes its own reaction.
+  rpc RemoveReaction(RemoveReactionRequest) returns (RemoveReactionResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.send";
+    option (laelia.v1.audit) = true;
   }
 
   // ConvertMessageToTask turns an existing top-level message into a task by

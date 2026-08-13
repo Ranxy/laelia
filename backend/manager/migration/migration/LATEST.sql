@@ -978,3 +978,25 @@ CREATE TABLE IF NOT EXISTS email_verification_token (
 );
 CREATE INDEX IF NOT EXISTS idx_email_verification_token_principal
     ON email_verification_token(principal_id);
+
+-- message_reaction: message emoji reactions (lightweight feedback, sideband).
+-- Never bumps the conversation room version, wakes agents, counts as unread,
+-- or generates activity. Actor is exactly one of principal_id (user) or
+-- agent_id (agent), so both actor columns stay nullable. "One row per
+-- (message, actor, emoji)" is enforced by two partial UNIQUE indexes (PK
+-- columns are implicitly NOT NULL in Postgres and would reject the NULL actor
+-- column), which make adds idempotent (ON CONFLICT DO NOTHING); removes are
+-- naturally idempotent.
+CREATE TABLE IF NOT EXISTS message_reaction (
+  message_id   uuid NOT NULL REFERENCES chat_message(id) ON DELETE CASCADE,
+  principal_id int NULL REFERENCES principal(id),
+  agent_id     int NULL REFERENCES agent(id),
+  emoji        text NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT message_reaction_actor CHECK (num_nonnulls(principal_id, agent_id) = 1)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_message_reaction_user
+  ON message_reaction (message_id, emoji, principal_id) WHERE principal_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_message_reaction_agent
+  ON message_reaction (message_id, emoji, agent_id) WHERE agent_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_message_reaction_message ON message_reaction(message_id);

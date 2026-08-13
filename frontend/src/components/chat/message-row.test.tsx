@@ -22,11 +22,23 @@ vi.mock("@/lib/use-is-desktop", () => ({
   useIsDesktop: mockUseIsDesktop,
 }));
 
+import { create } from "@bufbuild/protobuf";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { Avatar, formatTime } from "@/components/chat/avatar";
 import { MessageRow } from "@/components/chat/message-row";
 import type { ChatMessageUI } from "@/stores/types";
+import { ReactionSchema } from "@/types/proto-es/v1/command_pb";
+
+// buildReaction constructs a Reaction message (which requires $typeName).
+function reaction(
+  emoji: string,
+  count: number,
+  reactors: string[],
+  reacted: boolean
+) {
+  return create(ReactionSchema, { emoji, count, reactors, reacted });
+}
 
 let container: HTMLDivElement | null = null;
 let root: ReturnType<typeof createRoot> | null = null;
@@ -166,5 +178,62 @@ describe("MessageRow thread entry", () => {
       link.click();
     });
     expect(onOpenThread).not.toHaveBeenCalled();
+  });
+});
+
+describe("MessageRow reaction bar", () => {
+  function renderRow(
+    reactions: ChatMessageUI["reactions"],
+    onToggleReaction: (msg: ChatMessageUI, emoji: string) => void
+  ) {
+    act(() => {
+      root!.render(
+        <MessageRow
+          msg={baseMsg({ role: "assistant", content: "done", reactions })}
+          showAvatar
+          agentTitle="Agent"
+          streamingContent=""
+          streamingEvents={[]}
+          onViewDetails={() => {}}
+          markdownCustomId="chat"
+          debugMode={false}
+          onToggleReaction={onToggleReaction}
+        />
+      );
+    });
+  }
+
+  it("renders reaction pills with emoji and count", () => {
+    renderRow(
+      [
+        reaction("👍", 2, ["alice", "rei-agent-1"], false),
+        reaction("✅", 1, ["bob"], true),
+      ],
+      () => {}
+    );
+    const text = container?.textContent ?? "";
+    expect(text).toContain("👍");
+    expect(text).toContain("2");
+    expect(text).toContain("✅");
+    expect(text).toContain("1");
+  });
+
+  it("does not render the bar when there are no reactions", () => {
+    renderRow([], () => {});
+    expect(container?.textContent).not.toContain("reactions");
+  });
+
+  it("calls onToggleReaction with the emoji on click", () => {
+    const onToggleReaction = vi.fn();
+    renderRow([reaction("👍", 1, ["alice"], false)], onToggleReaction);
+    const pill = Array.from(container?.querySelectorAll("button") ?? []).find(
+      (b) => b.textContent?.includes("👍")
+    );
+    expect(pill).toBeTruthy();
+    act(() => {
+      pill!.click();
+    });
+    expect(onToggleReaction).toHaveBeenCalledTimes(1);
+    expect(onToggleReaction.mock.calls[0][1]).toBe("👍");
   });
 });

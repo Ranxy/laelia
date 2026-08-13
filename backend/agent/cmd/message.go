@@ -8,7 +8,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(messageCmd)
-	messageCmd.AddCommand(messageCheckCmd, messageReadCmd, messageSearchCmd, messageAckCmd, messageSendCmd)
+	messageCmd.AddCommand(messageCheckCmd, messageReadCmd, messageSearchCmd, messageAckCmd, messageSendCmd, messageReactCmd)
 }
 
 var messageCmd = &cobra.Command{
@@ -137,6 +137,35 @@ var messageSendCmd = &cobra.Command{
 	},
 }
 
+// message react <message-handle> --emoji <emoji> [--remove]
+var (
+	messageReactEmoji  string
+	messageReactRemove bool
+)
+
+var messageReactCmd = &cobra.Command{
+	Use:   "react <message-handle>",
+	Short: "Add or remove an emoji reaction on a message (lightweight feedback)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(_ *cobra.Command, args []string) error {
+		if messageReactEmoji == "" {
+			printError("INVALID_ARGUMENT_FAILED", "--emoji is required", "Pass a single emoji, e.g. --emoji 👍.")
+			return ErrCLIFailed
+		}
+		path := "/reaction/add"
+		if messageReactRemove {
+			path = "/reaction/remove"
+		}
+		if !call(path, daemonsrv.Request{
+			Message:       args[0],
+			ReactionEmoji: messageReactEmoji,
+		}) {
+			return ErrCLIFailed
+		}
+		return nil
+	},
+}
+
 func init() {
 	messageReadCmd.Flags().Int64Var(&messageReadVersion, "version", 0, "room version to page relative to (defaults to reading from the start)")
 	messageReadCmd.Flags().BoolVar(&messageReadBefore, "before", false, "page to messages older than --version (oldest→newest); default reads messages newer than --version")
@@ -152,4 +181,7 @@ func init() {
 	messageSendCmd.Flags().StringVar(&messageSendContent, "content", "", "message text; \"-\" reads from stdin")
 	messageSendCmd.Flags().Int64Var(&messageSendBaseVersion, "base-version", 0, "room version the reply is based on (from `message read` current_version)")
 	messageSendCmd.Flags().StringArrayVar(&messageSendAttachments, "attach", nil, "file id to attach to this message (repeatable); the file must already be uploaded to this conversation via `file upload --conversation`")
+
+	messageReactCmd.Flags().StringVar(&messageReactEmoji, "emoji", "", "single emoji to react with (e.g. 👍, ✅) — required")
+	messageReactCmd.Flags().BoolVar(&messageReactRemove, "remove", false, "remove the reaction instead of adding it")
 }

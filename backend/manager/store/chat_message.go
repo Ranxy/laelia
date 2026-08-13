@@ -60,6 +60,12 @@ type ChatMessage struct {
 	// via ListConversationMessages / ListThreadMessages / ListTasks /
 	// GetTaskMessage; nil for non-task messages and thread replies.
 	TaskInfo *TaskInfo
+	// Reactions are this message's emoji reactions, aggregated per emoji and
+	// caller-relative (`reacted`). Populated by fillReactions via
+	// ListConversationMessages / ListThreadMessages; empty (non-nil) for a
+	// message with no reactions. Reactions are a lightweight sideband and never
+	// bump the room version.
+	Reactions []*v1pb.Reaction
 }
 
 // chatMessageScanner scans a chat_message row from the common column order
@@ -523,6 +529,24 @@ func (s *Store) ListChannelThreads(ctx context.Context, conversationID uuid.UUID
 
 func itoa(n int) string {
 	return strconv.Itoa(n)
+}
+
+// MessageExistsInConversation reports whether a chat_message row with the given
+// id belongs to the conversation, whether it is a root message or a thread
+// reply. Used by the reaction RPCs to reject reactions on messages outside the
+// caller's conversation (NOT_FOUND), independent of thread nesting.
+func (s *Store) MessageExistsInConversation(ctx context.Context, conversationID, messageID uuid.UUID) (bool, error) {
+	var exists bool
+	err := s.GetDB().QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM chat_message
+			WHERE id = $1 AND conversation_id = $2
+		)
+	`, messageID, conversationID).Scan(&exists)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to check message existence")
+	}
+	return exists, nil
 }
 
 // IsThreadRoot reports whether rootID is a root message in conversationID —

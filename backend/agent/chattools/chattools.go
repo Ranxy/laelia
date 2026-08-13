@@ -331,6 +331,7 @@ func GetConversationMessages(ctx context.Context, d Deps, in GetConversationMess
 				m.SenderName, senderTypeString(m.SenderType), m.IsOwn,
 				addr, m.Name, m.RoomVersion, m.Content, m.Attachments,
 			)
+			text += formatReactionsLine(m.GetReactions())
 		}
 		if direction == "before" && len(resp.Msg.Messages) == limit {
 			oldest := resp.Msg.Messages[0].RoomVersion
@@ -655,6 +656,7 @@ func GetThreadMessages(ctx context.Context, d Deps, in GetThreadMessagesInput) (
 		} else {
 			text += line
 		}
+		text += formatReactionsLine(m.GetReactions())
 	}
 	if direction == "before" && len(resp.Msg.Messages)-1 == limit {
 		oldest := resp.Msg.Messages[1].RoomVersion

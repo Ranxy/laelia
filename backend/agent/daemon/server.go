@@ -499,6 +499,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/message/search", s.handleMessageSearch)
 	mux.HandleFunc("/message/ack", s.handleMessageAck)
 	mux.HandleFunc("/message/send", s.handleMessageSend)
+	mux.HandleFunc("/reaction/add", s.handleReactionAdd)
+	mux.HandleFunc("/reaction/remove", s.handleReactionRemove)
 	mux.HandleFunc("/message/thread/check", s.handleThreadCheck)
 	mux.HandleFunc("/message/thread/read", s.handleThreadRead)
 	mux.HandleFunc("/message/thread/send", s.handleThreadSend)
@@ -603,6 +605,11 @@ type Request struct {
 	Tz       string `json:"tz,omitempty"`
 	Result   string `json:"result,omitempty"`
 	Error    string `json:"error,omitempty"`
+
+	// ReactionEmoji is the single emoji for the reaction add/remove commands.
+	// The target message is carried in Message (as a "<address>:<message-id>"
+	// handle, not a task resource name, for the reaction endpoints).
+	ReactionEmoji string `json:"reaction_emoji,omitempty"`
 }
 
 // Response is the shared envelope. Success: Text set, Code empty. Failure:
@@ -729,6 +736,26 @@ func (s *Server) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 			Content:       req.Content,
 			BaseVersion:   req.BaseVersion,
 			AttachmentIDs: req.AttachmentIDs,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleReactionAdd(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.AddReaction(r.Context(), s.deps(req), chattools.ReactionInput{
+			Message: req.Message,
+			Emoji:   req.ReactionEmoji,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleReactionRemove(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.RemoveReaction(r.Context(), s.deps(req), chattools.ReactionInput{
+			Message: req.Message,
+			Emoji:   req.ReactionEmoji,
 		})
 		return text, asChatError(err)
 	})

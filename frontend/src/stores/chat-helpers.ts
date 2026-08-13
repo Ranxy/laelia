@@ -23,6 +23,7 @@ export function toUiMessage(msg: ChatMessage): ChatMessageUI {
     threadRoot: msg.threadRoot || undefined,
     threadReplyCount: msg.threadReplyCount || undefined,
     roomVersion: msg.roomVersion || undefined,
+    reactions: msg.reactions,
     task: msg.task
       ? {
           taskNumber: msg.task.taskNumber,

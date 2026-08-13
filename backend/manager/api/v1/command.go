@@ -721,6 +721,9 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 		v1m.IsOwn = callerAgent != nil && msg.SenderAgentID.Valid && int(msg.SenderAgentID.Int32) == callerAgent.ID
 		v1msgs = append(v1msgs, v1m)
 	}
+	if err := s.fillReactions(ctx, msgs, v1msgs); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to fill reactions"))
+	}
 
 	return connect.NewResponse(&v1pb.ListConversationMessagesResponse{
 		Messages:       v1msgs,
@@ -818,6 +821,9 @@ func (s *CommandService) ListThreadMessages(ctx context.Context, req *connect.Re
 		v1m := storeToV1ChatMessage(msg)
 		v1m.IsOwn = callerAgent != nil && msg.SenderAgentID.Valid && int(msg.SenderAgentID.Int32) == callerAgent.ID
 		v1msgs = append(v1msgs, v1m)
+	}
+	if err := s.fillReactions(ctx, msgs, v1msgs); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to fill reactions"))
 	}
 
 	return connect.NewResponse(&v1pb.ListThreadMessagesResponse{
@@ -1007,6 +1013,127 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 	}), nil
 }
 
+// requireReactionCaller resolves the caller's identity (a user or an agent) and
+// verifies it may act on the given message's conversation:
+//   - the message must exist in the conversation (NOT_FOUND);
+//   - an agent caller must be a member of the conversation (mirroring
+//     PostMessage); a user caller is gated by the interceptor's
+//     conversations.send permission (mirroring SendMessage).
+//
+// It returns the caller's principal id (nil for an agent caller) and agent id
+// (nil for a user caller), which the store uses to scope reactions and compute
+// the caller-relative `reacted` flag.
+func (s *CommandService) requireReactionCaller(ctx context.Context, convID, msgID uuid.UUID) (principalID, agentID *int, err error) {
+	exists, existsErr := s.store.MessageExistsInConversation(ctx, convID, msgID)
+	if existsErr != nil {
+		return nil, nil, connect.NewError(connect.CodeInternal, errors.Wrapf(existsErr, "failed to check message existence"))
+	}
+	if !exists {
+		return nil, nil, connect.NewError(connect.CodeNotFound, errors.New("message not found in conversation"))
+	}
+
+	if agent, ok := GetAgentFromContext(ctx); ok && agent != nil {
+		if _, err := s.requireAgentMemberByConvID(ctx, convID); err != nil {
+			return nil, nil, err
+		}
+		aid := agent.ID
+		return nil, &aid, nil
+	}
+	if user, ok := GetUserFromContext(ctx); ok && user != nil {
+		uid := user.ID
+		return &uid, nil, nil
+	}
+	return nil, nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authenticated user or agent required"))
+}
+
+// AddReaction places the caller's emoji reaction on a message. Idempotent and
+// lightweight: it never bumps the conversation's room version, wakes agents,
+// counts as unread, or generates activity. See store.AddReaction.
+func (s *CommandService) AddReaction(ctx context.Context, req *connect.Request[v1pb.AddReactionRequest]) (*connect.Response[v1pb.AddReactionResponse], error) {
+	convID, msgID, err := parseMessageName(req.Msg.Message)
+	if err != nil {
+		return nil, err
+	}
+	emoji, err := common.NormalizeReactionEmoji(req.Msg.Emoji)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	principalID, agentID, err := s.requireReactionCaller(ctx, convID, msgID)
+	if err != nil {
+		return nil, err
+	}
+	reactions, err := s.store.AddReaction(ctx, convID, msgID, principalID, agentID, emoji)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to add reaction"))
+	}
+	return connect.NewResponse(&v1pb.AddReactionResponse{Message: req.Msg.Message, Reactions: reactions}), nil
+}
+
+// RemoveReaction removes the caller's own emoji reaction from a message.
+// Idempotent: removing an emoji the caller did not place is a no-op. Removing
+// an emoji that exists but was placed by someone else is PERMISSION_DENIED —
+// only the reactor removes its own reaction.
+func (s *CommandService) RemoveReaction(ctx context.Context, req *connect.Request[v1pb.RemoveReactionRequest]) (*connect.Response[v1pb.RemoveReactionResponse], error) {
+	convID, msgID, err := parseMessageName(req.Msg.Message)
+	if err != nil {
+		return nil, err
+	}
+	emoji, err := common.NormalizeReactionEmoji(req.Msg.Emoji)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	principalID, agentID, err := s.requireReactionCaller(ctx, convID, msgID)
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.store.RemoveReaction(ctx, convID, msgID, principalID, agentID, emoji)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to remove reaction"))
+	}
+	if !result.Removed && result.Others {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("you can only remove your own reaction"))
+	}
+	return connect.NewResponse(&v1pb.RemoveReactionResponse{Message: req.Msg.Message, Reactions: result.Reactions}), nil
+}
+
+// reactionCallerFromContext resolves the caller's identity for the
+// caller-relative `reacted` reaction flag: the agent id when an agent is
+// authenticated, the principal id when a user is, and nil/nil otherwise.
+func reactionCallerFromContext(ctx context.Context) (principalID, agentID *int) {
+	if agent, ok := GetAgentFromContext(ctx); ok && agent != nil {
+		aid := agent.ID
+		return nil, &aid
+	}
+	if user, ok := GetUserFromContext(ctx); ok && user != nil {
+		uid := user.ID
+		return &uid, nil
+	}
+	return nil, nil
+}
+
+// fillReactions attaches each message's aggregated reactions to its v1 view,
+// for the read handlers (ListConversationMessages / ListThreadMessages). One
+// batch query covers the page so reaction display does not incur an N+1. A
+// message with no reactions emits an empty (non-nil) list.
+func (s *CommandService) fillReactions(ctx context.Context, msgs []*store.ChatMessage, v1msgs []*v1pb.ChatMessage) error {
+	if len(msgs) == 0 {
+		return nil
+	}
+	principalID, agentID := reactionCallerFromContext(ctx)
+	ids := make([]uuid.UUID, len(msgs))
+	for i, m := range msgs {
+		ids[i] = m.ID
+	}
+	byID, err := s.store.ListReactionsForMessages(ctx, ids, principalID, agentID)
+	if err != nil {
+		return err
+	}
+	for i, m := range msgs {
+		v1msgs[i].Reactions = byID[m.ID]
+	}
+	return nil
+}
+
 func storeToV1ChatMessage(msg *store.ChatMessage) *v1pb.ChatMessage {
 	senderName := msg.PrincipalName
 	senderType := v1pb.SenderType(msg.SenderType)
@@ -1028,6 +1155,7 @@ func storeToV1ChatMessage(msg *store.ChatMessage) *v1pb.ChatMessage {
 		Attachments:      msg.Attachments,
 		ThreadReplyCount: msg.ThreadReplyCount,
 		Task:             storeToV1TaskInfo(msg.TaskInfo),
+		Reactions:        msg.Reactions,
 	}
 	if msg.CommandID.Valid {
 		v1m.CommandId = msg.CommandID.UUID.String()

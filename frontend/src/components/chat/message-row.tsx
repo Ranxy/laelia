@@ -189,6 +189,10 @@ export interface MessageRowProps {
   // row swaps its inline raw-text placeholder for block markdown a frame later.
   // Large histories leave it off so off-screen rows stay cheap to mount.
   eager?: boolean;
+  // onToggleReaction, when provided, enables the reaction bar under the
+  // message: clicking an emoji pill adds the caller's reaction (or removes it
+  // if they already reacted). Receives the message and the emoji.
+  onToggleReaction?: (msg: ChatMessageUI, emoji: string) => void;
 }
 
 export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
@@ -211,6 +215,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     currentPrincipalId,
     scrollRoot,
     eager = false,
+    onToggleReaction,
   } = props;
   const { t, i18n } = useTranslation();
   const isDesktop = useIsDesktop();
@@ -645,6 +650,33 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
             </div>
           )}
         </div>
+
+        {/* Reaction bar: existing emoji pills, click to toggle the caller's
+            reaction. Only rendered when the message has reactions and the
+            caller wired the toggle handler. */}
+        {onToggleReaction &&
+          !isStreaming &&
+          (msg.reactions?.length ?? 0) > 0 && (
+            <div className="flex flex-wrap items-center gap-1 px-0.5">
+              {msg.reactions!.map((r) => (
+                <button
+                  key={r.emoji}
+                  type="button"
+                  onClick={() => onToggleReaction(msg, r.emoji)}
+                  title={r.reactors.join(", ")}
+                  className={cn(
+                    "flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors cursor-pointer",
+                    r.reacted
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-control-border text-control hover:border-accent hover:text-accent"
+                  )}
+                >
+                  <span>{r.emoji}</span>
+                  <span>{r.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
         {/* View details link */}
         {!isUser && msg.commandId && !isStreaming && debugMode && (

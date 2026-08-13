@@ -150,6 +150,8 @@
     - [AddChannelMemberInput](#laelia-v1-AddChannelMemberInput)
     - [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest)
     - [AddChannelMemberResponse](#laelia-v1-AddChannelMemberResponse)
+    - [AddReactionRequest](#laelia-v1-AddReactionRequest)
+    - [AddReactionResponse](#laelia-v1-AddReactionResponse)
     - [AgentActivity](#laelia-v1-AgentActivity)
     - [AgentReady](#laelia-v1-AgentReady)
     - [AgentStreamMessage](#laelia-v1-AgentStreamMessage)
@@ -268,8 +270,11 @@
     - [PostMessageResponse](#laelia-v1-PostMessageResponse)
     - [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered)
     - [RawAcpPayload](#laelia-v1-RawAcpPayload)
+    - [Reaction](#laelia-v1-Reaction)
     - [Reminder](#laelia-v1-Reminder)
     - [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest)
+    - [RemoveReactionRequest](#laelia-v1-RemoveReactionRequest)
+    - [RemoveReactionResponse](#laelia-v1-RemoveReactionResponse)
     - [ResolveChannelByTitleRequest](#laelia-v1-ResolveChannelByTitleRequest)
     - [ResolveChannelByTitleResponse](#laelia-v1-ResolveChannelByTitleResponse)
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
@@ -2697,6 +2702,45 @@ flags. The resource name is &#34;users/{user}/activities/{message}&#34;.
 
 
 
+<a name="laelia-v1-AddReactionRequest"></a>
+
+### AddReactionRequest
+AddReactionRequest / RemoveReactionRequest add or remove the caller&#39;s emoji
+reaction on a message. Both are idempotent: adding an emoji the caller
+already placed, or removing one they did not place, succeeds as a no-op and
+returns the message&#39;s current aggregate. Removing an emoji that exists but
+was placed by someone else is PERMISSION_DENIED (only the reactor removes
+its own reaction). A reaction is lightweight feedback: it never bumps the
+conversation&#39;s room version, never wakes agents, never counts as unread, and
+never generates conversation activity.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [string](#string) |  | message is the resource name of the message to react to (&#34;conversations/{c}/messages/{m}&#34;). Annotated as a Conversation resource reference so the IAM interceptor resolves the parent conversation (the resolver normalizes the child message path to its parent) and checks the caller&#39;s conversations.send permission on it. |
+| emoji | [string](#string) |  | emoji is a single emoji (no whitespace), validated server-side. |
+
+
+
+
+
+
+<a name="laelia-v1-AddReactionResponse"></a>
+
+### AddReactionResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [string](#string) |  |  |
+| reactions | [Reaction](#laelia-v1-Reaction) | repeated | reactions is the updated aggregate for the message after the add. |
+
+
+
+
+
+
 <a name="laelia-v1-AgentActivity"></a>
 
 ### AgentActivity
@@ -2985,6 +3029,7 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | task | [TaskInfo](#laelia-v1-TaskInfo) |  | task is set when this message is a task (a row exists in the task table for this message id). Populated by ListConversationMessages / ListThreadMessages for root messages; absent for non-task messages and thread replies. |
 | agent_id | [string](#string) |  | agent_id is the agent resource ID (&#34;agents/{id}&#34;) that owns the command referenced by command_id. Populated when the sender is an agent so the frontend can construct command-detail URLs. |
 | principal_id | [string](#string) |  | principal_id is the mention handle of the principal that authored this message (principal.handle). For a user message it is the sending user&#39;s handle (matching the {user} segment of the &#34;users/{user}&#34; resource name); for an agent message it is the conversation owner&#39;s handle; for a system message it is &#34;system-bot&#34;. The frontend uses it to tell the current user&#39;s own messages apart from other users&#39; messages in shared channels (sender_name alone is a display name and can collide across users). |
+| reactions | [Reaction](#laelia-v1-Reaction) | repeated | reactions is this message&#39;s current emoji reactions, aggregated per emoji (emoji, count, reactors, and whether the caller reacted). Populated by ListConversationMessages / ListThreadMessages; empty when the message has no reactions. A reaction is lightweight feedback and never bumps the room version. |
 
 
 
@@ -4768,6 +4813,28 @@ to the pending RefreshAgentProviders caller.
 
 
 
+<a name="laelia-v1-Reaction"></a>
+
+### Reaction
+Reaction is one emoji&#39;s aggregate on a message: the emoji, how many distinct
+reactors placed it, who they are (display names), and whether the caller
+itself placed it (caller-relative, mirroring ChatMessage.is_own). Populated
+by ListConversationMessages / ListThreadMessages and returned by
+AddReaction / RemoveReaction.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| emoji | [string](#string) |  |  |
+| count | [int32](#int32) |  |  |
+| reactors | [string](#string) | repeated |  |
+| reacted | [bool](#bool) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-Reminder"></a>
 
 ### Reminder
@@ -4814,6 +4881,38 @@ row carries the schedule, assignee, and lifecycle state. The resource name is
 | conversation | [string](#string) |  |  |
 | member_id | [string](#string) |  |  |
 | member_type | [int32](#int32) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RemoveReactionRequest"></a>
+
+### RemoveReactionRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [string](#string) |  | message is the resource name of the message to unreact (&#34;conversations/{c}/messages/{m}&#34;). Annotated as a Conversation resource reference so the IAM interceptor checks conversations.send on the parent conversation (see AddReactionRequest). |
+| emoji | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RemoveReactionResponse"></a>
+
+### RemoveReactionResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [string](#string) |  |  |
+| reactions | [Reaction](#laelia-v1-Reaction) | repeated | reactions is the updated aggregate for the message after the removal. |
 
 
 
@@ -5609,6 +5708,8 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | ListThreadParticipants | [ListThreadParticipantsRequest](#laelia-v1-ListThreadParticipantsRequest) | [ListThreadParticipantsResponse](#laelia-v1-ListThreadParticipantsResponse) | ListThreadParticipants lists the distinct senders (users and agents) that posted in a thread. Intended for the agent daemon. The caller must be a member of the conversation. |
 | SendMessage | [SendMessageRequest](#laelia-v1-SendMessageRequest) | [ChatMessage](#laelia-v1-ChatMessage) |  |
 | PostMessage | [PostMessageRequest](#laelia-v1-PostMessageRequest) | [PostMessageResponse](#laelia-v1-PostMessageResponse) |  |
+| AddReaction | [AddReactionRequest](#laelia-v1-AddReactionRequest) | [AddReactionResponse](#laelia-v1-AddReactionResponse) | AddReaction places the caller&#39;s emoji reaction on a message (idempotent: re-adding your own emoji is a no-op). A reaction is lightweight feedback — it never bumps the conversation&#39;s room version, wakes agents, counts as unread, or generates activity. Caller must be a member of the message&#39;s conversation. |
+| RemoveReaction | [RemoveReactionRequest](#laelia-v1-RemoveReactionRequest) | [RemoveReactionResponse](#laelia-v1-RemoveReactionResponse) | RemoveReaction removes the caller&#39;s own emoji reaction from a message (idempotent: removing an emoji the caller did not place is a no-op). Removing an emoji that exists but was placed by someone else is PERMISSION_DENIED — only the reactor removes its own reaction. |
 | ConvertMessageToTask | [ConvertMessageToTaskRequest](#laelia-v1-ConvertMessageToTaskRequest) | [ConvertMessageToTaskResponse](#laelia-v1-ConvertMessageToTaskResponse) | ConvertMessageToTask turns an existing top-level message into a task by attaching task metadata (number, status=TODO, no assignee). Any channel member (user or agent) may convert. Emits a system notification row. |
 | ListTasks | [ListTasksRequest](#laelia-v1-ListTasksRequest) | [ListTasksResponse](#laelia-v1-ListTasksResponse) | ListTasks returns one page of the task board for a conversation: the channel&#39;s tasks (root messages with task metadata), newest first, optionally filtered by status. Use page_size / page_token for pagination. |
 | ListTaskCounts | [ListTaskCountsRequest](#laelia-v1-ListTaskCountsRequest) | [ListTaskCountsResponse](#laelia-v1-ListTaskCountsResponse) | ListTaskCounts returns per-status task totals for a conversation, so the task board summary stays accurate independent of list pagination. |

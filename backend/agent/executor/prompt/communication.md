@@ -31,6 +31,7 @@ Parsing rules the resolver follows (so you do not have to):
 | `laelia-machine message search [--conversation C] --query Q [--since T] [--limit N]` | `search_chat_history` | Search past messages by keyword. `--conversation` is a conversation address (optional, scopes the search). |
 | `laelia-machine message send <address> --content <text> --base-version V [--attach <file-id>...]` | `post_message` | Post a reply. Uses optimistic concurrency on `--base-version`. Pass `--content -` to read the message body from stdin (use this for multi-line text). `--attach` is a repeatable file id; each id must be a file you already uploaded to **this** conversation with `file upload --conversation <address>`. If your reply is long, split it into a brief description plus an attachment: write the attachment into your temp workspace (`temp/` under your working directory), `laelia-machine file upload temp/<path> --conversation <address>` (note the returned id), then `message send` with `--attach <id>`. To start a DM with a peer agent or user, `message send dm:@<peer> --base-version 0 ...`. |
 | `laelia-machine message ack <address> --processed-version V` | `ack_processed_version` | Advance your durable per-channel cursor to `--processed-version`. **Acks the whole conversation**: it also skips past any unread thread replies in that conversation, so you MUST read every subscribed thread (via `thread check`/`thread read`) BEFORE acking, or you will miss replies. |
+| `laelia-machine message react '<message-handle>' --emoji <emoji> [--remove]` | — | Add or remove your emoji reaction on a message (lightweight feedback). `<message-handle>` is the `<address>:<message-id>` form copied from `message read`/`thread read`. **Use ONLY when a human explicitly asks for a reaction or when a reaction is a clear acknowledgement (e.g. `👍` on an approved result). Do NOT auto-react to every merge, deploy, task completion, or routine status update.** A reaction posts no message, wakes nobody, and is NOT an ack — never use it in place of `message send` or `message ack`. |
 | `laelia-machine thread check` | `list_thread_updates` | List threads you are subscribed to (via @mention, having replied, or having started the thread) that have new replies since your per-channel cursor. Takes no argument — it lists ALL subscribed threads across every conversation. Each line: `- <address> thread <root-id>: N new replies (latest_version=V)`. Empty = no subscribed thread has new replies. The `latest_version` is `max(reply.room_version)`; a thread surfaces here when that exceeds your `processed_version` for its conversation. Run this once per turn (BEFORE any `message ack`), then for each line run `thread read <address> --root <root-id>` to read that thread. |
 | `laelia-machine thread read <address> --root <root-msg-id> [--version V] [--before] [--limit N]` | `get_thread_messages` | Read a thread — the root message (labeled `[ROOT]`, context only) followed by its replies — relative to a room version. By default returns replies newer than `--version` (the "after" direction — there is no `--after` flag, it is the default). Pass `--before` to instead return up to `--limit` prior replies (oldest→newest). Output states `current_version` — use it as `--base-version` for `thread send`. Use your `processed_version` for the conversation as `--version`. `--root` accepts a bare message id or a `<address>:<message-id>` handle. |
 | `laelia-machine thread send <address> --root <root-msg-id> --content <text> --base-version V [--attach <file-id>...]` | `post_thread_message` | Post a reply INTO a thread (not the main channel). Uses optimistic concurrency on `--base-version`, same conflict/retry semantics as `message send`. `--root` accepts a bare message id or a `<address>:<message-id>` handle (e.g. straight from `task claim`), so you can reply in a task's thread without stripping the prefix. `--attach` is a repeatable file id uploaded to this conversation. `@mention`ing an agent in a thread subscribes them (and you, by posting) — see Threads below. |
@@ -86,6 +87,16 @@ When a message carries file attachments, they are listed on indented lines immed
 ```
 
 The `id` is the value you pass to `laelia-machine file download <id>` to fetch that file's bytes into your temp workspace and read them. If a message refers to a file but shows no attachment line, the file was not attached to that message — do not invent an id.
+
+When a message carries emoji reactions, they are listed on an indented `reactions:` line immediately below the content (only when non-empty), so you can perceive what reactions a message has received:
+
+```
+[<timestamp>] <sender_name> (<sender_type>): <content>
+  message: <address>:<message-id>  version: V
+  reactions: 👍 ×2 (alice, rei-agent-1), ✅ (bob)
+```
+
+Each reaction is `<emoji> [×N] (reactor, ...)`. A reaction is lightweight feedback — it does not wake you and is not a message; treat it as context only, and do not reply to it.
 
 ### Threads
 
@@ -171,7 +182,7 @@ There is no stdout on failure.
 The `Code:` prefix tells you which layer failed, so you know whether to retry, fix your input, or give up:
 
 - `MISSING_*` / `TOKEN_*` — local auth bootstrap. The env the daemon injected is missing or wrong (e.g. `MISSING_DAEMON`, `TOKEN_MISSING`, `TOKEN_INVALID`). You almost certainly cannot recover from inside the session — these mean you are not running inside a proper drain session. Stop.
-- `INVALID_ARGUMENT_FAILED` — your command arguments were wrong (missing `--query`, non-positive `--processed-version`, etc.). Fix the arguments and retry.
+- `INVALID_ARGUMENT_FAILED` — your command arguments were wrong (missing `--query`, non-positive `--processed-version`, an invalid reaction emoji such as empty/whitespace-containing/over-long, etc.). Fix the arguments and retry.
 - `NOT_FOUND_FAILED` — the conversation or command does not exist, or you are not a member. Do not retry unchanged.
 - `PERMISSION_FAILED` — you lack access to the resource. Do not retry unchanged.
 - `AUTH_FAILED` — the agent's access token was rejected by the manager. This can be transient if the daemon is mid-rotation; retry once.

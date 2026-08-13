@@ -953,6 +953,153 @@ export declare type ListFilesResponse = Message<"laelia.v1.ListFilesResponse"> &
 export declare const ListFilesResponseSchema: GenMessage<ListFilesResponse>;
 
 /**
+ * Reaction is one emoji's aggregate on a message: the emoji, how many distinct
+ * reactors placed it, who they are (display names), and whether the caller
+ * itself placed it (caller-relative, mirroring ChatMessage.is_own). Populated
+ * by ListConversationMessages / ListThreadMessages and returned by
+ * AddReaction / RemoveReaction.
+ *
+ * @generated from message laelia.v1.Reaction
+ */
+export declare type Reaction = Message<"laelia.v1.Reaction"> & {
+  /**
+   * @generated from field: string emoji = 1;
+   */
+  emoji: string;
+
+  /**
+   * @generated from field: int32 count = 2;
+   */
+  count: number;
+
+  /**
+   * @generated from field: repeated string reactors = 3;
+   */
+  reactors: string[];
+
+  /**
+   * @generated from field: bool reacted = 4;
+   */
+  reacted: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.Reaction.
+ * Use `create(ReactionSchema)` to create a new message.
+ */
+export declare const ReactionSchema: GenMessage<Reaction>;
+
+/**
+ * AddReactionRequest / RemoveReactionRequest add or remove the caller's emoji
+ * reaction on a message. Both are idempotent: adding an emoji the caller
+ * already placed, or removing one they did not place, succeeds as a no-op and
+ * returns the message's current aggregate. Removing an emoji that exists but
+ * was placed by someone else is PERMISSION_DENIED (only the reactor removes
+ * its own reaction). A reaction is lightweight feedback: it never bumps the
+ * conversation's room version, never wakes agents, never counts as unread, and
+ * never generates conversation activity.
+ *
+ * @generated from message laelia.v1.AddReactionRequest
+ */
+export declare type AddReactionRequest = Message<"laelia.v1.AddReactionRequest"> & {
+  /**
+   * message is the resource name of the message to react to
+   * ("conversations/{c}/messages/{m}"). Annotated as a Conversation resource
+   * reference so the IAM interceptor resolves the parent conversation (the
+   * resolver normalizes the child message path to its parent) and checks the
+   * caller's conversations.send permission on it.
+   *
+   * @generated from field: string message = 1;
+   */
+  message: string;
+
+  /**
+   * emoji is a single emoji (no whitespace), validated server-side.
+   *
+   * @generated from field: string emoji = 2;
+   */
+  emoji: string;
+};
+
+/**
+ * Describes the message laelia.v1.AddReactionRequest.
+ * Use `create(AddReactionRequestSchema)` to create a new message.
+ */
+export declare const AddReactionRequestSchema: GenMessage<AddReactionRequest>;
+
+/**
+ * @generated from message laelia.v1.AddReactionResponse
+ */
+export declare type AddReactionResponse = Message<"laelia.v1.AddReactionResponse"> & {
+  /**
+   * @generated from field: string message = 1;
+   */
+  message: string;
+
+  /**
+   * reactions is the updated aggregate for the message after the add.
+   *
+   * @generated from field: repeated laelia.v1.Reaction reactions = 2;
+   */
+  reactions: Reaction[];
+};
+
+/**
+ * Describes the message laelia.v1.AddReactionResponse.
+ * Use `create(AddReactionResponseSchema)` to create a new message.
+ */
+export declare const AddReactionResponseSchema: GenMessage<AddReactionResponse>;
+
+/**
+ * @generated from message laelia.v1.RemoveReactionRequest
+ */
+export declare type RemoveReactionRequest = Message<"laelia.v1.RemoveReactionRequest"> & {
+  /**
+   * message is the resource name of the message to unreact
+   * ("conversations/{c}/messages/{m}"). Annotated as a Conversation resource
+   * reference so the IAM interceptor checks conversations.send on the parent
+   * conversation (see AddReactionRequest).
+   *
+   * @generated from field: string message = 1;
+   */
+  message: string;
+
+  /**
+   * @generated from field: string emoji = 2;
+   */
+  emoji: string;
+};
+
+/**
+ * Describes the message laelia.v1.RemoveReactionRequest.
+ * Use `create(RemoveReactionRequestSchema)` to create a new message.
+ */
+export declare const RemoveReactionRequestSchema: GenMessage<RemoveReactionRequest>;
+
+/**
+ * @generated from message laelia.v1.RemoveReactionResponse
+ */
+export declare type RemoveReactionResponse = Message<"laelia.v1.RemoveReactionResponse"> & {
+  /**
+   * @generated from field: string message = 1;
+   */
+  message: string;
+
+  /**
+   * reactions is the updated aggregate for the message after the removal.
+   *
+   * @generated from field: repeated laelia.v1.Reaction reactions = 2;
+   */
+  reactions: Reaction[];
+};
+
+/**
+ * Describes the message laelia.v1.RemoveReactionResponse.
+ * Use `create(RemoveReactionResponseSchema)` to create a new message.
+ */
+export declare const RemoveReactionResponseSchema: GenMessage<RemoveReactionResponse>;
+
+/**
  * @generated from message laelia.v1.ChatMessage
  */
 export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
@@ -1081,6 +1228,17 @@ export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
    * @generated from field: string principal_id = 18;
    */
   principalId: string;
+
+  /**
+   * reactions is this message's current emoji reactions, aggregated per emoji
+   * (emoji, count, reactors, and whether the caller reacted). Populated by
+   * ListConversationMessages / ListThreadMessages; empty when the message has
+   * no reactions. A reaction is lightweight feedback and never bumps the room
+   * version.
+   *
+   * @generated from field: repeated laelia.v1.Reaction reactions = 19;
+   */
+  reactions: Reaction[];
 };
 
 /**
@@ -5495,6 +5653,33 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof PostMessageRequestSchema;
     output: typeof PostMessageResponseSchema;
+  },
+  /**
+   * AddReaction places the caller's emoji reaction on a message (idempotent:
+   * re-adding your own emoji is a no-op). A reaction is lightweight feedback —
+   * it never bumps the conversation's room version, wakes agents, counts as
+   * unread, or generates activity. Caller must be a member of the message's
+   * conversation.
+   *
+   * @generated from rpc laelia.v1.CommandService.AddReaction
+   */
+  addReaction: {
+    methodKind: "unary";
+    input: typeof AddReactionRequestSchema;
+    output: typeof AddReactionResponseSchema;
+  },
+  /**
+   * RemoveReaction removes the caller's own emoji reaction from a message
+   * (idempotent: removing an emoji the caller did not place is a no-op).
+   * Removing an emoji that exists but was placed by someone else is
+   * PERMISSION_DENIED — only the reactor removes its own reaction.
+   *
+   * @generated from rpc laelia.v1.CommandService.RemoveReaction
+   */
+  removeReaction: {
+    methodKind: "unary";
+    input: typeof RemoveReactionRequestSchema;
+    output: typeof RemoveReactionResponseSchema;
   },
   /**
    * ConvertMessageToTask turns an existing top-level message into a task by

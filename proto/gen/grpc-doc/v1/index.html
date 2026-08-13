@@ -748,6 +748,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.AddReactionRequest"><span class="badge">M</span>AddReactionRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AddReactionResponse"><span class="badge">M</span>AddReactionResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.AgentActivity"><span class="badge">M</span>AgentActivity</a>
                 </li>
               
@@ -1220,11 +1228,23 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.Reaction"><span class="badge">M</span>Reaction</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.Reminder"><span class="badge">M</span>Reminder</a>
                 </li>
               
                 <li>
                   <a href="#laelia.v1.RemoveChannelMemberRequest"><span class="badge">M</span>RemoveChannelMemberRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RemoveReactionRequest"><span class="badge">M</span>RemoveReactionRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RemoveReactionResponse"><span class="badge">M</span>RemoveReactionResponse</a>
                 </li>
               
                 <li>
@@ -7250,6 +7270,72 @@ already in the channel are skipped, so re-adding a group is idempotent. </p></td
 
         
       
+        <h3 id="laelia.v1.AddReactionRequest">AddReactionRequest</h3>
+        <p>AddReactionRequest / RemoveReactionRequest add or remove the caller's emoji</p><p>reaction on a message. Both are idempotent: adding an emoji the caller</p><p>already placed, or removing one they did not place, succeeds as a no-op and</p><p>returns the message's current aggregate. Removing an emoji that exists but</p><p>was placed by someone else is PERMISSION_DENIED (only the reactor removes</p><p>its own reaction). A reaction is lightweight feedback: it never bumps the</p><p>conversation's room version, never wakes agents, never counts as unread, and</p><p>never generates conversation activity.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>message is the resource name of the message to react to
+(&#34;conversations/{c}/messages/{m}&#34;). Annotated as a Conversation resource
+reference so the IAM interceptor resolves the parent conversation (the
+resolver normalizes the child message path to its parent) and checks the
+caller&#39;s conversations.send permission on it. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>emoji</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>emoji is a single emoji (no whitespace), validated server-side. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.AddReactionResponse">AddReactionResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reactions</td>
+                  <td><a href="#laelia.v1.Reaction">Reaction</a></td>
+                  <td>repeated</td>
+                  <td><p>reactions is the updated aggregate for the message after the add. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.AgentActivity">AgentActivity</h3>
         <p></p>
 
@@ -8052,6 +8138,17 @@ for an agent message it is the conversation owner&#39;s handle; for a system
 message it is &#34;system-bot&#34;. The frontend uses it to tell the current
 user&#39;s own messages apart from other users&#39; messages in shared channels
 (sender_name alone is a display name and can collide across users). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reactions</td>
+                  <td><a href="#laelia.v1.Reaction">Reaction</a></td>
+                  <td>repeated</td>
+                  <td><p>reactions is this message&#39;s current emoji reactions, aggregated per emoji
+(emoji, count, reactors, and whether the caller reacted). Populated by
+ListConversationMessages / ListThreadMessages; empty when the message has
+no reactions. A reaction is lightweight feedback and never bumps the room
+version. </p></td>
                 </tr>
               
             </tbody>
@@ -11779,6 +11876,51 @@ rooted at the given message name. Empty posts a normal channel message. </p></td
 
         
       
+        <h3 id="laelia.v1.Reaction">Reaction</h3>
+        <p>Reaction is one emoji's aggregate on a message: the emoji, how many distinct</p><p>reactors placed it, who they are (display names), and whether the caller</p><p>itself placed it (caller-relative, mirroring ChatMessage.is_own). Populated</p><p>by ListConversationMessages / ListThreadMessages and returned by</p><p>AddReaction / RemoveReaction.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>emoji</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reactors</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reacted</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.Reminder">Reminder</h3>
         <p>Reminder is the scheduled-task metadata attached to a root chat_message. The</p><p>chat_message (root) remains the source of truth for the trigger content; this</p><p>row carries the schedule, assignee, and lifecycle state. The resource name is</p><p>"reminders/{message_id}" — the reminder's identity is its trigger message.</p>
 
@@ -11960,6 +12102,71 @@ offline agent (0 when the agent was reached on the first try). </p></td>
                   <td><a href="#int32">int32</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RemoveReactionRequest">RemoveReactionRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>message is the resource name of the message to unreact
+(&#34;conversations/{c}/messages/{m}&#34;). Annotated as a Conversation resource
+reference so the IAM interceptor checks conversations.send on the parent
+conversation (see AddReactionRequest). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>emoji</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RemoveReactionResponse">RemoveReactionResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reactions</td>
+                  <td><a href="#laelia.v1.Reaction">Reaction</a></td>
+                  <td>repeated</td>
+                  <td><p>reactions is the updated aggregate for the message after the removal. </p></td>
                 </tr>
               
             </tbody>
@@ -13803,6 +14010,27 @@ conversation.</p></td>
                 <td><a href="#laelia.v1.PostMessageRequest">PostMessageRequest</a></td>
                 <td><a href="#laelia.v1.PostMessageResponse">PostMessageResponse</a></td>
                 <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>AddReaction</td>
+                <td><a href="#laelia.v1.AddReactionRequest">AddReactionRequest</a></td>
+                <td><a href="#laelia.v1.AddReactionResponse">AddReactionResponse</a></td>
+                <td><p>AddReaction places the caller&#39;s emoji reaction on a message (idempotent:
+re-adding your own emoji is a no-op). A reaction is lightweight feedback —
+it never bumps the conversation&#39;s room version, wakes agents, counts as
+unread, or generates activity. Caller must be a member of the message&#39;s
+conversation.</p></td>
+              </tr>
+            
+              <tr>
+                <td>RemoveReaction</td>
+                <td><a href="#laelia.v1.RemoveReactionRequest">RemoveReactionRequest</a></td>
+                <td><a href="#laelia.v1.RemoveReactionResponse">RemoveReactionResponse</a></td>
+                <td><p>RemoveReaction removes the caller&#39;s own emoji reaction from a message
+(idempotent: removing an emoji the caller did not place is a no-op).
+Removing an emoji that exists but was placed by someone else is
+PERMISSION_DENIED — only the reactor removes its own reaction.</p></td>
               </tr>
             
               <tr>

@@ -72,6 +72,16 @@ func TestResolveResources(t *testing.T) {
 			want: []*iam.ResourceRef{{ResourceType: models.Policy_CONVERSATION, Name: "conversations/abc"}},
 		},
 		{
+			name: "add reaction resolves conversation from message name",
+			msg:  &v1pb.AddReactionRequest{Message: "conversations/abc/messages/42", Emoji: "👍"},
+			want: []*iam.ResourceRef{{ResourceType: models.Policy_CONVERSATION, Name: "conversations/abc"}},
+		},
+		{
+			name: "remove reaction resolves conversation from message name",
+			msg:  &v1pb.RemoveReactionRequest{Message: "conversations/abc/messages/42", Emoji: "👍"},
+			want: []*iam.ResourceRef{{ResourceType: models.Policy_CONVERSATION, Name: "conversations/abc"}},
+		},
+		{
 			name: "list channels has no resource",
 			msg:  &v1pb.ListChannelsRequest{},
 			want: nil,

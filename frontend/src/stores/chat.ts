@@ -1,9 +1,11 @@
 import { create } from "@bufbuild/protobuf";
 import { commandServiceClient } from "@/connect";
 import {
+  AddReactionRequestSchema,
   GetOrCreateConversationRequestSchema,
   GetOrCreateUserUserDMRequestSchema,
   ListConversationMessagesRequestSchema,
+  RemoveReactionRequestSchema,
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { appendNewMessages, toUiMessage } from "./chat-helpers";
@@ -167,5 +169,31 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       });
     }
     return res;
+  },
+
+  async toggleReaction(conversation, messageId, emoji) {
+    const message = `${conversation}/messages/${messageId}`;
+    const msg = get().chatMessages[conversation]?.find(
+      (m) => m.id === messageId
+    );
+    // `reacted` is caller-relative (computed server-side for the current
+    // user), so toggling is: remove if I already reacted, else add.
+    const reacted = msg?.reactions?.find((r) => r.emoji === emoji)?.reacted;
+    const res = reacted
+      ? await commandServiceClient.removeReaction(
+          create(RemoveReactionRequestSchema, { message, emoji })
+        )
+      : await commandServiceClient.addReaction(
+          create(AddReactionRequestSchema, { message, emoji })
+        );
+    const reactions = res.reactions;
+    set((state) => ({
+      chatMessages: {
+        ...state.chatMessages,
+        [conversation]: (state.chatMessages[conversation] ?? []).map((m) =>
+          m.id === messageId ? { ...m, reactions } : m
+        ),
+      },
+    }));
   },
 });
