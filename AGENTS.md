@@ -109,8 +109,8 @@ scripts/build_laelia.sh                             # outputs build/laelia + bui
 LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia.sh  # route the pi GitHub download through a proxy
 
 # Docker images (manager image embeds the frontend; machine image embeds pi)
-LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_docker.sh
-# -> laelia/manager:local + laelia/machine:local
+LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_manager_docker.sh  # -> laelia/manager:local
+LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_machine_docker.sh  # -> laelia/machine:local
 ```
 
 Notes:

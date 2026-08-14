@@ -22,14 +22,12 @@ published yet.
 
 ## 1. Build the images
 
+The two images are built independently:
+
 ```bash
-scripts/build_laelia_docker.sh
+scripts/build_laelia_manager_docker.sh   # -> laelia/manager:local + laelia/manager:latest
+scripts/build_laelia_machine_docker.sh   # -> laelia/machine:local + laelia/machine:latest
 ```
-
-This creates:
-
-- `laelia/manager:local` and `laelia/manager:latest`
-- `laelia/machine:local` and `laelia/machine:latest`
 
 Build options:
 
@@ -37,13 +35,15 @@ Build options:
 | --- | --- |
 | `VERSION` | Image tag version (default: `local`) |
 | `LAELIA_BUILD_PROXY` | Build-time proxy for Go module downloads and the pi download |
-| `PI_PROXY` | Override for the pi download only |
+| `PI_PROXY` | Override for the pi download only (machine image) |
 | `APT_MIRROR` | Debian mirror used for the machine image's apt packages |
+| `CODEX_NPM_SPEC` | Codex CLI version spec installed in the machine image |
 
 Example:
 
 ```bash
-VERSION=1.2.0 LAELIA_BUILD_PROXY=http://proxy.example.com:8080 scripts/build_laelia_docker.sh
+VERSION=1.2.0 LAELIA_BUILD_PROXY=http://proxy.example.com:8080 scripts/build_laelia_manager_docker.sh
+VERSION=1.2.0 LAELIA_BUILD_PROXY=http://proxy.example.com:8080 scripts/build_laelia_machine_docker.sh
 ```
 
 Do not export a global `HTTPS_PROXY` for `docker build`: BuildKit injects it
