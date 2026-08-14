@@ -174,7 +174,7 @@ export function DashboardLayout() {
   }, [navigate]);
 
   return (
-    <div ref={rootRef} className="flex h-screen overflow-hidden bg-background">
+    <div ref={rootRef} className="flex h-dvh overflow-hidden bg-background">
       <DesktopSidebar
         collapsed={collapsed}
         onToggleCollapse={toggleCollapsed}
