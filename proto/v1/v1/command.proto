@@ -123,6 +123,9 @@ message CommandOutput {
     STDOUT = 1;
     STDERR = 2;
     SYSTEM = 3;
+    // Agent assistant output (thinking/reasoning and agent-generated text that
+    // is not a raw stdout/stderr/system message).
+    ASSISTANT = 4;
   }
   string command_id = 1;
   StreamType type = 2;
@@ -2015,6 +2018,9 @@ message CommandProgress {
   CommandOutput.StreamType type = 2;
   string content = 3;
   int32 seq_no = 4;
+  // timestamp is the agent-side wall-clock time when this output chunk was
+  // produced (before any manager-side buffering/arrival delay).
+  google.protobuf.Timestamp timestamp = 5;
 }
 
 message CommandResult {

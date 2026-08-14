@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
@@ -16,6 +17,8 @@ type OutputChunk struct {
 	StreamType v1pb.CommandOutput_StreamType
 	Content    string
 	SeqNo      int32
+	// Timestamp is the agent-side wall-clock time when this chunk was produced.
+	Timestamp *timestamppb.Timestamp
 }
 
 // Result is the terminal outcome of a Runtime execution and is streamed back

@@ -478,7 +478,7 @@ func TestThreadExecutor_NoTurnPromptPersistsThread(t *testing.T) {
 	assert.Equal(t, "thread-1", state.ThreadID)
 }
 
-func TestThreadExecutor_ThinkingDeltaSurfacesAsSystemOutput(t *testing.T) {
+func TestThreadExecutor_ThinkingDeltaSurfacesAsAssistantOutput(t *testing.T) {
 	cfg := newThreadTestConfig(t, "cold")
 	rt, err := NewThread(newThreadTestRequest(cfg.WorkingDir), cfg, &fakeThreadProvider{})
 	require.NoError(t, err)
@@ -486,14 +486,14 @@ func TestThreadExecutor_ThinkingDeltaSurfacesAsSystemOutput(t *testing.T) {
 	obs := runACPTestRuntime(t, rt, 30*time.Second, 0)
 
 	require.Zero(t, obs.result.ExitCode)
-	var systemChunks []string
+	var assistantChunks []string
 	for _, chunk := range obs.outputs {
-		if chunk.StreamType == v1pb.CommandOutput_SYSTEM {
-			systemChunks = append(systemChunks, chunk.Content)
+		if chunk.StreamType == v1pb.CommandOutput_ASSISTANT {
+			assistantChunks = append(assistantChunks, chunk.Content)
 		}
 	}
-	assert.NotEmpty(t, systemChunks, "thinking deltas must surface as system output")
-	assert.True(t, strings.Contains(strings.Join(systemChunks, ""), "thinking about the task"))
+	assert.NotEmpty(t, assistantChunks, "thinking deltas must surface as assistant output")
+	assert.True(t, strings.Contains(strings.Join(assistantChunks, ""), "thinking about the task"))
 }
 
 func TestThreadExecutor_SteerInjectsIntoRunningTurn(t *testing.T) {

@@ -1102,6 +1102,12 @@ func (c *commandStream) buildRuntime(req executor.Request) (executor.Runtime, er
 }
 
 func sendCommandProgress(stream streamSender, commandID string, chunk executor.OutputChunk) error {
+	// Carry the agent-side timestamp through so the manager can order and store
+	// it without adding its own arrival delay.
+	timestamp := chunk.Timestamp
+	if timestamp == nil {
+		timestamp = timestamppb.New(time.Now())
+	}
 	return stream.Send(&v1pb.AgentStreamMessage{
 		Message: &v1pb.AgentStreamMessage_Progress{
 			Progress: &v1pb.CommandProgress{
@@ -1109,6 +1115,7 @@ func sendCommandProgress(stream streamSender, commandID string, chunk executor.O
 				Type:      chunk.StreamType,
 				Content:   chunk.Content,
 				SeqNo:     chunk.SeqNo,
+				Timestamp: timestamp,
 			},
 		},
 	})

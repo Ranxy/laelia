@@ -41,6 +41,12 @@ const DYNAMIC_PREFIXES = [
   "reminders.status-",
   "command.status-",
   "command.event-",
+  // command-event-toolbar.tsx filter map translated via t(FILTER_LABEL_KEY[f]).
+  "command.filter-",
+  // command-event-ledger.tsx phase map translated via t(PHASE_LABEL_KEY[phase]).
+  "command.phase-",
+  // command-event-kind.ts output stream kinds translated via t(kind.labelKey).
+  "command.stream-",
   // token-usage-card.tsx rows: { key: "command.token-*" } translated via
   // t(row.key); the literal keys live in a data array, not a t("…") call.
   "command.token-input",

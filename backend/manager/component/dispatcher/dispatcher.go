@@ -1172,7 +1172,15 @@ func (d *Dispatcher) HandleProgress(ctx context.Context, _ int, progress *v1pb.C
 		return errors.Wrap(err, "progress commandId parse failed")
 	}
 
-	if err := d.store.AppendCommandOutput(ctx, commanID, progress.SeqNo, int32(progress.Type), progress.Content); err != nil {
+	// Prefer the agent-side timestamp carried in the progress; fall back to
+	// arrival time for older agents that do not send one.
+	ts := progress.GetTimestamp()
+	if ts == nil {
+		ts = timestamppb.Now()
+	}
+	createdAt := ts.AsTime()
+
+	if err := d.store.AppendCommandOutput(ctx, commanID, progress.SeqNo, int32(progress.Type), progress.Content, createdAt); err != nil {
 		return errors.Wrapf(err, "failed to store command output")
 	}
 
@@ -1181,13 +1189,7 @@ func (d *Dispatcher) HandleProgress(ctx context.Context, _ int, progress *v1pb.C
 		Type:      progress.Type,
 		Content:   progress.Content,
 		SeqNo:     progress.SeqNo,
-		// CommandProgress carries no timestamp; stamp the live broadcast with
-		// now so the frontend timeline can order it against tool-call events
-		// (which carry their own timestamp). Without this, streamed outputs sort
-		// to the top (zero ts) and tool cards sink to the bottom. Historical
-		// replay (WatchCommand) reads created_at from the DB, so this only
-		// affects the live path.
-		Timestamp: timestamppb.Now(),
+		Timestamp: ts,
 	}
 
 	d.broadcast(progress.CommandId, output)

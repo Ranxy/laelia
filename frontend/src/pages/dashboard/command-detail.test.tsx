@@ -44,6 +44,10 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: tFn }),
 }));
 
+vi.mock("markstream-react", () => ({
+  default: ({ content }: { content: string }) => <div>{content}</div>,
+}));
+
 // markstream splits text across nested spans, which defeats getByText; stub
 // the summary renderer so assertions read the content directly.
 vi.mock("@/components/command-terminal", () => ({
@@ -284,19 +288,94 @@ describe("command-detail", () => {
     expect(screen.queryByText("command.event-text")).not.toBeInTheDocument();
     // Paired tool call renders as a card (timeline + events panel both show it).
     expect(screen.getAllByText("read_file").length).toBeGreaterThan(0);
-    // Context usage renders as the live progress bar.
-    expect(screen.getByText("command.event-context-usage")).toBeInTheDocument();
 
-    // Expand the RAW_ACP payload.
-    fireEvent.click(screen.getByRole("button", { name: "command.details" }));
+    // Click the lifecycle ledger row to open the inspector.
+    fireEvent.click(screen.getByText("started"));
     expect(
-      await screen.findByText(/"acp-json"/, {}, { timeout: 3000 })
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "command.collapse" }));
+      (await screen.findAllByText("command.inspector-summary", {}, { timeout: 3000 }))
+        .length
+    ).toBeGreaterThan(0);
+    // Close the inspector.
+    fireEvent.click(screen.getByRole("button", { name: "common.close" }));
     await waitFor(
-      () => expect(screen.queryByText(/"acp-json"/)).not.toBeInTheDocument(),
+      () =>
+        expect(screen.queryAllByText("command.inspector-summary")).toHaveLength(0),
       { timeout: 3000 }
     );
+  });
+
+  it("opens the output inspector when clicking an ASSISTANT row", async () => {
+    mock.getCommand.mockResolvedValue(
+      command({ status: CommandStatus.RUNNING })
+    );
+    mock.activeOutputs = {
+      [NAME]: [
+        {
+          commandId: "c1",
+          type: 4,
+          content: "thinking text",
+          seqNo: 1,
+          timestamp: { seconds: 1700000000n },
+        },
+      ],
+    };
+
+    renderPage();
+
+    // Click the ASSISTANT output row in the ledger.
+    fireEvent.click(await screen.findByText("thinking text", {}, { timeout: 3000 }));
+    expect(
+      await screen.findByText("command.inspector-length", {}, { timeout: 3000 })
+    ).toBeInTheDocument();
+  });
+
+  it("lets the second ASSISTANT row open the inspector too", async () => {
+    mock.getCommand.mockResolvedValue(
+      command({ status: CommandStatus.RUNNING })
+    );
+    mock.activeOutputs = {
+      [NAME]: [
+        {
+          commandId: "c1",
+          type: 4,
+          content: "first thinking",
+          seqNo: 1,
+          timestamp: { seconds: 1700000000n },
+        },
+        {
+          commandId: "c1",
+          type: 4,
+          content: "second thinking",
+          seqNo: 3,
+          timestamp: { seconds: 1700000002n },
+        },
+      ],
+    };
+    mock.activeEvents = {
+      [NAME]: [
+        {
+          commandId: "c1",
+          seqNo: 2,
+          type: CommandEventType.TOOL_CALL_STARTED,
+          summary: "",
+          timestamp: { seconds: 1700000001n },
+          payload: {
+            case: "toolCallStarted",
+            value: { title: "read_file", rawInput: {} },
+          },
+        } as unknown as CommandEvent,
+      ],
+    };
+
+    renderPage();
+
+    // Click the SECOND ASSISTANT row (separated from the first by a tool).
+    fireEvent.click(
+      await screen.findByText("second thinking", {}, { timeout: 3000 })
+    );
+    expect(
+      await screen.findByText("command.inspector-length", {}, { timeout: 3000 })
+    ).toBeInTheDocument();
   });
 
   it("renders the token usage card on the summary tab", async () => {

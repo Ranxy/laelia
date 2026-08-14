@@ -16,6 +16,7 @@ import (
 
 	acp "github.com/coder/acp-go-sdk"
 	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/agent/acp2"
 	"github.com/Ranxy/laelia/backend/agent/provider"
@@ -485,7 +486,7 @@ func (e *ThreadExecutor) handleEvent(ev acp2.Event) bool {
 		e.flushIfNeeded()
 	case acp2.EventThinkingDelta:
 		e.gate.MarkProgress()
-		e.buffer.append(v1pb.CommandOutput_SYSTEM, ev.Text)
+		e.buffer.append(v1pb.CommandOutput_ASSISTANT, ev.Text)
 		e.flushIfNeeded()
 	case acp2.EventToolCallStarted:
 		e.gate.MarkProgress()
@@ -639,7 +640,7 @@ func (e *ThreadExecutor) sendOutput(streamType v1pb.CommandOutput_StreamType, co
 	if !ok {
 		return
 	}
-	chunk := OutputChunk{StreamType: streamType, Content: allowed, SeqNo: e.nextSeq()}
+	chunk := OutputChunk{StreamType: streamType, Content: allowed, SeqNo: e.nextSeq(), Timestamp: timestamppb.New(time.Now())}
 	// Never block a producer once the session is cancelled: the consumer
 	// (runCommand) stops draining on its own ctx.Done, and run()'s deferred
 	// close(e.outputCh) must not race a blocked/racing send.

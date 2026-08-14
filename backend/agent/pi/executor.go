@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -481,7 +482,7 @@ func (e *PiExecutor) handleMessageUpdate(ev *event) {
 		if ame.Delta == "" {
 			return
 		}
-		e.buffer.append(v1pb.CommandOutput_SYSTEM, ame.Delta)
+		e.buffer.append(v1pb.CommandOutput_ASSISTANT, ame.Delta)
 		e.flushIfNeeded()
 	case assistantEventDone:
 		// message complete; nothing to emit.
@@ -550,7 +551,7 @@ func (e *PiExecutor) sendOutput(streamType v1pb.CommandOutput_StreamType, conten
 	if !ok {
 		return
 	}
-	chunk := executor.OutputChunk{StreamType: streamType, Content: allowed, SeqNo: e.nextSeq()}
+	chunk := executor.OutputChunk{StreamType: streamType, Content: allowed, SeqNo: e.nextSeq(), Timestamp: timestamppb.New(time.Now())}
 	select {
 	case e.outputCh <- chunk:
 	case <-e.ctx.Done():
@@ -562,10 +563,11 @@ func (e *PiExecutor) sendOutput(streamType v1pb.CommandOutput_StreamType, conten
 // here because that type is unexported. See the PiExecutor.buffer field doc for
 // why batching is required.
 type outputBuffer struct {
-	mu     sync.Mutex
-	stdout strings.Builder
-	system strings.Builder
-	order  []v1pb.CommandOutput_StreamType
+	mu        sync.Mutex
+	stdout    strings.Builder
+	system    strings.Builder
+	assistant strings.Builder
+	order     []v1pb.CommandOutput_StreamType
 }
 
 func (b *outputBuffer) append(streamType v1pb.CommandOutput_StreamType, text string) {
@@ -582,6 +584,11 @@ func (b *outputBuffer) append(streamType v1pb.CommandOutput_StreamType, text str
 			b.order = append(b.order, streamType)
 		}
 		_, _ = b.system.WriteString(text)
+	case v1pb.CommandOutput_ASSISTANT:
+		if b.assistant.Len() == 0 {
+			b.order = append(b.order, streamType)
+		}
+		_, _ = b.assistant.WriteString(text)
 	default:
 		// Other stream types (STDERR) are sent directly, not buffered.
 	}
@@ -590,7 +597,7 @@ func (b *outputBuffer) append(streamType v1pb.CommandOutput_StreamType, text str
 func (b *outputBuffer) totalLen() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.stdout.Len() + b.system.Len()
+	return b.stdout.Len() + b.system.Len() + b.assistant.Len()
 }
 
 func (b *outputBuffer) flush(e *PiExecutor) {
@@ -599,6 +606,8 @@ func (b *outputBuffer) flush(e *PiExecutor) {
 	b.stdout.Reset()
 	system := b.system.String()
 	b.system.Reset()
+	assistant := b.assistant.String()
+	b.assistant.Reset()
 	order := b.order
 	b.order = b.order[:0]
 	b.mu.Unlock()
@@ -614,6 +623,11 @@ func (b *outputBuffer) flush(e *PiExecutor) {
 			if system != "" {
 				e.sendOutput(v1pb.CommandOutput_SYSTEM, system)
 				system = ""
+			}
+		case v1pb.CommandOutput_ASSISTANT:
+			if assistant != "" {
+				e.sendOutput(v1pb.CommandOutput_ASSISTANT, assistant)
+				assistant = ""
 			}
 		default:
 		}

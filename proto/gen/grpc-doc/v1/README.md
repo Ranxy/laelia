@@ -3207,6 +3207,7 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | type | [CommandOutput.StreamType](#laelia-v1-CommandOutput-StreamType) |  |  |
 | content | [string](#string) |  |  |
 | seq_no | [int32](#int32) |  |  |
+| timestamp | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | timestamp is the agent-side wall-clock time when this output chunk was produced (before any manager-side buffering/arrival delay). |
 
 
 
@@ -5579,6 +5580,7 @@ and Unread. The ACTIVITY_STATE prefix satisfies protobuf C&#43;&#43; scoping rul
 | STDOUT | 1 |  |
 | STDERR | 2 |  |
 | SYSTEM | 3 |  |
+| ASSISTANT | 4 | Agent assistant output (thinking/reasoning and agent-generated text that is not a raw stdout/stderr/system message). |
 
 
 

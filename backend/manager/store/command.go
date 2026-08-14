@@ -414,12 +414,12 @@ func (s *Store) UpdateCommandResultSummary(ctx context.Context, id uuid.UUID, fi
 	return nil
 }
 
-func (s *Store) AppendCommandOutput(ctx context.Context, cmdID uuid.UUID, seqNo int32, streamType int32, content string) error {
+func (s *Store) AppendCommandOutput(ctx context.Context, cmdID uuid.UUID, seqNo int32, streamType int32, content string, createdAt time.Time) error {
 	_, err := s.GetDB().ExecContext(ctx, `
-		INSERT INTO command_output (command_id, seq_no, stream_type, content)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO command_output (command_id, seq_no, stream_type, content, created_at)
+		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (command_id, seq_no) DO NOTHING
-	`, cmdID, seqNo, streamType, content)
+	`, cmdID, seqNo, streamType, content, createdAt)
 	if err != nil {
 		return errors.Wrapf(err, "failed to append command output")
 	}

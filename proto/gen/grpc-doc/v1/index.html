@@ -8669,6 +8669,14 @@ auto-granted by the runtime, so the payloads are gone. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>timestamp</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p>timestamp is the agent-side wall-clock time when this output chunk was
+produced (before any manager-side buffering/arrival delay). </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -13538,6 +13546,13 @@ produce no Activity row.</p></td>
                 <td>SYSTEM</td>
                 <td>3</td>
                 <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ASSISTANT</td>
+                <td>4</td>
+                <td><p>Agent assistant output (thinking/reasoning and agent-generated text that
+is not a raw stdout/stderr/system message).</p></td>
               </tr>
             
           </tbody>

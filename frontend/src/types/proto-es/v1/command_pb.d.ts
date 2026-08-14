@@ -227,6 +227,14 @@ export enum CommandOutput_StreamType {
    * @generated from enum value: SYSTEM = 3;
    */
   SYSTEM = 3,
+
+  /**
+   * Agent assistant output (thinking/reasoning and agent-generated text that
+   * is not a raw stdout/stderr/system message).
+   *
+   * @generated from enum value: ASSISTANT = 4;
+   */
+  ASSISTANT = 4,
 }
 
 /**
@@ -4534,6 +4542,14 @@ export declare type CommandProgress = Message<"laelia.v1.CommandProgress"> & {
    * @generated from field: int32 seq_no = 4;
    */
   seqNo: number;
+
+  /**
+   * timestamp is the agent-side wall-clock time when this output chunk was
+   * produced (before any manager-side buffering/arrival delay).
+   *
+   * @generated from field: google.protobuf.Timestamp timestamp = 5;
+   */
+  timestamp?: Timestamp | undefined;
 };
 
 /**

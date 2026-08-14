@@ -1,163 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChatToolCall } from "@/components/chat-events/tool-call";
+import { CommandEventInspector } from "@/components/command-events/command-event-inspector";
+import {
+  CommandEventLedger,
+  type CommandEventFilter,
+} from "@/components/command-events/command-event-ledger";
+import { CommandEventTimelineOverview } from "@/components/command-events/command-event-timeline-overview";
+import { CommandEventToolbar } from "@/components/command-events/command-event-toolbar";
+import { isVisibleEvent } from "@/components/command-events/command-event-kind";
 import { CommandStatusBadge } from "@/components/command-status-badge";
 import { FinalSummary } from "@/components/command-terminal";
-import { CommandTimeline } from "@/components/command-timeline";
-import { ContextUsageBar } from "@/components/context-usage-bar";
 import { TokenUsageCard } from "@/components/token-usage-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
 import {
-  commandEventTypeToI18nKey,
   formatDuration,
-  formatTimeOfDay,
   formatTimestamp,
 } from "@/lib/command-status";
 import { pairToolCallEvents, type ToolCallPair } from "@/lib/tool-call-events";
-import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
-import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
+import type {
+  CommandEvent,
+  CommandOutput,
+} from "@/types/proto-es/v1/command_pb";
 import {
   CommandEventType,
   CommandStatus,
 } from "@/types/proto-es/v1/command_pb";
-
-const eventTypeColors: Record<number, string> = {
-  [CommandEventType.LIFECYCLE]: "text-control-light",
-  [CommandEventType.TOOL_CALL_STARTED]: "text-info",
-  [CommandEventType.TOOL_CALL_FINISHED]: "text-success",
-  [CommandEventType.DIFF_EMITTED]: "text-accent",
-  [CommandEventType.WARNING]: "text-warning",
-  [CommandEventType.RAW_ACP]: "text-control-light",
-  [CommandEventType.FINAL_SUMMARY]: "text-success",
-  [CommandEventType.CONTEXT_COMPACTION_STARTED]: "text-warning",
-  [CommandEventType.CONTEXT_COMPACTION_FINISHED]: "text-success",
-  [CommandEventType.CONTEXT_USAGE_UPDATE]: "text-info",
-  [CommandEventType.TOKEN_USAGE]: "text-info",
-};
-
-function isVisibleEvent(event: CommandEvent): boolean {
-  return (
-    event.type !== CommandEventType.TEXT_DELTA &&
-    event.type !== CommandEventType.COMMAND_EVENT_TYPE_UNSPECIFIED
-  );
-}
-
-function EventRow({ event }: { event: CommandEvent }) {
-  const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
-  const isRaw = event.type === CommandEventType.RAW_ACP;
-  const showExpand = isRaw || event.type === CommandEventType.DIFF_EMITTED;
-
-  const labelKey =
-    commandEventTypeToI18nKey[event.type] ?? "command.event-unknown";
-
-  return (
-    <div
-      className={cn(
-        "flex flex-col gap-1 py-1.5 px-3 rounded border border-control-border",
-        isRaw && "opacity-60"
-      )}
-    >
-      <div className="flex items-center gap-2">
-        <span
-          className={cn(
-            "text-xs font-medium",
-            eventTypeColors[event.type] ?? "text-control"
-          )}
-        >
-          {t(labelKey)}
-        </span>
-        <span className="text-xs text-control-light">#{event.seqNo}</span>
-        {event.summary && (
-          <span className="text-xs text-control truncate flex-1">
-            {event.summary.slice(0, 120)}
-          </span>
-        )}
-        {showExpand && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs"
-            onClick={() => setExpanded(!expanded)}
-          >
-            {expanded ? t("command.collapse") : t("command.details")}
-          </Button>
-        )}
-        <span className="text-xs text-control-light ml-auto">
-          {formatTimeOfDay(event.timestamp)}
-        </span>
-      </div>
-      {expanded && event.payload.value && (
-        <pre className="text-xs text-matrix-green font-mono bg-dark-bg rounded p-2 mt-1 overflow-auto max-h-64 whitespace-pre-wrap break-all min-w-0">
-          {JSON.stringify(event.payload.value, null, 2)}
-        </pre>
-      )}
-    </div>
-  );
-}
-
-// Renders a tool-call pair as a structured card (title + input + output +
-// status) inside an EventRow-style header. Used for TOOL_CALL_STARTED (with
-// its paired finished) and orphan TOOL_CALL_FINISHED events. The card itself
-// comes from the shared ChatToolCall component so command-detail and chat
-// render tool calls identically.
-function ToolEventRow({
-  event,
-  startedEvent,
-  finishedEvent,
-  selected,
-  onSelect,
-}: {
-  event: CommandEvent;
-  startedEvent?: CommandEvent;
-  finishedEvent?: CommandEvent;
-  selected?: boolean;
-  onSelect?: (seqNo: number) => void;
-}) {
-  const { t } = useTranslation();
-  const labelKey =
-    commandEventTypeToI18nKey[event.type] ?? "command.event-unknown";
-  const targetSeqNo = startedEvent?.seqNo ?? event.seqNo;
-
-  return (
-    <div
-      role={onSelect ? "button" : undefined}
-      tabIndex={onSelect ? 0 : undefined}
-      aria-pressed={selected}
-      onClick={() => onSelect?.(targetSeqNo)}
-      onKeyDown={(e) => {
-        if (!onSelect || (e.key !== "Enter" && e.key !== " ")) return;
-        e.preventDefault();
-        onSelect(targetSeqNo);
-      }}
-      className={cn(
-        "flex flex-col gap-1 py-1.5 px-1 rounded",
-        onSelect && "cursor-pointer",
-        selected && "ring-1 ring-accent bg-accent/10"
-      )}
-    >
-      <div className="flex items-center gap-2 px-2">
-        <span
-          className={cn(
-            "text-xs font-medium",
-            eventTypeColors[event.type] ?? "text-control"
-          )}
-        >
-          {t(labelKey)}
-        </span>
-        <span className="text-xs text-control-light">#{event.seqNo}</span>
-        <span className="text-xs text-control-light ml-auto">
-          {formatTimeOfDay(event.timestamp)}
-        </span>
-      </div>
-      <ChatToolCall startedEvent={startedEvent} finishedEvent={finishedEvent} />
-    </div>
-  );
-}
 
 export function CommandDetailPage() {
   const { t } = useTranslation();
@@ -193,7 +64,11 @@ export function CommandDetailPage() {
   const [steering, setSteering] = useState(false);
   const [tab, setTab] = useState<"run" | "summary" | null>(null);
   const [showCompletionHint, setShowCompletionHint] = useState(false);
-  const [selectedToolSeq, setSelectedToolSeq] = useState<number | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [rangeKeys, setRangeKeys] = useState<string[] | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState<CommandEventFilter>("all");
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const prevStatusRef = useRef<number | null>(null);
   const completionNotifiedRef = useRef(false);
   const refreshDoneRef = useRef(false);
@@ -232,7 +107,9 @@ export function CommandDetailPage() {
     loadedCmdNameRef.current = null;
     setTab(null);
     setShowCompletionHint(false);
-    setSelectedToolSeq(null);
+    setSelectedKey(null);
+    setRangeKeys(null);
+    setInspectorOpen(false);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -320,16 +197,10 @@ export function CommandDetailPage() {
     if (value === "summary") setShowCompletionHint(false);
   };
 
-  const toggleToolSelect = (seqNo: number) => {
-    setSelectedToolSeq((cur) => (cur === seqNo ? null : seqNo));
+  const toggleToolSelect = (key: string) => {
+    setSelectedKey((cur) => (cur === key ? null : key));
+    setInspectorOpen(true);
   };
-
-  const latestUsage = useMemo(() => {
-    const usage = visibleEvents.filter(
-      (ev) => ev.type === CommandEventType.CONTEXT_USAGE_UPDATE
-    );
-    return usage.length > 0 ? usage[usage.length - 1] : null;
-  }, [visibleEvents]);
 
   // The per-command token consumption recorded at turn end; shown on the
   // summary tab once the command completes.
@@ -341,9 +212,8 @@ export function CommandDetailPage() {
     return latest?.payload.case === "tokenUsage" ? latest.payload.value : null;
   }, [visibleEvents]);
 
-  // Pair TOOL_CALL_STARTED with TOOL_CALL_FINISHED so the Events panel shows
-  // one structured card per tool call (input + output) instead of two
-  // disconnected rows whose payloads are never expanded today.
+  // Pair TOOL_CALL_STARTED with TOOL_CALL_FINISHED so the inspector can show
+  // one structured card per tool call (input + output).
   const toolPairs = useMemo(
     () => pairToolCallEvents(visibleEvents),
     [visibleEvents]
@@ -353,46 +223,99 @@ export function CommandDetailPage() {
     for (const p of toolPairs) m.set(p.started.seqNo, p);
     return m;
   }, [toolPairs]);
-  const pairedFinishedSeqNos = useMemo(() => {
-    const s = new Set<number>();
-    for (const p of toolPairs) if (p.finished) s.add(p.finished.seqNo);
-    return s;
-  }, [toolPairs]);
 
-  const renderEvent = (ev: CommandEvent) => {
-    // Usage updates are rendered as one live progress bar (latestUsage), not
-    // one row per rate-limited update. Token usage is shown on the summary tab.
-    if (ev.type === CommandEventType.CONTEXT_USAGE_UPDATE) return null;
-    if (ev.type === CommandEventType.TOKEN_USAGE) return null;
-    if (ev.type === CommandEventType.TOOL_CALL_STARTED) {
-      const pair = toolPairByStartedSeqNo.get(ev.seqNo);
-      return (
-        <ToolEventRow
-          key={ev.seqNo}
-          event={ev}
-          startedEvent={ev}
-          finishedEvent={pair?.finished}
-          selected={selectedToolSeq === ev.seqNo}
-          onSelect={toggleToolSelect}
-        />
-      );
+  // Merge consecutive same-type output chunks (mirrors the ledger) so the
+  // inspector can show a full ASSISTANT message rather than one tiny chunk.
+  // A tool/event between two chunks breaks the merge so each separate message
+  // keeps its own row key and stays clickable.
+  const mergedOutputs = useMemo(() => {
+    const tsToMs = (ts: { seconds?: bigint; nanos?: number } | undefined) =>
+      ts?.seconds ? Number(ts.seconds) * 1000 + (ts.nanos ?? 0) / 1_000_000 : 0;
+    type Item =
+      | { kind: "output"; ts: number; output: CommandOutput }
+      | { kind: "break"; ts: number };
+    const items: Item[] = [];
+    for (const o of outputs) {
+      items.push({ kind: "output", ts: tsToMs(o.timestamp), output: o });
     }
-    if (ev.type === CommandEventType.TOOL_CALL_FINISHED) {
-      // Paired finished events are already rendered inside the started card.
-      if (pairedFinishedSeqNos.has(ev.seqNo)) return null;
-      return (
-        <ToolEventRow
-          key={ev.seqNo}
-          event={ev}
-          startedEvent={undefined}
-          finishedEvent={ev}
-          selected={selectedToolSeq === ev.seqNo}
-          onSelect={toggleToolSelect}
-        />
-      );
+    for (const ev of visibleEvents) {
+      if (
+        ev.type === CommandEventType.TEXT_DELTA ||
+        ev.type === CommandEventType.CONTEXT_USAGE_UPDATE ||
+        ev.type === CommandEventType.RAW_ACP ||
+        ev.type === CommandEventType.COMMAND_EVENT_TYPE_UNSPECIFIED
+      ) {
+        continue;
+      }
+      items.push({ kind: "break", ts: tsToMs(ev.timestamp) });
     }
-    return <EventRow key={ev.seqNo} event={ev} />;
-  };
+    items.sort((a, b) => a.ts - b.ts);
+
+    const out: Array<{
+      key: string;
+      content: string;
+      startTs: number;
+      endTs: number;
+      type: number;
+    }> = [];
+    let current: (typeof out)[number] | null = null;
+    for (const item of items) {
+      if (item.kind === "break") {
+        current = null;
+        continue;
+      }
+      const ts = item.ts;
+      if (current && current.type === item.output.type && current.endTs <= ts) {
+        current.content += item.output.content;
+        current.endTs = ts;
+        continue;
+      }
+      current = {
+        key: `out-${item.output.seqNo}`,
+        content: item.output.content,
+        startTs: ts,
+        endTs: ts,
+        type: item.output.type,
+      };
+      out.push(current);
+    }
+    return out;
+  }, [outputs, visibleEvents]);
+
+  // The event currently shown in the inspector, resolved from the unique row
+  // key so outputs (out-*) and events (ev-*/tool-*) never get mixed up even
+  // though they use independent seq_no spaces.
+  const selectedInspector = useMemo(() => {
+    if (selectedKey == null) return null;
+    if (selectedKey.startsWith("tool-")) {
+      const seqNo = Number(selectedKey.slice("tool-".length));
+      const pair = toolPairByStartedSeqNo.get(seqNo);
+      if (!pair) return null;
+      return {
+        event: pair.started,
+        startedEvent: pair.started,
+        finishedEvent: pair.finished,
+      };
+    }
+    if (selectedKey.startsWith("ev-")) {
+      const seqNo = Number(selectedKey.slice("ev-".length));
+      const ev = visibleEvents.find((e) => e.seqNo === seqNo);
+      return ev
+        ? { event: ev, startedEvent: undefined, finishedEvent: undefined }
+        : null;
+    }
+    if (selectedKey.startsWith("out-")) {
+      const merged = mergedOutputs.find((m) => m.key === selectedKey);
+      if (!merged) return null;
+      return {
+        event: undefined as never,
+        startedEvent: undefined,
+        finishedEvent: undefined,
+        output: merged,
+      };
+    }
+    return null;
+  }, [selectedKey, toolPairByStartedSeqNo, visibleEvents, mergedOutputs]);
 
   const isRunning =
     !!displayCmd &&
@@ -539,45 +462,46 @@ export function CommandDetailPage() {
             </TabsList>
 
             <TabsPanel value="run" keepMounted className="flex-1 min-h-0 mt-3">
-              <div className="h-full flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[minmax(0,1fr)]">
-                <div className="flex flex-col gap-2 min-w-0 min-h-0 flex-1 lg:h-full">
-                  <h2 className="text-sm font-medium text-control shrink-0">
-                    {t("command.output")}
-                  </h2>
-                  <CommandTimeline
+              <div className="flex h-full min-h-0 flex-col gap-2">
+                <CommandEventToolbar
+                  searchQuery={searchQuery}
+                  onSearchQueryChange={setSearchQuery}
+                  filter={filter}
+                  onFilterChange={setFilter}
+                />
+                <CommandEventTimelineOverview
+                  outputs={outputs}
+                  events={visibleEvents}
+                  selectedKey={selectedKey}
+                  onSelect={toggleToolSelect}
+                  onRangeSelect={setRangeKeys}
+                />
+                <div className="relative min-h-0 flex-1">
+                  <CommandEventLedger
                     outputs={outputs}
                     events={visibleEvents}
-                    scrollToSeqNo={selectedToolSeq}
-                    activeSeqNo={selectedToolSeq}
-                    onToolCardClick={toggleToolSelect}
-                    active={tab === "run"}
-                    className="flex-1 min-h-0"
+                    selectedKey={selectedKey}
+                    onSelect={toggleToolSelect}
+                    scrollToKey={selectedKey}
+                    rangeKeys={rangeKeys}
+                    searchQuery={searchQuery}
+                    filter={filter}
+                    className="h-full min-w-0"
                   />
-                </div>
-
-                {visibleEvents.length > 0 && (
-                  <div className="flex flex-col gap-2 min-w-0 min-h-0 flex-1 lg:h-full">
-                    <h2 className="text-sm font-medium text-control shrink-0">
-                      {t("command.events")}
-                    </h2>
-                    <div className="rounded border border-control-border p-2 flex flex-col gap-1 flex-1 min-h-0 overflow-auto">
-                      {latestUsage && <ContextUsageBar event={latestUsage} />}
-                      {visibleEvents.map((ev) => renderEvent(ev))}
-                    </div>
-                  </div>
-                )}
-
-                {visibleEvents.length === 0 &&
-                  displayCmd.status === CommandStatus.RUNNING && (
-                    <div className="flex flex-col gap-2 min-w-0 min-h-0 flex-1 lg:h-full">
-                      <h2 className="text-sm font-medium text-control shrink-0">
-                        {t("command.events")}
-                      </h2>
-                      <div className="rounded border border-control-border p-4 text-xs text-control-light">
-                        {t("command.waiting-events")}
-                      </div>
-                    </div>
+                  {inspectorOpen && selectedInspector && (
+                    <CommandEventInspector
+                      event={selectedInspector.event}
+                      startedEvent={selectedInspector.startedEvent}
+                      finishedEvent={selectedInspector.finishedEvent}
+                      output={selectedInspector.output}
+                      onClose={() => {
+                        setInspectorOpen(false);
+                        setSelectedKey(null);
+                      }}
+                      className="absolute inset-y-0 right-0 z-10 w-80"
+                    />
                   )}
+                </div>
               </div>
             </TabsPanel>
 

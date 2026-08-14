@@ -20,6 +20,7 @@ import (
 	acp "github.com/coder/acp-go-sdk"
 	pkgerrors "github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -36,10 +37,11 @@ const usageUpdateMinInterval = 5 * time.Second
 var debugToolCalls = os.Getenv("LAELIA_DEBUG_TOOL_CALLS") == "1"
 
 type outputBuffer struct {
-	mu     sync.Mutex
-	stdout strings.Builder
-	system strings.Builder
-	order  []v1pb.CommandOutput_StreamType
+	mu        sync.Mutex
+	stdout    strings.Builder
+	system    strings.Builder
+	assistant strings.Builder
+	order     []v1pb.CommandOutput_StreamType
 }
 
 func (b *outputBuffer) append(streamType v1pb.CommandOutput_StreamType, text string) {
@@ -56,6 +58,11 @@ func (b *outputBuffer) append(streamType v1pb.CommandOutput_StreamType, text str
 			b.order = append(b.order, streamType)
 		}
 		_, _ = b.system.WriteString(text)
+	case v1pb.CommandOutput_ASSISTANT:
+		if b.assistant.Len() == 0 {
+			b.order = append(b.order, streamType)
+		}
+		_, _ = b.assistant.WriteString(text)
 	default:
 	}
 }
@@ -63,7 +70,7 @@ func (b *outputBuffer) append(streamType v1pb.CommandOutput_StreamType, text str
 func (b *outputBuffer) totalLen() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.stdout.Len() + b.system.Len()
+	return b.stdout.Len() + b.system.Len() + b.assistant.Len()
 }
 
 // outputSink is the minimal surface outputBuffer needs to flush buffered text.
@@ -78,6 +85,8 @@ func (b *outputBuffer) flush(e outputSink) {
 	b.stdout.Reset()
 	system := b.system.String()
 	b.system.Reset()
+	assistant := b.assistant.String()
+	b.assistant.Reset()
 	order := b.order
 	b.order = b.order[:0]
 	b.mu.Unlock()
@@ -94,6 +103,11 @@ func (b *outputBuffer) flush(e outputSink) {
 				e.sendOutput(v1pb.CommandOutput_SYSTEM, system)
 				system = ""
 			}
+		case v1pb.CommandOutput_ASSISTANT:
+			if assistant != "" {
+				e.sendOutput(v1pb.CommandOutput_ASSISTANT, assistant)
+				assistant = ""
+			}
 		default:
 		}
 	}
@@ -102,7 +116,7 @@ func (b *outputBuffer) flush(e outputSink) {
 func (b *outputBuffer) hasContent() bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.stdout.Len() > 0 || b.system.Len() > 0
+	return b.stdout.Len() > 0 || b.system.Len() > 0 || b.assistant.Len() > 0
 }
 
 type rawEventBatch struct {
@@ -726,7 +740,7 @@ func (e *ACPExecutor) sendOutput(streamType v1pb.CommandOutput_StreamType, conte
 	if !ok {
 		return
 	}
-	chunk := OutputChunk{StreamType: streamType, Content: allowed, SeqNo: e.nextSeq()}
+	chunk := OutputChunk{StreamType: streamType, Content: allowed, SeqNo: e.nextSeq(), Timestamp: timestamppb.New(time.Now())}
 	// Never block a producer once the session is cancelled: the consumer
 	// (runCommand) stops draining on its own ctx.Done, and run()'s deferred
 	// close(e.outputCh) must not race a blocked/racing send. Selecting on
@@ -975,7 +989,7 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 	case u.AgentThoughtChunk != nil:
 		text := contentBlockText(u.AgentThoughtChunk.Content)
 		if text != "" {
-			c.executor.buffer.append(v1pb.CommandOutput_SYSTEM, text)
+			c.executor.buffer.append(v1pb.CommandOutput_ASSISTANT, text)
 			c.executor.flushIfNeeded()
 		}
 		c.executor.rawEvents.append(c.executor, "agent_thought_chunk", toJSONMap(u.AgentThoughtChunk))
