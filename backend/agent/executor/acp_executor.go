@@ -22,6 +22,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/Ranxy/laelia/backend/agent/home"
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
@@ -1349,6 +1350,12 @@ func buildRuntimeEnv(allowEnv []string, customEnv, env map[string]string, reques
 	}
 	if req.CommandID != "" {
 		values["LAELIA_COMMAND"] = req.CommandID
+	}
+	// Propagate LAELIA_HOME unconditionally when the parent has it, so every
+	// child process resolves the same Laelia data root even if the agent's
+	// AllowEnv whitelist does not include it.
+	if v := os.Getenv(home.EnvDir); v != "" {
+		values[home.EnvDir] = v
 	}
 	// Prepend the agent binary's directory to PATH so `laelia-machine` resolves
 	// regardless of the host's PATH configuration.

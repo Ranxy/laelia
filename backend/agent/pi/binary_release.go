@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+
+	"github.com/Ranxy/laelia/backend/agent/home"
 )
 
 // embeddedDist is the standalone pi distribution baked in at compile time.
@@ -35,11 +37,7 @@ func ResolveBinary() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	dir := filepath.Join(home, ".laelia", "bin", "pi-"+hex.EncodeToString(sum[:8])+"-"+runtime.GOOS+"-"+runtime.GOARCH)
+	dir := home.Join("bin", "pi-"+hex.EncodeToString(sum[:8])+"-"+runtime.GOOS+"-"+runtime.GOARCH)
 	binPath := filepath.Join(dir, "pi")
 	if info, err := os.Stat(binPath); err == nil && info.Size() > 0 {
 		return binPath, nil

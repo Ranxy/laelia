@@ -4,10 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/Ranxy/laelia/backend/agent/home"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -90,7 +90,7 @@ type PiConfig struct {
 	PersonaPrompt string
 
 	// WorkingDir is the per-agent dir pi runs in AND stores sessions under
-	// (--session-dir). ~/.laelia/<machineID>/<agentID>/.
+	// (--session-dir). <data root>/<machineID>/<agentID>/.
 	WorkingDir string
 
 	// PiBinaryPath is the resolved pi executable (dev env var or embedded blob).
@@ -193,10 +193,9 @@ func BuildPiCapability(user *v1pb.AgentACPConfig) *v1pb.AgentCapability {
 }
 
 // agentWorkingDir is the per-agent pi session/working directory. It mirrors
-// executor.AgentWorkingDir so pi agents share the same ~/.laelia/<m>/<a>/ home.
+// executor.AgentWorkingDir so pi agents share the same data root/<m>/<a> home.
 func agentWorkingDir(machineID, agentID string) string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".laelia", machineID, agentID)
+	return home.Join(machineID, agentID)
 }
 
 // LaunchFingerprint covers everything that shapes the subprocess launch (api
@@ -248,6 +247,12 @@ func (c *PiConfig) buildPiEnv(commandID string) []string {
 	}
 	if commandID != "" {
 		values["LAELIA_COMMAND"] = commandID
+	}
+	// Propagate LAELIA_HOME unconditionally when the parent has it, so pi and
+	// any laelia-machine CLI it spawns resolve the same data root even though
+	// LAELIA_HOME is not part of the fixed piAllowEnv whitelist.
+	if v := os.Getenv(home.EnvDir); v != "" {
+		values[home.EnvDir] = v
 	}
 	if c.BinaryDir != "" {
 		existing := values["PATH"]

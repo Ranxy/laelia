@@ -34,7 +34,7 @@ type Request struct {
 	AgentID string
 	// MachineID is the resource id (uuid) of the machine hosting this agent.
 	// A machine hosts many agents on one host, so it namespaces each agent's
-	// on-disk state (~/.laelia/<machineID>/<agentID>/): working dir, ACP
+	// on-disk state (<data root>/<machineID>/<agentID>/): working dir, ACP
 	// session-state, and command-state. Empty only in unit tests that don't
 	// touch the filesystem.
 	MachineID string

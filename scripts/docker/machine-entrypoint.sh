@@ -4,6 +4,7 @@
 # approval URL to the container logs and waits for a logged-in user to approve
 # it in a browser, then runs in the foreground. No token is ever baked into an
 # image or command line.
+# LAELIA_HOME is inherited as-is by laelia-machine and selects the data root.
 set -euo pipefail
 
 args=(setup --no-browser)

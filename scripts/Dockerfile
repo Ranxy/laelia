@@ -90,7 +90,9 @@ RUN if [ -n "${APT_MIRROR}" ]; then \
 		ca-certificates curl git jq wget unzip zip xz-utils ripgrep \
 		python3 python3-pip python3-venv python-is-python3 build-essential \
 	&& rm -rf /var/lib/apt/lists/* \
-	&& useradd --create-home --uid 1001 laelia
+	&& useradd --create-home --uid 1001 laelia \
+	&& mkdir -p /data \
+	&& chown 1001:1001 /data
 # Codex ACP v2 provider: the codex CLI ships an app-server speaking the thread
 # protocol. Login/config state is NEVER baked in — operators mount a writable
 # CODEX_HOME volume (config.toml + auth/models) at runtime, see

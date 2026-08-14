@@ -38,6 +38,14 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }
 
+func TestPathUsesLaeliaHomeOverride(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("LAELIA_HOME", root)
+	t.Setenv("HOME", "/should/not/be/used")
+
+	assert.Equal(t, filepath.Join(root, "machine.json"), Path())
+}
+
 func TestLoadMissingReturnsNil(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	got, err := Load()

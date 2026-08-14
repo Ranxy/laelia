@@ -298,8 +298,9 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 
 	// The agent's resource id IS its readable handle ("rei-agent-1"): slugified
 	// name plus a per-slug counter. It doubles as the mention id, the DM
-	// address suffix, and the agent's workspace directory name
-	// (~/.laelia/<machine>/<handle>/). Immutable after creation.
+	// address suffix, and the agent's workspace directory name (under the
+	// machine data root, default ~/.laelia/<machine>/<handle>/). Immutable
+	// after creation.
 	slug := common.SlugifyHandle(create.Name)
 	if slug == "" {
 		slug = "agent"

@@ -29,6 +29,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/Ranxy/laelia/backend/agent/chattools"
+	"github.com/Ranxy/laelia/backend/agent/home"
 	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
@@ -44,12 +45,11 @@ const (
 )
 
 // Server is the local loopback daemon. A machine runs ONE daemon for all its
-// hosted agents: the socket lives at the well-known ~/.laelia/daemon.sock
-// (one daemon per computer, so a second laelia-machine process can detect the
-// live socket and refuse to start) and the daemon routes each request to the
-// agent named in LAELIA_AGENT (injected into every ACP subprocess). It is
-// constructed once per machine process and lives for the whole machine
-// lifetime.
+// hosted agents: the socket lives at the well-known daemon.sock under the
+// Laelia data root (default ~/.laelia/daemon.sock, or LAELIA_HOME when set)
+// and the daemon routes each request to the agent named in LAELIA_AGENT
+// (injected into every ACP subprocess). It is constructed once per machine
+// process and lives for the whole machine lifetime.
 type Server struct {
 	managerURL        string
 	machineResourceID string
@@ -90,15 +90,12 @@ type Server struct {
 	userClients   map[string]v1connect.UserServiceClient
 }
 
-// New creates a daemon bound to the well-known unix socket
-// ~/.laelia/daemon.sock. machineResourceID still keys the per-agent workspace
-// dirs (~/.laelia/<machineID>/<agentID>/). getToken returns the current
-// machine access token (rotated by heartbeat), shared by every hosted agent.
+// New creates a daemon bound to the well-known unix socket under the Laelia
+// data root (default ~/.laelia/daemon.sock, or LAELIA_HOME when set).
+// machineResourceID still keys the per-agent workspace dirs
+// (<root>/<machineID>/<agentID>/). getToken returns the current machine access
+// token (rotated by heartbeat), shared by every hosted agent.
 func New(managerURL, machineResourceID string, getToken func() string, httpClient *http.Client) (*Server, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, errors.Wrap(err, "resolve home dir")
-	}
 	socketPath := DefaultSocketPath()
 
 	token := make([]byte, 32)
@@ -117,7 +114,7 @@ func New(managerURL, machineResourceID string, getToken func() string, httpClien
 		machineResourceID: machineResourceID,
 		getToken:          getToken,
 		httpClient:        httpClient,
-		homeDir:           home,
+		homeDir:           home.Dir(),
 		socketPath:        socketPath,
 		sessionToken:      sessionToken,
 		agentClients:      make(map[string]v1connect.CommandServiceClient),
@@ -130,15 +127,11 @@ func New(managerURL, machineResourceID string, getToken func() string, httpClien
 
 func (s *Server) SocketPath() string { return s.socketPath }
 
-// DefaultSocketPath returns the well-known daemon socket location
-// (~/.laelia/daemon.sock). setup/run probe it to detect an already-running
-// laelia-machine before starting a second instance.
+// DefaultSocketPath returns the well-known daemon socket location (default
+// ~/.laelia/daemon.sock, or under LAELIA_HOME when set). setup/run probe it to
+// detect an already-running laelia-machine before starting a second instance.
 func DefaultSocketPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return filepath.Join(os.Getenv("HOME"), ".laelia", "daemon.sock")
-	}
-	return filepath.Join(home, ".laelia", "daemon.sock")
+	return home.Join("daemon.sock")
 }
 func (s *Server) SessionToken() string { return s.sessionToken }
 
@@ -440,20 +433,20 @@ func bareAgentID(agent string) string {
 }
 
 // workspaceFor returns the calling agent's persistent working directory
-// (~/.laelia/<machineID>/<agentID>/), the same directory the executor runs the
-// agent's shell in. File commands confine local paths to the temp subdirectory
-// of this workspace so transient upload/download files never clutter the
-// agent's persistent files.
+// (<data root>/<machineID>/<agentID>/), the same directory the executor runs
+// the agent's shell in. File commands confine local paths to the temp
+// subdirectory of this workspace so transient upload/download files never
+// clutter the agent's persistent files.
 func (s *Server) workspaceFor(agent string) (string, error) {
 	agentID := bareAgentID(agent)
 	if agentID == "" || agentID == "." || agentID == ".." || strings.ContainsAny(agentID, `/\`) {
 		return "", errors.New("agent is required to resolve the file workspace")
 	}
-	return filepath.Join(s.homeDir, ".laelia", s.machineResourceID, agentID), nil
+	return filepath.Join(s.homeDir, s.machineResourceID, agentID), nil
 }
 
 // fileWorkspace resolves the calling agent's working directory, its temp jail
-// (~/.laelia/<machineID>/<agentID>/temp/), and the base for relative paths:
+// (<data root>/<machineID>/<agentID>/temp/), and the base for relative paths:
 // the CLI process's cwd when available (normally the agent's working
 // directory), falling back to the working directory itself.
 func (s *Server) fileWorkspace(req Request) (tempDir, base string, err error) {

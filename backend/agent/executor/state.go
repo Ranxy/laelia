@@ -3,9 +3,9 @@ package executor
 import (
 	"encoding/json"
 	"os"
-	"path/filepath"
 
 	"github.com/Ranxy/laelia/backend/agent/atomicfile"
+	"github.com/Ranxy/laelia/backend/agent/home"
 )
 
 type LocalState struct {
@@ -51,6 +51,5 @@ func ClearLocalState(machineID, agentID string) error {
 }
 
 func statePath(machineID, agentID string) string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".laelia", machineID, agentID, "command-state.json")
+	return home.Join(machineID, agentID, "command-state.json")
 }

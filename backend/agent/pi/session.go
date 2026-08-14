@@ -12,7 +12,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -22,6 +21,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/agent/atomicfile"
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/home"
 )
 
 // turnEventBuffer bounds the per-turn event channel. The drain loop consumes
@@ -789,8 +789,7 @@ func piFingerprint(c *PiConfig) string {
 }
 
 func piSessionPath(machineID, agentID string) string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".laelia", machineID, agentID, "pi-session.json")
+	return home.Join(machineID, agentID, "pi-session.json")
 }
 
 func loadPiSession(machineID, agentID string) (*piSessionState, error) {

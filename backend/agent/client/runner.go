@@ -12,6 +12,7 @@ import (
 	"github.com/Ranxy/laelia/backend/agent/chattools"
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/home"
 	"github.com/Ranxy/laelia/backend/agent/pi"
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -452,18 +453,25 @@ func (r *agentRunner) buildMcpServers(req executor.Request) []acp.McpServer {
 	if existing := os.Getenv("PATH"); existing != "" {
 		path = path + string(os.PathListSeparator) + existing
 	}
+	env := []acp.EnvVariable{
+		{Name: "PATH", Value: path},
+		{Name: "LAELIA_DAEMON_SOCKET", Value: req.DaemonSocket},
+		{Name: "LAELIA_SESSION_TOKEN", Value: req.SessionToken},
+		{Name: "LAELIA_AGENT", Value: req.AgentResourceID},
+	}
+	// Propagate LAELIA_HOME unconditionally when the parent has it, so the MCP
+	// proxy subprocess resolves the same data root even though it is not part
+	// of the fixed env list above.
+	if v := os.Getenv(home.EnvDir); v != "" {
+		env = append(env, acp.EnvVariable{Name: home.EnvDir, Value: v})
+	}
 	return []acp.McpServer{
 		{
 			Stdio: &acp.McpServerStdio{
 				Name:    "laelia-mcp",
 				Command: "laelia-machine",
 				Args:    []string{"mcp-proxy"},
-				Env: []acp.EnvVariable{
-					{Name: "PATH", Value: path},
-					{Name: "LAELIA_DAEMON_SOCKET", Value: req.DaemonSocket},
-					{Name: "LAELIA_SESSION_TOKEN", Value: req.SessionToken},
-					{Name: "LAELIA_AGENT", Value: req.AgentResourceID},
-				},
+				Env:     env,
 			},
 		},
 	}

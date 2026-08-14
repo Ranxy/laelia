@@ -41,7 +41,7 @@ var secretFilePatterns = []*regexp.Regexp{
 // neverVisibleHiddenNames are entries hidden even when the caller asks for
 // hidden files: generic high-sensitivity credential directories an LLM agent
 // may create inside its working dir. The machine's own credential file
-// (~/.laelia/machine.json) lives outside the browsable roots.
+// (<data root>/machine.json) lives outside the browsable roots.
 var neverVisibleHiddenNames = map[string]bool{
 	".aws": true, ".gnupg": true, ".ssh": true,
 }

@@ -4,13 +4,12 @@ import (
 	"context"
 	"io"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
+	"github.com/Ranxy/laelia/backend/agent/home"
 	"github.com/Ranxy/laelia/backend/agent/workspace"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
@@ -188,14 +187,14 @@ func (c *MachineClient) handleDiscoverProviders(ctx context.Context, send func(*
 }
 
 // handleMachineWorkspaceScan summarizes every per-agent workspace directory
-// under ~/.laelia/<machineID>/ and replies. The machine state file
-// (~/.laelia/machine.json) lives directly under ~/.laelia/, outside the
+// under <data root>/<machineID>/ and replies. The machine state file
+// (<data root>/machine.json) lives directly under the data root, outside the
 // scanned root, so it is never reported.
 func (c *MachineClient) handleMachineWorkspaceScan(_ context.Context, send func(*v1pb.MachineStreamMessage) error, req *v1pb.MachineWorkspaceScanRequest) {
 	if req == nil {
 		return
 	}
-	root := filepath.Join(os.Getenv("HOME"), ".laelia", c.machineID)
+	root := home.Join(c.machineID)
 	summaries, err := workspace.Scan(root)
 	if err != nil {
 		slog.Warn("machine workspace scan failed", "machineID", c.machineID, "error", err)

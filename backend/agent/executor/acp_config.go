@@ -1,12 +1,11 @@
 package executor
 
 import (
-	"os"
-	"path/filepath"
 	"time"
 
 	acp "github.com/coder/acp-go-sdk"
 
+	"github.com/Ranxy/laelia/backend/agent/home"
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
@@ -94,11 +93,11 @@ type ACPConfig struct {
 }
 
 // AgentWorkingDir returns the per-agent persistent working directory under
-// ~/.laelia/<machineID>/<agentID>/. A machine hosts many agents, so the machine
-// id namespaces each agent's state on a shared host. The caller creates it.
+// <data root>/<machineID>/<agentID>/. A machine hosts many agents, so the
+// machine id namespaces each agent's state on a shared host. The caller
+// creates it.
 func AgentWorkingDir(machineID, agentID string) string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".laelia", machineID, agentID)
+	return home.Join(machineID, agentID)
 }
 
 // BuildACPConfig resolves the user-configurable AgentACPConfig (provider,

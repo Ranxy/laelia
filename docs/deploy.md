@@ -159,14 +159,13 @@ Environment variables:
 | `LAELIA_MANAGER_URL` | Manager base URL. For `http://` URLs the entrypoint automatically adds `--allow-http`. |
 | `LAELIA_INSECURE` | `true` to skip TLS certificate verification (self-signed setups; development only). |
 | `LAELIA_DEBUG` | `true` for debug logging. |
+| `LAELIA_HOME` | Laelia data root directory (use an absolute path). When set, `machine.json`, `daemon.sock`, agent workspaces, and the materialized pi runtime all live under this directory. Defaults to `~/.laelia`. |
 
 The machine makes outbound connections only; no port needs to be published.
-Mount a volume at `/home/laelia` so agent workspaces, the persisted login
-state (`~/.laelia/machine.json`), and the materialized pi runtime survive
-container restarts. Mount the whole home directory (rather than a
-not-yet-existing `.laelia` subdirectory) so the files stay owned by the
-image's unprivileged user. If you prefer a bind mount, create the directory
-and `chown 1001:1001` it first.
+Mount a volume at `$LAELIA_HOME` so agent workspaces, the persisted login
+state (`machine.json`), and the materialized pi runtime survive container
+restarts. If you prefer a bind mount, create the directory and
+`chown 1001:1001` it first.
 
 If the container is recreated without the volume, the login state is lost:
 the machine re-runs the device flow and registers a brand-new machine (the

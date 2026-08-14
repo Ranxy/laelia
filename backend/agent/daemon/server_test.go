@@ -57,19 +57,19 @@ func mustRequest(h http.Header) *http.Request {
 // ---- T20: validateWorkspacePath symlink-escape hardening ----
 
 // TestWorkspaceForJailsPerAgent: file commands must resolve under the calling
-// agent's working directory (~/.laelia/<machineID>/<agentID>/), not a
+// agent's working directory (<data root>/<machineID>/<agentID>/), not a
 // machine-shared temp dir.
 func TestWorkspaceForJailsPerAgent(t *testing.T) {
-	home := t.TempDir()
-	s := &Server{homeDir: home, machineResourceID: "machine-1"}
+	root := t.TempDir()
+	s := &Server{homeDir: root, machineResourceID: "machine-1"}
 
 	got, err := s.workspaceFor("agents/agent-2")
 	assert.NoError(t, err)
-	assert.Equal(t, filepath.Join(home, ".laelia", "machine-1", "agent-2"), got)
+	assert.Equal(t, filepath.Join(root, "machine-1", "agent-2"), got)
 
 	got, err = s.workspaceFor("agent-2")
 	assert.NoError(t, err)
-	assert.Equal(t, filepath.Join(home, ".laelia", "machine-1", "agent-2"), got)
+	assert.Equal(t, filepath.Join(root, "machine-1", "agent-2"), got)
 }
 
 func TestWorkspaceForRejectsMissingAgent(t *testing.T) {
@@ -131,7 +131,7 @@ func TestValidateWorkspacePath_RejectsSymlinkParentEscape(t *testing.T) {
 // TestValidateWorkspacePath_ResolvesCwdRelativeIntoAgentTemp is the regression
 // test for the machine-layer change: from the agent's working directory,
 // `file upload temp/docker-report.md` must resolve to
-// ~/.laelia/<machineID>/<agentID>/temp/docker-report.md.
+// <data root>/<machineID>/<agentID>/temp/docker-report.md.
 func TestValidateWorkspacePath_ResolvesCwdRelativeIntoAgentTemp(t *testing.T) {
 	home := t.TempDir()
 	tempDir := filepath.Join(home, "temp")
@@ -167,8 +167,8 @@ func TestValidateWorkspacePath_ResolvesFromTempCwd(t *testing.T) {
 }
 
 // TestValidateWorkspacePath_RejectsOldMachineTempEscape: the pre-machine temp
-// path (~/.laelia/<machine>/temp/) is now outside every agent's workspace, so
-// ../temp/... must be rejected.
+// path (<data root>/<machine>/temp/) is now outside every agent's workspace,
+// so ../temp/... must be rejected.
 func TestValidateWorkspacePath_RejectsOldMachineTempEscape(t *testing.T) {
 	home := t.TempDir()
 	tempDir := filepath.Join(home, "temp")

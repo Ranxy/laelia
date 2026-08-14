@@ -149,7 +149,7 @@ type commandStream struct {
 	// agents/<id>/commands/<id>).
 	agentID string
 	// machineID is the bare UUID of the machine hosting this agent. It namespaces
-	// the agent's on-disk state (~/.laelia/<machineID>/<agentID>/) and is passed
+	// the agent's on-disk state (<data root>/<machineID>/<agentID>/) and is passed
 	// to the executor as Request.MachineID.
 	machineID   string
 	isExecuting atomic.Bool

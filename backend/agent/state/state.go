@@ -1,18 +1,18 @@
-// Package state persists the machine's local registration state in
-// ~/.laelia/machine.json. It is the single source of truth for the machine's
-// identity (machine id) and its only credential (the refresh token); the
-// bootstrap-token era's per-machine token files are gone. One machine per
-// computer means one state file.
+// Package state persists the machine's local registration state in the Laelia
+// data root (default ~/.laelia/machine.json, or LAELIA_HOME when set). It is
+// the single source of truth for the machine's identity (machine id) and its
+// only credential (the refresh token); the bootstrap-token era's per-machine
+// token files are gone. One machine per computer means one state file.
 package state
 
 import (
 	"encoding/json"
 	"errors"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/Ranxy/laelia/backend/agent/atomicfile"
+	"github.com/Ranxy/laelia/backend/agent/home"
 )
 
 // State is the persisted machine registration. The refresh token is the only
@@ -26,13 +26,10 @@ type State struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
-// Path returns the state file location (~/.laelia/machine.json).
+// Path returns the state file location (default ~/.laelia/machine.json, or
+// under LAELIA_HOME when set).
 func Path() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return filepath.Join(os.Getenv("HOME"), ".laelia", "machine.json")
-	}
-	return filepath.Join(home, ".laelia", "machine.json")
+	return home.Join("machine.json")
 }
 
 // Load reads the state file. A missing file returns (nil, nil); a corrupt

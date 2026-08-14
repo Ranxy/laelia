@@ -5,9 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
-	"path/filepath"
 
 	"github.com/Ranxy/laelia/backend/agent/atomicfile"
+	"github.com/Ranxy/laelia/backend/agent/home"
 )
 
 // maxResumeFailuresBeforeWarning is the consecutive ResumeSession failure count
@@ -20,9 +20,9 @@ const maxResumeFailuresBeforeWarning = 3
 // the LLM conversation — and the init prompt sent once at cold start — is
 // inherited. This file is what makes the session survive between turns.
 //
-// It lives at ~/.laelia/<machineID>/<agentID>/acp-session.json, a sibling of
-// the per-command command-state.json (see state.go) under the same machine +
-// agent directory. Fingerprint invalidates it when the admin changes the
+// It lives at <data root>/<machineID>/<agentID>/acp-session.json, a sibling
+// of the per-command command-state.json (see state.go) under the same machine
+// + agent directory. Fingerprint invalidates it when the admin changes the
 // provider/model/working dir, so a config change drops back to a cold
 // NewSession + fresh init prompt rather than resuming a session the provider
 // no longer recognizes.
@@ -72,8 +72,7 @@ func threadSessionFingerprint(cfg *ThreadConfig) string {
 }
 
 func acpSessionPath(machineID, agentID string) string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".laelia", machineID, agentID, "acp-session.json")
+	return home.Join(machineID, agentID, "acp-session.json")
 }
 
 // loadACPSession reads the persisted ACP session state. A missing file is not

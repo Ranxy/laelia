@@ -16,6 +16,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/agent/client"
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
+	"github.com/Ranxy/laelia/backend/agent/home"
 	"github.com/Ranxy/laelia/backend/agent/state"
 	"github.com/Ranxy/laelia/backend/common/log"
 )
@@ -61,7 +62,7 @@ func runMachine() error {
 		return errors.New("local machine state is incomplete; run `laelia-machine setup` to re-authenticate")
 	}
 
-	slog.Info("laelia-machine starting", "manager", managerURL, "machineID", st.MachineID)
+	slog.Info("laelia-machine starting", "manager", managerURL, "machineID", st.MachineID, "dataDir", home.Dir())
 
 	machine, err := client.New(managerURL, st.MachineID, st.RefreshToken, flags.insecure, flags.allowHTTP, func(token string) {
 		st.RefreshToken = token

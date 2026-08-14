@@ -3,16 +3,16 @@ package executor
 import (
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/Ranxy/laelia/backend/agent/atomicfile"
+	"github.com/Ranxy/laelia/backend/agent/home"
 )
 
 // ContextState tracks one agent's session context across drain turns: observed
 // usage, compaction history, warm-turn health, and the decision flag that makes
 // the next warm turn carry a re-anchor prompt. It is persisted at
-// ~/.laelia/<machineID>/<agentID>/context-state.json, a sibling of
+// <data root>/<machineID>/<agentID>/context-state.json, a sibling of
 // command-state.json / acp-session.json under the same machine + agent dir.
 //
 // Fingerprint mirrors the session fingerprint (acp-session.json / pi-session
@@ -85,8 +85,7 @@ func (c *ContextState) ResetForFingerprint(fingerprint string) {
 }
 
 func contextStatePath(machineID, agentID string) string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".laelia", machineID, agentID, "context-state.json")
+	return home.Join(machineID, agentID, "context-state.json")
 }
 
 // LoadContextState reads the persisted context state. A missing file is not an

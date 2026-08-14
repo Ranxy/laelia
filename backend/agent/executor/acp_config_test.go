@@ -72,6 +72,17 @@ func TestBuildACPEnvBootstrapOverridesCustomEnv(t *testing.T) {
 	assert.Equal(t, "cmd-1", got["LAELIA_COMMAND"], "bootstrap LAELIA_* must win over custom env")
 }
 
+func TestBuildACPEnvPropagatesLaeliaHomeOutsideAllowEnv(t *testing.T) {
+	t.Setenv("LAELIA_HOME", "/custom/laelia")
+	cfg := &ACPConfig{
+		AllowEnv:  []string{"PATH"},
+		CustomEnv: map[string]string{"LAELIA_HOME": "hijack"},
+	}
+	env := buildACPEnv(cfg, nil, Request{})
+	got := envSliceToMap(env)
+	assert.Equal(t, "/custom/laelia", got["LAELIA_HOME"], "parent LAELIA_HOME must be forced into child env even when not allowlisted")
+}
+
 func TestModelOptionContains(t *testing.T) {
 	ungrouped := acp.SessionConfigSelectOptionsUngrouped{
 		{Value: "m1", Name: "M1"},

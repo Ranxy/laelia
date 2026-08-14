@@ -173,6 +173,23 @@ func TestBuildPiEnv_APIKeyAndBootstrap(t *testing.T) {
 	assert.Equal(t, "sk-or", envMap(env)["OPENROUTER_API_KEY"])
 }
 
+func TestBuildPiEnvPropagatesLaeliaHomeOutsideAllowEnv(t *testing.T) {
+	t.Setenv("LAELIA_HOME", "/custom/laelia")
+	t.Setenv("PATH", "/usr/bin")
+
+	cfg := &PiConfig{
+		APIProvider:     APIProviderDeepseek,
+		APIKey:          "sk-deepseek",
+		AgentResourceID: "agents/abc",
+		DaemonSocket:    "/tmp/sock",
+		SessionToken:    "tok",
+		BinaryDir:       "/opt/laelia/bin",
+	}
+	env := cfg.buildPiEnv("commands/1")
+	m := envMap(env)
+	assert.Equal(t, "/custom/laelia", m["LAELIA_HOME"], "parent LAELIA_HOME must be forced into pi env even though piAllowEnv does not include it")
+}
+
 func envMap(env []string) map[string]string {
 	m := map[string]string{}
 	for _, kv := range env {

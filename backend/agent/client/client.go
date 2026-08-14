@@ -134,8 +134,8 @@ func (eb *ExponentialBackoff) Reset() {
 // New creates a MachineClient for the machine identified by machineID
 // (bare uuid). refreshToken is the machine's durable credential loaded from
 // the local state file; saveRefreshToken persists a rolling renewal back to
-// that file. The daemon socket and per-agent workspace dirs live under
-// ~/.laelia/.
+// that file. The daemon socket and per-agent workspace dirs live under the
+// Laelia data root (default ~/.laelia, or LAELIA_HOME when set).
 func New(managerURL, machineID, refreshToken string, insecure bool, allowHTTP bool, saveRefreshToken func(string)) (*MachineClient, error) {
 	managerURL = strings.TrimRight(managerURL, "/")
 
