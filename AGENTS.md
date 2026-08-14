@@ -148,6 +148,23 @@ psql -h localhost -p 5432 -U dev -d laelia -c "sql"
 ```
 
 
+### Test Server (one-click test environment)
+
+To start a throwaway, browser-accessible laelia instance (manual testing, or
+sharing a page with other users/agents), use `scripts/test-server.sh`. It
+builds the frontend + backend (embedded), runs an isolated embedded PostgreSQL,
+seeds preset users, and serves on a random port inside `--workdir`:
+
+```bash
+scripts/test-server.sh run --workdir /tmp/laelia-test-1
+# ... prints the URL and preset accounts (admin@laelia.test / admin1234 etc.)
+scripts/test-server.sh stop   --workdir /tmp/laelia-test-1
+rm -rf /tmp/laelia-test-1   # run stop first; removes all instance state
+```
+
+Full usage, options, and caveats: see `docs/test-server.md`.
+
+
 ## Code Style
 - **General**: Follow Google style guides for all languages
   - **Go**: https://google.github.io/styleguide/go/
