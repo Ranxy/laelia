@@ -100,9 +100,14 @@ function useSidebarItems(): SidebarItem[] {
   // these, so every child is hidden for them and filterSidebarList then drops
   // the now-empty Settings group entirely — leaving no settings affordance in
   // the sidebar for non-admins. Per-resource perms are not considered here.
-  const canViewStorage =
-    useHasPermission("laelia.settings.get") ||
-    useHasPermission("laelia.settings.update");
+  // Evaluate both permission hooks before OR-ing their results. A direct
+  // `useHasPermission(a) || useHasPermission(b)` short-circuits the second hook
+  // when the first permission is granted, which changes the hook count between
+  // renders (it depends on the logged-in user's permission set) and desyncs
+  // React's hook list.
+  const canSettingsGet = useHasPermission("laelia.settings.get");
+  const canSettingsUpdate = useHasPermission("laelia.settings.update");
+  const canViewStorage = canSettingsGet || canSettingsUpdate;
   const canViewUsers = useHasPermission("laelia.users.list");
   const canViewMachines = useHasPermission("laelia.machines.get");
   const canViewRoles = useHasPermission("laelia.roles.list");

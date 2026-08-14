@@ -53,9 +53,13 @@ interface MenuItem {
 
 function useSettingsMenuItems(): MenuItem[] {
   const { t } = useTranslation();
-  const canViewStorage =
-    useHasPermission("laelia.settings.get") ||
-    useHasPermission("laelia.settings.update");
+  // Evaluate both permission hooks before OR-ing their results. A direct
+  // `useHasPermission(a) || useHasPermission(b)` short-circuits the second hook
+  // when the first permission is granted, changing the hook count between
+  // renders (it depends on the logged-in user's permission set).
+  const canSettingsGet = useHasPermission("laelia.settings.get");
+  const canSettingsUpdate = useHasPermission("laelia.settings.update");
+  const canViewStorage = canSettingsGet || canSettingsUpdate;
   const canViewUsers = useHasPermission("laelia.users.list");
   const canViewMachines = useHasPermission("laelia.machines.get");
   const canViewRoles = useHasPermission("laelia.roles.list");
