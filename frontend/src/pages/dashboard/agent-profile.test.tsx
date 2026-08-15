@@ -536,9 +536,14 @@ describe("AgentProfilePage", () => {
     const providerTrigger = (await screen.findAllByRole("combobox"))[0];
     await pickSelect(providerTrigger, "agent.acp-config-provider-builtin-pi");
 
+    // Switch the API key source to "My own API key" (self-provided).
+    // The mode select is the second combobox (provider, mode, then the
+    // selected mode's fields).
+    const modeSelect = screen.getAllByRole("combobox")[1];
+    await pickSelect(modeSelect, "agent.acp-config-pi-mode-self");
+
     // Pick the API provider.
-    const comboboxes = screen.getAllByRole("combobox");
-    const apiProviderSelect = comboboxes[comboboxes.length - 1];
+    const apiProviderSelect = screen.getAllByRole("combobox").at(-1)!;
     await pickSelect(apiProviderSelect, "deepseek");
 
     // Type the API key and blur: blur persists the key and fetches models.

@@ -118,6 +118,7 @@ export function AgentProfilePage() {
   const [apiProvider, setApiProvider] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [apiBaseUrl, setApiBaseUrl] = useState("");
+  const [piMode, setPiMode] = useState<"global" | "self">("global");
   const [globalProvider, setGlobalProvider] = useState("");
   const [globalProviderEntry, setGlobalProviderEntry] = useState("");
   const [customEnvEntries, setCustomEnvEntries] = useState<
@@ -351,6 +352,11 @@ export function AgentProfilePage() {
         ? Object.entries(cfg.customEnv).map(([key, value]) => ({ key, value }))
         : [],
     };
+    const nextPiMode: "global" | "self" = cfg?.globalProvider
+      ? "global"
+      : cfg?.apiProvider
+        ? "self"
+        : "global";
     configRef.current = next;
     setExecutable(next.executable);
     setArgs(next.args);
@@ -361,6 +367,7 @@ export function AgentProfilePage() {
     setApiProvider(next.apiProvider);
     setApiKey(next.apiKey);
     setApiBaseUrl(next.apiBaseUrl);
+    setPiMode(nextPiMode);
     setGlobalProvider(next.globalProvider);
     setGlobalProviderEntry(next.globalProviderEntry);
     setCustomEnvEntries(next.customEnvEntries);
@@ -573,6 +580,11 @@ export function AgentProfilePage() {
   function canSaveFor(draft: typeof configRef.current): boolean {
     if (draft.provider === "custom") return draft.executable.trim() !== "";
     if (draft.provider === "builtin-pi") {
+      // Global-provider mode needs a provider + entry; self-provided mode
+      // needs an api provider + model.
+      if (draft.globalProvider) {
+        return draft.globalProviderEntry.trim() !== "";
+      }
       return draft.apiProvider.trim() !== "" && draft.model.trim() !== "";
     }
     const info = availableProviders.find(
@@ -1099,6 +1111,9 @@ export function AgentProfilePage() {
                                 ? configRef.current.protocol
                                 : "",
                             apiProvider: "",
+                            globalProvider: "",
+                            globalProviderEntry: "",
+                            apiBaseUrl: "",
                           };
                           setProvider(next);
                           setModel("");
@@ -1106,6 +1121,10 @@ export function AgentProfilePage() {
                             next === "custom" ? configRef.current.protocol : ""
                           );
                           setApiProvider("");
+                          setGlobalProvider("");
+                          setGlobalProviderEntry("");
+                          setApiBaseUrl("");
+                          setPiMode("global");
                           saveConfig();
                         }}
                       >
@@ -1155,66 +1174,82 @@ export function AgentProfilePage() {
 
                   {isPiProvider && (
                     <>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-sm font-medium">
-                          {t("agent.acp-config-pi-global-provider")}
-                        </label>
-                        <Select
-                          value={globalProvider}
-                          onValueChange={(v) => {
-                            const next = String(v ?? "");
-                            configRef.current = {
-                              ...configRef.current,
-                              globalProvider: next,
-                              globalProviderEntry: "",
-                            };
-                            setGlobalProvider(next);
-                            setGlobalProviderEntry("");
-                            saveConfig();
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue>
-                              {(v: string | null) =>
-                                v
-                                  ? (apiProviders.find((p) => p.name === v)
-                                      ?.title ?? v)
-                                  : ""
+                      {showLegacyInline && (
+                        <div className="flex flex-col gap-1">
+                          <label className="text-sm font-medium">
+                            {t("agent.acp-config-pi-mode")}
+                          </label>
+                          <Select
+                            value={piMode}
+                            onValueChange={(v) => {
+                              const next = v === "self" ? "self" : "global";
+                              if (next === "global") {
+                                // Switching to managed: clear the inline side.
+                                configRef.current = {
+                                  ...configRef.current,
+                                  apiProvider: "",
+                                  apiKey: "",
+                                  apiBaseUrl: "",
+                                  model: "",
+                                };
+                                setApiProvider("");
+                                setApiKey("");
+                                setApiBaseUrl("");
+                                setModel("");
+                                setPiModels([]);
+                                setPiModelsError("");
+                              } else {
+                                // Switching to self-provided: clear the managed side.
+                                configRef.current = {
+                                  ...configRef.current,
+                                  globalProvider: "",
+                                  globalProviderEntry: "",
+                                };
+                                setGlobalProvider("");
+                                setGlobalProviderEntry("");
                               }
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {apiProviders.length === 0 && (
-                              <SelectItem value="__no_provider" disabled>
-                                {t(
-                                  "agent.acp-config-pi-global-providers-empty"
-                                )}
+                              setPiMode(next);
+                              saveConfig();
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue>
+                                {(v: string | null) =>
+                                  v === "self"
+                                    ? t("agent.acp-config-pi-mode-self")
+                                    : t("agent.acp-config-pi-mode-managed")
+                                }
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="global">
+                                {t("agent.acp-config-pi-mode-managed")}
                               </SelectItem>
-                            )}
-                            {apiProviders.map((p) => (
-                              <SelectItem key={p.name} value={p.name}>
-                                {p.title}
+                              <SelectItem value="self">
+                                {t("agent.acp-config-pi-mode-self")}
                               </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
 
-                      {globalProvider &&
-                        (globalProviderEntries.length > 0 ? (
+                      {piMode === "global" && (
+                        <>
                           <div className="flex flex-col gap-1">
                             <label className="text-sm font-medium">
-                              {t("agent.acp-config-pi-global-entry")}
+                              {t("agent.acp-config-pi-global-provider")}
                             </label>
                             <Select
-                              value={globalProviderEntry}
+                              value={globalProvider}
                               onValueChange={(v) => {
                                 const next = String(v ?? "");
                                 configRef.current = {
                                   ...configRef.current,
-                                  globalProviderEntry: next,
+                                  globalProvider: next,
+                                  globalProviderEntry: "",
                                 };
-                                setGlobalProviderEntry(next);
+                                setGlobalProvider(next);
+                                setGlobalProviderEntry("");
                                 saveConfig();
                               }}
                             >
@@ -1222,34 +1257,81 @@ export function AgentProfilePage() {
                                 <SelectValue>
                                   {(v: string | null) =>
                                     v
-                                      ? entryLabel(
-                                          globalProviderEntries.find(
-                                            (e) => e.name === v
-                                          )
-                                        )
+                                      ? (apiProviders.find((p) => p.name === v)
+                                          ?.title ?? v)
                                       : ""
                                   }
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
-                                {globalProviderEntries.map((e) => (
-                                  <SelectItem key={e.name} value={e.name}>
-                                    {entryLabel(e)}
+                                {apiProviders.length === 0 && (
+                                  <SelectItem value="__no_provider" disabled>
+                                    {t(
+                                      "agent.acp-config-pi-global-providers-empty"
+                                    )}
+                                  </SelectItem>
+                                )}
+                                {apiProviders.map((p) => (
+                                  <SelectItem key={p.name} value={p.name}>
+                                    {p.title}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-                            <p className="text-xs text-control-light">
-                              {t("agent.acp-config-pi-global-entry-hint")}
-                            </p>
                           </div>
-                        ) : (
-                          <p className="text-xs text-control-light">
-                            {t("agent.acp-config-pi-global-entries-empty")}
-                          </p>
-                        ))}
 
-                      {showLegacyInline && (
+                          {globalProvider &&
+                            (globalProviderEntries.length > 0 ? (
+                              <div className="flex flex-col gap-1">
+                                <label className="text-sm font-medium">
+                                  {t("agent.acp-config-pi-global-entry")}
+                                </label>
+                                <Select
+                                  value={globalProviderEntry}
+                                  onValueChange={(v) => {
+                                    const next = String(v ?? "");
+                                    configRef.current = {
+                                      ...configRef.current,
+                                      globalProviderEntry: next,
+                                    };
+                                    setGlobalProviderEntry(next);
+                                    saveConfig();
+                                  }}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue>
+                                      {(v: string | null) =>
+                                        v
+                                          ? entryLabel(
+                                              globalProviderEntries.find(
+                                                (e) => e.name === v
+                                              )
+                                            )
+                                          : ""
+                                      }
+                                    </SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {globalProviderEntries.map((e) => (
+                                      <SelectItem key={e.name} value={e.name}>
+                                        {entryLabel(e)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-control-light">
+                                  {t("agent.acp-config-pi-global-entry-hint")}
+                                </p>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-control-light">
+                                {t("agent.acp-config-pi-global-entries-empty")}
+                              </p>
+                            ))}
+                        </>
+                      )}
+
+                      {piMode === "self" && showLegacyInline && (
                         <>
                           <div className="flex flex-col gap-1">
                             <label className="text-sm font-medium">
