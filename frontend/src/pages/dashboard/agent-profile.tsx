@@ -1,4 +1,12 @@
-import { Check, Loader2, Pencil, Trash2, Upload } from "lucide-react";
+import {
+  Check,
+  Loader2,
+  Pencil,
+  Play,
+  Square,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -204,6 +212,64 @@ export function AgentProfilePage() {
   const [transferConfirmOpen, setTransferConfirmOpen] = useState(false);
   const [transferBusy, setTransferBusy] = useState(false);
   const [transferError, setTransferError] = useState("");
+  const [stopOpen, setStopOpen] = useState(false);
+  const [stopBusy, setStopBusy] = useState(false);
+  const [stopError, setStopError] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  async function handleStop() {
+    setStopBusy(true);
+    setStopError("");
+    try {
+      await useAppStore.getState().stopAgent(agentName);
+      setStopOpen(false);
+      await loadAgent();
+      toastManager.add({
+        type: "success",
+        title: t("agent.stopped-toast"),
+      });
+    } catch (err) {
+      setStopError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setStopBusy(false);
+    }
+  }
+
+  async function handleStart() {
+    try {
+      await useAppStore.getState().startAgent(agentName);
+      await loadAgent();
+      toastManager.add({
+        type: "success",
+        title: t("agent.started-toast"),
+      });
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  async function handleDelete() {
+    setDeleteBusy(true);
+    setDeleteError("");
+    try {
+      await useAppStore.getState().deleteAgent(agentName);
+      setDeleteOpen(false);
+      toastManager.add({
+        type: "success",
+        title: t("agent.deleted-toast"),
+      });
+      navigate("/members/agents");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
 
   async function loadAgent() {
     if (!agentId) return;
@@ -696,7 +762,10 @@ export function AgentProfilePage() {
                   </span>
                 </Field>
                 <Field label={t("agent.detail-status")}>
-                  <ConnectionBadge state={agent.status?.state} />
+                  <ConnectionBadge
+                    state={agent.status?.state}
+                    enabled={agent.enabled}
+                  />
                 </Field>
                 <Field label={t("agent.detail-configuration")}>
                   {lifecycleLabel(t, lifecycle)}
@@ -916,6 +985,52 @@ export function AgentProfilePage() {
               </FieldRow>
             </Card>
           </div>
+
+          {/* Actions */}
+          {canEdit && (
+            <div>
+              <Card title={t("common.actions")}>
+                <div className="flex flex-col gap-2">
+                  {agent.enabled ? (
+                    <Button
+                      variant="outline"
+                      size="md"
+                      className="w-full justify-center"
+                      onClick={() => {
+                        setStopError("");
+                        setStopOpen(true);
+                      }}
+                    >
+                      <Square className="size-4" />
+                      {t("common.stop")}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="md"
+                      className="w-full justify-center"
+                      onClick={handleStart}
+                    >
+                      <Play className="size-4" />
+                      {t("common.start")}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="md"
+                    className="w-full justify-center border-error/30 bg-error/10 text-error hover:bg-error/15"
+                    onClick={() => {
+                      setDeleteError("");
+                      setDeleteOpen(true);
+                    }}
+                  >
+                    <Trash2 className="size-4" />
+                    {t("common.delete")}
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          )}
 
           {/* Runtime config */}
           <div>
@@ -1475,6 +1590,68 @@ export function AgentProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Stop-agent confirm */}
+      <AlertDialog
+        open={stopOpen}
+        onOpenChange={(next) => !next && setStopOpen(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogTitle>
+            {t("agent.stop-agent-confirm-title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("agent.stop-agent-confirm-description", { title: agent.title })}
+          </AlertDialogDescription>
+          {stopError && <Alert variant="error" description={stopError} />}
+          <AlertDialogFooter>
+            <AlertDialogClose>
+              <Button variant="outline" disabled={stopBusy}>
+                {t("common.cancel")}
+              </Button>
+            </AlertDialogClose>
+            <Button
+              variant="destructive"
+              disabled={stopBusy}
+              onClick={handleStop}
+            >
+              {stopBusy ? t("common.saving") : t("common.stop")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete-agent confirm */}
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(next) => !next && setDeleteOpen(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogTitle>
+            {t("agent.delete-agent-confirm-title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("agent.delete-agent-confirm-description", {
+              title: agent.title,
+            })}
+          </AlertDialogDescription>
+          {deleteError && <Alert variant="error" description={deleteError} />}
+          <AlertDialogFooter>
+            <AlertDialogClose>
+              <Button variant="outline" disabled={deleteBusy}>
+                {t("common.cancel")}
+              </Button>
+            </AlertDialogClose>
+            <Button
+              variant="destructive"
+              disabled={deleteBusy}
+              onClick={handleDelete}
+            >
+              {deleteBusy ? t("common.saving") : t("common.delete")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Ownership transfer: pick target + reason, then a second risky-action
           confirm. The transfer is unilateral and effective immediately. */}

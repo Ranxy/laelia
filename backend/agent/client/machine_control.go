@@ -86,6 +86,12 @@ func (c *MachineClient) runControlStream(ctx context.Context, _ *daemonsrv.Serve
 			case *v1pb.ManagerMachineStreamMessage_RemoveAgent:
 				c.stopRunner(m.RemoveAgent.GetAgentName())
 
+			case *v1pb.ManagerMachineStreamMessage_DeleteAgentWorkspace:
+				// Tear down the runner and permanently delete the agent's workspace
+				// on this machine. Runs inline (it is a fast directory remove).
+				c.stopRunner(m.DeleteAgentWorkspace.GetAgentName())
+				c.deleteAgentWorkspace(m.DeleteAgentWorkspace.GetAgentName())
+
 			case *v1pb.ManagerMachineStreamMessage_AgentConfigUpdate:
 				c.hotReloadAgentConfig(m.AgentConfigUpdate)
 

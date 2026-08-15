@@ -1,13 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
-import {
-  Loader2,
-  Plus,
-  Shield,
-  Trash,
-  User as UserIcon,
-  X,
-} from "lucide-react";
+import { Loader2, Plus, Shield, User as UserIcon, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -167,11 +160,6 @@ export function MachineProfilePage() {
   // provider + entry pickers. Handler-gated server-side: non-admins see only
   // the providers they may use.
   const apiProviders = useAppStore((s) => s.apiProviders);
-
-  // Remove-agent state.
-  const [removeTarget, setRemoveTarget] = useState<AgentSummary | null>(null);
-  const [removing, setRemoving] = useState(false);
-  const [removeError, setRemoveError] = useState("");
 
   // Access (IAM) state: who may create agents on this machine. The policy is
   // loaded only for callers who may manage it (machine.canManage).
@@ -551,23 +539,6 @@ export function MachineProfilePage() {
     }
   }
 
-  async function handleConfirmRemoveAgent() {
-    if (!removeTarget) return;
-    setRemoving(true);
-    setRemoveError("");
-    try {
-      const deleteAgent = useAppStore.getState().deleteAgent;
-      await deleteAgent(removeTarget.name);
-      setRemoveTarget(null);
-      await reload();
-      fetchMachines({ pageSize: 100 }, { silent: true });
-    } catch (err) {
-      setRemoveError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setRemoving(false);
-    }
-  }
-
   function memberLabel(member: string): string {
     if (member === "allUsers") return t("machine.access-member-all-users");
     if (member.startsWith("users/")) {
@@ -893,22 +864,11 @@ export function MachineProfilePage() {
                             <span className="truncate text-sm font-medium text-main">
                               {agent.title}
                             </span>
-                            <ConnectionBadge state={agent.status?.state} />
+                            <ConnectionBadge
+                              state={agent.status?.state}
+                              enabled={agent.enabled}
+                            />
                           </div>
-                          {agent.canDelete && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="size-6 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                              aria-label={t("common.delete")}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setRemoveTarget(agent);
-                              }}
-                            >
-                              <Trash className="size-3.5" />
-                            </Button>
-                          )}
                         </div>
                       </li>
                     );
@@ -1398,38 +1358,6 @@ export function MachineProfilePage() {
           </DialogDescription>
         </DialogContent>
       </Dialog>
-
-      {/* Remove-agent confirm */}
-      <AlertDialog
-        open={!!removeTarget}
-        onOpenChange={(next) => !next && setRemoveTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogTitle>
-            {t("machine.remove-agent-confirm-title")}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("machine.remove-agent-confirm-description", {
-              title: removeTarget?.title ?? "",
-            })}
-          </AlertDialogDescription>
-          {removeError && <Alert variant="error" description={removeError} />}
-          <AlertDialogFooter>
-            <AlertDialogClose>
-              <Button variant="outline" disabled={removing}>
-                {t("common.cancel")}
-              </Button>
-            </AlertDialogClose>
-            <Button
-              variant="destructive"
-              disabled={removing}
-              onClick={handleConfirmRemoveAgent}
-            >
-              {removing ? t("common.saving") : t("common.delete")}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Manage access (who may create agents) */}
       <Sheet

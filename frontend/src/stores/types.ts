@@ -232,6 +232,11 @@ export interface AgentSlice {
     }
   ) => Promise<Agent>;
   deleteAgent: (name: string) => Promise<void>;
+  // stopAgent stops an agent: its machine runner is torn down and it processes
+  // no session messages until startAgent. The agent row is preserved.
+  stopAgent: (name: string) => Promise<void>;
+  // startAgent resumes a stopped agent so it processes messages again.
+  startAgent: (name: string) => Promise<void>;
   rotateAgentToken: (
     name: string,
     reason?: string
@@ -298,6 +303,7 @@ export interface MemberSummary {
   title: string;
   subtitle: string;
   connectionState?: AgentStatus_ConnectionState;
+  enabled?: boolean;
 }
 
 // MembersSlice owns the flat workspace directory that merges the user roster

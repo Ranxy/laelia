@@ -691,6 +691,38 @@ export declare type DeleteAgentRequest = Message<"laelia.v1.DeleteAgentRequest">
 export declare const DeleteAgentRequestSchema: GenMessage<DeleteAgentRequest>;
 
 /**
+ * @generated from message laelia.v1.StopAgentRequest
+ */
+export declare type StopAgentRequest = Message<"laelia.v1.StopAgentRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.StopAgentRequest.
+ * Use `create(StopAgentRequestSchema)` to create a new message.
+ */
+export declare const StopAgentRequestSchema: GenMessage<StopAgentRequest>;
+
+/**
+ * @generated from message laelia.v1.StartAgentRequest
+ */
+export declare type StartAgentRequest = Message<"laelia.v1.StartAgentRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.StartAgentRequest.
+ * Use `create(StartAgentRequestSchema)` to create a new message.
+ */
+export declare const StartAgentRequestSchema: GenMessage<StartAgentRequest>;
+
+/**
  * @generated from message laelia.v1.UpdateAgentACPConfigRequest
  */
 export declare type UpdateAgentACPConfigRequest = Message<"laelia.v1.UpdateAgentACPConfigRequest"> & {
@@ -1308,6 +1340,16 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
   canManageChannelMembers: boolean;
 
   /**
+   * enabled reports whether the agent is running. When false the agent has
+   * been stopped (StopAgent): its machine runner is torn down and it does not
+   * process session messages or run an LLM agent until StartAgent. Default
+   * true.
+   *
+   * @generated from field: bool enabled = 23;
+   */
+  enabled: boolean;
+
+  /**
    * machine_title is the display name (title) of the machine this agent is
    * bound to, resolved server-side by GetAgent so clients can render a
    * human-readable machine name without a second GetMachine round-trip (the
@@ -1438,12 +1480,12 @@ export declare type AgentSummary = Message<"laelia.v1.AgentSummary"> & {
   canManageChannelMembers: boolean;
 
   /**
-   * can_delete reports whether the current caller may delete this agent: its
-   * owner or a workspace-scope holder of laelia.agents.edit.
+   * enabled reports whether the agent is running; mirrors Agent.enabled (see
+   * there). False means the agent is stopped and processes no messages.
    *
-   * @generated from field: bool can_delete = 13;
+   * @generated from field: bool enabled = 15;
    */
-  canDelete: boolean;
+  enabled: boolean;
 };
 
 /**
@@ -1968,6 +2010,32 @@ export declare const AgentService: GenService<{
   deleteAgent: {
     methodKind: "unary";
     input: typeof DeleteAgentRequestSchema;
+    output: typeof EmptySchema;
+  },
+  /**
+   * StopAgent stops an agent: its machine runner is torn down and it no
+   * longer processes session messages or runs an LLM agent until StartAgent.
+   * The agent row is preserved (not deleted) and remains visible. Authorized
+   * in the handler for the agent's owner or a holder of laelia.agents.edit.
+   *
+   * @generated from rpc laelia.v1.AgentService.StopAgent
+   */
+  stopAgent: {
+    methodKind: "unary";
+    input: typeof StopAgentRequestSchema;
+    output: typeof EmptySchema;
+  },
+  /**
+   * StartAgent resumes a stopped agent: its machine runner is re-spawned and
+   * it resumes processing session messages. No-op (still succeeds) if the
+   * agent is already enabled. Authorized in the handler for the agent's owner
+   * or a holder of laelia.agents.edit.
+   *
+   * @generated from rpc laelia.v1.AgentService.StartAgent
+   */
+  startAgent: {
+    methodKind: "unary";
+    input: typeof StartAgentRequestSchema;
     output: typeof EmptySchema;
   },
   /**

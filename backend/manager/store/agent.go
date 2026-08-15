@@ -15,15 +15,23 @@ import (
 	models "github.com/Ranxy/laelia/backend/generated-go/store"
 )
 
-var agentDeleteTrue = true
+var (
+	agentDeleteTrue   = true
+	agentEnabledTrue  = true
+	agentEnabledFalse = false
+)
 
 type AgentMessage struct {
-	ID                 int
-	ResourceID         string
-	Name               string
-	TokenVersion       int
-	CreatedAt          time.Time
-	Deleted            bool
+	ID           int
+	ResourceID   string
+	Name         string
+	TokenVersion int
+	CreatedAt    time.Time
+	Deleted      bool
+	// Enabled reports whether the agent is running. When false the agent has
+	// been stopped (StopAgent): its machine runner is torn down and it
+	// processes no session messages until StartAgent.
+	Enabled            bool
 	Info               *models.AgentInfo
 	Status             *models.AgentStatus
 	LastTokenRotatedAt time.Time
@@ -90,6 +98,7 @@ type UpdateAgentMessage struct {
 	FollowOwnerPermissions  *bool
 	CanManageChannelMembers *bool
 	OwnerID                 *int
+	Enabled                 *bool
 }
 
 func (s *Store) GetAgent(ctx context.Context, id int) (*AgentMessage, error) {
@@ -194,6 +203,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 		agent.allow_add_to_channel,
 		agent.follow_owner_permissions,
 		agent.can_manage_channel_members,
+		agent.enabled,
 		agent.avatar_s3_key,
 		agent.machine_id,
 		machine.resource_id
@@ -236,6 +246,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 			&agentMessage.AllowAddToChannel,
 			&agentMessage.FollowOwnerPermissions,
 			&agentMessage.CanManageChannelMembers,
+			&agentMessage.Enabled,
 			&agentMessage.AvatarS3Key,
 			&machineID,
 			&machineResourceID,
@@ -475,6 +486,9 @@ func (s *Store) UpdateAgent(ctx context.Context, current *AgentMessage, patch *U
 	if v := patch.OwnerID; v != nil {
 		sets, args = append(sets, fmt.Sprintf("owner_id = $%d", len(args)+1)), append(args, *v)
 	}
+	if v := patch.Enabled; v != nil {
+		sets, args = append(sets, fmt.Sprintf("enabled = $%d", len(args)+1)), append(args, *v)
+	}
 
 	if len(sets) == 0 {
 		return current, nil
@@ -527,4 +541,31 @@ func (s *Store) DeleteAgent(ctx context.Context, resourceID string) error {
 		return err
 	}
 	return nil
+}
+
+// StopAgent disables an agent (enabled = false): its machine runner is torn
+// down and it processes no session messages until StartAgent. Returns the
+// updated agent.
+func (s *Store) StopAgent(ctx context.Context, resourceID string) (*AgentMessage, error) {
+	agent, err := s.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, err
+	}
+	if agent == nil {
+		return nil, errors.Errorf("agent %s not found", resourceID)
+	}
+	return s.UpdateAgent(ctx, agent, &UpdateAgentMessage{Enabled: &agentEnabledFalse})
+}
+
+// StartAgent re-enables a stopped agent (enabled = true) so it resumes
+// processing session messages. Returns the updated agent.
+func (s *Store) StartAgent(ctx context.Context, resourceID string) (*AgentMessage, error) {
+	agent, err := s.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, err
+	}
+	if agent == nil {
+		return nil, errors.Errorf("agent %s not found", resourceID)
+	}
+	return s.UpdateAgent(ctx, agent, &UpdateAgentMessage{Enabled: &agentEnabledTrue})
 }

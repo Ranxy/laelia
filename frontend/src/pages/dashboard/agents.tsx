@@ -4,7 +4,8 @@ type Lifecycle =
   | "waiting-connection"
   | "pending-config"
   | "ready"
-  | "configured-offline";
+  | "configured-offline"
+  | "stopped";
 
 // AgentLifecycleLike is the structural input agentLifecycle reads. It is
 // satisfied by both AgentSummary (list view: top-level provider/executable)
@@ -15,12 +16,15 @@ export interface AgentLifecycleLike {
   provider?: string;
   executable?: string;
   info?: { acpConfig?: { provider?: string; executable?: string } };
+  enabled?: boolean;
 }
 
 // agentLifecycle classifies an agent's operational state for both the left-rail
 // polling loop (we keep refreshing while any agent is non-ready) and the profile
 // tab's lifecycle label. Exported so agent-profile can render the same label.
 export function agentLifecycle(agent: AgentLifecycleLike): Lifecycle {
+  // A stopped agent is not processing, regardless of its connection state.
+  if (agent.enabled === false) return "stopped";
   const online = agent.status?.state === AgentStatus_ConnectionState.ONLINE;
   // An agent is "configured" when it has either a selected provider or a
   // custom executable. A built-in provider derives its command from the

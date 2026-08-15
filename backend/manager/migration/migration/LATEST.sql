@@ -170,6 +170,10 @@ CREATE TABLE agent (
     -- can_manage_channel_members: whether the agent may add/remove members in a
     -- channel where its owner is a channel Admin/Owner. Default TRUE.
     can_manage_channel_members boolean NOT NULL DEFAULT TRUE,
+    -- enabled: whether the agent is running. When false the agent has been
+    -- stopped (StopAgent): its machine runner is torn down and it processes no
+    -- session messages until StartAgent. Default TRUE.
+    enabled boolean NOT NULL DEFAULT TRUE,
     -- S3 object key of the agent's uploaded avatar image, empty when the agent
     -- has not uploaded one (frontend renders a deterministic pixel identicon instead).
     avatar_s3_key text NOT NULL DEFAULT ''
@@ -192,6 +196,9 @@ ALTER TABLE agent ADD COLUMN IF NOT EXISTS follow_owner_permissions boolean NOT 
 -- can_manage_channel_members: whether the agent may add/remove members in a
 -- channel where its owner is a channel Admin/Owner. Default TRUE.
 ALTER TABLE agent ADD COLUMN IF NOT EXISTS can_manage_channel_members boolean NOT NULL DEFAULT TRUE;
+
+-- enabled: whether the agent is running (stopped agents process no messages).
+ALTER TABLE agent ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT TRUE;
 
 -- owner_id: authorization authority for the agent, backfilled from created_by
 -- (mirrors the conversation table's created_by -> owner_id migration).

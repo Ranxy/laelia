@@ -528,7 +528,7 @@ function OwnedAgentRow({ agent }: { agent: AgentSummary }) {
           </span>
         )}
       </div>
-      <ConnectionBadge state={agent.status?.state} />
+      <ConnectionBadge state={agent.status?.state} enabled={agent.enabled} />
     </button>
   );
 }

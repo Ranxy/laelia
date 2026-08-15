@@ -112,6 +112,7 @@ function agent(overrides?: Partial<Agent>): Agent {
     tokenVersion: 0,
     createdBy: "users/1",
     canEdit: true,
+    enabled: true,
     avatar: "",
     machine: "machines/m1",
     allowAddToChannel: false,
@@ -170,6 +171,9 @@ function seedStore(overrides?: {
     updateAgentACPConfig: mock.updateAgentACPConfig,
     listPiModels: mock.listPiModels,
     transferAgentOwnership: mock.transferAgentOwnership,
+    stopAgent: vi.fn(),
+    startAgent: vi.fn(),
+    deleteAgent: vi.fn(),
   } as never);
 }
 

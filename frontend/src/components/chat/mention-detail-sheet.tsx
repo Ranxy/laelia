@@ -166,7 +166,10 @@ export function MentionDetailSheet({
                   {type === "agent" && agent && (
                     <>
                       <DetailRow label="Status">
-                        <ConnectionBadge state={agent.status?.state} />
+                        <ConnectionBadge
+                          state={agent.status?.state}
+                          enabled={agent.enabled}
+                        />
                       </DetailRow>
                       {agent.info?.hostname && (
                         <DetailRow label="Hostname">

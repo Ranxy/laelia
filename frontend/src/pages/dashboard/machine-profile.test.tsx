@@ -27,7 +27,6 @@ const mock = vi.hoisted(() => ({
   revokeMachineToken: vi.fn(),
   forceDisconnectMachine: vi.fn(),
   createAgent: vi.fn(),
-  deleteAgent: vi.fn(),
   getMachineIamPolicy: vi.fn(),
   setMachineIamPolicy: vi.fn(),
   listGroups: vi.fn(),
@@ -123,7 +122,6 @@ function agentSummary(overrides?: Partial<AgentSummary>): AgentSummary {
     owner: "users/1",
     followOwnerPermissions: true,
     canManageChannelMembers: true,
-    canDelete: true,
     ...overrides,
   } as unknown as AgentSummary;
 }
@@ -156,7 +154,6 @@ function seedStore(overrides?: {
     forceDisconnectMachine: mock.forceDisconnectMachine,
     transferMachineOwnership: mock.transferMachineOwnership,
     createAgent: mock.createAgent,
-    deleteAgent: mock.deleteAgent,
   } as never);
 }
 
@@ -205,7 +202,6 @@ beforeEach(() => {
   mock.revokeMachineToken.mockReset();
   mock.forceDisconnectMachine.mockReset();
   mock.createAgent.mockReset();
-  mock.deleteAgent.mockReset();
   mock.getMachineIamPolicy.mockReset();
   mock.setMachineIamPolicy.mockReset();
   mock.listGroups.mockReset();
@@ -228,7 +224,6 @@ beforeEach(() => {
   mock.revokeMachineToken.mockResolvedValue(undefined);
   mock.forceDisconnectMachine.mockResolvedValue(undefined);
   mock.createAgent.mockResolvedValue(undefined);
-  mock.deleteAgent.mockResolvedValue(undefined);
   mock.getMachineIamPolicy.mockResolvedValue({
     policy: { bindings: [] },
     etag: "etag-1",
@@ -405,23 +400,6 @@ describe("MachineProfilePage", () => {
     renderPage();
 
     expect(await screen.findByText("machine.no-agents")).toBeInTheDocument();
-  });
-
-  it("deletes an agent from the roster after confirmation", async () => {
-    mock.listMachineAgents.mockResolvedValue([agentSummary()]);
-    renderPage();
-
-    fireEvent.click(
-      await screen.findByRole("button", { name: "common.delete" })
-    );
-    // The confirm button in the alert dialog is the last "common.delete".
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "common.delete" }).at(-1)!
-    );
-
-    await waitFor(() => {
-      expect(mock.deleteAgent).toHaveBeenCalledWith("agents/a1");
-    });
   });
 
   it("shows the access card members and opens the manage sheet", async () => {

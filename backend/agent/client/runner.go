@@ -562,3 +562,16 @@ func (c *MachineClient) teardownRunners() {
 		r.stop()
 	}
 }
+
+// deleteAgentWorkspace permanently removes an agent's per-machine workspace
+// directory (used on DeleteAgent). Best-effort: a missing or already-removed
+// directory is treated as success.
+func (c *MachineClient) deleteAgentWorkspace(agentName string) {
+	agentID := bareAgentID(agentName)
+	dir := executor.AgentWorkingDir(c.machineID, agentID)
+	if err := os.RemoveAll(dir); err != nil {
+		slog.Warn("failed to remove agent workspace", "agent", agentName, "dir", dir, "error", err)
+		return
+	}
+	slog.Info("removed agent workspace", "agent", agentName, "dir", dir)
+}

@@ -497,11 +497,9 @@ func (s *MachineService) ListMachineAgents(ctx context.Context, req *connect.Req
 	// agents.edit lookup for the whole roster plus the per-row owner comparison
 	// (per-agent policy bindings are not consulted, so a custom role bound on
 	// the agent may still delete server-side while the UI hides the button).
-	canDelete := canDeleteAgentWorkspace(ctx, s.iam, caller)
 	resp := &v1pb.ListMachineAgentsResponse{}
 	for _, agent := range agents {
 		summary := convertToAgentSummary(ctx, s.store, agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
-		summary.CanDelete = canDelete || isAgentOwner(caller, agent)
 		resp.Agents = append(resp.Agents, summary)
 	}
 	return connect.NewResponse(resp), nil
@@ -689,6 +687,11 @@ func (s *MachineService) buildAssignedAgents(ctx context.Context, machineID int)
 	}
 	out := make([]*v1pb.AgentAssignment, 0, len(agents))
 	for _, agent := range agents {
+		// Stopped agents are not assigned: their runner must not be hosted by the
+		// machine app. They rejoin the roster on the next resync after StartAgent.
+		if !agent.Enabled {
+			continue
+		}
 		acp, err := resolveAcpConfigForDaemon(ctx, s.store, convertToV1AgentACPConfig(agent.Info.GetAcpConfig()))
 		if err != nil {
 			slog.Warn("failed to resolve acp config for assigned agent", "agent", agent.ResourceID, log.WithError(err))

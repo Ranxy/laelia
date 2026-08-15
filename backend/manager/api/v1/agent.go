@@ -250,11 +250,8 @@ func (s *AgentService) ListAgents(ctx context.Context, req *connect.Request[v1pb
 	// the per-row owner comparison (per-agent policy bindings are not
 	// consulted, so a custom role bound on the agent may still delete
 	// server-side while the list hides the button).
-	caller, _ := GetUserFromContext(ctx)
-	canDelete := canDeleteAgentWorkspace(ctx, s.iam, caller)
 	for _, agent := range agents {
 		summary := convertToAgentSummary(ctx, s.store, agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
-		summary.CanDelete = canDelete || isAgentOwner(caller, agent)
 		response.Agents = append(response.Agents, summary)
 	}
 	return connect.NewResponse(response), nil
@@ -457,8 +454,11 @@ func canDeleteAgentWorkspace(ctx context.Context, im *iam.Manager, user *store.U
 	return ok
 }
 
-func (s *AgentService) DeleteAgent(ctx context.Context, req *connect.Request[v1pb.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error) {
-	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
+// resolveEditableAgent loads a non-deleted agent by its resource name and
+// checks the caller may edit it (owner or laelia.agents.edit). Used by
+// DeleteAgent, StopAgent, and StartAgent.
+func (s *AgentService) resolveEditableAgent(ctx context.Context, name string, verb string) (*store.AgentMessage, error) {
+	resourceID, err := common.GetAgentResourceID(name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
@@ -469,20 +469,89 @@ func (s *AgentService) DeleteAgent(ctx context.Context, req *connect.Request[v1p
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
 	}
+	if agent.Deleted {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s has been deleted", resourceID))
+	}
 	user, _ := GetUserFromContext(ctx)
 	if !s.canEditAgent(ctx, user, agent) {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a holder of laelia.agents.edit can delete this agent"))
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("only the agent's owner or a holder of laelia.agents.edit can %s this agent", verb))
 	}
-	if err := s.store.DeleteAgent(ctx, resourceID); err != nil {
+	return agent, nil
+}
+
+func (s *AgentService) DeleteAgent(ctx context.Context, req *connect.Request[v1pb.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error) {
+	agent, err := s.resolveEditableAgent(ctx, req.Msg.Name, "delete")
+	if err != nil {
+		return nil, err
+	}
+	if err := s.store.DeleteAgent(ctx, agent.ResourceID); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to delete agent, error: %v", err))
 	}
 
-	// Best-effort: tell the machine app to tear down the deleted agent's runner.
-	// A missed push is harmless — the agent row is soft-deleted and won't appear
-	// in the next ConnectMachine resync, so the runner is simply not restarted.
+	// Best-effort: tear down the deleted agent's runner and remove its
+	// workspace on the machine. A missed push is harmless — the agent row is
+	// soft-deleted and won't appear in the next ConnectMachine resync, so the
+	// runner is simply not restarted.
+	if s.dispatcher != nil && agent.MachineID > 0 {
+		uid := common.FormatAgentUID(agent.ResourceID)
+		if pushErr := s.dispatcher.SendRemoveAgent(agent.MachineID, uid); pushErr != nil {
+			slog.Info("best-effort remove-agent push skipped", "agent", agent.ResourceID, "machineID", agent.MachineID, "error", pushErr)
+		}
+		if pushErr := s.dispatcher.SendDeleteAgentWorkspace(agent.MachineID, uid); pushErr != nil {
+			slog.Info("best-effort delete-agent-workspace push skipped", "agent", agent.ResourceID, "machineID", agent.MachineID, "error", pushErr)
+		}
+	}
+	return connect.NewResponse(&emptypb.Empty{}), nil
+}
+
+// StopAgent stops an agent: its machine runner is torn down and it processes
+// no session messages until StartAgent. The agent row is preserved.
+func (s *AgentService) StopAgent(ctx context.Context, req *connect.Request[v1pb.StopAgentRequest]) (*connect.Response[emptypb.Empty], error) {
+	agent, err := s.resolveEditableAgent(ctx, req.Msg.Name, "stop")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.store.StopAgent(ctx, agent.ResourceID); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to stop agent, error: %v", err))
+	}
+
+	// Best-effort: tear down the runner on the machine. A missed push is
+	// harmless — the agent is excluded from assigned_agents on the next resync,
+	// so the runner is simply not restarted.
 	if s.dispatcher != nil && agent.MachineID > 0 {
 		if pushErr := s.dispatcher.SendRemoveAgent(agent.MachineID, common.FormatAgentUID(agent.ResourceID)); pushErr != nil {
-			slog.Info("best-effort remove-agent push skipped", "agent", agent.ResourceID, "machineID", agent.MachineID, "error", pushErr)
+			slog.Info("best-effort stop-agent push skipped", "agent", agent.ResourceID, "machineID", agent.MachineID, "error", pushErr)
+		}
+	}
+	return connect.NewResponse(&emptypb.Empty{}), nil
+}
+
+// StartAgent resumes a stopped agent: its machine runner is re-spawned and it
+// resumes processing session messages. No-op (still succeeds) when already
+// enabled.
+func (s *AgentService) StartAgent(ctx context.Context, req *connect.Request[v1pb.StartAgentRequest]) (*connect.Response[emptypb.Empty], error) {
+	agent, err := s.resolveEditableAgent(ctx, req.Msg.Name, "start")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.store.StartAgent(ctx, agent.ResourceID); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to start agent, error: %v", err))
+	}
+
+	// Best-effort: tell the machine app to host the agent again. A missed push
+	// is recovered on the next ConnectMachine resync.
+	if s.dispatcher != nil && agent.MachineID > 0 {
+		assignmentAcp, resolveErr := resolveAcpConfigForDaemon(ctx, s.store, convertToV1AgentACPConfig(agent.Info.GetAcpConfig()))
+		if resolveErr != nil {
+			slog.Info("failed to resolve acp config for agent assignment", "agent", agent.ResourceID, log.WithError(resolveErr))
+		}
+		assignment := &v1pb.AgentAssignment{
+			AgentName:        common.FormatAgentUID(agent.ResourceID),
+			AgentDisplayName: agent.Name,
+			AcpConfig:        assignmentAcp,
+		}
+		if pushErr := s.dispatcher.SendAgentAssignment(agent.MachineID, assignment); pushErr != nil {
+			slog.Info("best-effort start-agent assignment push skipped", "agent", agent.ResourceID, "machineID", agent.MachineID, "error", pushErr)
 		}
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
@@ -1202,6 +1271,7 @@ func (s *AgentService) convertToAgent(ctx context.Context, agent *store.AgentMes
 		FollowOwnerPermissions:  agent.FollowOwnerPermissions,
 		CanManageChannelMembers: agent.CanManageChannelMembers,
 		Machine:                 common.FormatMachineUID(agent.MachineResourceID),
+		Enabled:                 agent.Enabled,
 	}
 	if agent.MachineID != 0 {
 		// The machine's display name rides along so clients can render a
@@ -1255,6 +1325,7 @@ func convertToAgentSummary(ctx context.Context, s *store.Store, agent *store.Age
 		FollowOwnerPermissions:  agent.FollowOwnerPermissions,
 		CanManageChannelMembers: agent.CanManageChannelMembers,
 		Machine:                 common.FormatMachineUID(agent.MachineResourceID),
+		Enabled:                 agent.Enabled,
 	}
 	if agent.Info != nil && agent.Info.AcpConfig != nil {
 		summary.Provider = agent.Info.AcpConfig.Provider

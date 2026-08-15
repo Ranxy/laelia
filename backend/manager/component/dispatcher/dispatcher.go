@@ -775,6 +775,12 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 	if err != nil || agent == nil {
 		return nil, errors.New("agent not found")
 	}
+	// A stopped agent must not run sessions: it stays idle and processes no
+	// session messages until StartAgent re-enables it.
+	if !agent.Enabled {
+		slog.Info("agent is stopped; staying idle", "agent", agent.ResourceID)
+		return &v1pb.BeginSessionResponse{Idle: true}, nil
+	}
 
 	// An agent must support an autonomous drain runtime (ACP or the bundled
 	// non-ACP pi runtime) to run a session. An agent with neither stays idle —
@@ -828,11 +834,26 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 	return &v1pb.BeginSessionResponse{CommandId: cmd.ID.String(), AgentDisplayName: agent.Name, OwnerDisplayName: ownerDisplayName}, nil
 }
 
+// agentStopped reports whether the agent has been stopped (StopAgent). A
+// stopped agent is still connectable but must not process session messages;
+// the notification methods skip delivery so it never begins a session.
+func (d *Dispatcher) agentStopped(ctx context.Context, agentID int) bool {
+	if d.store == nil {
+		return false
+	}
+	agent, err := d.store.GetAgent(ctx, agentID)
+	return err != nil || agent == nil || !agent.Enabled
+}
+
 // NotifyNewMessages pushes a NewMessagesAvailable hint to a connected agent so
 // it knows the conversation has advanced (e.g. another participant posted).
 // Phase 1 primarily calls this after assistant replies so multi-agent channels
 // can be informed; the action-less agent-autonomy gate arrives in Phase 2.
-func (d *Dispatcher) NotifyNewMessages(_ context.Context, agentID int, conversationID string, version int64) {
+func (d *Dispatcher) NotifyNewMessages(ctx context.Context, agentID int, conversationID string, version int64) {
+	// A stopped agent must not be woken to process messages.
+	if d.agentStopped(ctx, agentID) {
+		return
+	}
 	d.mu.RLock()
 	sess, ok := d.sessions[agentID]
 	d.mu.RUnlock()
@@ -860,7 +881,11 @@ func (d *Dispatcher) NotifyNewMessages(_ context.Context, agentID int, conversat
 // BeginSession, which authoritatively checks the per-channel cursors; the wake
 // itself carries no payload. Used on reconnect and (via NotifyNewMessages) when
 // any message lands in a conversation the agent is a member of.
-func (d *Dispatcher) NotifyWake(_ context.Context, agentID int) {
+func (d *Dispatcher) NotifyWake(ctx context.Context, agentID int) {
+	// A stopped agent must not be woken to check for work.
+	if d.agentStopped(ctx, agentID) {
+		return
+	}
 	d.mu.RLock()
 	sess, ok := d.sessions[agentID]
 	d.mu.RUnlock()
@@ -883,7 +908,11 @@ func (d *Dispatcher) NotifyWake(_ context.Context, agentID int) {
 // go straight to thread check/read. Best-effort like NotifyNewMessages: the
 // agent's durable cursor (advanced via ListThreadUpdates + AckProcessedVersion)
 // is the source of truth, so a missed wake is recovered on reconnect.
-func (d *Dispatcher) NotifyThreadMention(_ context.Context, agentID int, conversationID string, version int64, threadRootMessageID string) {
+func (d *Dispatcher) NotifyThreadMention(ctx context.Context, agentID int, conversationID string, version int64, threadRootMessageID string) {
+	// A stopped agent must not be woken to process a thread mention.
+	if d.agentStopped(ctx, agentID) {
+		return
+	}
 	d.mu.RLock()
 	sess, ok := d.sessions[agentID]
 	d.mu.RUnlock()
@@ -1579,4 +1608,22 @@ func marshalEventPayload(event *v1pb.CommandEvent) ([]byte, error) {
 	default:
 		return nil, nil
 	}
+}
+
+// SendDeleteAgentWorkspace tears down an agent's runner and deletes its
+// workspace directory on the machine (used on DeleteAgent). Best-effort: a
+// machine that is offline misses the push, and the workspace is not reclaimed
+// until a later explicit delete while the machine is connected.
+func (d *Dispatcher) SendDeleteAgentWorkspace(machineID int, agentName string) error {
+	d.mu.RLock()
+	sess, ok := d.machines[machineID]
+	d.mu.RUnlock()
+	if !ok {
+		return errors.New("machine is not connected")
+	}
+	return sess.Send(&v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_DeleteAgentWorkspace{
+			DeleteAgentWorkspace: &v1pb.DeleteAgentWorkspace{AgentName: agentName},
+		},
+	})
 }

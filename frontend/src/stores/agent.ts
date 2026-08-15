@@ -17,6 +17,8 @@ import {
   RefreshAgentProvidersRequestSchema,
   RevokeAgentTokenRequestSchema,
   RotateAgentTokenRequestSchema,
+  StartAgentRequestSchema,
+  StopAgentRequestSchema,
   TransferAgentOwnershipRequestSchema,
   UpdateAgentACPConfigRequestSchema,
   UpdateAgentMcpConfigRequestSchema,
@@ -135,6 +137,29 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     );
     set((state) => ({
       agents: state.agents.filter((a) => a.name !== name),
+    }));
+  },
+
+  async stopAgent(name: string) {
+    await agentServiceClient.stopAgent(
+      create(StopAgentRequestSchema, { name })
+    );
+    // Reflect the disabled state locally so the UI updates without a refetch.
+    set((state) => ({
+      agents: state.agents.map((a) =>
+        a.name === name ? { ...a, enabled: false } : a
+      ),
+    }));
+  },
+
+  async startAgent(name: string) {
+    await agentServiceClient.startAgent(
+      create(StartAgentRequestSchema, { name })
+    );
+    set((state) => ({
+      agents: state.agents.map((a) =>
+        a.name === name ? { ...a, enabled: true } : a
+      ),
     }));
   },
 

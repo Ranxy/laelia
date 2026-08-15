@@ -405,7 +405,10 @@ function MemberRow({
         ) : null}
       </div>
       {isAgent ? (
-        <ConnectionBadge state={member.connectionState} />
+        <ConnectionBadge
+          state={member.connectionState}
+          enabled={member.enabled}
+        />
       ) : (
         <span className="text-xs text-control-light">
           {t("members.kind-user")}

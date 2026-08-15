@@ -937,6 +937,14 @@ export declare type ManagerMachineStreamMessage = Message<"laelia.v1.ManagerMach
      */
     value: MachineWorkspaceScanRequest;
     case: "machineWorkspaceScanRequest";
+  } | {
+    /**
+     * stop the runner and delete an agent's workspace directory
+     *
+     * @generated from field: laelia.v1.DeleteAgentWorkspace delete_agent_workspace = 8;
+     */
+    value: DeleteAgentWorkspace;
+    case: "deleteAgentWorkspace";
   } | { case: undefined; value?: undefined };
 };
 
@@ -977,6 +985,25 @@ export declare type RemoveAgent = Message<"laelia.v1.RemoveAgent"> & {
  * Use `create(RemoveAgentSchema)` to create a new message.
  */
 export declare const RemoveAgentSchema: GenMessage<RemoveAgent>;
+
+/**
+ * DeleteAgentWorkspace tells the machine to tear down an agent's runner and
+ * permanently remove its workspace directory under the machine data root.
+ *
+ * @generated from message laelia.v1.DeleteAgentWorkspace
+ */
+export declare type DeleteAgentWorkspace = Message<"laelia.v1.DeleteAgentWorkspace"> & {
+  /**
+   * @generated from field: string agent_name = 1;
+   */
+  agentName: string;
+};
+
+/**
+ * Describes the message laelia.v1.DeleteAgentWorkspace.
+ * Use `create(DeleteAgentWorkspaceSchema)` to create a new message.
+ */
+export declare const DeleteAgentWorkspaceSchema: GenMessage<DeleteAgentWorkspace>;
 
 /**
  * @generated from message laelia.v1.AgentConfigUpdate

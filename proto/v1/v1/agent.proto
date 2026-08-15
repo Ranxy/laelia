@@ -67,6 +67,23 @@ service AgentService {
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
+  // StopAgent stops an agent: its machine runner is torn down and it no
+  // longer processes session messages or runs an LLM agent until StartAgent.
+  // The agent row is preserved (not deleted) and remains visible. Authorized
+  // in the handler for the agent's owner or a holder of laelia.agents.edit.
+  rpc StopAgent(StopAgentRequest) returns (google.protobuf.Empty) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
+  // StartAgent resumes a stopped agent: its machine runner is re-spawned and
+  // it resumes processing session messages. No-op (still succeeds) if the
+  // agent is already enabled. Authorized in the handler for the agent's owner
+  // or a holder of laelia.agents.edit.
+  rpc StartAgent(StartAgentRequest) returns (google.protobuf.Empty) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
 
   // Token rotation: generate a new bootstrap token, old token invalid after
   // grace period. Authorized in the handler for the agent's owner or a holder
@@ -403,6 +420,20 @@ message DeleteAgentRequest {
   ];
 }
 
+message StopAgentRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+}
+
+message StartAgentRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+}
+
 // --- Update ACP Config ---
 
 message UpdateAgentACPConfigRequest {
@@ -629,6 +660,12 @@ message Agent {
   // Default true.
   bool can_manage_channel_members = 20;
 
+  // enabled reports whether the agent is running. When false the agent has
+  // been stopped (StopAgent): its machine runner is torn down and it does not
+  // process session messages or run an LLM agent until StartAgent. Default
+  // true.
+  bool enabled = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // machine_title is the display name (title) of the machine this agent is
   // bound to, resolved server-side by GetAgent so clients can render a
   // human-readable machine name without a second GetMachine round-trip (the
@@ -685,9 +722,10 @@ message AgentSummary {
   // consumers can show whether the agent may manage members on its owner's
   // behalf.
   bool can_manage_channel_members = 12;
-  // can_delete reports whether the current caller may delete this agent: its
-  // owner or a workspace-scope holder of laelia.agents.edit.
-  bool can_delete = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // enabled reports whether the agent is running; mirrors Agent.enabled (see
+  // there). False means the agent is stopped and processes no messages.
+  bool enabled = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message AgentInfo {

@@ -64,6 +64,7 @@ export const createMembersSlice: AppSliceCreator<MembersSlice> = (
           title: a.title || a.name,
           subtitle: a.machine || "",
           connectionState: a.status?.state,
+          enabled: a.enabled,
         })),
       ].sort((x, y) => x.title.localeCompare(y.title));
 

@@ -31,6 +31,7 @@ vi.mock("@/connect", () => ({
             title: "Agent A",
             machine: "machines/m1",
             status: { state: 2 },
+            enabled: true,
           },
         ],
         nextPageToken: "",
@@ -67,6 +68,7 @@ describe("fetchMembers", () => {
         title: "Agent A",
         subtitle: "machines/m1",
         connectionState: 2,
+        enabled: true,
       },
       {
         kind: "user",

@@ -92,7 +92,8 @@
       "configured-offline": "Configured (offline)",
       "pending-config": "Connected — pending configuration",
       "ready": "Ready",
-      "waiting-connection": "Waiting for machine"
+      "waiting-connection": "Waiting for machine",
+      "stopped": "Stopped"
     },
     "mcp-empty": "No MCP servers are available to you yet. Ask an admin to create and grant one.",
     "mcp-my-section": "My MCP servers",
@@ -144,7 +145,14 @@
     "transfer-owner-target": "New owner",
     "transfer-owner-target-placeholder": "Select a user",
     "transfer-owner-title": "Transfer Agent Ownership",
-    "waiting-connection-hint": "This agent is picked up automatically by its machine — no per-agent command is needed. If it stays offline, make sure the machine is connected."
+    "waiting-connection-hint": "This agent is picked up automatically by its machine — no per-agent command is needed. If it stays offline, make sure the machine is connected.",
+    "stop-agent-confirm-title": "Stop agent",
+    "stop-agent-confirm-description": "This will tear down {{title}}'s machine runner and it will stop processing any session messages until you start it again. You can start it again at any time.",
+    "delete-agent-confirm-title": "Delete agent",
+    "delete-agent-confirm-description": "Are you sure you want to delete agent {{title}}? This will permanently delete the agent and its workspace on the machine, and cannot be undone.",
+    "stopped-toast": "Agent stopped",
+    "started-toast": "Agent started",
+    "deleted-toast": "Agent deleted"
   },
   "auth": {
     "device-login": {
@@ -447,7 +455,9 @@
     "sign-up": "Sign up",
     "toggle-password-visibility": "Toggle password visibility",
     "toggle-secret-visibility": "Toggle visibility",
-    "type-to-search": "Type to search..."
+    "type-to-search": "Type to search...",
+    "stop": "Stop",
+    "start": "Start"
   },
   "landing": {},
   "machine": {
@@ -522,8 +532,6 @@
     "providers": "Available Providers",
     "providers-refresh-failed": "Failed to refresh providers",
     "refresh-providers": "Refresh",
-    "remove-agent-confirm-description": "Are you sure you want to delete agent {{title}}? The machine will tear down its runner.",
-    "remove-agent-confirm-title": "Remove agent",
     "revoke-token": "Revoke Token",
     "revoke-token-confirm-description": "All tokens for this machine will be revoked and all active sessions terminated. The machine will be completely disconnected. To reconnect it, run `laelia-machine setup` on the host and approve the login again.",
     "revoke-token-confirm-title": "Revoke All Tokens",

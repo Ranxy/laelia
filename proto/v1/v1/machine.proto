@@ -427,6 +427,7 @@ message ManagerMachineStreamMessage {
     Pong pong = 5;
     ReloadAgentAssignment reload_agent_assignment = 6; // full re-sync of one agent
     MachineWorkspaceScanRequest machine_workspace_scan_request = 7; // scan per-agent workspace directories on this machine
+    DeleteAgentWorkspace delete_agent_workspace = 8; // stop the runner and delete an agent's workspace directory
   }
 }
 
@@ -435,6 +436,12 @@ message MachineReady {
 }
 
 message RemoveAgent {
+  string agent_name = 1;
+}
+
+// DeleteAgentWorkspace tells the machine to tear down an agent's runner and
+// permanently remove its workspace directory under the machine data root.
+message DeleteAgentWorkspace {
   string agent_name = 1;
 }
 
