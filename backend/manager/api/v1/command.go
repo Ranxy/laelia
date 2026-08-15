@@ -578,9 +578,11 @@ const maxLongPollWaitMs = 30000
 // subscription is not missed, and re-reads on every wake because not every
 // room-version bump produces messages this read can see (e.g. a thread reply
 // bumps the conversation version but is excluded from ListConversationMessages).
-// On timeout it returns the empty delta with the last-read current version so
-// the client can advance its cursor and re-issue. A nil hub (unit tests) skips
-// the wait and returns the re-read immediately.
+// On timeout or cancellation it returns the empty delta with the last-read
+// current version so the client can advance its cursor and re-issue — a canceled
+// long poll (client aborts the in-flight request, e.g. on unmount) is a normal
+// exit, not an error, and must not surface as a CodeCanceled. A nil hub (unit
+// tests) skips the wait and returns the re-read immediately.
 func (s *CommandService) longPollDelta(ctx context.Context, convID uuid.UUID, waitMs int32, readDelta func() ([]*store.ChatMessage, int64, error)) ([]*store.ChatMessage, int64, error) {
 	if s.roomhub == nil {
 		return readDelta()
@@ -613,7 +615,7 @@ func (s *CommandService) longPollDelta(ctx context.Context, convID uuid.UUID, wa
 		case <-timer.C:
 			return nil, currentVersion, nil
 		case <-ctx.Done():
-			return nil, 0, connect.NewError(connect.CodeCanceled, errors.Wrap(ctx.Err(), "long poll canceled"))
+			return nil, currentVersion, nil
 		}
 	}
 }

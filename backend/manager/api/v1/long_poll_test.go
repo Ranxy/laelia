@@ -102,3 +102,16 @@ func TestLongPollDeltaNilHubReturnsImmediately(t *testing.T) {
 	assert.Empty(t, msgs)
 	assert.Equal(t, int64(3), version)
 }
+
+func TestLongPollDeltaCancelReturnsEmptyDelta(t *testing.T) {
+	svc := &CommandService{roomhub: roomhub.New()}
+	convID := uuid.New()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // already canceled -> long poll exits immediately
+	msgs, version, err := svc.longPollDelta(ctx, convID, 25000, func() ([]*store.ChatMessage, int64, error) {
+		return nil, 7, nil
+	})
+	require.NoError(t, err)
+	assert.Empty(t, msgs)
+	assert.Equal(t, int64(7), version)
+}

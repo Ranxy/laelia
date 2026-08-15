@@ -68,7 +68,7 @@ func (*DebugInterceptor) debugInterceptorDo(ctx context.Context, fullMethod stri
 			connectErr = connect.NewError(connect.CodeUnknown, err)
 		}
 		switch connectErr.Code() {
-		case connect.CodeUnauthenticated, connect.CodeOutOfRange, connect.CodePermissionDenied, connect.CodeNotFound, connect.CodeInvalidArgument:
+		case connect.CodeUnauthenticated, connect.CodeOutOfRange, connect.CodePermissionDenied, connect.CodeNotFound, connect.CodeInvalidArgument, connect.CodeCanceled:
 			logLevel = slog.LevelDebug
 			logMsg = "client error"
 		case connect.CodeInternal, connect.CodeUnknown, connect.CodeDataLoss, connect.CodeUnavailable, connect.CodeDeadlineExceeded:
