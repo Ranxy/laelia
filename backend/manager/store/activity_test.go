@@ -146,3 +146,52 @@ func TestPlanActivityUpserts(t *testing.T) {
 		assert.Equal(t, int32(ActivityCategoryTask), targets[0].cats)
 	})
 }
+
+// TestExcludeSenderFromActivity locks in the sender-exclusion contract: a user
+// is dropped from MENTION and THREAD (self-notifications) but keeps TASK and
+// REMINDER, so the creator of a task/reminder still sees it in their own
+// activity feed (mirroring agent-created tasks, where the owner sees the task
+// because the agent sender is never in the user sets).
+func TestExcludeSenderFromActivity(t *testing.T) {
+	t.Run("task creator keeps TASK", func(t *testing.T) {
+		mention := map[int]int32{7: ActivityCategoryMention}
+		thread := map[int]int32{7: ActivityCategoryTask}
+		excludeSenderFromActivity(mention, thread, 7)
+		assert.Equal(t, int32(ActivityCategoryTask), thread[7],
+			"the task creator must keep TASK activity")
+		_, ok := mention[7]
+		assert.False(t, ok, "self-mention must be dropped")
+	})
+
+	t.Run("reminder creator keeps REMINDER", func(t *testing.T) {
+		mention := map[int]int32{}
+		thread := map[int]int32{7: ActivityCategoryReminder}
+		excludeSenderFromActivity(mention, thread, 7)
+		assert.Equal(t, int32(ActivityCategoryReminder), thread[7],
+			"the reminder creator must keep REMINDER activity")
+	})
+
+	t.Run("thread reply drops THREAD", func(t *testing.T) {
+		mention := map[int]int32{}
+		thread := map[int]int32{7: ActivityCategoryThread}
+		excludeSenderFromActivity(mention, thread, 7)
+		_, ok := thread[7]
+		assert.False(t, ok, "a user must not get THREAD activity for their own reply")
+	})
+
+	t.Run("task reply keeps TASK but drops THREAD", func(t *testing.T) {
+		mention := map[int]int32{}
+		thread := map[int]int32{7: ActivityCategoryTask | ActivityCategoryThread}
+		excludeSenderFromActivity(mention, thread, 7)
+		assert.Equal(t, int32(ActivityCategoryTask), thread[7],
+			"a reply to one's own task keeps TASK but drops THREAD")
+	})
+
+	t.Run("other users are untouched", func(t *testing.T) {
+		mention := map[int]int32{8: ActivityCategoryMention}
+		thread := map[int]int32{8: ActivityCategoryTask}
+		excludeSenderFromActivity(mention, thread, 7)
+		assert.Equal(t, int32(ActivityCategoryMention), mention[8])
+		assert.Equal(t, int32(ActivityCategoryTask), thread[8])
+	})
+}

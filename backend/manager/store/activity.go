@@ -365,6 +365,24 @@ func planActivityUpserts(isDM, inThread bool, messageID, conversationID, effecti
 	return targets
 }
 
+// excludeSenderFromActivity removes the sender from the per-user category maps
+// so a user never gets a self-notification. It drops MENTION (self-mention,
+// already filtered upstream) and THREAD (the sender's own reply) entirely, but
+// keeps TASK/REMINDER: the creator of a task/reminder must see it in their own
+// activity feed to track it, mirroring agent-created tasks where the owner sees
+// the task because the agent sender is never in the user sets.
+func excludeSenderFromActivity(mentionCats, threadCats map[int]int32, senderID int) {
+	delete(mentionCats, senderID)
+	if cats, ok := threadCats[senderID]; ok {
+		cats &^= ActivityCategoryThread
+		if cats == 0 {
+			delete(threadCats, senderID)
+		} else {
+			threadCats[senderID] = cats
+		}
+	}
+}
+
 // generateActivityRows is the synchronous body of GenerateActivityForMessage.
 // See GenerateActivityForMessage for the dispatch policy and the doc below for
 // the targeting/folding contract.
@@ -469,18 +487,23 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 			}
 		}
 	}
-	// Exclude the sender so a user never gets activity for its own message. This
-	// applies only to USER-sent messages: their PrincipalID is the sender's own
-	// principal id. An AGENT/SYSTEM message carries the conversation owner (or the
-	// system bot) as PrincipalID — NOT the agent sender — and the owner IS a
-	// conversation member, so deleting by PrincipalID there would wrongly drop the
-	// owner from TASK/REMINDER/THREAD activity for agent replies in their own
-	// conversations. The agent sender is never in the user sets above (only
-	// type=="user" mentions and user members/participants are), so there is nothing
-	// to exclude for agent/system messages.
+	// Exclude the sender from self-notifications. This applies only to
+	// USER-sent messages: their PrincipalID is the sender's own principal id.
+	// An AGENT/SYSTEM message carries the conversation owner (or the system
+	// bot) as PrincipalID — NOT the agent sender — and the owner IS a
+	// conversation member, so deleting by PrincipalID there would wrongly drop
+	// the owner from TASK/REMINDER/THREAD activity for agent replies in their
+	// own conversations. The agent sender is never in the user sets above (only
+	// type=="user" mentions and user members/participants are), so there is
+	// nothing to exclude for agent/system messages.
+	//
+	// A user is excluded from MENTION (self-mention, already dropped upstream)
+	// and THREAD (their own reply), but NOT from TASK/REMINDER: the creator of
+	// a task/reminder must see it in their own activity feed to track it,
+	// mirroring agent-created tasks where the owner sees the task because the
+	// agent sender is never in the user sets.
 	if msg.SenderType == SenderTypeUser {
-		delete(mentionCats, msg.PrincipalID)
-		delete(threadCats, msg.PrincipalID)
+		excludeSenderFromActivity(mentionCats, threadCats, msg.PrincipalID)
 	}
 
 	// effectiveRoot is the thread this message belongs to, for folding and for the
