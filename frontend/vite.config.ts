@@ -17,6 +17,12 @@ export default defineConfig({
     // them across deploys.
     chunkSizeWarningLimit: 800,
     rollupOptions: {
+      checks: {
+        // markstream-react's published dist contains misplaced /* @__PURE__ */
+        // comments (e.g. after `case "xxx":` labels). Rolldown warns and
+        // ignores them; they are harmless. Silence the noise.
+        invalidAnnotation: false,
+      },
       output: {
         // Rolldown's manualChunks takes a function. Bucket the big, stable
         // vendors into cacheable chunks so the entry chunk stays lean.
