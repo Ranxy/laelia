@@ -565,6 +565,8 @@ func (s *Store) fillTaskInfo(ctx context.Context, msgs []*ChatMessage) error {
 		case 1:
 			ti.AssigneeName = userName
 			ti.AssigneeResourceID = userHandle
+		default:
+			return errors.New("Incorrect AssigneeType")
 		}
 		info[msgID] = &ti
 	}
