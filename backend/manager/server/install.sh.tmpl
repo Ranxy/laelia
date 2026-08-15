@@ -1,0 +1,188 @@
+#!/bin/sh
+# laelia-machine installer — downloads the prebuilt binary from the manager,
+# verifies its sha256 against the manifest, and installs it onto PATH.
+#
+#   curl -fsSL https://<manager>/machine/install.sh | sh
+#
+# Env overrides:
+#   LAELIA_MACHINE_INSTALL_DIR   install dir; default = $HOME/.local/bin
+#   LAELIA_MACHINE_FORCE         set to 1 to reinstall even if already present
+set -eu
+
+MANAGER_URL="${LAELIA_MANAGER_URL:-__LAELIA_MANAGER_URL__}"
+BIN_NAME="laelia-machine"
+INSTALL_DIR="${LAELIA_MACHINE_INSTALL_DIR:-$HOME/.local/bin}"
+DEFAULT_INSTALL_DIR="$HOME/.local/bin"
+FORCE="${LAELIA_MACHINE_FORCE:-0}"
+
+err() { printf '[install] error: %s\n' "$1" >&2; exit 1; }
+info() { printf '[install] %s\n' "$1" >&2; }
+
+need() { command -v "$1" >/dev/null 2>&1 || err "missing required tool: $1"; }
+need uname; need mkdir; need chmod; need mv
+if command -v curl >/dev/null 2>&1; then
+  DLO="curl -fsSL -o"
+  DLP="curl -fL --retry 3 --retry-delay 1 --progress-bar -o"
+elif command -v wget >/dev/null 2>&1; then
+  DLO="wget -qO"
+  DLP="wget --tries=3 --show-progress -O"
+else err "need curl or wget"; fi
+
+[ -n "$MANAGER_URL" ] || err "manager URL is not set; re-fetch this script from your manager"
+
+detect_target() {
+  os="$(uname -s)"
+  case "$os" in
+    Linux)  PLAT="linux" ;;
+    Darwin) PLAT="darwin" ;;
+    *) err "unsupported OS: $os (this installer handles Linux + macOS; Windows uses install.ps1)" ;;
+  esac
+  machine="$(uname -m)"
+  case "$machine" in
+    arm64|aarch64) ARCH="arm64" ;;
+    x86_64|amd64)  ARCH="x64" ;;
+    *) err "unsupported arch: $machine" ;;
+  esac
+  TARGET="${PLAT}-${ARCH}"
+}
+detect_target
+
+BASE="${MANAGER_URL%/}/machine"
+
+info "resolving manifest from ${BASE}/manifest.json"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+$DLO "$tmp/manifest.json" "${BASE}/manifest.json" || err "failed to download manifest.json"
+
+flat_manifest="$(tr -d '\n' < "$tmp/manifest.json")"
+target_body="$(printf '%s' "$flat_manifest" | awk -v key="\"${TARGET}\"" '
+  {
+    s = $0
+    n = index(s, key)
+    if (n == 0) exit
+    rest = substr(s, n + length(key))
+    sub(/^[[:space:]]*:[[:space:]]*\{/, "", rest)
+    depth = 1
+    out = ""
+    for (i = 1; i <= length(rest); i++) {
+      c = substr(rest, i, 1)
+      if (c == "{") depth++
+      else if (c == "}") {
+        depth--
+        if (depth == 0) { print out; exit }
+      }
+      out = out c
+    }
+  }
+')"
+[ -n "$target_body" ] || err "no prebuilt binary for ${TARGET} in manifest"
+
+strip_nested() {
+  printf '%s' "$1" | awk '{
+    s = $0; depth = 0; out = ""
+    for (i = 1; i <= length(s); i++) {
+      c = substr(s, i, 1)
+      if (c == "{") { depth++; continue }
+      if (c == "}") { depth--; continue }
+      if (depth == 0) out = out c
+    }
+    print out
+  }'
+}
+extract_gz_body() {
+  printf '%s' "$1" | awk '{
+    s = $0; n = length(s); depth = 0
+    for (i = 1; i <= n; i++) {
+      c = substr(s, i, 1)
+      if (c == "{") { depth++; continue }
+      if (c == "}") { depth--; continue }
+      if (c == "\"" && depth == 0 && substr(s, i, 4) == "\"gz\"") {
+        j = i + 4
+        while (j <= n && substr(s, j, 1) ~ /[[:space:]]/) j++
+        if (substr(s, j, 1) != ":") continue
+        j++
+        while (j <= n && substr(s, j, 1) ~ /[[:space:]]/) j++
+        if (substr(s, j, 1) != "{") exit
+        d = 1; out = ""
+        for (k = j + 1; k <= n; k++) {
+          ck = substr(s, k, 1)
+          if (ck == "{") d++
+          else if (ck == "}") { d--; if (d == 0) { print out; exit } }
+          out = out ck
+        }
+      }
+    }
+  }'
+}
+outer_block="$(strip_nested "$target_body")"
+gz_inner="$(strip_nested "$(extract_gz_body "$target_body")")"
+
+extract_str() {
+  printf '%s' "$1" | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p"
+}
+extract_num() {
+  printf '%s' "$1" | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p"
+}
+
+FILE="$(extract_str "$outer_block" file)"
+WANT_SHA="$(extract_str "$outer_block" sha256)"
+[ -n "$FILE" ] && [ -n "$WANT_SHA" ] || err "manifest entry for ${TARGET} missing file/sha256"
+
+GZ_FILE="$(extract_str "$gz_inner" file)"
+GZ_WANT_SHA="$(extract_str "$gz_inner" sha256)"
+[ -n "$GZ_FILE" ] && [ -n "$GZ_WANT_SHA" ] || err "manifest entry for ${TARGET} missing gz file/sha256"
+
+if command -v sha256sum >/dev/null 2>&1; then SHA_CMD="sha256sum";
+elif command -v shasum >/dev/null 2>&1; then SHA_CMD="shasum -a 256";
+else err "need sha256sum or shasum to verify the download"; fi
+
+info "downloading ${GZ_FILE}…"
+$DLP "$tmp/$GZ_FILE" "${BASE}/bin/${TARGET}" || err "failed to download ${GZ_FILE}"
+GOT_GZ_SHA="$($SHA_CMD "$tmp/$GZ_FILE" | awk '{print $1}')"
+[ "$GOT_GZ_SHA" = "$GZ_WANT_SHA" ] || err "sha256 mismatch for ${GZ_FILE} (got ${GOT_GZ_SHA}, want ${GZ_WANT_SHA})"
+info "compressed sha256 verified"
+
+command -v gunzip >/dev/null 2>&1 || err "missing required tool: gunzip"
+info "decompressing…"
+gunzip -c "$tmp/$GZ_FILE" > "$tmp/$FILE" || err "failed to gunzip ${GZ_FILE}"
+GOT_SHA="$($SHA_CMD "$tmp/$FILE" | awk '{print $1}')"
+[ "$GOT_SHA" = "$WANT_SHA" ] || err "sha256 mismatch for ${FILE} after decompression (got ${GOT_SHA}, want ${WANT_SHA})"
+info "binary sha256 verified"
+
+mkdir -p "$INSTALL_DIR"
+chmod +x "$tmp/$FILE"
+install_stage="$INSTALL_DIR/.${BIN_NAME}.install.$$"
+cp "$tmp/$FILE" "$install_stage" || err "failed to stage verified binary"
+chmod +x "$install_stage"
+STAGED_SHA="$($SHA_CMD "$install_stage" | awk '{print $1}')"
+[ "$STAGED_SHA" = "$WANT_SHA" ] || err "sha256 mismatch after staging install candidate"
+mv -f "$install_stage" "$INSTALL_DIR/$BIN_NAME" || err "failed to atomically promote verified install candidate"
+info "installed to ${INSTALL_DIR}/${BIN_NAME}"
+
+case ":${PATH}:" in
+  *":${INSTALL_DIR}:"*) ;;
+  *)
+    if [ "$INSTALL_DIR" = "$DEFAULT_INSTALL_DIR" ]; then
+      shell_path="${SHELL:-}"
+      shell_name="${shell_path##*/}"
+      case "$shell_name" in
+        zsh) shell_config="${ZDOTDIR:-$HOME}/.zshrc" ;;
+        bash) shell_config="$HOME/.bashrc" ;;
+        *) shell_config="" ;;
+      esac
+      if [ -n "$shell_config" ]; then
+        path_line='export PATH="$HOME/.local/bin:$PATH"'
+        if ! grep -Fqx "$path_line" "$shell_config" 2>/dev/null; then
+          printf '\n# laelia-machine\n%s\n' "$path_line" >> "$shell_config" || true
+          info "added ${INSTALL_DIR} to PATH in ${shell_config}"
+        fi
+      else
+        info "note: add ${INSTALL_DIR} to your PATH"
+      fi
+    else
+      info "note: add ${INSTALL_DIR} to your PATH"
+    fi
+    ;;
+esac
+
+info "done — run: ${BIN_NAME} --manager ${MANAGER_URL} setup"

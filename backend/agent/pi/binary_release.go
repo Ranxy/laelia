@@ -14,22 +14,12 @@ import (
 	"github.com/Ranxy/laelia/backend/agent/home"
 )
 
-// embeddedDist is the standalone pi distribution baked in at compile time.
-// The release build script (scripts/build-pi.sh) downloads and extracts the
-// target-platform distribution into backend/agent/pi/embedded/dist before
-// `go build -tags release`. pi resolves its runtime assets (theme/,
-// package.json, node_modules/, ...) relative to its executable, so the whole
-// distribution is embedded and materialized together, not just the binary.
-//
-//go:embed embedded/dist
-var embeddedDist embed.FS
-
-// ResolveBinary extracts the embedded pi distribution to a per-machine cache
+// resolveBinary extracts the embedded pi distribution to a per-machine cache
 // directory (content-addressed by a hash so it is written once and reused)
 // and returns the pi binary path. An embedded blob cannot be exec'd directly,
 // so the binary is materialized on disk with mode 0700 alongside its assets.
-func ResolveBinary() (string, error) {
-	distFS, err := fs.Sub(embeddedDist, "embedded/dist")
+func resolveBinary(embeddedDist embed.FS, subPath string) (string, error) {
+	distFS, err := fs.Sub(embeddedDist, subPath)
 	if err != nil {
 		return "", err
 	}
@@ -38,7 +28,11 @@ func ResolveBinary() (string, error) {
 		return "", err
 	}
 	dir := home.Join("bin", "pi-"+hex.EncodeToString(sum[:8])+"-"+runtime.GOOS+"-"+runtime.GOARCH)
-	binPath := filepath.Join(dir, "pi")
+	binName := "pi"
+	if runtime.GOOS == "windows" {
+		binName = "pi.exe"
+	}
+	binPath := filepath.Join(dir, binName)
 	if info, err := os.Stat(binPath); err == nil && info.Size() > 0 {
 		return binPath, nil
 	}
@@ -58,7 +52,7 @@ func ResolveBinary() (string, error) {
 			return err
 		}
 		mode := fs.FileMode(0o600)
-		if name == "pi" {
+		if name == binName {
 			mode = 0o700
 		}
 		return os.WriteFile(target, data, mode)

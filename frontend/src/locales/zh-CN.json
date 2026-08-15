@@ -535,7 +535,12 @@
       "step-command": "1. 在机器上运行此命令",
       "step-wait": "2. 等待机器连接",
       "title": "添加机器",
-      "waiting": "正在等待机器连接…请运行上面的命令,并在打开的浏览器页面中批准登录。"
+      "waiting": "正在等待机器连接…请运行上面的命令,并在打开的浏览器页面中批准登录。",
+      "step-install": "1. 安装机器应用",
+      "install-hint": "在要连接的电脑上运行：",
+      "install-os-linux": "Linux",
+      "install-os-macos": "macOS",
+      "install-os-windows": "Windows"
     },
     "no-agents": "该机器上尚未托管任何 Agent。",
     "no-providers": "尚未发现任何 Provider。请在宿主上启动机器应用并点击刷新。",

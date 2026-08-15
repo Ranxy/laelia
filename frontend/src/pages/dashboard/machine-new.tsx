@@ -5,16 +5,27 @@ import { useNavigate } from "react-router-dom";
 import { Card, Field } from "@/components/profile-common";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { buildMachineSetupCommand } from "@/lib/machine-token";
+import {
+  buildMachineInstallCommand,
+  buildMachineSetupCommand,
+  type MachineInstallOS,
+} from "@/lib/machine-token";
 import { useAppStore } from "@/stores";
 import type { MachineSummary } from "@/types/proto-es/v1/machine_pb";
 
+function detectInstallOS(): MachineInstallOS {
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes("win")) return "windows";
+  if (ua.includes("mac")) return "macos";
+  return "linux";
+}
+
 // MachineNewPage is the create-machine waiting page. It no longer creates a
-// machine directly: it shows the `laelia-machine setup` command, then watches
-// ListMachines for a machine that was created by the current user after this
-// page opened (i.e. the machine the user just approved on the device-login
-// page). When one appears, the user confirms/renames it and is taken to its
-// profile.
+// machine directly: it shows the install command + `laelia-machine setup`
+// command, then watches ListMachines for a machine that was created by the
+// current user after this page opened (i.e. the machine the user just approved
+// on the device-login page). When one appears, the user confirms/renames it
+// and is taken to its profile.
 export function MachineNewPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -27,6 +38,10 @@ export function MachineNewPage() {
   // pageOpenTime anchors "new": only machines created after this page opened
   // and by the current user count as the machine being set up right now.
   const pageOpenTime = useRef(Date.now());
+  const [installOS, setInstallOS] = useState<MachineInstallOS>(() =>
+    detectInstallOS()
+  );
+  const [installCopied, setInstallCopied] = useState(false);
   const [copied, setCopied] = useState(false);
   const [candidate, setCandidate] = useState<MachineSummary | undefined>(
     undefined
@@ -41,6 +56,7 @@ export function MachineNewPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const installCommand = buildMachineInstallCommand(installOS);
   const command = buildMachineSetupCommand();
 
   const poll = useCallback(async () => {
@@ -80,6 +96,16 @@ export function MachineNewPage() {
     });
   }, [candidate, currentUser, machines, getMachine]);
 
+  async function handleCopyInstall() {
+    try {
+      await navigator.clipboard.writeText(installCommand);
+      setInstallCopied(true);
+      setTimeout(() => setInstallCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable; the command is visible for manual copy.
+    }
+  }
+
   async function handleCopy() {
     try {
       await navigator.clipboard.writeText(command);
@@ -104,6 +130,12 @@ export function MachineNewPage() {
     }
   }
 
+  const installOSOptions: { value: MachineInstallOS; label: string }[] = [
+    { value: "linux", label: t("machine.new.install-os-linux") },
+    { value: "macos", label: t("machine.new.install-os-macos") },
+    { value: "windows", label: t("machine.new.install-os-windows") },
+  ];
+
   return (
     <div className="h-full overflow-y-auto p-6">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
@@ -115,6 +147,43 @@ export function MachineNewPage() {
             {t("machine.new.description")}
           </p>
         </div>
+
+        <Card title={t("machine.new.step-install")}>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-control-light">
+              {t("machine.new.install-hint")}
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {installOSOptions.map((opt) => (
+                <Button
+                  key={opt.value}
+                  variant={installOS === opt.value ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setInstallOS(opt.value)}
+                >
+                  {opt.label}
+                </Button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 rounded bg-white border border-control-border px-3 py-2 font-mono text-xs break-all text-black dark:bg-zinc-900 dark:text-white">
+                {installCommand}
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handleCopyInstall()}
+              >
+                {installCopied ? (
+                  <Check className="size-4 text-success" />
+                ) : (
+                  <Copy className="size-4" />
+                )}
+                {installCopied ? t("common.copied") : t("common.copy")}
+              </Button>
+            </div>
+          </div>
+        </Card>
 
         <Card title={t("machine.new.step-command")}>
           <div className="flex flex-col gap-3">

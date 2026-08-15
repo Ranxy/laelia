@@ -20,8 +20,8 @@ RUN go mod download
 COPY . .
 RUN apk add --no-cache curl bash
 # build-pi.sh downloads the pi distribution matching the build target platform
-# and writes it to backend/agent/pi/embedded/dist, which the release-tagged
-# machine build then embeds.
+# and writes it to backend/agent/pi/embedded/dist-<goos>-<goarch>, which the
+# release-tagged machine build then embeds.
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 ENV PI_PROXY=${PI_PROXY}
 RUN ./scripts/build-pi.sh

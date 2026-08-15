@@ -104,11 +104,11 @@ cd proto && buf generate
 ### Build & Docker
 
 ```bash
-# Local monolithic build: frontend -> embedded into manager, pi -> embedded into machine
+# Local monolithic build: frontend + per-platform machine binaries -> embedded into manager
 scripts/build_laelia.sh                             # outputs build/laelia + build/laelia-machine
 LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia.sh  # route the pi GitHub download through a proxy
 
-# Docker images (manager image embeds the frontend; machine image embeds pi)
+# Docker images (manager image embeds frontend + machine binaries; machine image embeds pi)
 LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_manager_docker.sh  # -> laelia/manager:local
 LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_machine_docker.sh  # -> laelia/machine:local
 ```
@@ -116,12 +116,16 @@ LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_machine_docker.sh  # ->
 Notes:
 
 - `scripts/build-pi.sh` downloads and checksum-verifies the standalone pi
-  distribution (binary + runtime assets) into `backend/agent/pi/embedded/dist`
-  before any `go build -tags release`. It is idempotent (recorded
-  version/platform in `pi.meta`); use `PI_FORCE=1` to re-download.
-- `backend/agent/pi/embedded/dist/pi` is a tracked 0-byte placeholder. A
-  release build replaces it with the real (large) binary; restore it with
-  `git restore backend/agent/pi/embedded/dist/pi` before committing.
+  distribution (binary + runtime assets) into
+  `backend/agent/pi/embedded/dist-<goos>-<goarch>` before any
+  `go build -tags release`. It is idempotent (recorded version/platform in
+  `pi.meta`); use `PI_FORCE=1` to re-download.
+- Each `backend/agent/pi/embedded/dist-*/pi` is a tracked 0-byte placeholder.
+  A release build replaces it with the real (large) binary; restore it with
+  `git restore backend/agent/pi/embedded/dist-*/pi` before committing.
+- `scripts/build_laelia.sh` cross-compiles linux-x64 / windows-x64 /
+  darwin-arm64 machine binaries, gzips them, and embeds them into the manager
+  (`backend/manager/server/embedded_machine/`, gitignored).
 - The manager image needs `LAELIA_PG_URL`; the machine image needs
   `LAELIA_MANAGER_URL` and `LAELIA_TOKEN` (its entrypoint maps these env vars
   to CLI flags, adding `--allow-http` for `http://` URLs automatically).

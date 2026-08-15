@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # build-pi.sh — materialize the standalone pi distribution that the release
 # build embeds into laelia (see backend/agent/pi/binary_release.go's
-# `//go:embed embedded/dist`). Run this BEFORE `go build -tags release` for a
-# target platform.
+# `//go:embed embedded/dist-<goos>-<goarch>`). Run this BEFORE
+# `go build -tags release` for a target platform.
 #
 # pi publishes prebuilt standalone binaries on its GitHub releases for
 # linux/darwin/windows on x64+arm64. This script downloads the archive matching
 # the target GOOS/GOARCH, verifies it against the release's SHA256SUMS, and
 # extracts the whole distribution (binary + theme/, node_modules/, wasm, etc.)
-# to backend/agent/pi/embedded/dist/. pi resolves its runtime assets relative
-# to its own executable, so embedding only the binary crashes at startup
-# (missing theme/dark.json).
+# to backend/agent/pi/embedded/dist-<goos>-<goarch>/. pi resolves its runtime
+# assets relative to its own executable, so embedding only the binary crashes
+# at startup (missing theme/dark.json).
 #
 # Usage:
 #   scripts/build-pi.sh                       # current platform
@@ -26,12 +26,13 @@ PI_VERSION="${PI_VERSION:-v0.82.1}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 OUT_DIR="${REPO_ROOT}/backend/agent/pi/embedded"
-OUT_FILE="${OUT_DIR}/dist/pi"
-META_FILE="${OUT_DIR}/dist/pi.meta"
 
 # Resolve target platform (defaults to the build host).
 GOOS_TARGET="${GOOS:-$(go env GOOS)}"
 GOARCH_TARGET="${GOARCH:-$(go env GOARCH)}"
+DIST_DIR="${OUT_DIR}/dist-${GOOS_TARGET}-${GOARCH_TARGET}"
+OUT_FILE="${DIST_DIR}/pi"
+META_FILE="${DIST_DIR}/pi.meta"
 
 # pi's release asset naming: pi-{os}-{arch}.tar.gz (windows uses .zip).
 # Go's amd64 maps to pi's x64; arm64 is unchanged.
@@ -85,8 +86,8 @@ if [[ "${expected}" != "${actual}" ]]; then
 fi
 echo "build-pi: checksum OK (${actual})"
 
-rm -rf "${OUT_DIR}/dist"
-mkdir -p "${OUT_DIR}"
+rm -rf "${DIST_DIR}"
+mkdir -p "${DIST_DIR}"
 
 if [[ "${ext}" == "zip" ]]; then
   (cd "${workdir}" && unzip -o "${archive}" -d extracted)
@@ -96,13 +97,17 @@ else
 fi
 
 # The archive contains the standalone `pi` binary at its root (or under a
-# single top directory). Locate the distribution root and copy it in whole.
-bin_path="$(find "${workdir}/extracted" -type f -name pi -perm -u+x | head -n1)"
+# single top directory). Locate the binary and copy the whole distribution
+# root (the directory containing it) into DIST_DIR.
+bin_path="$(find "${workdir}/extracted" -type f \( -name pi -o -name pi.exe \) | head -n1)"
 if [[ -z "${bin_path}" ]]; then
   echo "build-pi: pi binary not found in archive" >&2
   exit 1
 fi
-cp -a "$(dirname "${bin_path}")" "${OUT_DIR}/dist"
+OUT_FILE="${DIST_DIR}/$(basename "${bin_path}")"
+# Copy the *contents* of the distribution root so DIST_DIR/pi (or pi.exe) is
+# the binary file itself, alongside theme/, node_modules/, etc.
+cp -a "$(dirname "${bin_path}")/." "${DIST_DIR}/"
 chmod 0700 "${OUT_FILE}"
 echo "${PI_VERSION} ${GOOS_TARGET} ${GOARCH_TARGET}" > "${META_FILE}"
 

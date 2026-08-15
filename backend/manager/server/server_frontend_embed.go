@@ -23,7 +23,7 @@ var embeddedFrontend embed.FS
 // falling back to index.html.
 func frontendStaticSkipper(c *echo.Context) bool {
 	p := c.Request().URL.Path
-	return strings.HasPrefix(p, "/v1") || p == "/metrics" || p == "/healthz" || strings.HasPrefix(p, "/assets/")
+	return strings.HasPrefix(p, "/v1") || strings.HasPrefix(p, "/machine/") || p == "/metrics" || p == "/healthz" || strings.HasPrefix(p, "/assets/")
 }
 
 func embedFrontend(e *echo.Echo) {

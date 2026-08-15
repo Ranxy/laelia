@@ -1,0 +1,171 @@
+<#
+.SYNOPSIS
+  Install the laelia-machine executable on Windows.
+
+.EXAMPLE
+  irm https://<manager>/machine/install.ps1 | iex
+
+.NOTES
+  PowerShell 5.1 or newer is supported. Optional environment variables:
+    LAELIA_MACHINE_INSTALL_DIR   Install directory (default: ~/.local/bin).
+    LAELIA_MACHINE_FORCE         Set to 1 to reinstall even if already present.
+#>
+
+$ErrorActionPreference = 'Stop'
+
+# Windows PowerShell 5.1 can otherwise negotiate TLS 1.0 on older hosts.
+[Net.ServicePointManager]::SecurityProtocol =
+  [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
+$ManagerUrl = if ($env:LAELIA_MANAGER_URL) {
+  $env:LAELIA_MANAGER_URL.TrimEnd('/')
+} else {
+  '__LAELIA_MANAGER_URL__'
+}
+$BinaryName = 'laelia-machine.exe'
+$CommandName = 'laelia-machine'
+$DefaultInstallDir = Join-Path $env:USERPROFILE '.local\bin'
+$InstallDir = if ($env:LAELIA_MACHINE_INSTALL_DIR) {
+  [System.IO.Path]::GetFullPath($env:LAELIA_MACHINE_INSTALL_DIR)
+} else {
+  [System.IO.Path]::GetFullPath($DefaultInstallDir)
+}
+$Force = $env:LAELIA_MACHINE_FORCE -eq '1'
+
+function Write-Step([string]$Message) {
+  Write-Host "[install] $Message" -ForegroundColor Cyan
+}
+
+function Fail([string]$Message) {
+  throw "[install] error: $Message"
+}
+
+function Invoke-Download([string]$Uri, [string]$OutFile) {
+  Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing
+}
+
+function Read-Json([string]$Uri) {
+  $response = Invoke-WebRequest -Uri $Uri -UseBasicParsing
+  $content = $response.Content
+  if ($content -is [byte[]]) {
+    $content = [System.Text.Encoding]::UTF8.GetString($content)
+  }
+  return $content | ConvertFrom-Json
+}
+
+function Get-Target {
+  $rawArch = try {
+    [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+  } catch {
+    if ($env:PROCESSOR_ARCHITEW6432) {
+      $env:PROCESSOR_ARCHITEW6432
+    } else {
+      $env:PROCESSOR_ARCHITECTURE
+    }
+  }
+
+  $arch = switch ($rawArch.ToUpperInvariant()) {
+    'AMD64' { 'x64' }
+    'X64' { 'x64' }
+    'ARM64' { 'arm64' }
+    default { Fail "unsupported Windows architecture: $rawArch" }
+  }
+  return "windows-$arch"
+}
+
+function Test-Sha256([string]$Path, [string]$Expected) {
+  if ($Expected -notmatch '^[a-fA-F0-9]{64}$') {
+    Fail "invalid sha256 in manifest: $Expected"
+  }
+  $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($actual -ne $Expected.ToLowerInvariant()) {
+    Fail "sha256 mismatch for $([System.IO.Path]::GetFileName($Path)) (got $actual, want $Expected)"
+  }
+}
+
+function Expand-Gzip([string]$Source, [string]$Destination) {
+  $input = [System.IO.File]::OpenRead($Source)
+  try {
+    $gzip = New-Object System.IO.Compression.GzipStream(
+      $input,
+      [System.IO.Compression.CompressionMode]::Decompress
+    )
+    try {
+      $output = [System.IO.File]::Create($Destination)
+      try { $gzip.CopyTo($output) } finally { $output.Dispose() }
+    } finally { $gzip.Dispose() }
+  } finally { $input.Dispose() }
+}
+
+function Add-ToUserPath([string]$Directory) {
+  $currentEntries = @($env:Path -split ';' | Where-Object { $_ })
+  $inCurrentProcess = $currentEntries | Where-Object {
+    $_.TrimEnd('\').Equals($Directory.TrimEnd('\'), [System.StringComparison]::OrdinalIgnoreCase)
+  }
+  if (-not $inCurrentProcess) { $env:Path = "$Directory;$env:Path" }
+
+  $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+  $userEntries = @($userPath -split ';' | Where-Object { $_ })
+  $alreadyPresent = $userEntries | Where-Object {
+    $_.TrimEnd('\').Equals($Directory.TrimEnd('\'), [System.StringComparison]::OrdinalIgnoreCase)
+  }
+  if ($alreadyPresent) {
+    Write-Step "$Directory is already in the user PATH"
+    return
+  }
+  $newPath = if ($userPath) { "$Directory;$userPath" } else { $Directory }
+  [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')
+  Write-Step "added $Directory to the user PATH (new terminals will pick it up)"
+}
+
+try {
+  if (-not $ManagerUrl) {
+    Fail 'manager URL is not set; re-fetch this script from your manager'
+  }
+  $target = Get-Target
+  Write-Step "detected target: $target"
+
+  $base = "$ManagerUrl/machine"
+  Write-Step "resolving manifest from $base/manifest.json"
+  $manifest = Read-Json "$base/manifest.json"
+  $entry = $manifest.targets.$target
+  if (-not $entry) { Fail "target $target is not present in the release manifest" }
+  $file = $entry.file
+  if (-not $file -or [System.IO.Path]::GetFileName($file) -ne $file) {
+    Fail "invalid Windows asset name in manifest: $file"
+  }
+  $gz = $entry.gz
+  if (-not $gz -or -not $gz.file -or -not $gz.sha256) {
+    Fail "manifest entry for $target missing gz file/sha256"
+  }
+
+  $tempDir = Join-Path $env:TEMP ("laelia-machine-install-" + [guid]::NewGuid().ToString('N'))
+  New-Item -ItemType Directory -Path $tempDir | Out-Null
+  try {
+    $downloadedGzip = Join-Path $tempDir $gz.file
+    Write-Step "downloading $base/bin/$target"
+    Invoke-Download "$base/bin/$target" $downloadedGzip
+    Test-Sha256 $downloadedGzip $gz.sha256
+    Write-Step 'compressed sha256 verified; decompressing'
+    $downloadedBinary = Join-Path $tempDir $file
+    Expand-Gzip $downloadedGzip $downloadedBinary
+    Test-Sha256 $downloadedBinary $entry.sha256
+    Write-Step 'binary sha256 verified'
+
+    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+    $destination = Join-Path $InstallDir $BinaryName
+    $staged = Join-Path $InstallDir ".$([System.IO.Path]::GetFileNameWithoutExtension($BinaryName)).install.$([guid]::NewGuid().ToString('N')).exe"
+    Copy-Item -LiteralPath $downloadedBinary -Destination $staged -Force
+    Test-Sha256 $staged $entry.sha256
+    Move-Item -LiteralPath $staged -Destination $destination -Force
+    Test-Sha256 $destination $entry.sha256
+    Write-Step "installed to $destination"
+    Add-ToUserPath $InstallDir
+    Write-Step "done — run: $CommandName --manager $ManagerUrl setup"
+  } finally {
+    Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+  }
+} catch {
+  [Console]::Error.WriteLine($_.Exception.Message)
+  exit 1
+}

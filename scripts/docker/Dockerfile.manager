@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1
-# Build context must be the repo root (.). Builds only the laelia manager
-# image: frontend -> manager-build -> manager. Deliberately contains NO machine
-# stages, so building manager never builds the machine/pi binary.
+# Build context must be the repo root (.). Builds the laelia manager image:
+# frontend + per-platform machine binaries -> manager-build -> manager.
 
 FROM node:24.12.0-slim AS frontend
 WORKDIR /frontend-build
@@ -10,7 +9,7 @@ RUN npm i -g pnpm@11.10.0 && pnpm i --frozen-lockfile
 COPY frontend/ ./
 RUN pnpm build
 
-FROM golang:1.26.5-alpine3.23 AS manager-build
+FROM golang:1.26.5-alpine3.23 AS machine-build
 ARG VERSION=local
 ARG GIT_COMMIT=unknown
 # LAELIA_BUILD_PROXY is a custom arg so the proxy only reaches stages that
@@ -23,8 +22,22 @@ WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+RUN apk add --no-cache curl bash gzip
+RUN ./scripts/build-embedded-machines.sh /out/embedded_machine
+
+FROM golang:1.26.5-alpine3.23 AS manager-build
+ARG VERSION=local
+ARG GIT_COMMIT=unknown
+ARG LAELIA_BUILD_PROXY
+ENV http_proxy=${LAELIA_BUILD_PROXY} https_proxy=${LAELIA_BUILD_PROXY} no_proxy=localhost,127.0.0.1
+ENV HTTP_PROXY=${LAELIA_BUILD_PROXY} HTTPS_PROXY=${LAELIA_BUILD_PROXY} NO_PROXY=localhost,127.0.0.1
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
 COPY --from=frontend /frontend-build/dist ./backend/manager/server/dist
-RUN CGO_ENABLED=0 go build -tags embed_frontend -ldflags "-w -s" -p=16 \
+COPY --from=machine-build /out/embedded_machine ./backend/manager/server/embedded_machine
+RUN CGO_ENABLED=0 go build -tags "embed_frontend embed_machine" -ldflags "-w -s" -p=16 \
 	-o /out/laelia ./backend/manager/bin/server/main.go
 
 FROM alpine:3.23 AS manager

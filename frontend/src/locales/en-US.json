@@ -535,7 +535,12 @@
       "step-command": "1. Run this on the machine",
       "step-wait": "2. Waiting for the machine",
       "title": "Add a Machine",
-      "waiting": "Waiting for the machine to connect… Run the command above and approve the login in the browser that opens."
+      "waiting": "Waiting for the machine to connect… Run the command above and approve the login in the browser that opens.",
+      "step-install": "1. Install the machine app",
+      "install-hint": "Run this on the computer you want to connect:",
+      "install-os-linux": "Linux",
+      "install-os-macos": "macOS",
+      "install-os-windows": "Windows"
     },
     "no-agents": "No agents hosted on this machine yet.",
     "no-providers": "No providers discovered yet. Start the machine app on the host and click Refresh.",

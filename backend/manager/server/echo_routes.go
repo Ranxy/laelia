@@ -14,6 +14,7 @@ import (
 	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/common/log"
 	"github.com/Ranxy/laelia/backend/manager/config"
+	"github.com/Ranxy/laelia/backend/manager/store"
 
 	connectcors "connectrpc.com/cors"
 )
@@ -21,6 +22,7 @@ import (
 func configureEchoRouters(
 	e *echo.Echo,
 	profile *config.Profile,
+	stores *store.Store,
 ) {
 	e.Use(recoverMiddleware)
 	e.Use(securityHeadersMiddleware())
@@ -42,7 +44,10 @@ func configureEchoRouters(
 		},
 	}))
 
-	// TODO we need to Embed frontend at future. for now, we just use frontend not embed for skip this
+	// Machine binary download routes must be registered before the SPA static
+	// middleware so they are not swallowed by the HTML5 fallback.
+	registerMachineDownloadRoutes(e, stores)
+
 	embedFrontend(e)
 
 	// Prometheus metrics - use custom registry to avoid duplicate registration in tests

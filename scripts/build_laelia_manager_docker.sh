@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the laelia manager docker image (frontend embedded).
+# Build the laelia manager docker image (frontend + machine binaries embedded).
 #
 # Usage:
 #   scripts/build_laelia_manager_docker.sh
