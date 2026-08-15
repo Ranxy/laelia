@@ -401,11 +401,11 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 		if m.MemberType != MemberTypeUser {
 			continue
 		}
-		uid, err := strconv.Atoi(m.MemberID)
-		if err != nil {
+		user, err := s.GetUserByHandle(ctx, m.MemberID)
+		if err != nil || user == nil {
 			continue
 		}
-		userMembers[uid] = true
+		userMembers[user.ID] = true
 	}
 
 	// Resolve the conversation once: its type decides whether this is a 1:1 DM,
@@ -429,11 +429,11 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 		if mn.Type != "user" || mn.Id == "" {
 			continue
 		}
-		uid, err := strconv.Atoi(mn.Id)
-		if err != nil {
+		user, err := s.GetUserByHandle(ctx, mn.Id)
+		if err != nil || user == nil {
 			continue
 		}
-		mentionCats[uid] |= ActivityCategoryMention
+		mentionCats[user.ID] |= ActivityCategoryMention
 	}
 	// DIRECT: a top-level plain message in a 1:1 DM (user<->user type=4 or
 	// user<->agent type=1) is addressed to the other user member even with no
