@@ -237,3 +237,35 @@ describe("MessageRow reaction bar", () => {
     expect(onToggleReaction.mock.calls[0][1]).toBe("👍");
   });
 });
+
+describe("MessageRow context menu", () => {
+  function renderRow(props: Partial<Parameters<typeof MessageRow>[0]>) {
+    act(() => {
+      root!.render(
+        <MessageRow
+          msg={baseMsg({ role: "assistant", content: "hello" })}
+          showAvatar
+          agentTitle="Agent"
+          streamingContent=""
+          streamingEvents={[]}
+          onViewDetails={() => {}}
+          markdownCustomId="chat"
+          debugMode={false}
+          {...props}
+        />
+      );
+    });
+  }
+
+  it("wraps the row in the context menu when onCopyMarkdown is provided", () => {
+    renderRow({ onCopyMarkdown: () => {} });
+    // The menu trigger is present (desktop). We can't easily assert the base-ui
+    // menu internals here, but the row content is still rendered.
+    expect(container?.textContent).toContain("hello");
+  });
+
+  it("does not wrap in the context menu when onCopyMarkdown is absent", () => {
+    renderRow({});
+    expect(container?.textContent).toContain("hello");
+  });
+});

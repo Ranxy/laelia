@@ -17,6 +17,7 @@ import {
   contentWithMentionTags,
   splitByMentions,
 } from "@/components/chat/mentions";
+import { MessageContextMenu } from "@/components/chat/message-context-menu";
 import { RemoteImage } from "@/components/chat/remote-image";
 import { TaskStatusBadge } from "@/components/chat/task-status-badge";
 import { ChatDiff } from "@/components/chat-events/diff-view";
@@ -193,6 +194,17 @@ export interface MessageRowProps {
   // message: clicking an emoji pill adds the caller's reaction (or removes it
   // if they already reacted). Receives the message and the emoji.
   onToggleReaction?: (msg: ChatMessageUI, emoji: string) => void;
+  // Context-menu wiring (main chat only). When onCopyMarkdown is provided the
+  // row gets a right-click menu with Copy Markdown (final content only). The
+  // caller wires onOpenThread (the same action as the hover entry, shown for
+  // root messages) and onConvertToTask (shown for root, non-task messages with
+  // the laelia.conversations.send permission) via the same callbacks.
+  onCopyMarkdown?: (content: string) => void;
+  onConvertToTask?: (msg: ChatMessageUI) => void;
+  // contextMenuRootOnly hides the "Open thread" entry from the menu for this
+  // row (used by the thread panel, where opening a thread from a reply is
+  // meaningless). Defaults to false.
+  contextMenuRootOnly?: boolean;
 }
 
 export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
@@ -216,6 +228,9 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     scrollRoot,
     eager = false,
     onToggleReaction,
+    onCopyMarkdown,
+    onConvertToTask,
+    contextMenuRootOnly = false,
   } = props;
   const { t, i18n } = useTranslation();
   const isDesktop = useIsDesktop();
@@ -393,7 +408,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     );
   }
 
-  return (
+  const row = (
     <div
       className={cn(
         "group flex gap-3",
@@ -710,5 +725,20 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
           )}
       </div>
     </div>
+  );
+
+  if (!onCopyMarkdown) return row;
+
+  return (
+    <MessageContextMenu
+      msg={msg}
+      content={msg.content}
+      onCopy={onCopyMarkdown}
+      onOpenThread={onOpenThread}
+      onConvertToTask={onConvertToTask}
+      canOpenThread={!contextMenuRootOnly}
+    >
+      {row}
+    </MessageContextMenu>
   );
 });

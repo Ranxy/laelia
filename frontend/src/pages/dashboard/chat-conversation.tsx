@@ -49,6 +49,7 @@ import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
 import { isImageAttachment } from "@/lib/image-file";
 import "@/lib/markdown";
+import { toastManager } from "@/lib/toast";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -105,6 +106,8 @@ interface MessageListProps {
   onMentionClick: (type: string, id: string, name: string) => void;
   mentionLabel: (handle: string) => string | undefined;
   onOpenThread: (msg: ChatMessageUI) => void;
+  onCopyMarkdown: (content: string) => void;
+  onConvertToTask: (msg: ChatMessageUI) => void;
   onPreviewAttachment: (attachment: Attachment, rootMessageId: string) => void;
   onJumpToSection: (
     attachment: Attachment,
@@ -129,6 +132,8 @@ const MessageList = memo(function MessageList({
   onMentionClick,
   mentionLabel,
   onOpenThread,
+  onCopyMarkdown,
+  onConvertToTask,
   onPreviewAttachment,
   onJumpToSection,
   onPreviewImage,
@@ -158,6 +163,8 @@ const MessageList = memo(function MessageList({
               MentionBadge={MentionBadge}
               markdownCustomId="channel-chat"
               onOpenThread={onOpenThread}
+              onCopyMarkdown={onCopyMarkdown}
+              onConvertToTask={onConvertToTask}
               onPreviewAttachment={onPreviewAttachment}
               onJumpToSection={onJumpToSection}
               onPreviewImage={onPreviewImage}
@@ -208,6 +215,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   );
   const toggleTasksPanel = useAppStore((s) => s.toggleTasksPanel);
   const closeTasksPanel = useAppStore((s) => s.closeTasksPanel);
+  const convertMessageToTask = useAppStore((s) => s.convertMessageToTask);
   const openFilePreview = useAppStore((s) => s.openFilePreview);
   const openImagePreview = useAppStore((s) => s.openImagePreview);
   const tasksPanelOpen = useAppStore((s) =>
@@ -720,6 +728,49 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     [channelId, conversationName, openThread, closeTasksPanel]
   );
 
+  // "Copy markdown" in the context menu: write the message's final raw markdown
+  // to the clipboard and toast the outcome.
+  const handleCopyMarkdown = useCallback(
+    async (content: string) => {
+      try {
+        await navigator.clipboard.writeText(content);
+        toastManager.add({
+          type: "success",
+          title: t("chat.copy-markdown-success"),
+        });
+      } catch {
+        toastManager.add({
+          type: "error",
+          title: t("chat.copy-markdown-error"),
+        });
+      }
+    },
+    [t]
+  );
+
+  // "Convert to task" in the context menu: turn a root, non-task message into a
+  // channel task. msg.id is the full resource name ("conversations/c/messages/m"),
+  // so strip it to the bare message id the store action expects.
+  const handleConvertToTask = useCallback(
+    async (msg: ChatMessageUI) => {
+      if (!channelId) return;
+      const messageId = msg.id.split("/").pop() ?? msg.id;
+      try {
+        await convertMessageToTask(channelId, messageId);
+        toastManager.add({
+          type: "success",
+          title: t("channelTask.convert-success"),
+        });
+      } catch {
+        toastManager.add({
+          type: "error",
+          title: t("channelTask.convert-error"),
+        });
+      }
+    },
+    [channelId, convertMessageToTask, t]
+  );
+
   // Open the full-page markdown preview for an attachment. The rootMessageId
   // is the attachment owner's effective thread root (its own threadRoot when
   // it is a reply, otherwise its own id) — used in Phase 2 to route comments.
@@ -870,6 +921,8 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
               onViewDetails={handleViewDetails}
               onMentionClick={handleMentionClick}
               onOpenThread={handleOpenThread}
+              onCopyMarkdown={handleCopyMarkdown}
+              onConvertToTask={handleConvertToTask}
               onPreviewAttachment={handlePreviewAttachment}
               onJumpToSection={handleJumpToSection}
               onPreviewImage={handlePreviewImage}

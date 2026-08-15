@@ -290,7 +290,9 @@
     "status-todo": "Todo",
     "status-unknown": "Unknown",
     "unassigned": "unassigned",
-    "untitled": "Untitled task"
+    "untitled": "Untitled task",
+    "convert-error": "Failed to convert to task",
+    "convert-success": "Converted to task"
   },
   "chat": {
     "agent": "Agent",
@@ -331,7 +333,12 @@
     "undo": "Undo",
     "view-details": "View details",
     "warning": "Warning",
-    "you": "You"
+    "you": "You",
+    "copy-markdown": "Copy Markdown",
+    "copy-markdown-error": "Couldn't copy markdown",
+    "copy-markdown-success": "Markdown copied",
+    "open-thread": "Open thread",
+    "convert-to-task": "Convert to task"
   },
   "command": {
     "back": "Back",

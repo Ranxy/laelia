@@ -290,7 +290,9 @@
     "status-todo": "待办",
     "status-unknown": "未知",
     "unassigned": "未认领",
-    "untitled": "未命名任务"
+    "untitled": "未命名任务",
+    "convert-error": "转换为任务失败",
+    "convert-success": "转换为任务成功"
   },
   "chat": {
     "agent": "Agent",
@@ -331,7 +333,12 @@
     "undo": "撤销",
     "view-details": "查看详情",
     "warning": "警告",
-    "you": "你"
+    "you": "你",
+    "copy-markdown": "复制 Markdown",
+    "copy-markdown-error": "复制 Markdown 失败",
+    "copy-markdown-success": "已复制 Markdown",
+    "open-thread": "打开话题",
+    "convert-to-task": "转换为任务"
   },
   "command": {
     "back": "返回",
