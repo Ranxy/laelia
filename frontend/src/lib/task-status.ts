@@ -43,3 +43,12 @@ export function taskStatusShort(status: number): string {
       return "";
   }
 }
+
+// taskStatusLabel returns the localized label for a task status, for the
+// thread-header status dropdown. Falls back to the unknown label.
+export function taskStatusLabel(
+  status: number,
+  t: (key: string) => string
+): string {
+  return t(taskStatusToI18nKey[status] ?? "channelTask.status-unknown");
+}

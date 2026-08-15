@@ -1,11 +1,13 @@
 import { create } from "@bufbuild/protobuf";
 import { commandServiceClient } from "@/connect";
 import {
+  AssignTaskRequestSchema,
   CloseTaskRequestSchema,
   ConvertMessageToTaskRequestSchema,
   ListTaskCountsRequestSchema,
   ListTasksRequestSchema,
   TaskStatus,
+  UpdateTaskStatusRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { toUiMessage } from "./chat-helpers";
 import type { AppSliceCreator, TaskSlice } from "./types";
@@ -139,7 +141,31 @@ export const createTaskSlice: AppSliceCreator<TaskSlice> = (set, get) => ({
     }
   },
 
-  async closeTask(conversationId, rootMessageId) {
+  // patchTaskThreadAndRefresh patches the open thread's root with the
+  // authoritative task message returned by a task mutation, then reloads the
+  // board + counts. Shared by updateTaskStatus / assignTask / closeTask.
+  async patchTaskThreadAndRefresh(conversationId, rootMessageId, res) {
+    const ui = res?.message ? toUiMessage(res.message) : null;
+    if (ui) {
+      set((state) => {
+        const thread = state.threadByRoot[rootMessageId];
+        if (!thread) return {};
+        return {
+          threadByRoot: {
+            ...state.threadByRoot,
+            [rootMessageId]: {
+              ...thread,
+              messages: thread.messages.map((m) => (m.id === ui.id ? ui : m)),
+            },
+          },
+        };
+      });
+    }
+    await get().loadTasks(conversationId);
+    void get().loadTaskCounts(conversationId);
+  },
+
+  async updateTaskStatus(conversationId, rootMessageId, status) {
     // threadByRoot is keyed by whatever openThread got: the full resource name
     // from the channel page (msg.id) or a bare id from the activity/reminder
     // detail embeds. The RPC wants the resource name, so strip a name down to
@@ -147,33 +173,38 @@ export const createTaskSlice: AppSliceCreator<TaskSlice> = (set, get) => ({
     const rootId = rootMessageId.split("/").pop() ?? rootMessageId;
     const message = `conversations/${conversationId}/messages/${rootId}`;
     try {
+      const res = await commandServiceClient.updateTaskStatus(
+        create(UpdateTaskStatusRequestSchema, { message, status })
+      );
+      await get().patchTaskThreadAndRefresh(conversationId, rootMessageId, res);
+    } catch (err) {
+      // The UI toasts the failure; keep the stale thread/board cache intact.
+      throw err;
+    }
+  },
+
+  async assignTask(conversationId, rootMessageId, memberType, memberId) {
+    const rootId = rootMessageId.split("/").pop() ?? rootMessageId;
+    const message = `conversations/${conversationId}/messages/${rootId}`;
+    try {
+      const res = await commandServiceClient.assignTask(
+        create(AssignTaskRequestSchema, { message, memberType, memberId })
+      );
+      await get().patchTaskThreadAndRefresh(conversationId, rootMessageId, res);
+    } catch (err) {
+      // The UI toasts the failure; keep the stale thread/board cache intact.
+      throw err;
+    }
+  },
+
+  async closeTask(conversationId, rootMessageId) {
+    const rootId = rootMessageId.split("/").pop() ?? rootMessageId;
+    const message = `conversations/${conversationId}/messages/${rootId}`;
+    try {
       const res = await commandServiceClient.closeTask(
         create(CloseTaskRequestSchema, { message })
       );
-      // The response is the authoritative task message (status DONE): patch
-      // the open thread's root so the header badge flips immediately, then
-      // refresh the board + counts like convertMessageToTask. The thread
-      // watcher's next poll would also pick up the state via the system
-      // notification's version bump; this keeps it instant. A missing message
-      // (defensive; the RPC always returns one) just skips the patch.
-      const ui = res.message ? toUiMessage(res.message) : null;
-      if (ui) {
-        set((state) => {
-          const thread = state.threadByRoot[rootMessageId];
-          if (!thread) return {};
-          return {
-            threadByRoot: {
-              ...state.threadByRoot,
-              [rootMessageId]: {
-                ...thread,
-                messages: thread.messages.map((m) => (m.id === ui.id ? ui : m)),
-              },
-            },
-          };
-        });
-      }
-      await get().loadTasks(conversationId);
-      void get().loadTaskCounts(conversationId);
+      await get().patchTaskThreadAndRefresh(conversationId, rootMessageId, res);
     } catch (err) {
       // The UI toasts the failure; keep the stale thread/board cache intact.
       throw err;

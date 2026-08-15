@@ -292,7 +292,17 @@
     "unassigned": "unassigned",
     "untitled": "Untitled task",
     "convert-error": "Failed to convert to task",
-    "convert-success": "Converted to task"
+    "convert-success": "Converted to task",
+    "status-change-aria": "Change task status",
+    "status-change-success": "Task status updated",
+    "status-change-error": "Failed to update task status",
+    "status-change-error-description": "Please try again.",
+    "assignee-aria": "Assign task",
+    "assignee-placeholder": "Unassigned",
+    "assignee-success": "Task assigned",
+    "assignee-error": "Failed to assign task",
+    "assignee-error-description": "Please try again.",
+    "creator": "Created by {{name}}"
   },
   "chat": {
     "agent": "Agent",

@@ -1,5 +1,5 @@
-import { useTranslation } from "react-i18next";
 import { Search } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { CommandEventFilter } from "./command-event-ledger";
 

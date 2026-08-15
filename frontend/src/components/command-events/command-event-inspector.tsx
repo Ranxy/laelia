@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
-import MarkdownRender from "markstream-react";
-import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import MarkdownRender from "markstream-react";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ChatDiff } from "@/components/chat-events/diff-view";
 import { ChatWarning } from "@/components/chat-events/warning";
 import { ContextUsageBar } from "@/components/context-usage-bar";
@@ -31,7 +31,15 @@ export interface CommandEventInspectorProps {
   className?: string;
 }
 
-type TabId = "summary" | "preview" | "payload" | "result" | "diff" | "raw" | "usage" | "timing";
+type TabId =
+  | "summary"
+  | "preview"
+  | "payload"
+  | "result"
+  | "diff"
+  | "raw"
+  | "usage"
+  | "timing";
 
 function availableTabs(event: CommandEvent): TabId[] {
   const tabs: TabId[] = ["summary"];
@@ -152,11 +160,7 @@ function OverviewSection({
           <span>{title}</span>
         </button>
       </h3>
-      {open && (
-        <div className="px-3 pb-3">
-          {children}
-        </div>
-      )}
+      {open && <div className="px-3 pb-3">{children}</div>}
     </section>
   );
 }
@@ -195,7 +199,13 @@ function ToolOverview({
           dt={t("command.inspector-status")}
           dd={
             finishedEvent ? (
-              <span className={status === "error" || status === "failed" ? "text-error" : "text-success"}>
+              <span
+                className={
+                  status === "error" || status === "failed"
+                    ? "text-error"
+                    : "text-success"
+                }
+              >
                 {status === "error" || status === "failed"
                   ? t("chat.tool-error")
                   : t("chat.tool-finished")}
@@ -241,7 +251,11 @@ function DiffOverview({ event }: { event: CommandEvent }) {
       <dl className="px-3 py-1">
         <OverviewRow
           dt={t("command.inspector-name")}
-          dd={event.payload.case === "diffEmitted" ? event.payload.value.path : "—"}
+          dd={
+            event.payload.case === "diffEmitted"
+              ? event.payload.value.path
+              : "—"
+          }
         />
       </dl>
       <OverviewSection title={t("command.inspector-diff")}>
@@ -284,8 +298,14 @@ function UsageOverview({ event }: { event: CommandEvent }) {
   return (
     <div>
       <dl className="px-3 py-1">
-        <OverviewRow dt={t("command.inspector-type")} dd={t(getCommandEventKind(event.type).labelKey)} />
-        <OverviewRow dt={t("command.inspector-time")} dd={formatDateTime(event.timestamp)} />
+        <OverviewRow
+          dt={t("command.inspector-type")}
+          dd={t(getCommandEventKind(event.type).labelKey)}
+        />
+        <OverviewRow
+          dt={t("command.inspector-time")}
+          dd={formatDateTime(event.timestamp)}
+        />
       </dl>
       {event.type === CommandEventType.CONTEXT_USAGE_UPDATE && (
         <OverviewSection title={t("command.inspector-usage")}>
@@ -368,7 +388,10 @@ export function CommandEventInspector({
 }: CommandEventInspectorProps) {
   const { t } = useTranslation();
   const tabs = useMemo(
-    () => (output ? (["summary", "preview", "raw"] as TabId[]) : availableTabs(event)),
+    () =>
+      output
+        ? (["summary", "preview", "raw"] as TabId[])
+        : availableTabs(event),
     [output, event]
   );
   const [activeTab, setActiveTab] = useState<TabId>(tabs[0] ?? "summary");
@@ -417,12 +440,12 @@ export function CommandEventInspector({
           {t(kind.labelKey)}
         </span>
         {!output && (
-          <span className="text-[10px] text-control-light">
-            #{event.seqNo}
-          </span>
+          <span className="text-[10px] text-control-light">#{event.seqNo}</span>
         )}
         <span className="ml-auto min-w-0 flex-1 truncate text-right text-[10px] text-control-light">
-          {output ? formatTimeMs(output.startTs) : formatDateTime(event.timestamp)}
+          {output
+            ? formatTimeMs(output.startTs)
+            : formatDateTime(event.timestamp)}
         </span>
         {onClose && (
           <button
@@ -469,66 +492,70 @@ export function CommandEventInspector({
             {activeTab === "raw" && <OutputRaw output={output} />}
           </>
         ) : (
-        <>
-        {activeTab === "summary" &&
-          (isTool ? (
-            <ToolOverview event={event} startedEvent={startedEvent} finishedEvent={finishedEvent} />
-          ) : isDiff ? (
-            <DiffOverview event={event} />
-          ) : isUsage ? (
-            <UsageOverview event={event} />
-          ) : (
-            <SummaryOverview event={event} />
-          ))}
+          <>
+            {activeTab === "summary" &&
+              (isTool ? (
+                <ToolOverview
+                  event={event}
+                  startedEvent={startedEvent}
+                  finishedEvent={finishedEvent}
+                />
+              ) : isDiff ? (
+                <DiffOverview event={event} />
+              ) : isUsage ? (
+                <UsageOverview event={event} />
+              ) : (
+                <SummaryOverview event={event} />
+              ))}
 
-        {activeTab === "payload" && startedEvent && (
-          <RawPayload event={startedEvent} />
-        )}
-        {activeTab === "result" && finishedEvent && (
-          <RawPayload event={finishedEvent} />
-        )}
-        {activeTab === "diff" && <ChatDiff event={event} />}
-        {activeTab === "raw" && <RawPayload event={event} />}
-        {activeTab === "usage" &&
-          event.type === CommandEventType.CONTEXT_USAGE_UPDATE && (
-            <div className="p-3">
-              <ContextUsageBar event={event} />
-            </div>
-          )}
-        {activeTab === "usage" &&
-          event.type === CommandEventType.TOKEN_USAGE &&
-          event.payload.case === "tokenUsage" && (
-            <div className="p-3">
-              <TokenUsageCard usage={event.payload.value} />
-            </div>
-          )}
-        {activeTab === "timing" && (
-          <div className="p-3">
-            {isTool ? (
-              <dl>
-                <OverviewRow
-                  dt={t("command.inspector-started")}
-                  dd={formatDateTime(startedEvent?.timestamp)}
-                />
-                <OverviewRow
-                  dt={t("command.inspector-finished")}
-                  dd={formatDateTime(finishedEvent?.timestamp)}
-                />
-              </dl>
-            ) : (
-              <p className="text-xs italic text-control-light">
-                {t("command.event-no-timing")}
-              </p>
+            {activeTab === "payload" && startedEvent && (
+              <RawPayload event={startedEvent} />
             )}
-          </div>
-        )}
+            {activeTab === "result" && finishedEvent && (
+              <RawPayload event={finishedEvent} />
+            )}
+            {activeTab === "diff" && <ChatDiff event={event} />}
+            {activeTab === "raw" && <RawPayload event={event} />}
+            {activeTab === "usage" &&
+              event.type === CommandEventType.CONTEXT_USAGE_UPDATE && (
+                <div className="p-3">
+                  <ContextUsageBar event={event} />
+                </div>
+              )}
+            {activeTab === "usage" &&
+              event.type === CommandEventType.TOKEN_USAGE &&
+              event.payload.case === "tokenUsage" && (
+                <div className="p-3">
+                  <TokenUsageCard usage={event.payload.value} />
+                </div>
+              )}
+            {activeTab === "timing" && (
+              <div className="p-3">
+                {isTool ? (
+                  <dl>
+                    <OverviewRow
+                      dt={t("command.inspector-started")}
+                      dd={formatDateTime(startedEvent?.timestamp)}
+                    />
+                    <OverviewRow
+                      dt={t("command.inspector-finished")}
+                      dd={formatDateTime(finishedEvent?.timestamp)}
+                    />
+                  </dl>
+                ) : (
+                  <p className="text-xs italic text-control-light">
+                    {t("command.event-no-timing")}
+                  </p>
+                )}
+              </div>
+            )}
 
-        {event.type === CommandEventType.WARNING && (
-          <div className="p-3">
-            <ChatWarning event={event} />
-          </div>
-        )}
-        </>
+            {event.type === CommandEventType.WARNING && (
+              <div className="p-3">
+                <ChatWarning event={event} />
+              </div>
+            )}
+          </>
         )}
       </div>
     </aside>

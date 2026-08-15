@@ -1,7 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import {
   ArrowLeft,
-  CheckCircle2,
   ExternalLink,
   Loader2,
   Maximize2,
@@ -22,15 +21,14 @@ import {
 } from "@/components/chat/message-row";
 import { RemoteImage } from "@/components/chat/remote-image";
 import { EmptyState, LoadingState } from "@/components/chat/states";
-import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { detectMention } from "@/composables/useMentionDetect";
 import {
@@ -42,6 +40,7 @@ import {
 import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
 import { isImageAttachment } from "@/lib/image-file";
+import { taskStatusLabel } from "@/lib/task-status";
 import { toastManager } from "@/lib/toast";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
@@ -769,37 +768,79 @@ function ThreadHeader({
   const isDesktop = useIsDesktop();
   const closeThread = useAppStore((s) => s.closeThread);
   const toggleTasksPanel = useAppStore((s) => s.toggleTasksPanel);
-  const closeTask = useAppStore((s) => s.closeTask);
-  const [closeTaskOpen, setCloseTaskOpen] = useState(false);
-  const [closingTask, setClosingTask] = useState(false);
+  const updateTaskStatus = useAppStore((s) => s.updateTaskStatus);
+  const assignTask = useAppStore((s) => s.assignTask);
+  const listChannelMembers = useAppStore((s) => s.listChannelMembers);
+  const conversationName = `conversations/${channelId}`;
+  const members =
+    useAppStore((s) => s.channelMembersByConv[conversationName]) ?? [];
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [assigning, setAssigning] = useState(false);
   const isTask = !!rootMsg?.task;
-  // Users close a task straight from its thread header — but only while it is
-  // not already DONE, and never in readOnly (admin agent-to-agent DMs).
-  const canCloseTask =
-    isTask && !readOnly && rootMsg?.task?.status !== TaskStatus.DONE;
-  const handleCloseTask = async () => {
-    if (!rootMsg) return;
-    setClosingTask(true);
+  // Task controls (status + assignee dropdowns) are hidden in readOnly
+  // (admin agent-to-agent DMs) and when the thread has no task root.
+  const canManageTask = isTask && !readOnly;
+
+  // Load the channel roster for the assignee dropdown on first render of a
+  // task thread (the members panel may not have been opened yet).
+  useEffect(() => {
+    if (canManageTask && members.length === 0) {
+      void listChannelMembers(channelId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManageTask, channelId]);
+
+  const handleStatusChange = async (value: string | null) => {
+    if (!rootMsg || value == null) return;
+    const status = Number(value);
+    if (status === rootMsg.task?.status) return;
+    setStatusUpdating(true);
     try {
-      await closeTask(channelId, rootMsg.id);
-      setCloseTaskOpen(false);
+      await updateTaskStatus(channelId, rootMsg.id, status);
       toastManager.add({
         type: "success",
-        title: t("channelTask.close-success"),
+        title: t("channelTask.status-change-success"),
       });
     } catch (err) {
       toastManager.add({
         type: "error",
-        title: t("channelTask.close-error"),
+        title: t("channelTask.status-change-error"),
         description:
           err instanceof Error
             ? err.message
-            : t("channelTask.close-error-description"),
+            : t("channelTask.status-change-error-description"),
       });
     } finally {
-      setClosingTask(false);
+      setStatusUpdating(false);
     }
   };
+
+  const handleAssigneeChange = async (value: string | null) => {
+    if (!rootMsg || value == null) return;
+    // value is "<memberType>:<memberId>".
+    const [memberType, memberId] = value.split(":");
+    if (!memberType || !memberId) return;
+    setAssigning(true);
+    try {
+      await assignTask(channelId, rootMsg.id, Number(memberType), memberId);
+      toastManager.add({
+        type: "success",
+        title: t("channelTask.assignee-success"),
+      });
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("channelTask.assignee-error"),
+        description:
+          err instanceof Error
+            ? err.message
+            : t("channelTask.assignee-error-description"),
+      });
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   const handleBackToTasks = () => {
     // Drill back from a task's thread to the channel's task board.
     closeThread();
@@ -837,44 +878,81 @@ function ThreadHeader({
           </span>
         </button>
       )}
-      {canCloseTask && (
+      {canManageTask && (
         <>
-          <button
-            type="button"
-            onClick={() => setCloseTaskOpen(true)}
-            className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors"
-            aria-label={t("channelTask.close")}
-            title={t("channelTask.close")}
+          {/* Status dropdown: move the task between any of the four statuses.
+              DONE closes the task (sets completed_at). */}
+          <Select
+            value={String(rootMsg?.task?.status ?? TaskStatus.TODO)}
+            onValueChange={(v) => void handleStatusChange(v)}
+            disabled={statusUpdating}
           >
-            <CheckCircle2 className="size-4" />
-          </button>
-          <AlertDialog open={closeTaskOpen} onOpenChange={setCloseTaskOpen}>
-            <AlertDialogContent>
-              <AlertDialogTitle>
-                {t("channelTask.close-confirm-title")}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {t("channelTask.close-confirm-description")}
-              </AlertDialogDescription>
-              <AlertDialogFooter>
-                <AlertDialogClose>
-                  <Button variant="outline" disabled={closingTask}>
-                    {t("common.cancel")}
-                  </Button>
-                </AlertDialogClose>
-                <Button
-                  variant="destructive"
-                  disabled={closingTask}
-                  onClick={handleCloseTask}
+            <SelectTrigger
+              size="xs"
+              className="shrink-0"
+              aria-label={t("channelTask.status-change-aria") ?? ""}
+            >
+              <SelectValue>
+                {(value) => taskStatusLabel(Number(value), t)}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={String(TaskStatus.TODO)}>
+                {t("channelTask.status-todo")}
+              </SelectItem>
+              <SelectItem value={String(TaskStatus.IN_PROGRESS)}>
+                {t("channelTask.status-in-progress")}
+              </SelectItem>
+              <SelectItem value={String(TaskStatus.IN_REVIEW)}>
+                {t("channelTask.status-in-review")}
+              </SelectItem>
+              <SelectItem value={String(TaskStatus.DONE)}>
+                {t("channelTask.status-done")}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Assignee dropdown: assign any channel member (user or agent) as
+              the task's owner. */}
+          <Select
+            value={
+              rootMsg?.task?.assigneeType && rootMsg.task.assigneeResourceId
+                ? `${rootMsg.task.assigneeType}:${rootMsg.task.assigneeResourceId}`
+                : ""
+            }
+            onValueChange={(v) => void handleAssigneeChange(v)}
+            disabled={assigning}
+          >
+            <SelectTrigger
+              size="xs"
+              className="shrink-0"
+              aria-label={t("channelTask.assignee-aria") ?? ""}
+            >
+              <SelectValue>
+                {() =>
+                  rootMsg?.task?.assigneeName ||
+                  t("channelTask.assignee-placeholder")
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {members.map((m) => (
+                <SelectItem
+                  key={`${m.memberType}:${m.memberId}`}
+                  value={`${m.memberType}:${m.memberId}`}
                 >
-                  {closingTask
-                    ? t("common.saving")
-                    : t("channelTask.close-confirm-action")}
-                </Button>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                  {m.displayName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </>
+      )}
+      {/* Creator display: the task's author (display name, no avatar). */}
+      {isTask && rootMsg?.senderName && (
+        <span className="hidden shrink-0 text-xs text-control-placeholder sm:inline">
+          {t("channelTask.creator", { name: rootMsg.senderName })}
+        </span>
       )}
       {/* The expand/collapse toggle is a desktop affordance: on mobile the
           thread panel already fills the screen, so the toggle is meaningless. */}

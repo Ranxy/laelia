@@ -69,6 +69,8 @@
     - [RevokeAgentTokenResponse](#laelia-v1-RevokeAgentTokenResponse)
     - [RotateAgentTokenRequest](#laelia-v1-RotateAgentTokenRequest)
     - [RotateAgentTokenResponse](#laelia-v1-RotateAgentTokenResponse)
+    - [StartAgentRequest](#laelia-v1-StartAgentRequest)
+    - [StopAgentRequest](#laelia-v1-StopAgentRequest)
     - [TransferAgentOwnershipRequest](#laelia-v1-TransferAgentOwnershipRequest)
     - [TransferAgentOwnershipResponse](#laelia-v1-TransferAgentOwnershipResponse)
     - [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest)
@@ -155,6 +157,8 @@
     - [AgentActivity](#laelia-v1-AgentActivity)
     - [AgentReady](#laelia-v1-AgentReady)
     - [AgentStreamMessage](#laelia-v1-AgentStreamMessage)
+    - [AssignTaskRequest](#laelia-v1-AssignTaskRequest)
+    - [AssignTaskResponse](#laelia-v1-AssignTaskResponse)
     - [Attachment](#laelia-v1-Attachment)
     - [BeginSession](#laelia-v1-BeginSession)
     - [BeginSessionResponse](#laelia-v1-BeginSessionResponse)
@@ -375,6 +379,7 @@
     - [AgentConfigUpdate](#laelia-v1-AgentConfigUpdate)
     - [ConnectMachineRequest](#laelia-v1-ConnectMachineRequest)
     - [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse)
+    - [DeleteAgentWorkspace](#laelia-v1-DeleteAgentWorkspace)
     - [DeleteMachineRequest](#laelia-v1-DeleteMachineRequest)
     - [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest)
     - [GetMachineRequest](#laelia-v1-GetMachineRequest)
@@ -659,6 +664,7 @@ RiskLevel is the risk level.
 | follow_owner_permissions | [bool](#bool) |  | follow_owner_permissions grants this agent read access to every channel (and DM) its owner can read, without requiring the agent to be added as a member. The agent can read and proactively join such channels; posting still requires explicit membership. Default true: the agent acts within its owner&#39;s channel visibility. |
 | mcp_servers | [string](#string) | repeated | mcp_servers is the set of MCP server resource names (mcpServers/{id}) enabled on this agent. The manager resolves them into a tool catalog when the agent starts; the machine never receives transport configuration. |
 | can_manage_channel_members | [bool](#bool) |  | can_manage_channel_members grants this agent the ability to add/remove members in a channel where its owner is a channel Admin or Owner. This is separate from follow_owner_permissions (which controls read visibility): the agent acts on its owner&#39;s behalf for member management only — it never inherits the owner&#39;s other manage powers (rename, delete, transfer, roles). Default true. |
+| enabled | [bool](#bool) |  | enabled reports whether the agent is running. When false the agent has been stopped (StopAgent): its machine runner is torn down and it does not process session messages or run an LLM agent until StartAgent. Default true. |
 | machine_title | [string](#string) |  | machine_title is the display name (title) of the machine this agent is bound to, resolved server-side by GetAgent so clients can render a human-readable machine name without a second GetMachine round-trip (the machine may be invisible to the caller, in which case GetMachine would return NotFound). Empty when the machine is missing. |
 
 
@@ -979,7 +985,7 @@ delete server-side while the list hides the button).
 | owner | [string](#string) |  | owner is the owner&#39;s user resource name (users/{id}); empty for legacy agents with no recorded owner. Surfaced on the summary so list consumers (e.g. the Members page&#39;s per-user &#34;Owned Agents&#34; view and the channel member picker) can group agents by owner without an N&#43;1 of GetAgent. |
 | follow_owner_permissions | [bool](#bool) |  | follow_owner_permissions mirrors Agent.follow_owner_permissions so list consumers can show whether the agent follows its owner&#39;s channel access. |
 | can_manage_channel_members | [bool](#bool) |  | can_manage_channel_members mirrors Agent.can_manage_channel_members so list consumers can show whether the agent may manage members on its owner&#39;s behalf. |
-| can_delete | [bool](#bool) |  | can_delete reports whether the current caller may delete this agent: its owner or a workspace-scope holder of laelia.agents.edit. |
+| enabled | [bool](#bool) |  | enabled reports whether the agent is running; mirrors Agent.enabled (see there). False means the agent is stopped and processes no messages. |
 
 
 
@@ -1507,6 +1513,36 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 
 
 
+<a name="laelia-v1-StartAgentRequest"></a>
+
+### StartAgentRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-StopAgentRequest"></a>
+
+### StopAgentRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-TransferAgentOwnershipRequest"></a>
 
 ### TransferAgentOwnershipRequest
@@ -1683,6 +1719,8 @@ ReadAgentWorkspaceFile RPC.
 | UpdateAgent | [UpdateAgentRequest](#laelia-v1-UpdateAgentRequest) | [Agent](#laelia-v1-Agent) | UpdateAgent patches a single mutable agent field. Only allow_add_to_channel is supported initially (any other update_mask path is rejected). Authorized in the handler for the agent&#39;s owner or a workspace admin; the IAM interceptor&#39;s agents.edit is admin-only, so this RPC carries no permission annotation and is handler-gated. |
 | TransferAgentOwnership | [TransferAgentOwnershipRequest](#laelia-v1-TransferAgentOwnershipRequest) | [TransferAgentOwnershipResponse](#laelia-v1-TransferAgentOwnershipResponse) | TransferAgentOwnership reassigns the agent&#39;s owner to another user. The new owner takes effect immediately and unilaterally (no acceptance required); the previous owner loses owner authority at once. Authorized in the handler for the agent&#39;s current owner or a workspace admin; like UpdateAgent this RPC carries no permission annotation (agents.edit is admin-only) and is handler-gated via canEditAgent. |
 | DeleteAgent | [DeleteAgentRequest](#laelia-v1-DeleteAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | DeleteAgent soft-deletes an agent. Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit on the agent; no permission annotation so the owner short-circuit can run. |
+| StopAgent | [StopAgentRequest](#laelia-v1-StopAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | StopAgent stops an agent: its machine runner is torn down and it no longer processes session messages or runs an LLM agent until StartAgent. The agent row is preserved (not deleted) and remains visible. Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit. |
+| StartAgent | [StartAgentRequest](#laelia-v1-StartAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | StartAgent resumes a stopped agent: its machine runner is re-spawned and it resumes processing session messages. No-op (still succeeds) if the agent is already enabled. Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit. |
 | RotateAgentToken | [RotateAgentTokenRequest](#laelia-v1-RotateAgentTokenRequest) | [RotateAgentTokenResponse](#laelia-v1-RotateAgentTokenResponse) | Token rotation: generate a new bootstrap token, old token invalid after grace period. Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit on the agent; no permission annotation so the owner short-circuit can run. |
 | RevokeAgentToken | [RevokeAgentTokenRequest](#laelia-v1-RevokeAgentTokenRequest) | [RevokeAgentTokenResponse](#laelia-v1-RevokeAgentTokenResponse) | Token revocation: revoke all tokens for the agent. Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit on the agent; no permission annotation so the owner short-circuit can run. |
 | ForceDisconnectAgent | [ForceDisconnectAgentRequest](#laelia-v1-ForceDisconnectAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Force-disconnects an agent connection. Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit on the agent; no permission annotation so the owner short-circuit can run. |
@@ -2795,6 +2833,38 @@ never generates conversation activity.
 | providers_discovered | [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered) |  | response to ManagerStreamMessage.discover_providers |
 | workspace_list_response | [WorkspaceListResponse](#laelia-v1-WorkspaceListResponse) |  | response to ManagerStreamMessage.workspace_list_request |
 | workspace_read_response | [WorkspaceReadResponse](#laelia-v1-WorkspaceReadResponse) |  | response to ManagerStreamMessage.workspace_read_request |
+
+
+
+
+
+
+<a name="laelia-v1-AssignTaskRequest"></a>
+
+### AssignTaskRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [string](#string) |  | message is the resource name of the task&#39;s root message (&#34;conversations/{c}/messages/{m}&#34;). |
+| member_type | [int32](#int32) |  | member_type is the target assignee kind: 1=user, 2=agent (reuses the MemberType semantics). A user assignee is a display-only &#34;owner&#34; and does not participate in claim/process flows; an agent assignee is the working owner. |
+| member_id | [string](#string) |  | member_id is the target member&#39;s stable id within the conversation: the agent&#39;s resource id (handle) for agents, the user&#39;s handle for users. |
+
+
+
+
+
+
+<a name="laelia-v1-AssignTaskResponse"></a>
+
+### AssignTaskResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [ChatMessage](#laelia-v1-ChatMessage) |  |  |
 
 
 
@@ -5120,8 +5190,9 @@ content/sender/room_version.
 | ----- | ---- | ----- | ----------- |
 | task_number | [int32](#int32) |  | task_number is the per-conversation sequence number shown as &#34;[task #N]&#34;. |
 | status | [TaskStatus](#laelia-v1-TaskStatus) |  |  |
-| assignee_name | [string](#string) |  | assignee_name is the assigned agent&#39;s display name, empty when unassigned. |
-| assignee_resource_id | [string](#string) |  | assignee_resource_id is the assigned agent&#39;s resource id (&#34;agents/&lt;id&gt;&#34;), empty when unassigned. |
+| assignee_name | [string](#string) |  | assignee_name is the assigned member&#39;s display name, empty when unassigned. |
+| assignee_resource_id | [string](#string) |  | assignee_resource_id is the assigned member&#39;s resource id (the agent&#39;s handle for agents, the user&#39;s handle for users), empty when unassigned. |
+| assignee_type | [int32](#int32) |  | assignee_type distinguishes the assignee kind: 1=user, 2=agent (reuses the MemberType semantics). 0 when unassigned. |
 
 
 
@@ -5357,7 +5428,7 @@ settable here — ownership only moves via TransferChannelOwnership.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | message | [string](#string) |  |  |
-| status | [TaskStatus](#laelia-v1-TaskStatus) |  | status is the target status. Allowed transitions (enforced server-side): IN_PROGRESS -&gt; IN_REVIEW (the assignee marks the task ready for human review) and IN_REVIEW -&gt; DONE (the assignee marks the task done after detecting the human&#39;s approval in the task&#39;s thread). TODO -&gt; IN_PROGRESS is performed by ClaimTask, not this RPC. |
+| status | [TaskStatus](#laelia-v1-TaskStatus) |  | status is the target status. Any channel member may move a task between any of the four statuses (TODO / IN_PROGRESS / IN_REVIEW / DONE). Setting DONE closes the task (sets completed_at); moving out of DONE clears it. |
 
 
 
@@ -5718,7 +5789,8 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | CreateTask | [CreateTaskRequest](#laelia-v1-CreateTaskRequest) | [CreateTaskResponse](#laelia-v1-CreateTaskResponse) | CreateTask posts a new top-level task message in a channel (used by agents to break work into subtasks for others to claim). The new task is created unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a system notification row and wakes other agent members. |
 | ClaimTask | [ClaimTaskRequest](#laelia-v1-ClaimTaskRequest) | [ClaimTaskResponse](#laelia-v1-ClaimTaskResponse) | ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it to the calling agent, subscribing the agent to the task&#39;s thread so approval replies wake it. Returns FAILED_PRECONDITION if the task is already claimed or not in TODO. Emits a system notification row. |
 | UnclaimTask | [UnclaimTaskRequest](#laelia-v1-UnclaimTaskRequest) | [UnclaimTaskResponse](#laelia-v1-UnclaimTaskResponse) | UnclaimTask releases the calling agent&#39;s claim on a task it owns, setting it back to TODO so another agent may claim it. Not allowed on DONE (terminal). Emits a system notification row. |
-| UpdateTaskStatus | [UpdateTaskStatusRequest](#laelia-v1-UpdateTaskStatusRequest) | [UpdateTaskStatusResponse](#laelia-v1-UpdateTaskStatusResponse) | UpdateTaskStatus advances a task&#39;s status. IN_PROGRESS -&gt; IN_REVIEW marks the assignee&#39;s work ready for human review; IN_REVIEW -&gt; DONE marks it complete (the assignee should call this only after detecting the human&#39;s approval in the task&#39;s thread). Only the assignee may call this. Emits a system notification row. |
+| UpdateTaskStatus | [UpdateTaskStatusRequest](#laelia-v1-UpdateTaskStatusRequest) | [UpdateTaskStatusResponse](#laelia-v1-UpdateTaskStatusResponse) | UpdateTaskStatus moves a task between any of the four statuses. Any channel member (user or agent) may call it; DONE closes the task (sets completed_at), and moving out of DONE clears it. Emits a system notification row. |
+| AssignTask | [AssignTaskRequest](#laelia-v1-AssignTaskRequest) | [AssignTaskResponse](#laelia-v1-AssignTaskResponse) | AssignTask assigns a task to a channel member (user or agent). A user assignee is a display-only &#34;owner&#34; and does not participate in the claim/process flow; an agent assignee is the working owner. Any channel member may assign. Emits a system notification row. |
 | CloseTask | [CloseTaskRequest](#laelia-v1-CloseTaskRequest) | [CloseTaskResponse](#laelia-v1-CloseTaskResponse) | CloseTask lets a channel member (user or agent) close a task from the UI: any non-DONE task transitions to DONE (terminal), setting completed_at. Unlike UpdateTaskStatus it does not require assignee ownership and accepts every open status (TODO / IN_PROGRESS / IN_REVIEW), so the user can close a task without going through the agent. Closing an already-DONE task is idempotent. Emits a system notification row. |
 | ConvertMessageToReminder | [ConvertMessageToReminderRequest](#laelia-v1-ConvertMessageToReminderRequest) | [ConvertMessageToReminderResponse](#laelia-v1-ConvertMessageToReminderResponse) | ConvertMessageToReminder turns an existing top-level message into a scheduled reminder owned by the calling agent (atomic create&#43;claim). The message must be a root in the conversation and not already a reminder. The agent is subscribed to the reminder&#39;s thread so discussion replies wake it. |
 | ListReminders | [ListRemindersRequest](#laelia-v1-ListRemindersRequest) | [ListRemindersResponse](#laelia-v1-ListRemindersResponse) | ListReminders returns reminders, optionally filtered by owning agent, conversation, and status. Used by the agent-page Reminders tab (user) and the agent CLI (self-list). |
@@ -6465,6 +6537,22 @@ in full in ConnectMachineResponse.assigned_agents on (re)connect.
 
 
 
+<a name="laelia-v1-DeleteAgentWorkspace"></a>
+
+### DeleteAgentWorkspace
+DeleteAgentWorkspace tells the machine to tear down an agent&#39;s runner and
+permanently remove its workspace directory under the machine data root.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_name | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-DeleteMachineRequest"></a>
 
 ### DeleteMachineRequest
@@ -6896,6 +6984,7 @@ MachineWorkspaceSummary is one agent workspace directory&#39;s usage summary.
 | pong | [Pong](#laelia-v1-Pong) |  |  |
 | reload_agent_assignment | [ReloadAgentAssignment](#laelia-v1-ReloadAgentAssignment) |  | full re-sync of one agent |
 | machine_workspace_scan_request | [MachineWorkspaceScanRequest](#laelia-v1-MachineWorkspaceScanRequest) |  | scan per-agent workspace directories on this machine |
+| delete_agent_workspace | [DeleteAgentWorkspace](#laelia-v1-DeleteAgentWorkspace) |  | stop the runner and delete an agent&#39;s workspace directory |
 
 
 

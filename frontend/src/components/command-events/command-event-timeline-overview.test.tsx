@@ -66,7 +66,9 @@ describe("CommandEventTimelineOverview equal width", () => {
 
     const spans = screen
       .getAllByRole("button")
-      .filter((b) => b.getAttribute("aria-label") !== "command.timeline-drag-hint");
+      .filter(
+        (b) => b.getAttribute("aria-label") !== "command.timeline-drag-hint"
+      );
     expect(spans).toHaveLength(2);
     // Each span should be roughly half the track (equal width), not a tiny
     // point stretched by real time.
@@ -149,7 +151,9 @@ describe("CommandEventTimelineOverview drag selection", () => {
       />
     );
 
-    const track = container.querySelector('[aria-label="command.timeline-drag-hint"]')!;
+    const track = container.querySelector(
+      '[aria-label="command.timeline-drag-hint"]'
+    )!;
     const rect = { left: 0, width: 200 } as DOMRect;
     vi.spyOn(track, "getBoundingClientRect").mockReturnValue(rect);
 
@@ -184,7 +188,9 @@ describe("CommandEventTimelineOverview right-click clears", () => {
       />
     );
 
-    const track = container.querySelector('[aria-label="command.timeline-drag-hint"]')!;
+    const track = container.querySelector(
+      '[aria-label="command.timeline-drag-hint"]'
+    )!;
     const rect = { left: 0, width: 200 } as DOMRect;
     vi.spyOn(track, "getBoundingClientRect").mockReturnValue(rect);
 

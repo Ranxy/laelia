@@ -706,6 +706,12 @@ CREATE TABLE IF NOT EXISTS task (
     task_number INTEGER NOT NULL,
     status SMALLINT NOT NULL DEFAULT 1,
     assignee_agent_id INTEGER REFERENCES agent(id) ON DELETE SET NULL,
+    -- assignee_type distinguishes the current assignee kind: 1=user, 2=agent
+    -- (reuses MemberType semantics). NULL when unassigned.
+    assignee_type SMALLINT,
+    -- assignee_user_id holds a user assignee (display-only "owner"); the agent
+    -- claim flow writes assignee_agent_id instead.
+    assignee_user_id INTEGER REFERENCES principal(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     completed_at TIMESTAMPTZ,

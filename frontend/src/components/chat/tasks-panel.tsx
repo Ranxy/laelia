@@ -193,6 +193,11 @@ function TaskCard({
         <p className="text-[11px] text-control-placeholder">
           {t("channelTask.status-label", { status: taskStatusShort(status) })}
         </p>
+        {task.senderName && (
+          <span className="text-[11px] text-control-placeholder">
+            {t("channelTask.creator", { name: task.senderName })}
+          </span>
+        )}
         <button
           type="button"
           onClick={(e) => {

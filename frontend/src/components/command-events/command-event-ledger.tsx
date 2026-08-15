@@ -7,10 +7,7 @@ import type {
   CommandOutput,
 } from "@/types/proto-es/v1/command_pb";
 import { CommandEventType } from "@/types/proto-es/v1/command_pb";
-import {
-  getCommandEventKind,
-  getOutputStreamKind,
-} from "./command-event-kind";
+import { getCommandEventKind, getOutputStreamKind } from "./command-event-kind";
 
 export type CommandEventFilter =
   | "all"
@@ -92,10 +89,7 @@ function matchesFilter(
   }
 }
 
-function matchesSearch(
-  row: { searchText: string },
-  query: string
-): boolean {
+function matchesSearch(row: { searchText: string }, query: string): boolean {
   if (!query) return true;
   return row.searchText.toLowerCase().includes(query.toLowerCase());
 }
@@ -130,7 +124,9 @@ function formatTimeRange(startTs: number, endTs: number): string {
   return `${formatTimeMs(startTs)} → ${formatTimeMs(endTs)}`;
 }
 
-function diffStats(event: CommandEvent): { added: number; removed: number } | null {
+function diffStats(
+  event: CommandEvent
+): { added: number; removed: number } | null {
   if (event.payload.case !== "diffEmitted") return null;
   const added = event.payload.value.newText
     ? event.payload.value.newText.split("\n").length
@@ -145,7 +141,10 @@ function EventContent({ event }: { event: CommandEvent }) {
   const { t } = useTranslation();
   const kind = getCommandEventKind(event.type);
 
-  if (event.type === CommandEventType.DIFF_EMITTED && event.payload.case === "diffEmitted") {
+  if (
+    event.type === CommandEventType.DIFF_EMITTED &&
+    event.payload.case === "diffEmitted"
+  ) {
     const stats = diffStats(event);
     return (
       <span className="flex min-w-0 items-center gap-2">
@@ -163,13 +162,21 @@ function EventContent({ event }: { event: CommandEvent }) {
     );
   }
 
-  if (event.type === CommandEventType.WARNING && event.payload.case === "warning") {
+  if (
+    event.type === CommandEventType.WARNING &&
+    event.payload.case === "warning"
+  ) {
     return (
-      <span className="truncate text-warning">{event.payload.value.message}</span>
+      <span className="truncate text-warning">
+        {event.payload.value.message}
+      </span>
     );
   }
 
-  if (event.type === CommandEventType.TOKEN_USAGE && event.payload.case === "tokenUsage") {
+  if (
+    event.type === CommandEventType.TOKEN_USAGE &&
+    event.payload.case === "tokenUsage"
+  ) {
     return (
       <span className="truncate text-info">
         {Number(event.payload.value.totalTokens).toLocaleString()} tokens
@@ -417,7 +424,11 @@ export function CommandEventLedger({
           {rows.map((row) => {
             const isTool = row.kind === "tool";
             const isOutput = row.kind === "output";
-            const event = isTool ? row.pair.started : isOutput ? undefined : row.event;
+            const event = isTool
+              ? row.pair.started
+              : isOutput
+                ? undefined
+                : row.event;
             const kind = isOutput
               ? getOutputStreamKind(row.output.type)
               : getCommandEventKind(event!.type);
@@ -448,9 +459,7 @@ export function CommandEventLedger({
                   "hover:bg-control-bg/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
                   selected &&
                     "bg-accent/5 shadow-[inset_3px_0_0_0_rgb(var(--color-accent))]",
-                  rangeKeys &&
-                    !rangeKeys.includes(row.key) &&
-                    "opacity-30"
+                  rangeKeys && !rangeKeys.includes(row.key) && "opacity-30"
                 )}
               >
                 <td className="px-3 py-1.5 align-top">

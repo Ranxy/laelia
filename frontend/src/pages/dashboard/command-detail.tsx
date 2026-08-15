@@ -2,23 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { CommandEventInspector } from "@/components/command-events/command-event-inspector";
+import { isVisibleEvent } from "@/components/command-events/command-event-kind";
 import {
-  CommandEventLedger,
   type CommandEventFilter,
+  CommandEventLedger,
 } from "@/components/command-events/command-event-ledger";
 import { CommandEventTimelineOverview } from "@/components/command-events/command-event-timeline-overview";
 import { CommandEventToolbar } from "@/components/command-events/command-event-toolbar";
-import { isVisibleEvent } from "@/components/command-events/command-event-kind";
 import { CommandStatusBadge } from "@/components/command-status-badge";
 import { FinalSummary } from "@/components/command-terminal";
 import { TokenUsageCard } from "@/components/token-usage-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
-import {
-  formatDuration,
-  formatTimestamp,
-} from "@/lib/command-status";
+import { formatDuration, formatTimestamp } from "@/lib/command-status";
 import { pairToolCallEvents, type ToolCallPair } from "@/lib/tool-call-events";
 import { useAppStore } from "@/stores";
 import type {

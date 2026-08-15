@@ -30,6 +30,7 @@ export function toUiMessage(msg: ChatMessage): ChatMessageUI {
           status: msg.task.status,
           assigneeName: msg.task.assigneeName || undefined,
           assigneeResourceId: msg.task.assigneeResourceId || undefined,
+          assigneeType: msg.task.assigneeType || undefined,
         }
       : undefined,
   };

@@ -30,12 +30,15 @@ var (
 	// ErrTaskNotClaimable is returned by ClaimTask when the task is not in TODO
 	// (already claimed, in review, or done).
 	ErrTaskNotClaimable = errors.New("task is already claimed or not in todo")
-	// ErrTaskNotOwner is returned by UnclaimTask / UpdateTaskStatus when the
-	// caller is not the task's assignee.
+	// ErrTaskNotOwner is returned by UnclaimTask when the caller is not the
+	// task's assignee.
 	ErrTaskNotOwner = errors.New("task is assigned to another agent")
 	// ErrTaskInvalidTransition is returned by UpdateTaskStatus when the
-	// requested status transition is not allowed from the current status.
+	// requested status is not a valid TaskStatus.
 	ErrTaskInvalidTransition = errors.New("task status transition not allowed")
+	// ErrTaskAssigneeNotMember is returned by AssignTask when the target member
+	// is not a member of the task's conversation.
+	ErrTaskAssigneeNotMember = errors.New("assignee is not a conversation member")
 )
 
 // TaskInfo is the join shape attached to a ChatMessage that is a task. It is
@@ -44,6 +47,8 @@ type TaskInfo struct {
 	TaskNumber         int32
 	Status             int16
 	AssigneeAgentID    sql.NullInt32
+	AssigneeUserID     sql.NullInt32
+	AssigneeType       int16
 	AssigneeName       string
 	AssigneeResourceID string
 }
@@ -212,7 +217,7 @@ func (s *Store) ConvertMessageToTask(ctx context.Context, msgID, convID uuid.UUI
 func (s *Store) ClaimTask(ctx context.Context, msgID, convID uuid.UUID, agentID int) (*ChatMessage, error) {
 	res, err := s.GetDB().ExecContext(ctx, `
 		UPDATE task
-		   SET status = $1, assignee_agent_id = $2, updated_at = now()
+		   SET status = $1, assignee_agent_id = $2, assignee_type = 2, updated_at = now()
 		 WHERE message_id = $3 AND conversation_id = $4 AND status = $5 AND assignee_agent_id IS NULL
 	`, TaskStatusInProgress, agentID, msgID, convID, TaskStatusTodo)
 	if err != nil {
@@ -235,7 +240,7 @@ func (s *Store) ClaimTask(ctx context.Context, msgID, convID uuid.UUID, agentID 
 func (s *Store) UnclaimTask(ctx context.Context, msgID uuid.UUID, agentID int) (*ChatMessage, error) {
 	res, err := s.GetDB().ExecContext(ctx, `
 		UPDATE task
-		   SET status = $1, assignee_agent_id = NULL, updated_at = now()
+		   SET status = $1, assignee_agent_id = NULL, assignee_type = NULL, updated_at = now()
 		 WHERE message_id = $2 AND assignee_agent_id = $3 AND status = $4
 	`, TaskStatusTodo, msgID, agentID, TaskStatusInProgress)
 	if err != nil {
@@ -251,29 +256,26 @@ func (s *Store) UnclaimTask(ctx context.Context, msgID uuid.UUID, agentID int) (
 	return s.GetTaskMessage(ctx, msgID)
 }
 
-// UpdateTaskStatus advances a task's status. Only IN_PROGRESS -> IN_REVIEW and
-// IN_REVIEW -> DONE are allowed here; TODO -> IN_PROGRESS is performed by
-// ClaimTask. The caller must be the assignee. Returns ErrTaskInvalidTransition
-// for an unsupported target, and ErrTaskNotOwner when the caller is not the
-// assignee or the task is not in the required predecessor status. On success
-// the returned ChatMessage is re-read with TaskInfo populated.
-func (s *Store) UpdateTaskStatus(ctx context.Context, msgID uuid.UUID, agentID int, target int16) (*ChatMessage, error) {
-	requiredCurrent, ok := taskStatusPredecessor(target)
-	if !ok {
+// UpdateTaskStatus moves a task to any of the four statuses. Any channel member
+// may call it; there is no transition restriction. Setting DONE closes the task
+// (sets completed_at); moving out of DONE clears it. Returns
+// ErrTaskInvalidTransition for an invalid target status, and ErrTaskNotFound
+// when the message has no task row. On success the returned ChatMessage is
+// re-read with TaskInfo populated.
+func (s *Store) UpdateTaskStatus(ctx context.Context, msgID uuid.UUID, target int16) (*ChatMessage, error) {
+	if target < TaskStatusTodo || target > TaskStatusDone {
 		return nil, ErrTaskInvalidTransition
 	}
 	var stmt string
 	switch target {
-	case TaskStatusInReview:
-		stmt = `UPDATE task SET status = $1, updated_at = now()
-			WHERE message_id = $2 AND assignee_agent_id = $3 AND status = $4`
 	case TaskStatusDone:
-		stmt = `UPDATE task SET status = $1, updated_at = now(), completed_at = now()
-			WHERE message_id = $2 AND assignee_agent_id = $3 AND status = $4`
+		stmt = `UPDATE task SET status = $1, completed_at = now(), updated_at = now()
+			WHERE message_id = $2`
 	default:
-		return nil, ErrTaskInvalidTransition
+		stmt = `UPDATE task SET status = $1, completed_at = NULL, updated_at = now()
+			WHERE message_id = $2`
 	}
-	res, err := s.GetDB().ExecContext(ctx, stmt, target, msgID, agentID, requiredCurrent)
+	res, err := s.GetDB().ExecContext(ctx, stmt, target, msgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to update task status")
 	}
@@ -282,10 +284,71 @@ func (s *Store) UpdateTaskStatus(ctx context.Context, msgID uuid.UUID, agentID i
 		return nil, errors.Wrapf(err, "failed to read task status update result")
 	}
 	if rows == 0 {
-		// Distinguish "not the owner" from "wrong status": a separate read of
-		// the row tells the caller why, but the mutation is atomic so the read
-		// is best-effort. The API layer maps either to FailedPrecondition.
-		return nil, ErrTaskNotOwner
+		return nil, ErrTaskNotFound
+	}
+	return s.GetTaskMessage(ctx, msgID)
+}
+
+// AssignTask assigns a task to a channel member (user or agent). A user
+// assignee is a display-only "owner" and does not participate in the
+// claim/process flow; an agent assignee is the working owner. The target must
+// be a member of the task's conversation. Returns ErrTaskNotFound when the
+// message has no task row, and ErrTaskAssigneeNotMember when the target is not
+// a conversation member. On success the returned ChatMessage is re-read with
+// TaskInfo populated.
+func (s *Store) AssignTask(ctx context.Context, msgID, convID uuid.UUID, memberType int32, memberID string) (*ChatMessage, error) {
+	// Resolve the target member to a principal/agent id and validate membership
+	// in one step. memberID is the member's stable handle (user handle or agent
+	// resource id).
+	var assigneeType int16
+	var agentID, userID sql.NullInt32
+	switch memberType {
+	case MemberTypeAgent:
+		var id int
+		if err := s.GetDB().QueryRowContext(ctx, `
+			SELECT a.id FROM agent a
+			JOIN conversation_member_meta cm ON cm.member_type = $1 AND cm.member_id = a.resource_id
+			WHERE a.resource_id = $2 AND cm.conversation_id = $3
+		`, MemberTypeAgent, memberID, convID).Scan(&id); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, ErrTaskAssigneeNotMember
+			}
+			return nil, errors.Wrapf(err, "failed to resolve agent assignee")
+		}
+		assigneeType = 2
+		agentID = sql.NullInt32{Int32: int32(id), Valid: true}
+	case MemberTypeUser:
+		var id int
+		if err := s.GetDB().QueryRowContext(ctx, `
+			SELECT p.id FROM principal p
+			JOIN conversation_member_meta cm ON cm.member_type = $1 AND cm.member_id = p.handle
+			WHERE p.handle = $2 AND cm.conversation_id = $3
+		`, MemberTypeUser, memberID, convID).Scan(&id); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, ErrTaskAssigneeNotMember
+			}
+			return nil, errors.Wrapf(err, "failed to resolve user assignee")
+		}
+		assigneeType = 1
+		userID = sql.NullInt32{Int32: int32(id), Valid: true}
+	default:
+		return nil, ErrTaskAssigneeNotMember
+	}
+
+	res, err := s.GetDB().ExecContext(ctx, `
+		UPDATE task
+		   SET assignee_type = $1, assignee_agent_id = $2, assignee_user_id = $3, updated_at = now()
+		 WHERE message_id = $4 AND conversation_id = $5
+	`, assigneeType, agentID, userID, msgID, convID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to assign task")
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read assign result")
+	}
+	if rows == 0 {
+		return nil, ErrTaskNotFound
 	}
 	return s.GetTaskMessage(ctx, msgID)
 }
@@ -322,20 +385,6 @@ func (s *Store) CloseTask(ctx context.Context, msgID, convID uuid.UUID) (msg *Ch
 		return nil, false, ErrTaskNotFound
 	}
 	return msg, rows > 0, nil
-}
-
-// taskStatusPredecessor returns the status a task must be in to advance to
-// target via UpdateTaskStatus, and whether target is a valid UpdateTaskStatus
-// target at all.
-func taskStatusPredecessor(target int16) (int16, bool) {
-	switch target {
-	case TaskStatusInReview:
-		return TaskStatusInProgress, true
-	case TaskStatusDone:
-		return TaskStatusInReview, true
-	default:
-		return 0, false
-	}
 }
 
 // GetTaskMessage returns a chat_message by id with TaskInfo (and
@@ -476,9 +525,12 @@ func (s *Store) fillTaskInfo(ctx context.Context, msgs []*ChatMessage) error {
 	}
 	rows, err := s.GetDB().QueryContext(ctx, `
 		SELECT t.message_id, t.task_number, t.status, t.assignee_agent_id,
-		       COALESCE(a.name, ''), COALESCE(a.resource_id, '')
+		       t.assignee_user_id, t.assignee_type,
+		       COALESCE(a.name, ''), COALESCE(a.resource_id, ''),
+		       COALESCE(u.name, ''), COALESCE(u.handle, '')
 		FROM task t
 		LEFT JOIN agent a ON a.id = t.assignee_agent_id
+		LEFT JOIN principal u ON u.id = t.assignee_user_id
 		WHERE t.message_id = ANY($1)
 	`, roots)
 	if err != nil {
@@ -488,14 +540,32 @@ func (s *Store) fillTaskInfo(ctx context.Context, msgs []*ChatMessage) error {
 	info := make(map[uuid.UUID]*TaskInfo, len(roots))
 	for rows.Next() {
 		var (
-			msgID      uuid.UUID
-			ti         TaskInfo
-			assigneeID sql.NullInt32
+			msgID        uuid.UUID
+			ti           TaskInfo
+			agentID      sql.NullInt32
+			userID       sql.NullInt32
+			assigneeType sql.NullInt16
+			agentName    string
+			agentResID   string
+			userName     string
+			userHandle   string
 		)
-		if err := rows.Scan(&msgID, &ti.TaskNumber, &ti.Status, &assigneeID, &ti.AssigneeName, &ti.AssigneeResourceID); err != nil {
+		if err := rows.Scan(&msgID, &ti.TaskNumber, &ti.Status, &agentID, &userID, &assigneeType, &agentName, &agentResID, &userName, &userHandle); err != nil {
 			return errors.Wrapf(err, "failed to scan task info")
 		}
-		ti.AssigneeAgentID = assigneeID
+		ti.AssigneeAgentID = agentID
+		ti.AssigneeUserID = userID
+		ti.AssigneeType = assigneeType.Int16
+		// Surface the assignee name/resource id according to the current
+		// assignee kind: agent for agent assignees, user for user assignees.
+		switch ti.AssigneeType {
+		case 2:
+			ti.AssigneeName = agentName
+			ti.AssigneeResourceID = agentResID
+		case 1:
+			ti.AssigneeName = userName
+			ti.AssigneeResourceID = userHandle
+		}
 		info[msgID] = &ti
 	}
 	if err := rows.Err(); err != nil {

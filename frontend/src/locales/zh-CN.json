@@ -292,7 +292,17 @@
     "unassigned": "未认领",
     "untitled": "未命名任务",
     "convert-error": "转换为任务失败",
-    "convert-success": "转换为任务成功"
+    "convert-success": "转换为任务成功",
+    "status-change-aria": "更改任务状态",
+    "status-change-success": "任务状态已更新",
+    "status-change-error": "更新任务状态失败",
+    "status-change-error-description": "请重试。",
+    "assignee-aria": "指派任务",
+    "assignee-placeholder": "未指派",
+    "assignee-success": "任务已指派",
+    "assignee-error": "指派任务失败",
+    "assignee-error-description": "请重试。",
+    "creator": "创建者：{{name}}"
   },
   "chat": {
     "agent": "Agent",

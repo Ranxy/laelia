@@ -36,19 +36,27 @@ export declare type TaskInfo = Message<"laelia.v1.TaskInfo"> & {
   status: TaskStatus;
 
   /**
-   * assignee_name is the assigned agent's display name, empty when unassigned.
+   * assignee_name is the assigned member's display name, empty when unassigned.
    *
    * @generated from field: string assignee_name = 3;
    */
   assigneeName: string;
 
   /**
-   * assignee_resource_id is the assigned agent's resource id ("agents/<id>"),
-   * empty when unassigned.
+   * assignee_resource_id is the assigned member's resource id (the agent's
+   * handle for agents, the user's handle for users), empty when unassigned.
    *
    * @generated from field: string assignee_resource_id = 4;
    */
   assigneeResourceId: string;
+
+  /**
+   * assignee_type distinguishes the assignee kind: 1=user, 2=agent (reuses the
+   * MemberType semantics). 0 when unassigned.
+   *
+   * @generated from field: int32 assignee_type = 5;
+   */
+  assigneeType: number;
 };
 
 /**
@@ -2949,11 +2957,9 @@ export declare type UpdateTaskStatusRequest = Message<"laelia.v1.UpdateTaskStatu
   message: string;
 
   /**
-   * status is the target status. Allowed transitions (enforced server-side):
-   * IN_PROGRESS -> IN_REVIEW (the assignee marks the task ready for human
-   * review) and IN_REVIEW -> DONE (the assignee marks the task done after
-   * detecting the human's approval in the task's thread). TODO -> IN_PROGRESS
-   * is performed by ClaimTask, not this RPC.
+   * status is the target status. Any channel member may move a task between
+   * any of the four statuses (TODO / IN_PROGRESS / IN_REVIEW / DONE). Setting
+   * DONE closes the task (sets completed_at); moving out of DONE clears it.
    *
    * @generated from field: laelia.v1.TaskStatus status = 2;
    */
@@ -2981,6 +2987,59 @@ export declare type UpdateTaskStatusResponse = Message<"laelia.v1.UpdateTaskStat
  * Use `create(UpdateTaskStatusResponseSchema)` to create a new message.
  */
 export declare const UpdateTaskStatusResponseSchema: GenMessage<UpdateTaskStatusResponse>;
+
+/**
+ * @generated from message laelia.v1.AssignTaskRequest
+ */
+export declare type AssignTaskRequest = Message<"laelia.v1.AssignTaskRequest"> & {
+  /**
+   * message is the resource name of the task's root message
+   * ("conversations/{c}/messages/{m}").
+   *
+   * @generated from field: string message = 1;
+   */
+  message: string;
+
+  /**
+   * member_type is the target assignee kind: 1=user, 2=agent (reuses the
+   * MemberType semantics). A user assignee is a display-only "owner" and does
+   * not participate in claim/process flows; an agent assignee is the working
+   * owner.
+   *
+   * @generated from field: int32 member_type = 2;
+   */
+  memberType: number;
+
+  /**
+   * member_id is the target member's stable id within the conversation: the
+   * agent's resource id (handle) for agents, the user's handle for users.
+   *
+   * @generated from field: string member_id = 3;
+   */
+  memberId: string;
+};
+
+/**
+ * Describes the message laelia.v1.AssignTaskRequest.
+ * Use `create(AssignTaskRequestSchema)` to create a new message.
+ */
+export declare const AssignTaskRequestSchema: GenMessage<AssignTaskRequest>;
+
+/**
+ * @generated from message laelia.v1.AssignTaskResponse
+ */
+export declare type AssignTaskResponse = Message<"laelia.v1.AssignTaskResponse"> & {
+  /**
+   * @generated from field: laelia.v1.ChatMessage message = 1;
+   */
+  message?: ChatMessage | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.AssignTaskResponse.
+ * Use `create(AssignTaskResponseSchema)` to create a new message.
+ */
+export declare const AssignTaskResponseSchema: GenMessage<AssignTaskResponse>;
 
 /**
  * @generated from message laelia.v1.CloseTaskRequest
@@ -5771,11 +5830,10 @@ export declare const CommandService: GenService<{
     output: typeof UnclaimTaskResponseSchema;
   },
   /**
-   * UpdateTaskStatus advances a task's status. IN_PROGRESS -> IN_REVIEW marks
-   * the assignee's work ready for human review; IN_REVIEW -> DONE marks it
-   * complete (the assignee should call this only after detecting the human's
-   * approval in the task's thread). Only the assignee may call this. Emits a
-   * system notification row.
+   * UpdateTaskStatus moves a task between any of the four statuses. Any channel
+   * member (user or agent) may call it; DONE closes the task (sets
+   * completed_at), and moving out of DONE clears it. Emits a system
+   * notification row.
    *
    * @generated from rpc laelia.v1.CommandService.UpdateTaskStatus
    */
@@ -5783,6 +5841,19 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof UpdateTaskStatusRequestSchema;
     output: typeof UpdateTaskStatusResponseSchema;
+  },
+  /**
+   * AssignTask assigns a task to a channel member (user or agent). A user
+   * assignee is a display-only "owner" and does not participate in the
+   * claim/process flow; an agent assignee is the working owner. Any channel
+   * member may assign. Emits a system notification row.
+   *
+   * @generated from rpc laelia.v1.CommandService.AssignTask
+   */
+  assignTask: {
+    methodKind: "unary";
+    input: typeof AssignTaskRequestSchema;
+    output: typeof AssignTaskResponseSchema;
   },
   /**
    * CloseTask lets a channel member (user or agent) close a task from the UI:

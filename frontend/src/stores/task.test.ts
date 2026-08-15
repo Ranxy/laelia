@@ -2,10 +2,12 @@ import { create } from "@bufbuild/protobuf";
 import { TimestampSchema } from "@bufbuild/protobuf/wkt";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  AssignTaskRequestSchema,
   ChatMessageSchema,
   CloseTaskRequestSchema,
   TaskInfoSchema,
   TaskStatus,
+  UpdateTaskStatusRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { toUiMessage } from "./chat-helpers";
 import { useAppStore } from "./index";
@@ -13,6 +15,8 @@ import { useAppStore } from "./index";
 // --- mock @/connect so closeTask talks to a controllable client ---
 const mock = vi.hoisted(() => ({
   closeTask: vi.fn(),
+  updateTaskStatus: vi.fn(),
+  assignTask: vi.fn(),
   listTasks: vi.fn(),
   listTaskCounts: vi.fn(),
 }));
@@ -20,6 +24,8 @@ const mock = vi.hoisted(() => ({
 vi.mock("@/connect", () => ({
   commandServiceClient: {
     closeTask: mock.closeTask,
+    updateTaskStatus: mock.updateTaskStatus,
+    assignTask: mock.assignTask,
     listTasks: mock.listTasks,
     listTaskCounts: mock.listTaskCounts,
   },
@@ -128,5 +134,112 @@ describe("task store closeTask", () => {
       .closeTask("c1", "conversations/c1/messages/m1");
 
     expect(mock.closeTask.mock.calls[0][0]).toEqual(expected);
+  });
+});
+
+describe("task store updateTaskStatus", () => {
+  it("moves the task to the target status and patches the open thread root", async () => {
+    mock.updateTaskStatus.mockResolvedValue({
+      message: taskMessage(TaskStatus.DONE, "root"),
+    });
+
+    await useAppStore
+      .getState()
+      .updateTaskStatus("c1", "conversations/c1/messages/m1", TaskStatus.DONE);
+
+    expect(mock.updateTaskStatus).toHaveBeenCalledTimes(1);
+    const req = mock.updateTaskStatus.mock.calls[0][0];
+    expect(req.message).toBe("conversations/c1/messages/m1");
+    expect(req.status).toBe(TaskStatus.DONE);
+
+    const root =
+      useAppStore.getState().threadByRoot["conversations/c1/messages/m1"]
+        .messages[0];
+    expect(root.task?.status).toBe(TaskStatus.DONE);
+
+    expect(mock.listTasks).toHaveBeenCalled();
+    expect(mock.listTaskCounts).toHaveBeenCalled();
+  });
+
+  it("sends the resource name shape the RPC expects", async () => {
+    mock.updateTaskStatus.mockResolvedValue({});
+    const expected = create(UpdateTaskStatusRequestSchema, {
+      message: "conversations/c1/messages/m1",
+      status: TaskStatus.IN_REVIEW,
+    });
+
+    await useAppStore
+      .getState()
+      .updateTaskStatus(
+        "c1",
+        "conversations/c1/messages/m1",
+        TaskStatus.IN_REVIEW
+      );
+
+    expect(mock.updateTaskStatus.mock.calls[0][0]).toEqual(expected);
+  });
+
+  it("throws on failure and leaves the thread untouched", async () => {
+    mock.updateTaskStatus.mockRejectedValue(new Error("boom"));
+
+    await expect(
+      useAppStore.getState().updateTaskStatus("c1", "m1", TaskStatus.DONE)
+    ).rejects.toThrow("boom");
+
+    const root =
+      useAppStore.getState().threadByRoot["conversations/c1/messages/m1"]
+        .messages[0];
+    expect(root.task?.status).toBe(TaskStatus.IN_PROGRESS);
+    expect(mock.listTasks).not.toHaveBeenCalled();
+  });
+});
+
+describe("task store assignTask", () => {
+  it("assigns a member and patches the open thread root", async () => {
+    mock.assignTask.mockResolvedValue({
+      message: taskMessage(TaskStatus.IN_PROGRESS, "root"),
+    });
+
+    await useAppStore
+      .getState()
+      .assignTask("c1", "conversations/c1/messages/m1", 2, "rei-agent-1");
+
+    expect(mock.assignTask).toHaveBeenCalledTimes(1);
+    const req = mock.assignTask.mock.calls[0][0];
+    expect(req.message).toBe("conversations/c1/messages/m1");
+    expect(req.memberType).toBe(2);
+    expect(req.memberId).toBe("rei-agent-1");
+
+    expect(mock.listTasks).toHaveBeenCalled();
+    expect(mock.listTaskCounts).toHaveBeenCalled();
+  });
+
+  it("sends the resource name shape the RPC expects", async () => {
+    mock.assignTask.mockResolvedValue({});
+    const expected = create(AssignTaskRequestSchema, {
+      message: "conversations/c1/messages/m1",
+      memberType: 1,
+      memberId: "ran-user-1",
+    });
+
+    await useAppStore
+      .getState()
+      .assignTask("c1", "conversations/c1/messages/m1", 1, "ran-user-1");
+
+    expect(mock.assignTask.mock.calls[0][0]).toEqual(expected);
+  });
+
+  it("throws on failure and leaves the thread untouched", async () => {
+    mock.assignTask.mockRejectedValue(new Error("boom"));
+
+    await expect(
+      useAppStore.getState().assignTask("c1", "m1", 2, "rei-agent-1")
+    ).rejects.toThrow("boom");
+
+    const root =
+      useAppStore.getState().threadByRoot["conversations/c1/messages/m1"]
+        .messages[0];
+    expect(root.task?.status).toBe(TaskStatus.IN_PROGRESS);
+    expect(mock.listTasks).not.toHaveBeenCalled();
   });
 });

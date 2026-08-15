@@ -1181,6 +1181,7 @@ func storeToV1TaskInfo(ti *store.TaskInfo) *v1pb.TaskInfo {
 		Status:             v1pb.TaskStatus(ti.Status),
 		AssigneeName:       ti.AssigneeName,
 		AssigneeResourceId: ti.AssigneeResourceID,
+		AssigneeType:       int32(ti.AssigneeType),
 	}
 }
 

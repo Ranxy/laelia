@@ -77,7 +77,9 @@ describe("CommandEventLedger", () => {
 
     // The paired finished event is not rendered as its own row.
     expect(screen.getAllByText("read_file").length).toBeGreaterThan(0);
-    expect(screen.queryByText("command.event-tool-finished")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("command.event-tool-finished")
+    ).not.toBeInTheDocument();
   });
 
   it("filters by search query", () => {
@@ -147,7 +149,6 @@ describe("CommandEventLedger", () => {
     fireEvent.click(screen.getByText("started"));
     expect(onSelect).toHaveBeenCalledWith("ev-7");
   });
-
 });
 
 describe("CommandEventLedger output merging", () => {

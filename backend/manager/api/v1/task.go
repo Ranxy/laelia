@@ -262,16 +262,13 @@ func (s *CommandService) UnclaimTask(ctx context.Context, req *connect.Request[v
 	return connect.NewResponse(&v1pb.UnclaimTaskResponse{Message: storeToV1ChatMessage(msg)}), nil
 }
 
-// UpdateTaskStatus advances a task's status. IN_PROGRESS -> IN_REVIEW marks the
-// assignee's work ready for human review; IN_REVIEW -> DONE marks it complete.
-// Only the assignee may call this. TODO -> IN_PROGRESS is performed by
-// ClaimTask, not this RPC.
+// UpdateTaskStatus moves a task between any of the four statuses. Any channel
+// member (user or agent) may call it; DONE closes the task (sets completed_at),
+// and moving out of DONE clears it. Authorization is the IAM interceptor's
+// conversations.send check against the task's conversation. Emits a system
+// notification row.
 func (s *CommandService) UpdateTaskStatus(ctx context.Context, req *connect.Request[v1pb.UpdateTaskStatusRequest]) (*connect.Response[v1pb.UpdateTaskStatusResponse], error) {
 	convID, msgID, err := parseMessageName(req.Msg.Message)
-	if err != nil {
-		return nil, err
-	}
-	agent, err := s.requireAgentMemberByConvID(ctx, convID)
 	if err != nil {
 		return nil, err
 	}
@@ -280,13 +277,11 @@ func (s *CommandService) UpdateTaskStatus(ctx context.Context, req *connect.Requ
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("status must not be unspecified"))
 	}
 
-	msg, err := s.store.UpdateTaskStatus(ctx, msgID, agent.ID, target)
+	msg, err := s.store.UpdateTaskStatus(ctx, msgID, target)
 	if err != nil {
 		switch {
 		case errors.Is(err, store.ErrTaskInvalidTransition):
-			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("unsupported status transition (use claim for todo->in_progress; this RPC advances in_progress->in_review or in_review->done)"))
-		case errors.Is(err, store.ErrTaskNotOwner):
-			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("task is not assigned to you or not in the required status"))
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid task status"))
 		case errors.Is(err, store.ErrTaskNotFound):
 			return nil, connect.NewError(connect.CodeNotFound, err)
 		default:
@@ -294,15 +289,44 @@ func (s *CommandService) UpdateTaskStatus(ctx context.Context, req *connect.Requ
 		}
 	}
 
+	actor := resolveActorName(ctx)
 	switch target {
 	case int16(v1pb.TaskStatus_TASK_STATUS_IN_REVIEW):
-		s.postTaskSystemNotification(ctx, convID, fmt.Sprintf("👀 %s marked task #%d ready for review", agent.Name, msg.TaskInfo.TaskNumber))
+		s.postTaskSystemNotification(ctx, convID, fmt.Sprintf("👀 %s marked task #%d ready for review", actor, msg.TaskInfo.TaskNumber))
 	case int16(v1pb.TaskStatus_TASK_STATUS_DONE):
-		s.postTaskSystemNotification(ctx, convID, fmt.Sprintf("✅ %s completed task #%d", agent.Name, msg.TaskInfo.TaskNumber))
+		s.postTaskSystemNotification(ctx, convID, fmt.Sprintf("✅ %s completed task #%d", actor, msg.TaskInfo.TaskNumber))
 	default:
-		// Other targets are rejected above as InvalidArgument; nothing to notify.
+		// TODO / IN_PROGRESS transitions carry no lifecycle notification.
 	}
 	return connect.NewResponse(&v1pb.UpdateTaskStatusResponse{Message: storeToV1ChatMessage(msg)}), nil
+}
+
+// AssignTask assigns a task to a channel member (user or agent). A user
+// assignee is a display-only "owner" and does not participate in the
+// claim/process flow; an agent assignee is the working owner. Any channel
+// member may assign. Authorization is the IAM interceptor's conversations.send
+// check against the task's conversation. Emits a system notification row.
+func (s *CommandService) AssignTask(ctx context.Context, req *connect.Request[v1pb.AssignTaskRequest]) (*connect.Response[v1pb.AssignTaskResponse], error) {
+	convID, msgID, err := parseMessageName(req.Msg.Message)
+	if err != nil {
+		return nil, err
+	}
+	if req.Msg.MemberId == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("member_id must not be empty"))
+	}
+	msg, err := s.store.AssignTask(ctx, msgID, convID, req.Msg.MemberType, req.Msg.MemberId)
+	if err != nil {
+		switch {
+		case errors.Is(err, store.ErrTaskNotFound):
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		case errors.Is(err, store.ErrTaskAssigneeNotMember):
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("assignee is not a member of this conversation"))
+		default:
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to assign task"))
+		}
+	}
+	s.postTaskSystemNotification(ctx, convID, fmt.Sprintf("👤 %s assigned task #%d to %s", resolveActorName(ctx), msg.TaskInfo.TaskNumber, msg.TaskInfo.AssigneeName))
+	return connect.NewResponse(&v1pb.AssignTaskResponse{Message: storeToV1ChatMessage(msg)}), nil
 }
 
 // CloseTask lets a channel member close a task directly from the UI: any

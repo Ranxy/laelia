@@ -159,6 +159,9 @@ const (
 	// CommandServiceUpdateTaskStatusProcedure is the fully-qualified name of the CommandService's
 	// UpdateTaskStatus RPC.
 	CommandServiceUpdateTaskStatusProcedure = "/laelia.v1.CommandService/UpdateTaskStatus"
+	// CommandServiceAssignTaskProcedure is the fully-qualified name of the CommandService's AssignTask
+	// RPC.
+	CommandServiceAssignTaskProcedure = "/laelia.v1.CommandService/AssignTask"
 	// CommandServiceCloseTaskProcedure is the fully-qualified name of the CommandService's CloseTask
 	// RPC.
 	CommandServiceCloseTaskProcedure = "/laelia.v1.CommandService/CloseTask"
@@ -346,12 +349,16 @@ type CommandServiceClient interface {
 	// it back to TODO so another agent may claim it. Not allowed on DONE
 	// (terminal). Emits a system notification row.
 	UnclaimTask(context.Context, *connect.Request[v1.UnclaimTaskRequest]) (*connect.Response[v1.UnclaimTaskResponse], error)
-	// UpdateTaskStatus advances a task's status. IN_PROGRESS -> IN_REVIEW marks
-	// the assignee's work ready for human review; IN_REVIEW -> DONE marks it
-	// complete (the assignee should call this only after detecting the human's
-	// approval in the task's thread). Only the assignee may call this. Emits a
-	// system notification row.
+	// UpdateTaskStatus moves a task between any of the four statuses. Any channel
+	// member (user or agent) may call it; DONE closes the task (sets
+	// completed_at), and moving out of DONE clears it. Emits a system
+	// notification row.
 	UpdateTaskStatus(context.Context, *connect.Request[v1.UpdateTaskStatusRequest]) (*connect.Response[v1.UpdateTaskStatusResponse], error)
+	// AssignTask assigns a task to a channel member (user or agent). A user
+	// assignee is a display-only "owner" and does not participate in the
+	// claim/process flow; an agent assignee is the working owner. Any channel
+	// member may assign. Emits a system notification row.
+	AssignTask(context.Context, *connect.Request[v1.AssignTaskRequest]) (*connect.Response[v1.AssignTaskResponse], error)
 	// CloseTask lets a channel member (user or agent) close a task from the UI:
 	// any non-DONE task transitions to DONE (terminal), setting completed_at.
 	// Unlike UpdateTaskStatus it does not require assignee ownership and accepts
@@ -677,6 +684,12 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("UpdateTaskStatus")),
 			connect.WithClientOptions(opts...),
 		),
+		assignTask: connect.NewClient[v1.AssignTaskRequest, v1.AssignTaskResponse](
+			httpClient,
+			baseURL+CommandServiceAssignTaskProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("AssignTask")),
+			connect.WithClientOptions(opts...),
+		),
 		closeTask: connect.NewClient[v1.CloseTaskRequest, v1.CloseTaskResponse](
 			httpClient,
 			baseURL+CommandServiceCloseTaskProcedure,
@@ -861,6 +874,7 @@ type commandServiceClient struct {
 	claimTask                 *connect.Client[v1.ClaimTaskRequest, v1.ClaimTaskResponse]
 	unclaimTask               *connect.Client[v1.UnclaimTaskRequest, v1.UnclaimTaskResponse]
 	updateTaskStatus          *connect.Client[v1.UpdateTaskStatusRequest, v1.UpdateTaskStatusResponse]
+	assignTask                *connect.Client[v1.AssignTaskRequest, v1.AssignTaskResponse]
 	closeTask                 *connect.Client[v1.CloseTaskRequest, v1.CloseTaskResponse]
 	convertMessageToReminder  *connect.Client[v1.ConvertMessageToReminderRequest, v1.ConvertMessageToReminderResponse]
 	listReminders             *connect.Client[v1.ListRemindersRequest, v1.ListRemindersResponse]
@@ -1091,6 +1105,11 @@ func (c *commandServiceClient) UpdateTaskStatus(ctx context.Context, req *connec
 	return c.updateTaskStatus.CallUnary(ctx, req)
 }
 
+// AssignTask calls laelia.v1.CommandService.AssignTask.
+func (c *commandServiceClient) AssignTask(ctx context.Context, req *connect.Request[v1.AssignTaskRequest]) (*connect.Response[v1.AssignTaskResponse], error) {
+	return c.assignTask.CallUnary(ctx, req)
+}
+
 // CloseTask calls laelia.v1.CommandService.CloseTask.
 func (c *commandServiceClient) CloseTask(ctx context.Context, req *connect.Request[v1.CloseTaskRequest]) (*connect.Response[v1.CloseTaskResponse], error) {
 	return c.closeTask.CallUnary(ctx, req)
@@ -1319,12 +1338,16 @@ type CommandServiceHandler interface {
 	// it back to TODO so another agent may claim it. Not allowed on DONE
 	// (terminal). Emits a system notification row.
 	UnclaimTask(context.Context, *connect.Request[v1.UnclaimTaskRequest]) (*connect.Response[v1.UnclaimTaskResponse], error)
-	// UpdateTaskStatus advances a task's status. IN_PROGRESS -> IN_REVIEW marks
-	// the assignee's work ready for human review; IN_REVIEW -> DONE marks it
-	// complete (the assignee should call this only after detecting the human's
-	// approval in the task's thread). Only the assignee may call this. Emits a
-	// system notification row.
+	// UpdateTaskStatus moves a task between any of the four statuses. Any channel
+	// member (user or agent) may call it; DONE closes the task (sets
+	// completed_at), and moving out of DONE clears it. Emits a system
+	// notification row.
 	UpdateTaskStatus(context.Context, *connect.Request[v1.UpdateTaskStatusRequest]) (*connect.Response[v1.UpdateTaskStatusResponse], error)
+	// AssignTask assigns a task to a channel member (user or agent). A user
+	// assignee is a display-only "owner" and does not participate in the
+	// claim/process flow; an agent assignee is the working owner. Any channel
+	// member may assign. Emits a system notification row.
+	AssignTask(context.Context, *connect.Request[v1.AssignTaskRequest]) (*connect.Response[v1.AssignTaskResponse], error)
 	// CloseTask lets a channel member (user or agent) close a task from the UI:
 	// any non-DONE task transitions to DONE (terminal), setting completed_at.
 	// Unlike UpdateTaskStatus it does not require assignee ownership and accepts
@@ -1646,6 +1669,12 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("UpdateTaskStatus")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceAssignTaskHandler := connect.NewUnaryHandler(
+		CommandServiceAssignTaskProcedure,
+		svc.AssignTask,
+		connect.WithSchema(commandServiceMethods.ByName("AssignTask")),
+		connect.WithHandlerOptions(opts...),
+	)
 	commandServiceCloseTaskHandler := connect.NewUnaryHandler(
 		CommandServiceCloseTaskProcedure,
 		svc.CloseTask,
@@ -1868,6 +1897,8 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceUnclaimTaskHandler.ServeHTTP(w, r)
 		case CommandServiceUpdateTaskStatusProcedure:
 			commandServiceUpdateTaskStatusHandler.ServeHTTP(w, r)
+		case CommandServiceAssignTaskProcedure:
+			commandServiceAssignTaskHandler.ServeHTTP(w, r)
 		case CommandServiceCloseTaskProcedure:
 			commandServiceCloseTaskHandler.ServeHTTP(w, r)
 		case CommandServiceConvertMessageToReminderProcedure:
@@ -2085,6 +2116,10 @@ func (UnimplementedCommandServiceHandler) UnclaimTask(context.Context, *connect.
 
 func (UnimplementedCommandServiceHandler) UpdateTaskStatus(context.Context, *connect.Request[v1.UpdateTaskStatusRequest]) (*connect.Response[v1.UpdateTaskStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.UpdateTaskStatus is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) AssignTask(context.Context, *connect.Request[v1.AssignTaskRequest]) (*connect.Response[v1.AssignTaskResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.AssignTask is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) CloseTask(context.Context, *connect.Request[v1.CloseTaskRequest]) (*connect.Response[v1.CloseTaskResponse], error) {

@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { pairToolCallEvents } from "@/lib/tool-call-events";
 import { cn } from "@/lib/utils";
 import type {
   CommandEvent,
   CommandOutput,
 } from "@/types/proto-es/v1/command_pb";
 import { CommandEventType } from "@/types/proto-es/v1/command_pb";
-import { pairToolCallEvents } from "@/lib/tool-call-events";
 
 export interface CommandEventTimelineOverviewProps {
   outputs: CommandOutput[];

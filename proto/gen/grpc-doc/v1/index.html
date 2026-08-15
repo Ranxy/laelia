@@ -437,6 +437,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.StartAgentRequest"><span class="badge">M</span>StartAgentRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.StopAgentRequest"><span class="badge">M</span>StopAgentRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.TransferAgentOwnershipRequest"><span class="badge">M</span>TransferAgentOwnershipRequest</a>
                 </li>
               
@@ -765,6 +773,14 @@
               
                 <li>
                   <a href="#laelia.v1.AgentStreamMessage"><span class="badge">M</span>AgentStreamMessage</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AssignTaskRequest"><span class="badge">M</span>AssignTaskRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AssignTaskResponse"><span class="badge">M</span>AssignTaskResponse</a>
                 </li>
               
                 <li>
@@ -1625,6 +1641,10 @@
               
                 <li>
                   <a href="#laelia.v1.ConnectMachineResponse"><span class="badge">M</span>ConnectMachineResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DeleteAgentWorkspace"><span class="badge">M</span>DeleteAgentWorkspace</a>
                 </li>
               
                 <li>
@@ -2508,6 +2528,16 @@ separate from follow_owner_permissions (which controls read visibility):
 the agent acts on its owner&#39;s behalf for member management only — it never
 inherits the owner&#39;s other manage powers (rename, delete, transfer, roles).
 Default true. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>enabled</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>enabled reports whether the agent is running. When false the agent has
+been stopped (StopAgent): its machine runner is torn down and it does not
+process session messages or run an LLM agent until StartAgent. Default
+true. </p></td>
                 </tr>
               
                 <tr>
@@ -3457,11 +3487,11 @@ behalf. </p></td>
                 </tr>
               
                 <tr>
-                  <td>can_delete</td>
+                  <td>enabled</td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
-                  <td><p>can_delete reports whether the current caller may delete this agent: its
-owner or a workspace-scope holder of laelia.agents.edit. </p></td>
+                  <td><p>enabled reports whether the agent is running; mirrors Agent.enabled (see
+there). False means the agent is stopped and processes no messages. </p></td>
                 </tr>
               
             </tbody>
@@ -4482,6 +4512,54 @@ the list to agents bound to that machine. Empty lists all agents. </p></td>
 
         
       
+        <h3 id="laelia.v1.StartAgentRequest">StartAgentRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.StopAgentRequest">StopAgentRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.TransferAgentOwnershipRequest">TransferAgentOwnershipRequest</h3>
         <p></p>
 
@@ -4911,6 +4989,26 @@ handler-gated via canEditAgent.</p></td>
                 <td><p>DeleteAgent soft-deletes an agent. Authorized in the handler for the
 agent&#39;s owner or a holder of laelia.agents.edit on the agent; no
 permission annotation so the owner short-circuit can run.</p></td>
+              </tr>
+            
+              <tr>
+                <td>StopAgent</td>
+                <td><a href="#laelia.v1.StopAgentRequest">StopAgentRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p>StopAgent stops an agent: its machine runner is torn down and it no
+longer processes session messages or runs an LLM agent until StartAgent.
+The agent row is preserved (not deleted) and remains visible. Authorized
+in the handler for the agent&#39;s owner or a holder of laelia.agents.edit.</p></td>
+              </tr>
+            
+              <tr>
+                <td>StartAgent</td>
+                <td><a href="#laelia.v1.StartAgentRequest">StartAgentRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p>StartAgent resumes a stopped agent: its machine runner is re-spawned and
+it resumes processing session messages. No-op (still succeeds) if the
+agent is already enabled. Authorized in the handler for the agent&#39;s owner
+or a holder of laelia.agents.edit.</p></td>
               </tr>
             
               <tr>
@@ -7506,6 +7604,73 @@ machine app&#39;s per-agent runner; required on the first message. </p></td>
                   <td><a href="#laelia.v1.WorkspaceReadResponse">WorkspaceReadResponse</a></td>
                   <td></td>
                   <td><p>response to ManagerStreamMessage.workspace_read_request </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.AssignTaskRequest">AssignTaskRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>message is the resource name of the task&#39;s root message
+(&#34;conversations/{c}/messages/{m}&#34;). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_type</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>member_type is the target assignee kind: 1=user, 2=agent (reuses the
+MemberType semantics). A user assignee is a display-only &#34;owner&#34; and does
+not participate in claim/process flows; an agent assignee is the working
+owner. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>member_id is the target member&#39;s stable id within the conversation: the
+agent&#39;s resource id (handle) for agents, the user&#39;s handle for users. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.AssignTaskResponse">AssignTaskResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -12558,15 +12723,23 @@ TODO. Only valid for top-level messages (thread_root must be empty). </p></td>
                   <td>assignee_name</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>assignee_name is the assigned agent&#39;s display name, empty when unassigned. </p></td>
+                  <td><p>assignee_name is the assigned member&#39;s display name, empty when unassigned. </p></td>
                 </tr>
               
                 <tr>
                   <td>assignee_resource_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>assignee_resource_id is the assigned agent&#39;s resource id (&#34;agents/&lt;id&gt;&#34;),
-empty when unassigned. </p></td>
+                  <td><p>assignee_resource_id is the assigned member&#39;s resource id (the agent&#39;s
+handle for agents, the user&#39;s handle for users), empty when unassigned. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>assignee_type</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>assignee_type distinguishes the assignee kind: 1=user, 2=agent (reuses the
+MemberType semantics). 0 when unassigned. </p></td>
                 </tr>
               
             </tbody>
@@ -13053,11 +13226,9 @@ new schedule. COMPLETED/CANCELLED/FAILED reminders cannot be edited. </p></td>
                   <td>status</td>
                   <td><a href="#laelia.v1.TaskStatus">TaskStatus</a></td>
                   <td></td>
-                  <td><p>status is the target status. Allowed transitions (enforced server-side):
-IN_PROGRESS -&gt; IN_REVIEW (the assignee marks the task ready for human
-review) and IN_REVIEW -&gt; DONE (the assignee marks the task done after
-detecting the human&#39;s approval in the task&#39;s thread). TODO -&gt; IN_PROGRESS
-is performed by ClaimTask, not this RPC. </p></td>
+                  <td><p>status is the target status. Any channel member may move a task between
+any of the four statuses (TODO / IN_PROGRESS / IN_REVIEW / DONE). Setting
+DONE closes the task (sets completed_at); moving out of DONE clears it. </p></td>
                 </tr>
               
             </tbody>
@@ -14107,11 +14278,20 @@ it back to TODO so another agent may claim it. Not allowed on DONE
                 <td>UpdateTaskStatus</td>
                 <td><a href="#laelia.v1.UpdateTaskStatusRequest">UpdateTaskStatusRequest</a></td>
                 <td><a href="#laelia.v1.UpdateTaskStatusResponse">UpdateTaskStatusResponse</a></td>
-                <td><p>UpdateTaskStatus advances a task&#39;s status. IN_PROGRESS -&gt; IN_REVIEW marks
-the assignee&#39;s work ready for human review; IN_REVIEW -&gt; DONE marks it
-complete (the assignee should call this only after detecting the human&#39;s
-approval in the task&#39;s thread). Only the assignee may call this. Emits a
-system notification row.</p></td>
+                <td><p>UpdateTaskStatus moves a task between any of the four statuses. Any channel
+member (user or agent) may call it; DONE closes the task (sets
+completed_at), and moving out of DONE clears it. Emits a system
+notification row.</p></td>
+              </tr>
+            
+              <tr>
+                <td>AssignTask</td>
+                <td><a href="#laelia.v1.AssignTaskRequest">AssignTaskRequest</a></td>
+                <td><a href="#laelia.v1.AssignTaskResponse">AssignTaskResponse</a></td>
+                <td><p>AssignTask assigns a task to a channel member (user or agent). A user
+assignee is a display-only &#34;owner&#34; and does not participate in the
+claim/process flow; an agent assignee is the working owner. Any channel
+member may assign. Emits a system notification row.</p></td>
               </tr>
             
               <tr>
@@ -15805,6 +15985,30 @@ AgentChannel per entry immediately after connect (and on every reconnect). </p><
 
         
       
+        <h3 id="laelia.v1.DeleteAgentWorkspace">DeleteAgentWorkspace</h3>
+        <p>DeleteAgentWorkspace tells the machine to tear down an agent's runner and</p><p>permanently remove its workspace directory under the machine data root.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.DeleteMachineRequest">DeleteMachineRequest</h3>
         <p></p>
 
@@ -16810,6 +17014,13 @@ the machine&#39;s creator or a holder of laelia.machines.delete. </p></td>
                   <td><a href="#laelia.v1.MachineWorkspaceScanRequest">MachineWorkspaceScanRequest</a></td>
                   <td></td>
                   <td><p>scan per-agent workspace directories on this machine </p></td>
+                </tr>
+              
+                <tr>
+                  <td>delete_agent_workspace</td>
+                  <td><a href="#laelia.v1.DeleteAgentWorkspace">DeleteAgentWorkspace</a></td>
+                  <td></td>
+                  <td><p>stop the runner and delete an agent&#39;s workspace directory </p></td>
                 </tr>
               
             </tbody>

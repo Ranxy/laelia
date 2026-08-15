@@ -5,6 +5,7 @@ import {
   Coins,
   FileDiff,
   Gauge,
+  type LucideIcon,
   Minimize2,
   Play,
   RotateCcw,
@@ -12,11 +13,12 @@ import {
   Shield,
   Terminal,
   Wrench,
-  type LucideIcon,
 } from "lucide-react";
 import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
-import { CommandEventType } from "@/types/proto-es/v1/command_pb";
-import { CommandOutput_StreamType } from "@/types/proto-es/v1/command_pb";
+import {
+  CommandEventType,
+  CommandOutput_StreamType,
+} from "@/types/proto-es/v1/command_pb";
 
 export interface CommandEventKind {
   /** i18n key for the tag label. */

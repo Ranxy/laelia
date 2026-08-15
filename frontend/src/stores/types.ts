@@ -95,6 +95,9 @@ export interface TaskInfoUI {
   status: number;
   assigneeName?: string;
   assigneeResourceId?: string;
+  // assigneeType distinguishes the assignee kind: 1=user, 2=agent. 0/absent
+  // when unassigned.
+  assigneeType?: number;
 }
 
 export interface AuthSlice {
@@ -588,10 +591,34 @@ export interface TaskSlice {
     conversationId: string,
     messageId: string
   ) => Promise<void>;
-  // closeTask marks a task DONE (terminal) from the UI. The caller's thread
-  // root is patched with the authoritative response and the board + counts
-  // reload; throws on failure so the UI can surface the error.
+  // updateTaskStatus moves a task to any of the four statuses. The caller's
+  // thread root is patched with the authoritative response and the board +
+  // counts reload; throws on failure so the UI can surface the error.
+  updateTaskStatus: (
+    conversationId: string,
+    rootMessageId: string,
+    status: number
+  ) => Promise<void>;
+  // assignTask assigns a task to a channel member (user or agent). The caller's
+  // thread root is patched with the authoritative response and the board +
+  // counts reload; throws on failure so the UI can surface the error.
+  assignTask: (
+    conversationId: string,
+    rootMessageId: string,
+    memberType: number,
+    memberId: string
+  ) => Promise<void>;
+  // closeTask marks a task DONE (terminal) from the UI. Kept for the agent
+  // tool path; the UI now uses updateTaskStatus(DONE) instead.
   closeTask: (conversationId: string, rootMessageId: string) => Promise<void>;
+  // patchTaskThreadAndRefresh patches the open thread's root with the
+  // authoritative task message returned by a task mutation, then reloads the
+  // board + counts. Shared by updateTaskStatus / assignTask / closeTask.
+  patchTaskThreadAndRefresh: (
+    conversationId: string,
+    rootMessageId: string,
+    res: { message?: import("@/types/proto-es/v1/command_pb").ChatMessage }
+  ) => Promise<void>;
 }
 
 export interface ReminderSlice {

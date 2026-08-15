@@ -58,11 +58,14 @@ message TaskInfo {
   // task_number is the per-conversation sequence number shown as "[task #N]".
   int32 task_number = 1;
   TaskStatus status = 2;
-  // assignee_name is the assigned agent's display name, empty when unassigned.
+  // assignee_name is the assigned member's display name, empty when unassigned.
   string assignee_name = 3;
-  // assignee_resource_id is the assigned agent's resource id ("agents/<id>"),
-  // empty when unassigned.
+  // assignee_resource_id is the assigned member's resource id (the agent's
+  // handle for agents, the user's handle for users), empty when unassigned.
   string assignee_resource_id = 4;
+  // assignee_type distinguishes the assignee kind: 1=user, 2=agent (reuses the
+  // MemberType semantics). 0 when unassigned.
+  int32 assignee_type = 5;
 }
 
 enum CommandEventType {
@@ -1047,15 +1050,36 @@ message UnclaimTaskResponse {
 }
 
 message UpdateTaskStatusRequest {
-  string message = 1 [(google.api.field_behavior) = REQUIRED];
-  // status is the target status. Allowed transitions (enforced server-side):
-  // IN_PROGRESS -> IN_REVIEW (the assignee marks the task ready for human
-  // review) and IN_REVIEW -> DONE (the assignee marks the task done after
-  // detecting the human's approval in the task's thread). TODO -> IN_PROGRESS
-  // is performed by ClaimTask, not this RPC.
+  string message = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
+  // status is the target status. Any channel member may move a task between
+  // any of the four statuses (TODO / IN_PROGRESS / IN_REVIEW / DONE). Setting
+  // DONE closes the task (sets completed_at); moving out of DONE clears it.
   TaskStatus status = 2 [(google.api.field_behavior) = REQUIRED];
 }
 message UpdateTaskStatusResponse {
+  ChatMessage message = 1;
+}
+
+message AssignTaskRequest {
+  // message is the resource name of the task's root message
+  // ("conversations/{c}/messages/{m}").
+  string message = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
+  // member_type is the target assignee kind: 1=user, 2=agent (reuses the
+  // MemberType semantics). A user assignee is a display-only "owner" and does
+  // not participate in claim/process flows; an agent assignee is the working
+  // owner.
+  int32 member_type = 2 [(google.api.field_behavior) = REQUIRED];
+  // member_id is the target member's stable id within the conversation: the
+  // agent's resource id (handle) for agents, the user's handle for users.
+  string member_id = 3 [(google.api.field_behavior) = REQUIRED];
+}
+message AssignTaskResponse {
   ChatMessage message = 1;
 }
 
@@ -1761,12 +1785,25 @@ service CommandService {
   // (terminal). Emits a system notification row.
   rpc UnclaimTask(UnclaimTaskRequest) returns (UnclaimTaskResponse) {}
 
-  // UpdateTaskStatus advances a task's status. IN_PROGRESS -> IN_REVIEW marks
-  // the assignee's work ready for human review; IN_REVIEW -> DONE marks it
-  // complete (the assignee should call this only after detecting the human's
-  // approval in the task's thread). Only the assignee may call this. Emits a
-  // system notification row.
-  rpc UpdateTaskStatus(UpdateTaskStatusRequest) returns (UpdateTaskStatusResponse) {}
+  // UpdateTaskStatus moves a task between any of the four statuses. Any channel
+  // member (user or agent) may call it; DONE closes the task (sets
+  // completed_at), and moving out of DONE clears it. Emits a system
+  // notification row.
+  rpc UpdateTaskStatus(UpdateTaskStatusRequest) returns (UpdateTaskStatusResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.send";
+    option (laelia.v1.audit) = true;
+  }
+
+  // AssignTask assigns a task to a channel member (user or agent). A user
+  // assignee is a display-only "owner" and does not participate in the
+  // claim/process flow; an agent assignee is the working owner. Any channel
+  // member may assign. Emits a system notification row.
+  rpc AssignTask(AssignTaskRequest) returns (AssignTaskResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.send";
+    option (laelia.v1.audit) = true;
+  }
 
   // CloseTask lets a channel member (user or agent) close a task from the UI:
   // any non-DONE task transitions to DONE (terminal), setting completed_at.

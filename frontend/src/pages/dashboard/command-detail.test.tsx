@@ -292,14 +292,21 @@ describe("command-detail", () => {
     // Click the lifecycle ledger row to open the inspector.
     fireEvent.click(screen.getByText("started"));
     expect(
-      (await screen.findAllByText("command.inspector-summary", {}, { timeout: 3000 }))
-        .length
+      (
+        await screen.findAllByText(
+          "command.inspector-summary",
+          {},
+          { timeout: 3000 }
+        )
+      ).length
     ).toBeGreaterThan(0);
     // Close the inspector.
     fireEvent.click(screen.getByRole("button", { name: "common.close" }));
     await waitFor(
       () =>
-        expect(screen.queryAllByText("command.inspector-summary")).toHaveLength(0),
+        expect(screen.queryAllByText("command.inspector-summary")).toHaveLength(
+          0
+        ),
       { timeout: 3000 }
     );
   });
@@ -323,7 +330,9 @@ describe("command-detail", () => {
     renderPage();
 
     // Click the ASSISTANT output row in the ledger.
-    fireEvent.click(await screen.findByText("thinking text", {}, { timeout: 3000 }));
+    fireEvent.click(
+      await screen.findByText("thinking text", {}, { timeout: 3000 })
+    );
     expect(
       await screen.findByText("command.inspector-length", {}, { timeout: 3000 })
     ).toBeInTheDocument();

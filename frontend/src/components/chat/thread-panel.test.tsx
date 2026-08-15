@@ -15,8 +15,16 @@ vi.mock("markstream-react", () => ({
   default: ({ content }: { content: string }) => <>{content}</>,
 }));
 
+const mockClient = vi.hoisted(() => ({
+  updateTaskStatus: vi.fn(),
+  assignTask: vi.fn(),
+  listChannelMembers: vi.fn(),
+  listTasks: vi.fn(),
+  listTaskCounts: vi.fn(),
+}));
+
 vi.mock("@/connect", () => ({
-  commandServiceClient: {},
+  commandServiceClient: mockClient,
 }));
 
 vi.mock("@/components/chat/message-row", () => ({
@@ -101,10 +109,31 @@ function renderPanel(rootMsg: ChatMessageUI, readOnly?: boolean) {
   );
 }
 
-describe("ThreadPanel close-task button", () => {
+// Base UI Select commits a selection on a real pointer click. jsdom's
+// fireEvent.click is a virtual click (detail === 0) that only activates an
+// already-highlighted option, so drive the option with pointer events first.
+function selectOption(optionText: string) {
+  const option = screen.getByText(optionText).closest('[role="option"]');
+  if (!option) throw new Error(`option not found: ${optionText}`);
+  fireEvent.pointerEnter(option, { pointerType: "mouse" });
+  fireEvent.pointerDown(option, { pointerType: "mouse" });
+  fireEvent.click(option);
+}
+
+describe("ThreadPanel task controls", () => {
   beforeEach(() => {
     useAppStore.getState().reset();
     mockUseIsDesktop.mockReturnValue(true);
+    mockClient.updateTaskStatus.mockResolvedValue({});
+    mockClient.assignTask.mockResolvedValue({});
+    mockClient.listChannelMembers.mockResolvedValue({ members: [] });
+    mockClient.listTasks.mockResolvedValue({ tasks: [], nextPageToken: "" });
+    mockClient.listTaskCounts.mockResolvedValue({
+      todoCount: 0,
+      inProgressCount: 0,
+      inReviewCount: 0,
+      doneCount: 1,
+    });
   });
 
   afterEach(() => {
@@ -112,13 +141,31 @@ describe("ThreadPanel close-task button", () => {
     document.body.innerHTML = "";
   });
 
-  it("shows the close button for an open task thread, to the left of the expand toggle", () => {
-    renderPanel(taskRoot(TaskStatus.IN_PROGRESS));
-    // Re-render with the expand toggle present (channel-page layout) and
-    // assert DOM order: close task, then expand.
-    const close = screen.getByLabelText("channelTask.close");
-    expect(close).not.toBeNull();
-    expect(close.getAttribute("title")).toBe("channelTask.close");
+  it("shows the status dropdown for an open task thread, before the expand toggle", () => {
+    useAppStore.setState({
+      threadByRoot: {
+        [ROOT_NAME]: {
+          messages: [taskRoot(TaskStatus.IN_PROGRESS)],
+          currentVersion: 1n,
+          loading: false,
+        },
+      },
+    });
+    render(
+      <ThreadPanel
+        channelId="c1"
+        channelTitle="C1"
+        rootMessageId={ROOT_NAME}
+        onClose={() => {}}
+        onToggleExpand={() => {}}
+      />
+    );
+    const status = screen.getByLabelText("channelTask.status-change-aria");
+    const expand = screen.getByLabelText("chat.thread-expand");
+    expect(status).not.toBeNull();
+    expect(
+      status.compareDocumentPosition(expand) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).not.toBe(0);
   });
 
   it("hides the expand/collapse toggle on mobile", () => {
@@ -145,57 +192,57 @@ describe("ThreadPanel close-task button", () => {
     expect(screen.queryByLabelText("chat.thread-collapse")).toBeNull();
   });
 
-  it("places the close button before the expand toggle in the header", () => {
-    useAppStore.setState({
-      threadByRoot: {
-        [ROOT_NAME]: {
-          messages: [taskRoot(TaskStatus.TODO)],
-          currentVersion: 1n,
-          loading: false,
-        },
-      },
-    });
-    render(
-      <ThreadPanel
-        channelId="c1"
-        channelTitle="C1"
-        rootMessageId={ROOT_NAME}
-        onClose={() => {}}
-        onToggleExpand={() => {}}
-      />
-    );
-    const close = screen.getByLabelText("channelTask.close");
-    const expand = screen.getByLabelText("chat.thread-expand");
-    expect(
-      close.compareDocumentPosition(expand) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).not.toBe(0);
-  });
-
-  it("hides the close button once the task is DONE", () => {
+  it("keeps the status dropdown for a DONE task (any status transition is allowed)", () => {
     renderPanel(taskRoot(TaskStatus.DONE));
-    expect(screen.queryByLabelText("channelTask.close")).toBeNull();
+    expect(
+      screen.getByLabelText("channelTask.status-change-aria")
+    ).not.toBeNull();
   });
 
-  it("hides the close button on non-task threads", () => {
+  it("hides the status dropdown on non-task threads", () => {
     renderPanel(plainRoot());
-    expect(screen.queryByLabelText("channelTask.close")).toBeNull();
+    expect(
+      screen.queryByLabelText("channelTask.status-change-aria")
+    ).toBeNull();
   });
 
-  it("hides the close button in readOnly threads", () => {
+  it("hides the status dropdown in readOnly threads", () => {
     renderPanel(taskRoot(TaskStatus.IN_PROGRESS), true);
-    expect(screen.queryByLabelText("channelTask.close")).toBeNull();
+    expect(
+      screen.queryByLabelText("channelTask.status-change-aria")
+    ).toBeNull();
   });
 
-  it("confirms before closing and calls closeTask with the conversation + root ids", () => {
+  it("changes the task status via the dropdown and calls updateTaskStatus", async () => {
     renderPanel(taskRoot(TaskStatus.IN_PROGRESS));
-    const closeTask = vi
-      .spyOn(useAppStore.getState(), "closeTask")
-      .mockResolvedValue(undefined);
+    const status = screen.getByLabelText("channelTask.status-change-aria");
+    fireEvent.click(status);
+    await screen.findByText("channelTask.status-done");
+    selectOption("channelTask.status-done");
+    expect(mockClient.updateTaskStatus).toHaveBeenCalledTimes(1);
+    const req = mockClient.updateTaskStatus.mock.calls[0][0];
+    expect(req.message).toBe(ROOT_NAME);
+    expect(req.status).toBe(TaskStatus.DONE);
+  });
 
-    fireEvent.click(screen.getByLabelText("channelTask.close"));
-    expect(screen.getByText("channelTask.close-confirm-title")).not.toBeNull();
+  it("shows the assignee dropdown for an open task thread", () => {
+    renderPanel(taskRoot(TaskStatus.IN_PROGRESS));
+    expect(screen.getByLabelText("channelTask.assignee-aria")).not.toBeNull();
+  });
 
-    fireEvent.click(screen.getByText("channelTask.close-confirm-action"));
-    expect(closeTask).toHaveBeenCalledWith("c1", ROOT_NAME);
+  it("assigns a member via the dropdown and calls assignTask", async () => {
+    mockClient.listChannelMembers.mockResolvedValue({
+      members: [{ memberType: 1, memberId: "ran-user-1", displayName: "Ran" }],
+    });
+    renderPanel(taskRoot(TaskStatus.IN_PROGRESS));
+    const assignee = screen.getByLabelText("channelTask.assignee-aria");
+    fireEvent.click(assignee);
+    await screen.findByText("Ran");
+    selectOption("Ran");
+    expect(mockClient.assignTask).toHaveBeenCalledTimes(1);
+    const req = mockClient.assignTask.mock.calls[0][0];
+    expect(req.message).toBe(ROOT_NAME);
+    expect(req.memberType).toBe(1);
+    expect(req.memberId).toBe("ran-user-1");
   });
 });

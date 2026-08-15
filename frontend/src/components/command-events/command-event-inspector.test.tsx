@@ -74,7 +74,9 @@ describe("CommandEventInspector", () => {
     );
 
     fireEvent.click(
-      screen.getAllByRole("tab").find((el) => el.textContent === "command.inspector-raw")!
+      screen
+        .getAllByRole("tab")
+        .find((el) => el.textContent === "command.inspector-raw")!
     );
     expect(screen.getByText("command.event-no-payload")).toBeInTheDocument();
 
@@ -109,13 +111,17 @@ describe("CommandEventInspector", () => {
 
     // Preview tab renders the content (markdown stubbed).
     fireEvent.click(
-      screen.getAllByRole("tab").find((el) => el.textContent === "command.inspector-preview")!
+      screen
+        .getAllByRole("tab")
+        .find((el) => el.textContent === "command.inspector-preview")!
     );
     expect(screen.getByText("**hello** world")).toBeInTheDocument();
 
     // Raw tab shows the raw content too.
     fireEvent.click(
-      screen.getAllByRole("tab").find((el) => el.textContent === "command.inspector-raw")!
+      screen
+        .getAllByRole("tab")
+        .find((el) => el.textContent === "command.inspector-raw")!
     );
     expect(screen.getByText("**hello** world")).toBeInTheDocument();
   });
