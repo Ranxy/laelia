@@ -152,7 +152,10 @@
     "delete-agent-confirm-description": "Are you sure you want to delete agent {{title}}? This will permanently delete the agent and its workspace on the machine, and cannot be undone.",
     "stopped-toast": "Agent stopped",
     "started-toast": "Agent started",
-    "deleted-toast": "Agent deleted"
+    "deleted-toast": "Agent deleted",
+    "acp-config-pi-api-base-url": "API base URL",
+    "acp-config-pi-api-base-url-hint": "Base URL of the custom OpenAI-compatible endpoint. Required.",
+    "acp-config-pi-api-base-url-placeholder": "https://your-endpoint.example.com/v1"
   },
   "auth": {
     "device-login": {
@@ -576,7 +579,8 @@
     "transfer-owner-reason-placeholder": "e.g. role change",
     "transfer-owner-target": "New owner",
     "transfer-owner-target-placeholder": "Select a user",
-    "transfer-owner-title": "Transfer Ownership"
+    "transfer-owner-title": "Transfer Ownership",
+    "add-agent-api-base-url-required": "Please enter an API base URL for the custom provider."
   },
   "members": {
     "add-agent": "Add agent",
@@ -755,8 +759,8 @@
       "fetch-models": "Fetch models",
       "fetching": "Fetching…",
       "field-base-url": "API base URL",
-      "field-base-url-hint": "Optional. Empty uses the provider type's default.",
-      "field-base-url-placeholder": "https://api.deepseek.com",
+      "field-base-url-hint": "Required for custom providers. DeepSeek / OpenRouter use their built-in defaults.",
+      "field-base-url-placeholder": "https://your-endpoint.example.com/v1",
       "field-description": "Description",
       "field-description-placeholder": "What this provider is for",
       "field-entries": "Entries (key + model)",
@@ -779,7 +783,9 @@
       "type-deepseek": "DeepSeek",
       "type-openrouter": "OpenRouter",
       "update-failed": "Failed to update provider",
-      "updated": "Provider updated"
+      "updated": "Provider updated",
+      "type-custom": "Custom",
+      "base-url-required": "API base URL is required for custom providers."
     },
     "audit": {
       "actor-unknown": "unknown",

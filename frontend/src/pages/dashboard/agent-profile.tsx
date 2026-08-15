@@ -117,6 +117,7 @@ export function AgentProfilePage() {
   const [protocol, setProtocol] = useState("");
   const [apiProvider, setApiProvider] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [apiBaseUrl, setApiBaseUrl] = useState("");
   const [globalProvider, setGlobalProvider] = useState("");
   const [globalProviderEntry, setGlobalProviderEntry] = useState("");
   const [customEnvEntries, setCustomEnvEntries] = useState<
@@ -152,6 +153,7 @@ export function AgentProfilePage() {
     protocol: "",
     apiProvider: "",
     apiKey: "",
+    apiBaseUrl: "",
     globalProvider: "",
     globalProviderEntry: "",
     customEnvEntries: [] as { key: string; value: string }[],
@@ -342,6 +344,7 @@ export function AgentProfilePage() {
       // Non-editors get an empty key server-side (redacted), which is fine —
       // they cannot save anyway. On save, an empty key means "keep existing".
       apiKey: cfg?.apiKey ?? "",
+      apiBaseUrl: cfg?.apiBaseUrl ?? "",
       globalProvider: cfg?.globalProvider ?? "",
       globalProviderEntry: cfg?.globalProviderEntry ?? "",
       customEnvEntries: cfg?.customEnv
@@ -357,6 +360,7 @@ export function AgentProfilePage() {
     setProtocol(next.protocol);
     setApiProvider(next.apiProvider);
     setApiKey(next.apiKey);
+    setApiBaseUrl(next.apiBaseUrl);
     setGlobalProvider(next.globalProvider);
     setGlobalProviderEntry(next.globalProviderEntry);
     setCustomEnvEntries(next.customEnvEntries);
@@ -437,6 +441,7 @@ export function AgentProfilePage() {
       apiProvider: draft.apiProvider.trim(),
       // Empty apiKey on save means "keep the existing stored key" server-side.
       apiKey: draft.apiKey,
+      apiBaseUrl: draft.apiBaseUrl.trim(),
       globalProvider: draft.globalProvider.trim(),
       globalProviderEntry: draft.globalProviderEntry.trim(),
     };
@@ -461,6 +466,7 @@ export function AgentProfilePage() {
       apiProvider: cfg?.apiProvider ?? "",
       // Preserve the stored key on a persona-only save.
       apiKey: cfg?.apiKey ?? "",
+      apiBaseUrl: cfg?.apiBaseUrl ?? "",
       globalProvider: cfg?.globalProvider ?? "",
       globalProviderEntry: cfg?.globalProviderEntry ?? "",
     };
@@ -520,10 +526,16 @@ export function AgentProfilePage() {
   // fetchPiModels loads the model list for an API provider from the manager
   // (ListPiModels). deepseek requires the api_key; openrouter is public. Results
   // are cached per provider so toggling back does not refetch.
-  async function fetchPiModels(nextProvider: string, key: string) {
+  async function fetchPiModels(
+    nextProvider: string,
+    key: string,
+    baseUrl = ""
+  ) {
     if (!nextProvider) return;
     if (nextProvider === "deepseek" && key.trim() === "") return;
-    const cached = piModelsCacheRef.current.get(nextProvider);
+    if (nextProvider === "custom" && baseUrl.trim() === "") return;
+    const cacheKey = `${nextProvider}/${baseUrl}`;
+    const cached = piModelsCacheRef.current.get(cacheKey);
     if (cached) {
       setPiModels(cached);
       setPiModelsError("");
@@ -533,8 +545,8 @@ export function AgentProfilePage() {
     setPiModelsError("");
     try {
       const listPiModels = useAppStore.getState().listPiModels;
-      const models = await listPiModels(nextProvider, key);
-      piModelsCacheRef.current.set(nextProvider, models);
+      const models = await listPiModels(nextProvider, key, baseUrl);
+      piModelsCacheRef.current.set(cacheKey, models);
       setPiModels(models);
     } catch (err) {
       const msg =
@@ -1256,6 +1268,10 @@ export function AgentProfilePage() {
                                   ...configRef.current,
                                   apiProvider: next,
                                   model: "",
+                                  apiBaseUrl:
+                                    next === "custom"
+                                      ? configRef.current.apiBaseUrl
+                                      : "",
                                 };
                                 if (apiKeyFetchDebounceRef.current) {
                                   clearTimeout(apiKeyFetchDebounceRef.current);
@@ -1263,6 +1279,11 @@ export function AgentProfilePage() {
                                 }
                                 setApiProvider(next);
                                 setModel("");
+                                setApiBaseUrl(
+                                  next === "custom"
+                                    ? configRef.current.apiBaseUrl
+                                    : ""
+                                );
                                 setPiModels([]);
                                 setPiModelsError("");
                                 saveConfig();
@@ -1282,6 +1303,42 @@ export function AgentProfilePage() {
                               </SelectContent>
                             </Select>
                           </div>
+
+                          {apiProvider === "custom" && (
+                            <div className="flex flex-col gap-1">
+                              <label className="text-sm font-medium">
+                                {t("agent.acp-config-pi-api-base-url")}
+                              </label>
+                              <Input
+                                value={apiBaseUrl}
+                                onChange={(e) => {
+                                  const next = e.target.value;
+                                  configRef.current = {
+                                    ...configRef.current,
+                                    apiBaseUrl: next,
+                                  };
+                                  setApiBaseUrl(next);
+                                }}
+                                onBlur={() => {
+                                  saveConfig();
+                                  if (apiBaseUrl.trim()) {
+                                    void fetchPiModels(
+                                      apiProvider,
+                                      apiKey,
+                                      apiBaseUrl
+                                    );
+                                  }
+                                }}
+                                placeholder={t(
+                                  "agent.acp-config-pi-api-base-url-placeholder"
+                                )}
+                                spellCheck={false}
+                              />
+                              <p className="text-xs text-control-light">
+                                {t("agent.acp-config-pi-api-base-url-hint")}
+                              </p>
+                            </div>
+                          )}
 
                           <div className="flex flex-col gap-1">
                             <label className="text-sm font-medium">
@@ -1316,7 +1373,9 @@ export function AgentProfilePage() {
                                   !apiProvider ||
                                   piModelsLoading ||
                                   (apiProvider === "deepseek" &&
-                                    apiKey.trim() === "")
+                                    apiKey.trim() === "") ||
+                                  (apiProvider === "custom" &&
+                                    apiBaseUrl.trim() === "")
                                 }
                                 onClick={() => {
                                   // Force a refetch: drop the cache entry first
@@ -1329,10 +1388,14 @@ export function AgentProfilePage() {
                                   }
                                   if (apiProvider) {
                                     piModelsCacheRef.current.delete(
-                                      apiProvider
+                                      `${apiProvider}/${apiBaseUrl}`
                                     );
                                   }
-                                  void fetchPiModels(apiProvider, apiKey);
+                                  void fetchPiModels(
+                                    apiProvider,
+                                    apiKey,
+                                    apiBaseUrl
+                                  );
                                 }}
                               >
                                 {piModelsLoading ? (
@@ -1374,7 +1437,11 @@ export function AgentProfilePage() {
                                 }
                                 apiKeyFetchDebounceRef.current = setTimeout(
                                   () => {
-                                    void fetchPiModels(apiProvider, next);
+                                    void fetchPiModels(
+                                      apiProvider,
+                                      next,
+                                      apiBaseUrl
+                                    );
                                   },
                                   600
                                 );
@@ -1387,7 +1454,11 @@ export function AgentProfilePage() {
                                   apiKeyFetchDebounceRef.current = undefined;
                                 }
                                 saveConfig();
-                                void fetchPiModels(apiProvider, apiKey);
+                                void fetchPiModels(
+                                  apiProvider,
+                                  apiKey,
+                                  apiBaseUrl
+                                );
                               }}
                             />
                             <p className="text-xs text-control-light">

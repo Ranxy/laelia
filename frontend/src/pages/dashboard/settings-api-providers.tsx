@@ -57,6 +57,7 @@ import { type User } from "@/types/proto-es/v1/user_service_pb";
 const PROVIDER_TYPE_OPTIONS = [
   { value: "deepseek", labelKey: "settings.api-providers.type-deepseek" },
   { value: "openrouter", labelKey: "settings.api-providers.type-openrouter" },
+  { value: "custom", labelKey: "settings.api-providers.type-custom" },
 ];
 
 interface EntryForm {
@@ -178,6 +179,13 @@ export function SettingsApiProvidersPage() {
       });
       return;
     }
+    if (createForm.providerType === "custom" && !createForm.baseUrl.trim()) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.api-providers.base-url-required"),
+      });
+      return;
+    }
     for (const e of createForm.entries) {
       if (!e.model.trim() || !e.apiKey.trim()) {
         toastManager.add({
@@ -193,7 +201,10 @@ export function SettingsApiProvidersPage() {
         apiProvider: {
           title: createForm.title.trim(),
           providerType: createForm.providerType,
-          baseUrl: createForm.baseUrl.trim(),
+          baseUrl:
+            createForm.providerType === "custom"
+              ? createForm.baseUrl.trim()
+              : "",
           description: createForm.description.trim(),
           members: createForm.members,
           entries: createForm.entries.map((e) => ({
@@ -230,6 +241,13 @@ export function SettingsApiProvidersPage() {
       });
       return;
     }
+    if (editForm.providerType === "custom" && !editForm.baseUrl.trim()) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.api-providers.base-url-required"),
+      });
+      return;
+    }
     for (const e of editForm.entries) {
       if (!e.model.trim()) {
         toastManager.add({
@@ -255,7 +273,8 @@ export function SettingsApiProvidersPage() {
           name: editTarget.name,
           title: editForm.title.trim(),
           providerType: editForm.providerType,
-          baseUrl: editForm.baseUrl.trim(),
+          baseUrl:
+            editForm.providerType === "custom" ? editForm.baseUrl.trim() : "",
           description: editForm.description.trim(),
           members: editForm.members,
           entries: editForm.entries.map((e) => ({
@@ -496,6 +515,10 @@ function ProviderSheet({
       setFetchError(t("settings.api-providers.fetch-key-required"));
       return;
     }
+    if (form.providerType === "custom" && !form.baseUrl.trim()) {
+      setFetchError(t("settings.api-providers.base-url-required"));
+      return;
+    }
     setFetching(true);
     setFetchError("");
     try {
@@ -582,21 +605,24 @@ function ProviderSheet({
               </SelectContent>
             </Select>
           </FieldRow>
-          <FieldRow
-            label={t("settings.api-providers.field-base-url")}
-            hint={t("settings.api-providers.field-base-url-hint")}
-          >
-            <Input
-              value={form.baseUrl}
-              onChange={(e) =>
-                onFormChange({ ...form, baseUrl: e.target.value })
-              }
-              placeholder={t(
-                "settings.api-providers.field-base-url-placeholder"
-              )}
-              spellCheck={false}
-            />
-          </FieldRow>
+          {form.providerType === "custom" && (
+            <FieldRow
+              label={t("settings.api-providers.field-base-url")}
+              hint={t("settings.api-providers.field-base-url-hint")}
+              required
+            >
+              <Input
+                value={form.baseUrl}
+                onChange={(e) =>
+                  onFormChange({ ...form, baseUrl: e.target.value })
+                }
+                placeholder={t(
+                  "settings.api-providers.field-base-url-placeholder"
+                )}
+                spellCheck={false}
+              />
+            </FieldRow>
+          )}
           <FieldRow label={t("settings.api-providers.field-description")}>
             <Input
               value={form.description}

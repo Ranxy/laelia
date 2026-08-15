@@ -221,9 +221,17 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     return res.providers;
   },
 
-  async listPiModels(apiProvider: string, apiKey: string): Promise<PiModel[]> {
+  async listPiModels(
+    apiProvider: string,
+    apiKey: string,
+    apiBaseUrl?: string
+  ): Promise<PiModel[]> {
     const res = await agentServiceClient.listPiModels(
-      create(ListPiModelsRequestSchema, { apiProvider, apiKey })
+      create(ListPiModelsRequestSchema, {
+        apiProvider,
+        apiKey,
+        apiBaseUrl: apiBaseUrl ?? "",
+      })
     );
     return res.models;
   },

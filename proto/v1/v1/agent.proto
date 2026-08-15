@@ -516,10 +516,12 @@ message ReadAgentWorkspaceFileResponse {
 }
 
 message ListPiModelsRequest {
-  // LLM API provider id ("deepseek" | "openrouter"). See AgentACPConfig.api_provider.
+  // LLM API provider id ("deepseek" | "openrouter" | "custom"). See AgentACPConfig.api_provider.
   string api_provider = 1 [(google.api.field_behavior) = REQUIRED];
-  // Plaintext LLM API key. Required for deepseek; ignored (public endpoint) for openrouter.
+  // Plaintext LLM API key. Required for deepseek and custom; ignored (public endpoint) for openrouter.
   string api_key = 2;
+  // Custom API base URL. Required when api_provider == "custom".
+  string api_base_url = 3;
 }
 
 message ListPiModelsResponse {
@@ -796,6 +798,10 @@ message AgentACPConfig {
   // "acp-v2" (thread protocol). Only meaningful for a "custom" provider: a
   // built-in provider's protocol is determined by its implementation.
   string protocol = 12;
+  // api_base_url is the custom LLM API base URL for the built-in pi runtime.
+  // Only meaningful when provider == "builtin-pi" and api_provider == "custom";
+  // ignored by ACP runtimes and by known (deepseek/openrouter) providers.
+  string api_base_url = 13;
 }
 
 message AgentCapability {

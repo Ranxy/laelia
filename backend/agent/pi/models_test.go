@@ -192,3 +192,27 @@ func TestListModelsCacheKeyDoesNotStoreRawKey(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 }
+
+func TestModelsURL(t *testing.T) {
+	if got := modelsURL("https://example.com/v1"); got != "https://example.com/v1/models" {
+		t.Fatalf("unexpected modelsURL: %q", got)
+	}
+	if got := modelsURL("https://example.com/v1/"); got != "https://example.com/v1/models" {
+		t.Fatalf("unexpected modelsURL with trailing slash: %q", got)
+	}
+}
+
+func TestListCustomModelsHitsModelsPath(t *testing.T) {
+	srv := httptest.NewServer(modelsHandler(t, "sk-custom", 200, `{"data":[{"id":"my-model"}]}`))
+	defer srv.Close()
+	modelsCache.entries = make(map[string]modelsCacheEntry) // ensure cold cache
+
+	// The user supplies the base URL without /models; the client must append it.
+	got, err := ListCustomModels(context.Background(), srv.Client(), srv.URL, "sk-custom")
+	if err != nil {
+		t.Fatalf("ListCustomModels: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != "my-model" {
+		t.Fatalf("unexpected models: %+v", got)
+	}
+}

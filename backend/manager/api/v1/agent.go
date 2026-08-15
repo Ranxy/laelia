@@ -1415,6 +1415,7 @@ func convertToV1AgentACPConfig(cfg *storepb.AgentACPConfig) *v1pb.AgentACPConfig
 		PersonaPrompt:       cfg.PersonaPrompt,
 		ApiProvider:         cfg.ApiProvider,
 		ApiKey:              cfg.ApiKey,
+		ApiBaseUrl:          cfg.ApiBaseUrl,
 		GlobalProvider:      cfg.GlobalProvider,
 		GlobalProviderEntry: cfg.GlobalProviderEntry,
 		Protocol:            cfg.Protocol,
@@ -1435,6 +1436,7 @@ func convertToStoreAgentACPConfig(cfg *v1pb.AgentACPConfig) *storepb.AgentACPCon
 		PersonaPrompt:       cfg.PersonaPrompt,
 		ApiProvider:         cfg.ApiProvider,
 		ApiKey:              cfg.ApiKey,
+		ApiBaseUrl:          cfg.ApiBaseUrl,
 		GlobalProvider:      cfg.GlobalProvider,
 		GlobalProviderEntry: cfg.GlobalProviderEntry,
 		Protocol:            cfg.Protocol,
@@ -1448,7 +1450,7 @@ func convertToStoreAgentACPConfig(cfg *v1pb.AgentACPConfig) *storepb.AgentACPCon
 func isEmptyAgentACPConfig(cfg *v1pb.AgentACPConfig) bool {
 	return cfg.Executable == "" && len(cfg.Args) == 0 && len(cfg.AllowEnv) == 0 &&
 		cfg.Provider == "" && cfg.Model == "" && len(cfg.CustomEnv) == 0 && cfg.PersonaPrompt == "" &&
-		cfg.GlobalProvider == "" && cfg.GlobalProviderEntry == "" && cfg.Protocol == ""
+		cfg.ApiBaseUrl == "" && cfg.GlobalProvider == "" && cfg.GlobalProviderEntry == "" && cfg.Protocol == ""
 }
 
 // buildCapabilityForACPConfig derives the agent capability from the
@@ -1992,15 +1994,24 @@ func (s *AgentService) ReadAgentWorkspaceFile(ctx context.Context, req *connect.
 // (the audit interceptor records method/actor/status only, not the body).
 func (*AgentService) ListPiModels(ctx context.Context, req *connect.Request[v1pb.ListPiModelsRequest]) (*connect.Response[v1pb.ListPiModelsResponse], error) {
 	apiProvider := strings.TrimSpace(req.Msg.ApiProvider)
-	if !pi.IsKnownAPIProvider(apiProvider) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unsupported api_provider %q", req.Msg.ApiProvider))
+	var models []pi.Model
+	var err error
+	if apiProvider == pi.APIProviderCustom {
+		baseURL := strings.TrimSpace(req.Msg.ApiBaseUrl)
+		if baseURL == "" {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("api_base_url is required for custom provider"))
+		}
+		models, err = pi.ListCustomModels(ctx, nil, baseURL, req.Msg.ApiKey)
+	} else {
+		if !pi.IsKnownAPIProvider(apiProvider) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unsupported api_provider %q", req.Msg.ApiProvider))
+		}
+		// DeepSeek's /models requires the caller's key; OpenRouter's is public.
+		if apiProvider == pi.APIProviderDeepseek && strings.TrimSpace(req.Msg.ApiKey) == "" {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("api_key is required to list models for this provider"))
+		}
+		models, err = pi.ListModels(ctx, nil, apiProvider, req.Msg.ApiKey)
 	}
-	// DeepSeek's /models requires the caller's key; OpenRouter's is public.
-	if apiProvider == pi.APIProviderDeepseek && strings.TrimSpace(req.Msg.ApiKey) == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("api_key is required to list models for this provider"))
-	}
-
-	models, err := pi.ListModels(ctx, nil, apiProvider, req.Msg.ApiKey)
 	if err != nil {
 		// Validation already ruled out client-side errors; anything left is an
 		// upstream provider/network failure (auth, timeout, non-2xx).
@@ -2060,8 +2071,11 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders 
 			}
 			return nil
 		}
-		if !pi.IsKnownAPIProvider(cfg.ApiProvider) {
-			return errors.Errorf("acp_config.api_provider %q is not supported (phase 1: deepseek, openrouter)", cfg.ApiProvider)
+		if !pi.IsKnownAPIProvider(cfg.ApiProvider) && cfg.ApiProvider != pi.APIProviderCustom {
+			return errors.Errorf("acp_config.api_provider %q is not supported (phase 1: deepseek, openrouter, custom)", cfg.ApiProvider)
+		}
+		if cfg.ApiProvider == pi.APIProviderCustom && strings.TrimSpace(cfg.ApiBaseUrl) == "" {
+			return errors.New("acp_config.api_base_url must be set for custom builtin-pi")
 		}
 		if strings.TrimSpace(cfg.ApiKey) == "" {
 			return errors.New("acp_config.api_key must be set for builtin-pi")

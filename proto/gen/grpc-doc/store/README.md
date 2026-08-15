@@ -121,6 +121,7 @@
 | global_provider | [string](#string) |  |  |
 | global_provider_entry | [string](#string) |  |  |
 | protocol | [string](#string) |  |  |
+| api_base_url | [string](#string) |  | api_base_url is the custom LLM API base URL for the built-in pi runtime. Only meaningful when provider == &#34;builtin-pi&#34; and api_provider == &#34;custom&#34;; ignored by ACP runtimes and by known (deepseek/openrouter) providers. |
 
 
 

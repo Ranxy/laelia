@@ -152,7 +152,10 @@
     "delete-agent-confirm-description": "确定要删除 Agent {{title}} 吗？这将永久删除该 Agent 及其在机器上的工作区，且无法恢复。",
     "stopped-toast": "Agent 已停止",
     "started-toast": "Agent 已启动",
-    "deleted-toast": "Agent 已删除"
+    "deleted-toast": "Agent 已删除",
+    "acp-config-pi-api-base-url": "API 基础地址",
+    "acp-config-pi-api-base-url-hint": "自定义 OpenAI 兼容端点的 base URL，必填。",
+    "acp-config-pi-api-base-url-placeholder": "https://your-endpoint.example.com/v1"
   },
   "auth": {
     "device-login": {
@@ -576,7 +579,8 @@
     "transfer-owner-reason-placeholder": "例如:角色变更",
     "transfer-owner-target": "新所有者",
     "transfer-owner-target-placeholder": "选择用户",
-    "transfer-owner-title": "转移所有权"
+    "transfer-owner-title": "转移所有权",
+    "add-agent-api-base-url-required": "自定义 provider 需要填写 API 基础地址。"
   },
   "members": {
     "add-agent": "添加 Agent",
@@ -755,8 +759,8 @@
       "fetch-models": "拉取模型",
       "fetching": "拉取中…",
       "field-base-url": "API 基础地址",
-      "field-base-url-hint": "可选。留空使用该类型的默认地址。",
-      "field-base-url-placeholder": "https://api.deepseek.com",
+      "field-base-url-hint": "自定义 provider 必填。DeepSeek / OpenRouter 使用内置默认地址。",
+      "field-base-url-placeholder": "https://your-endpoint.example.com/v1",
       "field-description": "描述",
       "field-description-placeholder": "该提供方的用途",
       "field-entries": "条目 (密钥 + 模型)",
@@ -779,7 +783,9 @@
       "type-deepseek": "DeepSeek",
       "type-openrouter": "OpenRouter",
       "update-failed": "更新提供方失败",
-      "updated": "提供方已更新"
+      "updated": "提供方已更新",
+      "type-custom": "自定义",
+      "base-url-required": "自定义 provider 需要填写 API 基础地址。"
     },
     "audit": {
       "actor-unknown": "未知",

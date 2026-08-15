@@ -198,6 +198,7 @@ func resolveAcpConfigForDaemon(ctx context.Context, stores *store.Store, cfg *v1
 		ApiProvider:   provider.ProviderType,
 		ApiKey:        entry.APIKey,
 		Model:         entry.ModelName,
+		ApiBaseUrl:    provider.BaseURL,
 		PersonaPrompt: cfg.PersonaPrompt,
 	}, nil
 }

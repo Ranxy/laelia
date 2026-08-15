@@ -80,13 +80,47 @@ func ListModels(ctx context.Context, client *http.Client, apiProvider, apiKey st
 	return models, nil
 }
 
+// ListCustomModels fetches the model list from an arbitrary OpenAI-compatible
+// base URL (GET {baseUrl}/models). Used by the custom API provider type. The
+// api_key is required and sent as a Bearer credential; it is never logged.
+func ListCustomModels(ctx context.Context, client *http.Client, baseURL, apiKey string) ([]Model, error) {
+	if client == nil {
+		client = defaultModelsClient
+	}
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		return nil, errors.New("base_url is required to list custom models")
+	}
+	if strings.TrimSpace(apiKey) == "" {
+		return nil, errors.New("api_key is required to list custom models")
+	}
+	if cached, ok := modelsCache.getCustom(baseURL, apiKey); ok {
+		return cached, nil
+	}
+	models, err := fetchModelsFromURL(ctx, client, modelsURL(baseURL), true, apiKey, "custom")
+	if err != nil {
+		return nil, err
+	}
+	modelsCache.setCustom(baseURL, apiKey, models)
+	return models, nil
+}
+
+// modelsURL appends the OpenAI-style /models path to a base URL, tolerating a
+// trailing slash on the base URL.
+func modelsURL(baseURL string) string {
+	return strings.TrimRight(baseURL, "/") + "/models"
+}
+
 func fetchModels(ctx context.Context, client *http.Client, apiProvider, apiKey string) ([]Model, error) {
-	url := providerModelsURL[apiProvider]
+	return fetchModelsFromURL(ctx, client, providerModelsURL[apiProvider], providerModelsNeedsKey(apiProvider), apiKey, apiProvider)
+}
+
+func fetchModelsFromURL(ctx context.Context, client *http.Client, url string, needsKey bool, apiKey, label string) ([]Model, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, pkgerrors.Wrap(err, "failed to build models request")
 	}
-	if providerModelsNeedsKey(apiProvider) {
+	if needsKey {
 		// api_key is a bearer credential — never log it.
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 	}
@@ -103,7 +137,7 @@ func fetchModels(ctx context.Context, client *http.Client, apiProvider, apiKey s
 		return nil, pkgerrors.Wrap(err, "failed to read provider models response")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, pkgerrors.Errorf("provider %q returned status %d", apiProvider, resp.StatusCode)
+		return nil, pkgerrors.Errorf("provider %q returned status %d", label, resp.StatusCode)
 	}
 
 	var parsed providerModelsResponse
@@ -170,6 +204,25 @@ func (s *modelsCacheStore) set(apiProvider, apiKey string, models []Model) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.entries[cacheKey(apiProvider, apiKey)] = modelsCacheEntry{
+		models:    models,
+		expiresAt: time.Now().Add(modelsCacheTTL),
+	}
+}
+
+func (s *modelsCacheStore) getCustom(baseURL, apiKey string) ([]Model, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, ok := s.entries[cacheKey("custom/"+baseURL, apiKey)]
+	if !ok || time.Now().After(e.expiresAt) {
+		return nil, false
+	}
+	return e.models, true
+}
+
+func (s *modelsCacheStore) setCustom(baseURL, apiKey string, models []Model) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.entries[cacheKey("custom/"+baseURL, apiKey)] = modelsCacheEntry{
 		models:    models,
 		expiresAt: time.Now().Add(modelsCacheTTL),
 	}

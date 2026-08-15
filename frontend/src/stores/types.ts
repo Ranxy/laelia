@@ -190,6 +190,7 @@ export interface AgentACPConfigInput {
   // boundary and the inline apiProvider/apiKey are ignored.
   apiProvider?: string;
   apiKey?: string;
+  apiBaseUrl?: string;
   globalProvider?: string;
   globalProviderEntry?: string;
 }
@@ -263,8 +264,13 @@ export interface AgentSlice {
   refreshAgentProviders: (name: string) => Promise<AgentProviderInfo[]>;
   // listPiModels proxies an LLM API provider's model-listing API through the
   // manager (CORS + key hygiene). Fetched dynamically so the model list is never
-  // hardcoded. apiKey is required for deepseek and ignored for openrouter.
-  listPiModels: (apiProvider: string, apiKey: string) => Promise<PiModel[]>;
+  // hardcoded. apiKey is required for deepseek and custom; ignored for
+  // openrouter. apiBaseUrl is required for custom.
+  listPiModels: (
+    apiProvider: string,
+    apiKey: string,
+    apiBaseUrl?: string
+  ) => Promise<PiModel[]>;
 }
 
 // MachineSlice owns the machine roster and the machine-management mutations.

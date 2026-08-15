@@ -709,6 +709,7 @@ permissions) is derived from a built-in template, not set by the admin.
 | global_provider | [string](#string) |  | global_provider is the resource name of the global API provider this builtin-pi agent uses (&#34;apiProviders/{id}&#34;). Only meaningful when provider == &#34;builtin-pi&#34;. When set, the stored config carries the provider/entry references instead of an inline api_provider/api_key; the server resolves the concrete api_provider/api_key/model at the daemon boundary. |
 | global_provider_entry | [string](#string) |  | global_provider_entry is the resource name of the (key, model) entry within the global provider, in the form &#34;apiProviders/{id}/entries/{entry}&#34;. Only meaningful when provider == &#34;builtin-pi&#34; and global_provider is set. |
 | protocol | [string](#string) |  | protocol declares the ACP protocol generation the provider speaks: empty (inferred from the provider type), &#34;acp-v1&#34; (session protocol) or &#34;acp-v2&#34; (thread protocol). Only meaningful for a &#34;custom&#34; provider: a built-in provider&#39;s protocol is determined by its implementation. |
+| api_base_url | [string](#string) |  | api_base_url is the custom LLM API base URL for the built-in pi runtime. Only meaningful when provider == &#34;builtin-pi&#34; and api_provider == &#34;custom&#34;; ignored by ACP runtimes and by known (deepseek/openrouter) providers. |
 
 
 
@@ -1288,8 +1289,9 @@ delete server-side while the list hides the button).
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| api_provider | [string](#string) |  | LLM API provider id (&#34;deepseek&#34; | &#34;openrouter&#34;). See AgentACPConfig.api_provider. |
-| api_key | [string](#string) |  | Plaintext LLM API key. Required for deepseek; ignored (public endpoint) for openrouter. |
+| api_provider | [string](#string) |  | LLM API provider id (&#34;deepseek&#34; | &#34;openrouter&#34; | &#34;custom&#34;). See AgentACPConfig.api_provider. |
+| api_key | [string](#string) |  | Plaintext LLM API key. Required for deepseek and custom; ignored (public endpoint) for openrouter. |
+| api_base_url | [string](#string) |  | Custom API base URL. Required when api_provider == &#34;custom&#34;. |
 
 
 

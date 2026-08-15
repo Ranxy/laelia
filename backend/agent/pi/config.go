@@ -3,7 +3,10 @@ package pi
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -39,6 +42,7 @@ const (
 	// the API key from.
 	APIProviderDeepseek   = "deepseek"
 	APIProviderOpenRouter = "openrouter"
+	APIProviderCustom     = "custom"
 )
 
 // apiProviderSpec maps an AgentACPConfig.api_provider to the pi provider id and
@@ -51,6 +55,7 @@ type apiProviderSpec struct {
 var apiProviders = map[string]apiProviderSpec{
 	APIProviderDeepseek:   {piProvider: "deepseek", keyEnv: "DEEPSEEK_API_KEY"},
 	APIProviderOpenRouter: {piProvider: "openrouter", keyEnv: "OPENROUTER_API_KEY"},
+	APIProviderCustom:     {piProvider: "custom", keyEnv: "LAELIA_CUSTOM_API_KEY"},
 }
 
 // IsKnownAPIProvider reports whether id is a supported phase-1 API provider
@@ -84,10 +89,16 @@ var piAllowEnv = []string{
 //
 //nolint:revive // stutter: mirrors executor.ACPConfig sibling for symmetry.
 type PiConfig struct {
-	APIProvider   string // AgentACPConfig.api_provider ("deepseek"|"openrouter")
+	APIProvider   string // AgentACPConfig.api_provider ("deepseek"|"openrouter"|"custom")
 	Model         string // AgentACPConfig.model
 	APIKey        string // AgentACPConfig.api_key
+	BaseURL       string // AgentACPConfig.api_base_url (custom only)
 	PersonaPrompt string
+
+	// ConfigDir is the per-agent pi config directory (PI_CODING_AGENT_DIR).
+	// Only set for custom providers; holds the models.json that declares the
+	// custom base URL.
+	ConfigDir string
 
 	// WorkingDir is the per-agent dir pi runs in AND stores sessions under
 	// (--session-dir). <data root>/<machineID>/<agentID>/.
@@ -148,13 +159,18 @@ func BuildPiConfig(
 	if strings.TrimSpace(user.ApiKey) == "" {
 		return nil
 	}
+	if user.ApiProvider == APIProviderCustom && strings.TrimSpace(user.ApiBaseUrl) == "" {
+		return nil
+	}
 
-	return &PiConfig{
+	workingDir := agentWorkingDir(machineID, agentID)
+	cfg := &PiConfig{
 		APIProvider:       user.ApiProvider,
 		Model:             user.Model,
 		APIKey:            user.ApiKey,
+		BaseURL:           strings.TrimSpace(user.ApiBaseUrl),
 		PersonaPrompt:     user.PersonaPrompt,
-		WorkingDir:        agentWorkingDir(machineID, agentID),
+		WorkingDir:        workingDir,
 		PiBinaryPath:      piBinaryPath,
 		AgentResourceID:   agentResourceID,
 		DaemonSocket:      daemonSocket,
@@ -169,6 +185,10 @@ func BuildPiConfig(
 		StartupTimeout:    defaultStartupTimeout,
 		IdleTimeout:       defaultIdleTimeout,
 	}
+	if user.ApiProvider == APIProviderCustom {
+		cfg.ConfigDir = filepath.Join(workingDir, ".pi-agent")
+	}
+	return cfg
 }
 
 // BuildPiCapability derives the agent capability for a builtin-pi config. It does
@@ -205,7 +225,7 @@ func agentWorkingDir(machineID, agentID string) string {
 // (e.g. a rotated API key baked into its env) and must be restarted.
 func (c *PiConfig) LaunchFingerprint() string {
 	h := sha256.New()
-	_, _ = h.Write([]byte(c.APIProvider + "\x00" + c.Model + "\x00" + c.APIKey + "\x00" + c.PiBinaryPath))
+	_, _ = h.Write([]byte(c.APIProvider + "\x00" + c.Model + "\x00" + c.APIKey + "\x00" + c.BaseURL + "\x00" + c.PiBinaryPath))
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
@@ -233,6 +253,11 @@ func (c *PiConfig) buildPiEnv(commandID string) []string {
 	// LLM API key for the configured provider.
 	if spec, ok := apiProviders[c.APIProvider]; ok {
 		values[spec.keyEnv] = c.APIKey
+	}
+	// Custom providers read their base URL from a per-agent models.json; point
+	// pi at that config dir so the file is isolated per agent.
+	if c.APIProvider == APIProviderCustom && c.ConfigDir != "" {
+		values["PI_CODING_AGENT_DIR"] = c.ConfigDir
 	}
 
 	// laelia-machine bootstrap so the LLM can drive the chat loop from its shell.
@@ -288,4 +313,35 @@ func (c *PiConfig) launchArgs() []string {
 		"--no-prompt-templates",
 		"--approve",
 	}
+}
+
+// writeCustomModels writes the per-agent models.json that declares the custom
+// provider's base URL to pi. The API key is referenced through the
+// LAELIA_CUSTOM_API_KEY env var (set in buildPiEnv) so the secret never lands
+// on disk. Only called for custom providers.
+func writeCustomModels(cfg *PiConfig) error {
+	if cfg.APIProvider != APIProviderCustom {
+		return nil
+	}
+	if cfg.ConfigDir == "" {
+		return errors.New("pi: custom provider requires a config dir")
+	}
+	if err := os.MkdirAll(cfg.ConfigDir, 0o700); err != nil {
+		return err
+	}
+	doc := map[string]any{
+		"providers": map[string]any{
+			"custom": map[string]any{
+				"baseUrl": cfg.BaseURL,
+				"api":     "openai-completions",
+				"apiKey":  "$LAELIA_CUSTOM_API_KEY",
+				"models":  []map[string]string{{"id": cfg.Model}},
+			},
+		},
+	}
+	data, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(cfg.ConfigDir, "models.json"), data, 0o600)
 }

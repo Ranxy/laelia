@@ -635,7 +635,7 @@ describe("MachineProfilePage", () => {
       screen.getByRole("button", { name: "agent.acp-config-pi-models-refresh" })
     );
     await waitFor(() => {
-      expect(mock.listPiModels).toHaveBeenCalledWith("deepseek", "sk-123");
+      expect(mock.listPiModels).toHaveBeenCalledWith("deepseek", "sk-123", "");
     });
 
     const modelInput = screen.getByPlaceholderText(

@@ -2696,6 +2696,15 @@ empty (inferred from the provider type), &#34;acp-v1&#34; (session protocol) or
 built-in provider&#39;s protocol is determined by its implementation. </p></td>
                 </tr>
               
+                <tr>
+                  <td>api_base_url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>api_base_url is the custom LLM API base URL for the built-in pi runtime.
+Only meaningful when provider == &#34;builtin-pi&#34; and api_provider == &#34;custom&#34;;
+ignored by ACP runtimes and by known (deepseek/openrouter) providers. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -4092,14 +4101,21 @@ the list to agents bound to that machine. Empty lists all agents. </p></td>
                   <td>api_provider</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>LLM API provider id (&#34;deepseek&#34; | &#34;openrouter&#34;). See AgentACPConfig.api_provider. </p></td>
+                  <td><p>LLM API provider id (&#34;deepseek&#34; | &#34;openrouter&#34; | &#34;custom&#34;). See AgentACPConfig.api_provider. </p></td>
                 </tr>
               
                 <tr>
                   <td>api_key</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>Plaintext LLM API key. Required for deepseek; ignored (public endpoint) for openrouter. </p></td>
+                  <td><p>Plaintext LLM API key. Required for deepseek and custom; ignored (public endpoint) for openrouter. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>api_base_url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Custom API base URL. Required when api_provider == &#34;custom&#34;. </p></td>
                 </tr>
               
             </tbody>

@@ -311,8 +311,12 @@ type AgentACPConfig struct {
 	GlobalProvider      string                 `protobuf:"bytes,10,opt,name=global_provider,json=globalProvider,proto3" json:"global_provider,omitempty"`
 	GlobalProviderEntry string                 `protobuf:"bytes,11,opt,name=global_provider_entry,json=globalProviderEntry,proto3" json:"global_provider_entry,omitempty"`
 	Protocol            string                 `protobuf:"bytes,12,opt,name=protocol,proto3" json:"protocol,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// api_base_url is the custom LLM API base URL for the built-in pi runtime.
+	// Only meaningful when provider == "builtin-pi" and api_provider == "custom";
+	// ignored by ACP runtimes and by known (deepseek/openrouter) providers.
+	ApiBaseUrl    string `protobuf:"bytes,13,opt,name=api_base_url,json=apiBaseUrl,proto3" json:"api_base_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AgentACPConfig) Reset() {
@@ -425,6 +429,13 @@ func (x *AgentACPConfig) GetGlobalProviderEntry() string {
 func (x *AgentACPConfig) GetProtocol() string {
 	if x != nil {
 		return x.Protocol
+	}
+	return ""
+}
+
+func (x *AgentACPConfig) GetApiBaseUrl() string {
+	if x != nil {
+		return x.ApiBaseUrl
 	}
 	return ""
 }
@@ -788,7 +799,7 @@ const file_store_agent_proto_rawDesc = "" +
 	" \x01(\v2\x1c.laelia.store.AgentACPConfigR\tacpConfig\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf9\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9b\x04\n" +
 	"\x0eAgentACPConfig\x12\x1e\n" +
 	"\n" +
 	"executable\x18\x01 \x01(\tR\n" +
@@ -805,7 +816,9 @@ const file_store_agent_proto_rawDesc = "" +
 	"\x0fglobal_provider\x18\n" +
 	" \x01(\tR\x0eglobalProvider\x122\n" +
 	"\x15global_provider_entry\x18\v \x01(\tR\x13globalProviderEntry\x12\x1a\n" +
-	"\bprotocol\x18\f \x01(\tR\bprotocol\x1a<\n" +
+	"\bprotocol\x18\f \x01(\tR\bprotocol\x12 \n" +
+	"\fapi_base_url\x18\r \x01(\tR\n" +
+	"apiBaseUrl\x1a<\n" +
 	"\x0eCustomEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd0\x02\n" +

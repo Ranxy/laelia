@@ -76,10 +76,10 @@ export function modelLabel(
   return m ? m.name || m.value : value;
 }
 
-// Phase-1 API providers for the built-in pi runtime. The model list for each
-// is fetched dynamically from the provider's model API (see usePiModels), never
-// hardcoded.
-export const piAPIProviderIds = ["deepseek", "openrouter"];
+// API providers for the built-in pi runtime. The model list for each is
+// fetched dynamically from the provider's model API (see usePiModels), never
+// hardcoded. "custom" requires an api_base_url.
+export const piAPIProviderIds = ["deepseek", "openrouter", "custom"];
 
 // entryLabel renders a global API provider entry's select label: "model (label)"
 // when the entry has a display label, the bare model otherwise.

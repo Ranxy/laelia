@@ -998,18 +998,25 @@ export declare const ReadAgentWorkspaceFileResponseSchema: GenMessage<ReadAgentW
  */
 export declare type ListPiModelsRequest = Message<"laelia.v1.ListPiModelsRequest"> & {
   /**
-   * LLM API provider id ("deepseek" | "openrouter"). See AgentACPConfig.api_provider.
+   * LLM API provider id ("deepseek" | "openrouter" | "custom"). See AgentACPConfig.api_provider.
    *
    * @generated from field: string api_provider = 1;
    */
   apiProvider: string;
 
   /**
-   * Plaintext LLM API key. Required for deepseek; ignored (public endpoint) for openrouter.
+   * Plaintext LLM API key. Required for deepseek and custom; ignored (public endpoint) for openrouter.
    *
    * @generated from field: string api_key = 2;
    */
   apiKey: string;
+
+  /**
+   * Custom API base URL. Required when api_provider == "custom".
+   *
+   * @generated from field: string api_base_url = 3;
+   */
+  apiBaseUrl: string;
 };
 
 /**
@@ -1746,6 +1753,15 @@ export declare type AgentACPConfig = Message<"laelia.v1.AgentACPConfig"> & {
    * @generated from field: string protocol = 12;
    */
   protocol: string;
+
+  /**
+   * api_base_url is the custom LLM API base URL for the built-in pi runtime.
+   * Only meaningful when provider == "builtin-pi" and api_provider == "custom";
+   * ignored by ACP runtimes and by known (deepseek/openrouter) providers.
+   *
+   * @generated from field: string api_base_url = 13;
+   */
+  apiBaseUrl: string;
 };
 
 /**

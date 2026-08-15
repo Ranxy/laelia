@@ -548,7 +548,7 @@ describe("AgentProfilePage", () => {
     fireEvent.change(keyInput, { target: { value: "sk-123" } });
     fireEvent.blur(keyInput);
     await waitFor(() => {
-      expect(mock.listPiModels).toHaveBeenCalledWith("deepseek", "sk-123");
+      expect(mock.listPiModels).toHaveBeenCalledWith("deepseek", "sk-123", "");
     });
 
     // Type into the model combobox, then blur the api key to trigger a save

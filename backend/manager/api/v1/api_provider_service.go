@@ -127,7 +127,7 @@ func (s *APIProviderService) CreateAPIProvider(ctx context.Context, req *connect
 	created, err := s.store.CreateAPIProvider(ctx, &store.APIProviderMessage{
 		Name:         strings.TrimSpace(in.Title),
 		ProviderType: strings.TrimSpace(in.ProviderType),
-		BaseURL:      strings.TrimSpace(in.BaseUrl),
+		BaseURL:      normalizeProviderBaseURL(in.ProviderType, in.BaseUrl),
 		Description:  strings.TrimSpace(in.Description),
 		CreatedBy:    user.ID,
 		Entries:      entries,
@@ -182,7 +182,7 @@ func (s *APIProviderService) UpdateAPIProvider(ctx context.Context, req *connect
 
 	updated, err := s.store.UpdateAPIProvider(ctx, current, &store.APIProviderMessage{
 		Name:        strings.TrimSpace(in.Title),
-		BaseURL:     strings.TrimSpace(in.BaseUrl),
+		BaseURL:     normalizeProviderBaseURL(in.ProviderType, in.BaseUrl),
 		Description: strings.TrimSpace(in.Description),
 		Entries:     entries,
 		Members:     members,
@@ -230,15 +230,25 @@ func (s *APIProviderService) DeleteAPIProvider(ctx context.Context, req *connect
 // the provider type's fixed URL; a base_url override is not supported for the
 // known types (fail-closed against SSRF).
 func (*APIProviderService) ListAPIProviderModels(ctx context.Context, req *connect.Request[v1pb.ListApiProviderModelsRequest]) (*connect.Response[v1pb.ListApiProviderModelsResponse], error) {
-	spec, ok := providerTypeDefaults[req.Msg.ProviderType]
-	if !ok {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unsupported provider_type %q", req.Msg.ProviderType))
-	}
-	if baseURL := strings.TrimSpace(req.Msg.BaseUrl); baseURL != "" && baseURL != spec.baseURL {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("base_url override is not supported for provider type %q", req.Msg.ProviderType))
-	}
 	apiKey := strings.TrimSpace(req.Msg.ApiKey)
-	models, err := pi.ListModels(ctx, nil, spec.apiProvider, apiKey)
+	var models []pi.Model
+	var err error
+	if req.Msg.ProviderType == pi.APIProviderCustom {
+		baseURL := strings.TrimSpace(req.Msg.BaseUrl)
+		if baseURL == "" {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("base_url is required for custom provider"))
+		}
+		models, err = pi.ListCustomModels(ctx, nil, baseURL, apiKey)
+	} else {
+		spec, ok := providerTypeDefaults[req.Msg.ProviderType]
+		if !ok {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unsupported provider_type %q", req.Msg.ProviderType))
+		}
+		if baseURL := strings.TrimSpace(req.Msg.BaseUrl); baseURL != "" && baseURL != spec.baseURL {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("base_url override is not supported for provider type %q", req.Msg.ProviderType))
+		}
+		models, err = pi.ListModels(ctx, nil, spec.apiProvider, apiKey)
+	}
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
@@ -274,14 +284,28 @@ func canUseAPIProvider(ctx context.Context, iamChecker *iam.Manager, stores *sto
 	return false, nil
 }
 
+// normalizeProviderBaseURL returns the base URL to persist: known provider
+// types always use their built-in default (stored empty), custom providers keep
+// the user-supplied URL.
+func normalizeProviderBaseURL(providerType, baseURL string) string {
+	if providerType == pi.APIProviderCustom {
+		return strings.TrimSpace(baseURL)
+	}
+	return ""
+}
+
 // validateAPIProviderBase validates the provider identity fields shared by
 // create and update.
 func (*APIProviderService) validateAPIProviderBase(in *v1pb.ApiProvider) error {
 	if strings.TrimSpace(in.ProviderType) == "" {
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("provider_type is required"))
 	}
-	if _, ok := providerTypeDefaults[in.ProviderType]; !ok {
-		return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unsupported provider_type %q (supported: deepseek, openrouter)", in.ProviderType))
+	if in.ProviderType == pi.APIProviderCustom {
+		if strings.TrimSpace(in.BaseUrl) == "" {
+			return connect.NewError(connect.CodeInvalidArgument, errors.New("base_url is required for custom provider"))
+		}
+	} else if _, ok := providerTypeDefaults[in.ProviderType]; !ok {
+		return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unsupported provider_type %q (supported: deepseek, openrouter, custom)", in.ProviderType))
 	}
 	if strings.TrimSpace(in.Title) == "" {
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("title is required"))

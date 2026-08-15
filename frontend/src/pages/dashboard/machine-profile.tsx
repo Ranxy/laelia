@@ -141,6 +141,7 @@ export function MachineProfilePage() {
   const [selfProvidedKeysEnabled, setSelfProvidedKeysEnabled] = useState(false);
   const [apiProvider, setApiProvider] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [apiBaseUrl, setApiBaseUrl] = useState("");
   const [piModels, setPiModels] = useState<PiModel[]>([]);
   const [piModelsLoading, setPiModelsLoading] = useState(false);
   const piModelsCacheRef = useRef<Map<string, PiModel[]>>(new Map());
@@ -214,10 +215,16 @@ export function MachineProfilePage() {
 
   // fetchPiModels loads the model list for a self-provided LLM API provider
   // (ListPiModels). deepseek requires the api_key; openrouter is public.
-  async function fetchPiModels(nextProvider: string, key: string) {
+  async function fetchPiModels(
+    nextProvider: string,
+    key: string,
+    baseUrl = ""
+  ) {
     if (!nextProvider) return;
     if (nextProvider === "deepseek" && key.trim() === "") return;
-    const cached = piModelsCacheRef.current.get(nextProvider);
+    if (nextProvider === "custom" && baseUrl.trim() === "") return;
+    const cacheKey = `${nextProvider}/${baseUrl}`;
+    const cached = piModelsCacheRef.current.get(cacheKey);
     if (cached) {
       setPiModels(cached);
       return;
@@ -227,8 +234,8 @@ export function MachineProfilePage() {
     try {
       const models = await useAppStore
         .getState()
-        .listPiModels(nextProvider, key);
-      piModelsCacheRef.current.set(nextProvider, models);
+        .listPiModels(nextProvider, key, baseUrl);
+      piModelsCacheRef.current.set(cacheKey, models);
       setPiModels(models);
     } catch (err) {
       setAddError(
@@ -246,13 +253,14 @@ export function MachineProfilePage() {
   useEffect(() => {
     if (provider !== "builtin-pi" || piMode !== "self" || !apiProvider) return;
     if (apiProvider === "deepseek" && apiKey.trim() === "") return;
+    if (apiProvider === "custom" && apiBaseUrl.trim() === "") return;
     const timer = setTimeout(
-      () => void fetchPiModels(apiProvider, apiKey),
+      () => void fetchPiModels(apiProvider, apiKey, apiBaseUrl),
       400
     );
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provider, piMode, apiProvider, apiKey]);
+  }, [provider, piMode, apiProvider, apiKey, apiBaseUrl]);
 
   // Access (who may create agents) logic. The machine IAM policy is
   // handler-gated server-side to the machine's creator or a workspace admin,
@@ -489,6 +497,10 @@ export function MachineProfilePage() {
           setAddError(t("machine.add-agent-api-key-required"));
           return;
         }
+        if (apiProvider === "custom" && !apiBaseUrl.trim()) {
+          setAddError(t("machine.add-agent-api-base-url-required"));
+          return;
+        }
       }
     }
     if (modelRequired && !model.trim()) {
@@ -522,6 +534,7 @@ export function MachineProfilePage() {
           globalProviderEntry: globalProviderEntry.trim(),
           apiProvider: apiProvider.trim(),
           apiKey: apiKey.trim(),
+          apiBaseUrl: apiBaseUrl.trim(),
         },
         undefined,
         allowAddToChannel
@@ -1100,8 +1113,10 @@ export function MachineProfilePage() {
                         <Select
                           value={apiProvider}
                           onValueChange={(v) => {
-                            setApiProvider(String(v ?? ""));
+                            const next = String(v ?? "");
+                            setApiProvider(next);
                             setModel("");
+                            setApiBaseUrl(next === "custom" ? apiBaseUrl : "");
                             setAddError("");
                           }}
                         >
@@ -1119,6 +1134,37 @@ export function MachineProfilePage() {
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {apiProvider === "custom" && (
+                        <div className="flex flex-col gap-1">
+                          <label className="text-sm font-medium">
+                            {t("agent.acp-config-pi-api-base-url")}
+                          </label>
+                          <Input
+                            value={apiBaseUrl}
+                            onChange={(e) => {
+                              setApiBaseUrl(e.target.value);
+                              setAddError("");
+                            }}
+                            onBlur={() => {
+                              if (apiBaseUrl.trim()) {
+                                void fetchPiModels(
+                                  apiProvider,
+                                  apiKey,
+                                  apiBaseUrl
+                                );
+                              }
+                            }}
+                            placeholder={t(
+                              "agent.acp-config-pi-api-base-url-placeholder"
+                            )}
+                            spellCheck={false}
+                          />
+                          <p className="text-xs text-control-light">
+                            {t("agent.acp-config-pi-api-base-url-hint")}
+                          </p>
+                        </div>
+                      )}
 
                       <div className="flex flex-col gap-1">
                         <label className="text-sm font-medium">
@@ -1167,13 +1213,21 @@ export function MachineProfilePage() {
                               !apiProvider ||
                               piModelsLoading ||
                               (apiProvider === "deepseek" &&
-                                apiKey.trim() === "")
+                                apiKey.trim() === "") ||
+                              (apiProvider === "custom" &&
+                                apiBaseUrl.trim() === "")
                             }
                             onClick={() => {
                               if (apiProvider) {
-                                piModelsCacheRef.current.delete(apiProvider);
+                                piModelsCacheRef.current.delete(
+                                  `${apiProvider}/${apiBaseUrl}`
+                                );
                               }
-                              void fetchPiModels(apiProvider, apiKey);
+                              void fetchPiModels(
+                                apiProvider,
+                                apiKey,
+                                apiBaseUrl
+                              );
                             }}
                           >
                             {piModelsLoading ? (
@@ -1333,7 +1387,10 @@ export function MachineProfilePage() {
                 (isPiProvider &&
                   (piMode === "global"
                     ? !globalProvider.trim() || !globalProviderEntry.trim()
-                    : !apiProvider.trim() || !model.trim() || !apiKey.trim()))
+                    : !apiProvider.trim() ||
+                      !model.trim() ||
+                      !apiKey.trim() ||
+                      (apiProvider === "custom" && !apiBaseUrl.trim())))
               }
               onClick={handleAddAgent}
             >

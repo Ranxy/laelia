@@ -155,6 +155,10 @@ func (s *Session) Start(commandID string) error {
 		s.startMu.Unlock()
 		return pkgerrors.Wrap(err, "pi: create working dir")
 	}
+	if err := writeCustomModels(s.cfg); err != nil {
+		s.startMu.Unlock()
+		return pkgerrors.Wrap(err, "pi: write custom models")
+	}
 	if err := writeManagedMcpExtension(s.cfg); err != nil {
 		slog.Warn("pi: failed to write managed mcp extension; continuing without mcp", "agent", s.cfg.AgentID, "error", err)
 	}

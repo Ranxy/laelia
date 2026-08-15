@@ -341,3 +341,35 @@ func TestMaskKeyPreview(t *testing.T) {
 		t.Fatalf("preview must not leak the full key, got %q", preview)
 	}
 }
+
+// TestNormalizeProviderBaseURL verifies known provider types drop the base URL
+// while custom providers keep it.
+func TestNormalizeProviderBaseURL(t *testing.T) {
+	if got := normalizeProviderBaseURL("deepseek", "https://evil.example.com"); got != "" {
+		t.Fatalf("deepseek should drop base_url, got %q", got)
+	}
+	if got := normalizeProviderBaseURL("openrouter", "https://evil.example.com"); got != "" {
+		t.Fatalf("openrouter should drop base_url, got %q", got)
+	}
+	if got := normalizeProviderBaseURL("custom", "  https://example.com/v1  "); got != "https://example.com/v1" {
+		t.Fatalf("custom should keep trimmed base_url, got %q", got)
+	}
+}
+
+// TestValidateAPIProviderBaseCustom verifies custom providers require a base URL.
+func TestValidateAPIProviderBaseCustom(t *testing.T) {
+	s := &APIProviderService{}
+	if err := s.validateAPIProviderBase(&v1pb.ApiProvider{
+		ProviderType: "custom",
+		Title:        "My Custom",
+		BaseUrl:      "https://example.com/v1",
+	}); err != nil {
+		t.Fatalf("valid custom provider rejected: %v", err)
+	}
+	if err := s.validateAPIProviderBase(&v1pb.ApiProvider{
+		ProviderType: "custom",
+		Title:        "My Custom",
+	}); err == nil {
+		t.Fatal("custom provider without base_url should be rejected")
+	}
+}
