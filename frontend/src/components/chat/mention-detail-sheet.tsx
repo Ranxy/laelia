@@ -21,6 +21,7 @@ import {
 import { agentServiceClient, userServiceClient } from "@/connect";
 import { agentResourceName } from "@/lib/command-status";
 import { toastManager } from "@/lib/toast";
+import { useSwipeToCloseSheet } from "@/lib/use-swipe-to-close-sheet";
 import { useAppStore } from "@/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";
@@ -65,6 +66,12 @@ export function MentionDetailSheet({
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [startingChat, setStartingChat] = useState(false);
+  const [popup, setPopup] = useState<HTMLDivElement | null>(null);
+  const [overlay, setOverlay] = useState<HTMLDivElement | null>(null);
+
+  // Mobile-only: mirror the thread panel's swipe-back gesture so the sheet can
+  // be dragged from the left edge to close, revealing the page underneath.
+  useSwipeToCloseSheet({ open, onClose, popup, overlay });
 
   useEffect(() => {
     if (!open) return;
@@ -125,7 +132,7 @@ export function MentionDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
-      <SheetContent width="medium">
+      <SheetContent width="medium" ref={setPopup} overlayRef={setOverlay}>
         <SheetHeader>
           <SheetTitle>
             {type === "agent" ? "Agent Details" : "User Details"}

@@ -1,7 +1,7 @@
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps, ReactNode, Ref } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import {
@@ -83,20 +83,25 @@ const sheetContentVariants = cva(
 
 interface SheetContentProps
   extends ComponentProps<typeof BaseDialog.Popup>,
-    VariantProps<typeof sheetContentVariants> {}
+    VariantProps<typeof sheetContentVariants> {
+  // Exposes the scrim so consumers (e.g. the mention detail sheet) can fade it
+  // out while a mobile swipe-to-close gesture reveals the page underneath.
+  overlayRef?: Ref<HTMLDivElement>;
+}
 
 function SheetContent({
   className,
   children,
   width,
   ref,
+  overlayRef,
   ...props
 }: SheetContentProps) {
   usePreserveHigherLayerAccess("overlay");
 
   return (
     <BaseDialog.Portal container={getLayerRoot("overlay")}>
-      <SheetOverlay />
+      <SheetOverlay ref={overlayRef} />
       <BaseDialog.Popup
         ref={ref}
         className={cn(

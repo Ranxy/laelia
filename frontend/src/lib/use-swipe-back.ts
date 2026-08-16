@@ -21,6 +21,19 @@ const TRIGGER_RATIO = 0.25; // release past 25% of the viewport commits
 const MIN_TRIGGER_PX = 80;
 const SNAP_MS = 200; // spring-back animation
 const COMMIT_MS = 250; // slide-out animation before the navigation commits
+
+// Shared with the mention-detail sheet's swipe-to-close gesture so both
+// surfaces feel identical on mobile.
+export {
+  COMMIT_MS as SWIPE_BACK_COMMIT_MS,
+  DIRECTION_LOCK as SWIPE_BACK_DIRECTION_LOCK,
+  EDGE_SIZE as SWIPE_BACK_EDGE_SIZE,
+  MAX_DRAG_RATIO as SWIPE_BACK_MAX_DRAG_RATIO,
+  MIN_TRIGGER_PX as SWIPE_BACK_MIN_TRIGGER_PX,
+  SNAP_MS as SWIPE_BACK_SNAP_MS,
+  TRIGGER_RATIO as SWIPE_BACK_TRIGGER_RATIO,
+};
+
 // Safety timeout: if the data router's navigation doesn't complete within this
 // window, force a reset so the gesture state doesn't get stuck.
 const RESET_TIMEOUT_MS = 1000;
