@@ -27,6 +27,7 @@ import {
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_PROFILE,
   SETTINGS_ROUTE_ROLES,
+  SETTINGS_ROUTE_SMTP,
   SETTINGS_ROUTE_STORAGE,
   SETTINGS_ROUTE_USERS,
 } from "./handles";
@@ -96,6 +97,10 @@ export const ROUTE_INFO: Record<string, RouteInfo> = {
   },
   [SETTINGS_ROUTE_GENERAL]: {
     titleKey: "sidebar.settings-general",
+    backTo: "/settings",
+  },
+  [SETTINGS_ROUTE_SMTP]: {
+    titleKey: "sidebar.settings-smtp",
     backTo: "/settings",
   },
   [SETTINGS_ROUTE_NOTIFICATIONS]: {

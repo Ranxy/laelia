@@ -34,6 +34,7 @@ import {
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_PROFILE,
   SETTINGS_ROUTE_ROLES,
+  SETTINGS_ROUTE_SMTP,
   SETTINGS_ROUTE_STORAGE,
   SETTINGS_ROUTE_USERS,
 } from "@/router/handles";
@@ -164,6 +165,12 @@ function useSidebarItems(): SidebarItem[] {
           {
             title: t("sidebar.settings-general"),
             name: SETTINGS_ROUTE_GENERAL,
+            type: "route",
+            hide: !canViewStorage,
+          },
+          {
+            title: t("sidebar.settings-smtp"),
+            name: SETTINGS_ROUTE_SMTP,
             type: "route",
             hide: !canViewStorage,
           },
