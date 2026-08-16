@@ -1,13 +1,8 @@
-import {
-  Bot,
-  ExternalLink,
-  Loader2,
-  MessageSquare,
-  User as UserIcon,
-} from "lucide-react";
+import { ExternalLink, Loader2, MessageSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +14,11 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { agentServiceClient, userServiceClient } from "@/connect";
+import {
+  avatarNameForAgentId,
+  avatarNameForUserId,
+  useAvatar,
+} from "@/lib/avatar-cache";
 import { agentResourceName } from "@/lib/command-status";
 import { toastManager } from "@/lib/toast";
 import { useSwipeToCloseSheet } from "@/lib/use-swipe-to-close-sheet";
@@ -42,11 +42,11 @@ function DetailRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-baseline gap-3 py-1.5">
-      <span className="text-xs font-semibold uppercase tracking-wide text-control w-24 shrink-0">
+    <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-start gap-x-4 py-2">
+      <dt className="pt-0.5 text-xs font-semibold uppercase tracking-wide text-control">
         {label}
-      </span>
-      <span className="text-sm text-main">{children}</span>
+      </dt>
+      <dd className="min-w-0 break-words text-sm text-main">{children}</dd>
     </div>
   );
 }
@@ -101,6 +101,17 @@ export function MentionDetailSheet({
   const handle =
     type === "agent" ? (agent?.handle ?? name) : (user?.handle ?? name);
 
+  // Avatar: use the entity's uploaded avatar resource name when available,
+  // otherwise synthesize the canonical avatar resource name from its id so
+  // useAvatar probes the cache and falls back to the pixel identicon.
+  const avatarName =
+    type === "agent"
+      ? agent?.avatar ||
+        (agent?.name ? `${agent.name}/avatar` : avatarNameForAgentId(id))
+      : user?.avatar ||
+        (user?.name ? `${user.name}/avatar` : avatarNameForUserId(id));
+  const avatarSrc = useAvatar(avatarName);
+
   // Opens (or reuses) the user↔agent DM and jumps to the chat surface, the
   // same flow as the agent detail page's "Chat" action.
   async function handleSendMessage() {
@@ -143,13 +154,7 @@ export function MentionDetailSheet({
           <div className="flex h-full flex-col gap-5">
             {/* Header card */}
             <div className="flex items-center gap-3 rounded-xs border border-control-border bg-control-bg/50 p-3">
-              <div className="flex size-9 items-center justify-center rounded-full bg-accent/10 text-accent">
-                {type === "agent" ? (
-                  <Bot className="size-4.5" />
-                ) : (
-                  <UserIcon className="size-4.5" />
-                )}
-              </div>
+              <Avatar seed={id || handle} src={avatarSrc} />
               <div className="flex flex-col gap-0.5 min-w-0">
                 <span className="text-sm font-medium text-main truncate">
                   {displayName}
@@ -165,7 +170,7 @@ export function MentionDetailSheet({
               </div>
             ) : (
               <div className="rounded-xs border border-control-border bg-background p-3">
-                <div className="flex flex-col divide-y divide-control-border/50">
+                <dl className="divide-y divide-control-border/50">
                   <DetailRow label="Name">{displayName}</DetailRow>
                   <DetailRow label="Handle">@{handle}</DetailRow>
                   <DetailRow label="Type">{entityLabel}</DetailRow>
@@ -177,6 +182,9 @@ export function MentionDetailSheet({
                           state={agent.status?.state}
                           enabled={agent.enabled}
                         />
+                      </DetailRow>
+                      <DetailRow label="Owner">
+                        {agent.ownerName || agent.owner || "-"}
                       </DetailRow>
                       {agent.info?.hostname && (
                         <DetailRow label="Hostname">
@@ -226,7 +234,7 @@ export function MentionDetailSheet({
                       Failed to load details
                     </div>
                   )}
-                </div>
+                </dl>
               </div>
             )}
 
