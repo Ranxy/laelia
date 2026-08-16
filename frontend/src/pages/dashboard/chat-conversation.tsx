@@ -159,6 +159,7 @@ const MessageList = memo(function MessageList({
               streamingEvents={rowProps.streamingEvents}
               onViewDetails={onViewDetails}
               onMentionClick={onMentionClick}
+              onSenderClick={onMentionClick}
               mentionLabel={mentionLabel}
               MentionBadge={MentionBadge}
               markdownCustomId="channel-chat"

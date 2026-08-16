@@ -238,6 +238,78 @@ describe("MessageRow reaction bar", () => {
   });
 });
 
+describe("MessageRow sender click", () => {
+  function renderRow(
+    msg: ChatMessageUI,
+    onSenderClick: (type: string, id: string, name: string) => void,
+    currentPrincipalId?: string
+  ) {
+    act(() => {
+      root!.render(
+        <MessageRow
+          msg={msg}
+          showAvatar
+          agentTitle={msg.role === "assistant" ? "Agent One" : ""}
+          streamingContent=""
+          streamingEvents={[]}
+          onViewDetails={() => {}}
+          onSenderClick={onSenderClick}
+          currentPrincipalId={currentPrincipalId}
+          markdownCustomId="chat"
+          debugMode={false}
+        />
+      );
+    });
+  }
+
+  it("opens the user detail sheet when the sender name is clicked", () => {
+    const onSenderClick = vi.fn();
+    renderRow(
+      baseMsg({
+        role: "user",
+        content: "hi",
+        principalId: "alice-user-1",
+        senderName: "Alice Lee",
+      }),
+      onSenderClick,
+      "me"
+    );
+    const name = Array.from(container?.querySelectorAll("button") ?? []).find(
+      (b) => b.textContent === "Alice Lee"
+    );
+    expect(name).toBeTruthy();
+    act(() => {
+      name!.click();
+    });
+    expect(onSenderClick).toHaveBeenCalledWith(
+      "user",
+      "alice-user-1",
+      "Alice Lee"
+    );
+  });
+
+  it("opens the agent detail sheet when the avatar is clicked", () => {
+    const onSenderClick = vi.fn();
+    renderRow(
+      baseMsg({
+        role: "assistant",
+        content: "done",
+        agentId: "agent-1",
+        senderName: "Agent One",
+      }),
+      onSenderClick
+    );
+    const avatar = Array.from(container?.querySelectorAll("button") ?? []).find(
+      (b) => b.getAttribute("aria-label") === "Agent One"
+    );
+    expect(avatar).toBeTruthy();
+    act(() => {
+      avatar!.click();
+    });
+    expect(onSenderClick).toHaveBeenCalledWith("agent", "agent-1", "Agent One");
+  });
+});
+
 describe("MessageRow context menu", () => {
   function renderRow(props: Partial<Parameters<typeof MessageRow>[0]>) {
     act(() => {

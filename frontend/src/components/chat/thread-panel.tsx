@@ -13,6 +13,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { MentionBadge } from "@/components/chat/mention-badge";
+import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
 import { MentionPopup } from "@/components/chat/mention-popup";
 import {
   EMPTY_EVENTS,
@@ -68,6 +69,7 @@ const ThreadReplies = memo(function ThreadReplies({
   debugMode,
   currentPrincipalId,
   mentionLabel,
+  onSenderClick,
 }: {
   replies: ChatMessageUI[];
   loading: boolean;
@@ -83,6 +85,7 @@ const ThreadReplies = memo(function ThreadReplies({
   debugMode: boolean;
   currentPrincipalId?: string;
   mentionLabel?: (handle: string) => string | undefined;
+  onSenderClick?: (type: "user" | "agent", id: string, name: string) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -114,6 +117,7 @@ const ThreadReplies = memo(function ThreadReplies({
               streamingContent={rowProps.streamingContent}
               streamingEvents={rowProps.streamingEvents}
               onViewDetails={onViewDetails}
+              onSenderClick={onSenderClick}
               mentionLabel={mentionLabel}
               MentionBadge={MentionBadge}
               markdownCustomId="thread-chat"
@@ -237,6 +241,11 @@ export function ThreadPanel({
   const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
   const [mentionMap, setMentionMap] = useState<MentionTarget[]>([]);
   const [cursorPos, setCursorPos] = useState(0);
+  const [detailMention, setDetailMention] = useState<{
+    type: "user" | "agent";
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Keyed by both the agent's resource name and its title so sender-title
   // lookup is O(1) instead of a linear scan per message (a thread with many
@@ -410,6 +419,13 @@ export function ThreadPanel({
     [navigate]
   );
 
+  const handleSenderClick = useCallback(
+    (type: "user" | "agent", id: string, name: string) => {
+      setDetailMention({ type, id, name });
+    },
+    []
+  );
+
   if (loading && !rootMsg) {
     return (
       <aside
@@ -486,6 +502,7 @@ export function ThreadPanel({
                 streamingContent=""
                 streamingEvents={rootMsg.events ?? EMPTY_EVENTS}
                 onViewDetails={handleViewDetails}
+                onSenderClick={handleSenderClick}
                 mentionLabel={mentionLabel}
                 MentionBadge={MentionBadge}
                 markdownCustomId="thread-chat"
@@ -513,6 +530,7 @@ export function ThreadPanel({
             debugMode={currentUser?.debugMode ?? false}
             currentPrincipalId={currentUser?.handle}
             mentionLabel={mentionLabel}
+            onSenderClick={handleSenderClick}
           />
         </div>
       </div>
@@ -731,6 +749,14 @@ export function ThreadPanel({
           </>
         )}
       </div>
+
+      <MentionDetailSheet
+        open={detailMention !== null}
+        type={detailMention?.type ?? "user"}
+        id={detailMention?.id ?? ""}
+        name={detailMention?.name ?? ""}
+        onClose={() => setDetailMention(null)}
+      />
     </aside>
   );
 }

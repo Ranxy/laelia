@@ -138,6 +138,9 @@ export interface MessageRowProps {
   // Optional mention-aware rendering (channel chat). When provided, the row
   // renders @mentions as badges and lets the caller react to clicks.
   onMentionClick?: (type: string, id: string, name: string) => void;
+  // When provided, clicking a message sender's avatar or display name opens
+  // the same user/agent detail sheet as a mention click.
+  onSenderClick?: (type: "user" | "agent", id: string, name: string) => void;
   // Maps a mention handle to its display label (display name, or
   // "name(handle)" when the channel has same-named members). Purely cosmetic:
   // matching and click dispatch keep using the handle. Falls back to the
@@ -216,6 +219,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     streamingEvents,
     onViewDetails,
     onMentionClick,
+    onSenderClick,
     mentionLabel,
     MentionBadge,
     markdownCustomId,
@@ -256,6 +260,41 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
       ? avatarNameForAgentId(msg.agentId)
       : undefined;
   const avatarSrc = useAvatar(avatarName);
+
+  // The sender identity used when clicking the avatar or name to open the
+  // Agent/User detail sheet. Only enabled when we can resolve a stable id.
+  const senderClickTarget = (() => {
+    if (isUser) {
+      const id = msg.principalId || currentPrincipalId || "";
+      if (!id) return null;
+      return {
+        type: "user" as const,
+        id,
+        name: msg.senderName || msg.principalId || currentPrincipalId || "",
+      };
+    }
+    const id = msg.agentId || "";
+    if (!id) return null;
+    return {
+      type: "agent" as const,
+      id,
+      name: agentTitle || msg.senderName || "",
+    };
+  })();
+  const handleSenderClick =
+    senderClickTarget && onSenderClick
+      ? () =>
+          onSenderClick(
+            senderClickTarget.type,
+            senderClickTarget.id,
+            senderClickTarget.name
+          )
+      : undefined;
+  const senderName = isUser
+    ? isOwnUser
+      ? t("chat.you")
+      : msg.senderName || t("chat.you")
+    : agentTitle || msg.senderName || t("chat.agent");
 
   const isStreaming = msg.streaming;
   const displayContent = isStreaming ? streamingContent : msg.content;
@@ -421,11 +460,26 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
       {/* Avatar */}
       <div className="flex shrink-0 flex-col items-center pt-0.5">
         {showAvatar ? (
-          <Avatar
-            seed={avatarSeed}
-            src={avatarSrc}
-            accent={isUser ? isOwnUser : false}
-          />
+          handleSenderClick ? (
+            <button
+              type="button"
+              onClick={handleSenderClick}
+              className="cursor-pointer rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              aria-label={senderName}
+            >
+              <Avatar
+                seed={avatarSeed}
+                src={avatarSrc}
+                accent={isUser ? isOwnUser : false}
+              />
+            </button>
+          ) : (
+            <Avatar
+              seed={avatarSeed}
+              src={avatarSrc}
+              accent={isUser ? isOwnUser : false}
+            />
+          )
         ) : (
           <div className="size-8 shrink-0" />
         )}
@@ -441,13 +495,19 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
         {/* Header */}
         {showAvatar && (
           <div className="flex items-center gap-2 px-0.5">
-            <span className="text-xs font-medium text-control">
-              {isUser
-                ? isOwnUser
-                  ? t("chat.you")
-                  : msg.senderName || t("chat.you")
-                : agentTitle || msg.senderName || t("chat.agent")}
-            </span>
+            {handleSenderClick ? (
+              <button
+                type="button"
+                onClick={handleSenderClick}
+                className="text-xs font-medium text-control transition-colors hover:text-accent cursor-pointer"
+              >
+                {senderName}
+              </button>
+            ) : (
+              <span className="text-xs font-medium text-control">
+                {senderName}
+              </span>
+            )}
             <span className="text-xs text-control-placeholder">
               {formatTime(msg.timestamp, i18n.language)}
             </span>
