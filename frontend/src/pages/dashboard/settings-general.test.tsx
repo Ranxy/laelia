@@ -43,6 +43,8 @@ vi.mock("@/lib/toast", () => ({ toastManager: toastMock }));
 const EMAIL_VERIFICATION_LABEL = "settings.general.require-email-verification";
 const EMAIL_VERIFICATION_PATH =
   "value.workspace_profile.require_email_verification";
+const EXTERNAL_URL_LABEL = "settings.general.external-url";
+const EXTERNAL_URL_PATH = "value.workspace_profile.external_url";
 
 type ProfileOverrides = Omit<
   Partial<WorkspaceProfileSetting>,
@@ -81,6 +83,14 @@ function rowSwitch(labelKey: string) {
     ".flex.items-center.justify-between"
   ) as HTMLElement;
   return within(row).getByRole("switch");
+}
+
+// card finds the settings card containing the labelled field.
+function card(labelKey: string) {
+  const label = screen.getByLabelText(labelKey);
+  return label.closest(
+    ".rounded-lg.border.border-control-border.bg-background.p-5.shadow-xs"
+  ) as HTMLElement;
 }
 
 beforeEach(() => {
@@ -300,7 +310,11 @@ describe("settings-general", () => {
     fireEvent.change(textarea, {
       target: { value: "Example.com\n@foo.com\n\n" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "common.save" }));
+    fireEvent.click(
+      within(card("settings.general.domains")).getByRole("button", {
+        name: "common.save",
+      })
+    );
 
     await waitFor(() => expect(mock.updateSetting).toHaveBeenCalledTimes(1));
     const req = mock.updateSetting.mock.calls[0][0] as UpdateSettingRequest;
@@ -330,6 +344,63 @@ describe("settings-general", () => {
       {},
       { timeout: 3000 }
     );
-    expect(screen.getByRole("button", { name: "common.save" })).toBeDisabled();
+    expect(
+      within(card("settings.general.domains")).getByRole("button", {
+        name: "common.save",
+      })
+    ).toBeDisabled();
+  });
+
+  it("renders the external URL from the profile", async () => {
+    mock.getSetting.mockResolvedValue(settingResponse(profile()));
+
+    renderPage();
+
+    const input = await screen.findByLabelText(EXTERNAL_URL_LABEL);
+    expect(input).toHaveValue("https://example.com");
+  });
+
+  it("sends a field-level update for only the external-url path when saved", async () => {
+    mock.getSetting.mockResolvedValue(settingResponse(profile()));
+    mock.updateSetting.mockResolvedValue(
+      settingResponse(profile({ externalUrl: "https://new.example.com" }))
+    );
+
+    renderPage();
+    const input = await screen.findByLabelText(EXTERNAL_URL_LABEL);
+    fireEvent.change(input, {
+      target: { value: "  https://new.example.com  " },
+    });
+    fireEvent.click(
+      within(card(EXTERNAL_URL_LABEL)).getByRole("button", {
+        name: "common.save",
+      })
+    );
+
+    await waitFor(() => expect(mock.updateSetting).toHaveBeenCalledTimes(1));
+    const req = mock.updateSetting.mock.calls[0][0] as UpdateSettingRequest;
+    expect(req.updateMask?.paths).toEqual([EXTERNAL_URL_PATH]);
+    const sent = req.setting?.value?.value?.value as
+      | WorkspaceProfileSetting
+      | undefined;
+    expect(sent?.externalUrl).toBe("https://new.example.com");
+    expect(toastMock.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "success",
+        title: "settings.general.saved",
+      })
+    );
+  });
+
+  it("keeps the external URL save button disabled until the value changes", async () => {
+    mock.getSetting.mockResolvedValue(settingResponse(profile()));
+
+    renderPage();
+    await screen.findByLabelText(EXTERNAL_URL_LABEL);
+    expect(
+      within(card(EXTERNAL_URL_LABEL)).getByRole("button", {
+        name: "common.save",
+      })
+    ).toBeDisabled();
   });
 });

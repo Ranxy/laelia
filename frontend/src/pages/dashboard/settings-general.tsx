@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PageLoading, SettingsPage } from "@/components/settings-page";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toastManager } from "@/lib/toast";
@@ -10,6 +11,7 @@ import { useAppStore } from "@/stores";
 import type { WorkspaceProfileSetting } from "@/types/proto-es/store/setting_pb";
 
 interface GeneralForm {
+  externalUrl: string;
   allowSignup: boolean;
   requireEmailVerification: boolean;
   enforceIdentityDomain: boolean;
@@ -17,6 +19,7 @@ interface GeneralForm {
 }
 
 const EMPTY: GeneralForm = {
+  externalUrl: "",
   allowSignup: true,
   requireEmailVerification: true,
   enforceIdentityDomain: false,
@@ -47,6 +50,7 @@ export function SettingsGeneralPage() {
   const [savingDomain, setSavingDomain] = useState(false);
   const [savingEmailVerification, setSavingEmailVerification] = useState(false);
   const [savingDomains, setSavingDomains] = useState(false);
+  const [savingExternalUrl, setSavingExternalUrl] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +59,7 @@ export function SettingsGeneralPage() {
         const profile = await useAppStore.getState().fetchWorkspaceProfile();
         if (cancelled) return;
         const next = {
+          externalUrl: profile?.externalUrl ?? "",
           allowSignup: !(profile?.disallowSignup ?? false),
           requireEmailVerification: profile?.requireEmailVerification ?? true,
           enforceIdentityDomain: profile?.enforceIdentityDomain ?? false,
@@ -79,6 +84,7 @@ export function SettingsGeneralPage() {
 
   function applyProfile(profile: WorkspaceProfileSetting | undefined) {
     const next = {
+      externalUrl: profile?.externalUrl ?? "",
       allowSignup: !(profile?.disallowSignup ?? false),
       requireEmailVerification: profile?.requireEmailVerification ?? true,
       enforceIdentityDomain: profile?.enforceIdentityDomain ?? false,
@@ -160,6 +166,27 @@ export function SettingsGeneralPage() {
     }
   }
 
+  async function handleSaveExternalUrl() {
+    setSavingExternalUrl(true);
+    try {
+      await saveField({ externalUrl: form.externalUrl.trim() }, [
+        "value.workspace_profile.external_url",
+      ]);
+      toastManager.add({
+        type: "success",
+        title: t("settings.general.saved"),
+      });
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.general.save-failed"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setSavingExternalUrl(false);
+    }
+  }
+
   async function handleSaveDomains() {
     setSavingDomains(true);
     try {
@@ -181,6 +208,7 @@ export function SettingsGeneralPage() {
     }
   }
 
+  const externalUrlDirty = form.externalUrl.trim() !== saved.externalUrl.trim();
   const domainsDirty =
     parseDomains(form.domains).join("\n") !==
     parseDomains(saved.domains).join("\n");
@@ -197,6 +225,40 @@ export function SettingsGeneralPage() {
         <PageLoading />
       ) : (
         <div className="mx-auto max-w-2xl space-y-4">
+          <div className="rounded-lg border border-control-border bg-background p-5 shadow-xs">
+            <label
+              htmlFor="general-external-url"
+              className="block text-sm font-medium text-main"
+            >
+              {t("settings.general.external-url")}
+            </label>
+            <Input
+              id="general-external-url"
+              value={form.externalUrl}
+              placeholder={t("settings.general.external-url-placeholder")}
+              onChange={(e) => set("externalUrl", e.target.value)}
+              spellCheck={false}
+              className="mt-2"
+            />
+            <div className="mt-1.5 flex items-center justify-between gap-3">
+              <p className="text-xs text-control-light">
+                {t("settings.general.external-url-hint")}
+              </p>
+              <Button
+                size="sm"
+                onClick={handleSaveExternalUrl}
+                disabled={savingExternalUrl || !externalUrlDirty}
+              >
+                {savingExternalUrl ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Save className="size-4" />
+                )}
+                {t("common.save")}
+              </Button>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between rounded-lg border border-control-border bg-background px-5 py-4 shadow-xs">
             <div>
               <div className="text-sm font-medium text-main">
