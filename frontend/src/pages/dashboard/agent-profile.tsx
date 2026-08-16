@@ -296,6 +296,14 @@ export function AgentProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Load the caller's accessible global API providers once per page view. The
+  // store slice caches them for the builtin-pi runtime's managed provider and
+  // entry pickers; without this the agent detail page would show the raw
+  // "apiProviders/{id}" resource name and an empty provider dropdown.
+  useEffect(() => {
+    void useAppStore.getState().fetchApiProviders(undefined, { silent: true });
+  }, []);
+
   // Load the owning machine's available providers whenever the agent's machine
   // binding is known. Providers are machine-scoped (the machine probes its host);
   // the agent profile reads them from the machine rather than the agent. The

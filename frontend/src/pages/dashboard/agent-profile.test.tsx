@@ -19,6 +19,7 @@ const mock = vi.hoisted(() => ({
   getMachine: vi.fn(),
   fetchAgents: vi.fn(),
   fetchUsers: vi.fn(),
+  fetchApiProviders: vi.fn(),
   updateAgent: vi.fn(),
   updateAgentACPConfig: vi.fn(),
   listPiModels: vi.fn(),
@@ -167,6 +168,7 @@ function seedStore(overrides?: {
     getMachine: mock.getMachine,
     fetchAgents: mock.fetchAgents,
     fetchUsers: mock.fetchUsers,
+    fetchApiProviders: mock.fetchApiProviders,
     updateAgent: mock.updateAgent,
     updateAgentACPConfig: mock.updateAgentACPConfig,
     listPiModels: mock.listPiModels,
@@ -209,6 +211,7 @@ beforeEach(() => {
   mock.getMachine.mockReset();
   mock.fetchAgents.mockReset();
   mock.fetchUsers.mockReset();
+  mock.fetchApiProviders.mockReset();
   mock.updateAgent.mockReset();
   mock.updateAgentACPConfig.mockReset();
   mock.listPiModels.mockReset();
@@ -227,6 +230,7 @@ beforeEach(() => {
   mock.getMachine.mockResolvedValue(machine());
   mock.fetchAgents.mockResolvedValue(undefined);
   mock.fetchUsers.mockResolvedValue(undefined);
+  mock.fetchApiProviders.mockResolvedValue(undefined);
   mock.updateAgent.mockResolvedValue(undefined);
   mock.updateAgentACPConfig.mockResolvedValue(undefined);
   mock.listPiModels.mockResolvedValue([
@@ -574,6 +578,42 @@ describe("AgentProfilePage", () => {
         })
       );
     });
+  });
+
+  it("shows the managed global provider title on a builtin-pi agent", async () => {
+    seedStore();
+    mock.fetchApiProviders.mockImplementation(async () => {
+      useAppStore.setState({
+        apiProviders: [
+          {
+            name: "apiProviders/p1",
+            title: "DeepSeek",
+            entries: [
+              {
+                name: "apiProviders/p1/entries/e1",
+                model: "deepseek-chat",
+              },
+            ],
+          },
+        ],
+      } as never);
+    });
+    mock.getAgent.mockResolvedValue(
+      agent({
+        info: {
+          ...agent().info,
+          acpConfig: acpConfig({
+            provider: "builtin-pi",
+            globalProvider: "apiProviders/p1",
+            globalProviderEntry: "apiProviders/p1/entries/e1",
+          }),
+        } as unknown as AgentInfo,
+      })
+    );
+    renderPage();
+
+    expect(await screen.findByText("DeepSeek")).toBeInTheDocument();
+    expect(mock.fetchApiProviders).toHaveBeenCalled();
   });
 
   it("shows the save-error status when a config save fails", async () => {
