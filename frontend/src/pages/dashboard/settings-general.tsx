@@ -21,7 +21,7 @@ interface GeneralForm {
 const EMPTY: GeneralForm = {
   externalUrl: "",
   allowSignup: true,
-  requireEmailVerification: true,
+  requireEmailVerification: false,
   enforceIdentityDomain: false,
   domains: "",
 };
@@ -61,7 +61,7 @@ export function SettingsGeneralPage() {
         const next = {
           externalUrl: profile?.externalUrl ?? "",
           allowSignup: !(profile?.disallowSignup ?? false),
-          requireEmailVerification: profile?.requireEmailVerification ?? true,
+          requireEmailVerification: profile?.requireEmailVerification ?? false,
           enforceIdentityDomain: profile?.enforceIdentityDomain ?? false,
           domains: (profile?.domains ?? []).join("\n"),
         };
@@ -86,7 +86,7 @@ export function SettingsGeneralPage() {
     const next = {
       externalUrl: profile?.externalUrl ?? "",
       allowSignup: !(profile?.disallowSignup ?? false),
-      requireEmailVerification: profile?.requireEmailVerification ?? true,
+      requireEmailVerification: profile?.requireEmailVerification ?? false,
       enforceIdentityDomain: profile?.enforceIdentityDomain ?? false,
       domains: (profile?.domains ?? []).join("\n"),
     };

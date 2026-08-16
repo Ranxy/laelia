@@ -237,7 +237,7 @@ type WorkspaceProfileSetting struct {
 	// link sent to the inbox before the account can sign in. Only takes effect
 	// when disallow_signup is false (self-service signup enabled); admin-created
 	// users and the first workspace user are always verified. Nil means
-	// "enabled" (the default).
+	// "disabled" (the default).
 	RequireEmailVerification *bool `protobuf:"varint,10,opt,name=require_email_verification,json=requireEmailVerification,proto3,oneof" json:"require_email_verification,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache

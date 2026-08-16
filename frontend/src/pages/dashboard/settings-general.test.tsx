@@ -55,7 +55,7 @@ function profile(overrides?: ProfileOverrides): WorkspaceProfileSetting {
   return create(WorkspaceProfileSettingSchema, {
     externalUrl: "https://example.com",
     disallowSignup: false,
-    requireEmailVerification: true,
+    requireEmailVerification: false,
     enforceIdentityDomain: false,
     domains: [],
     ...overrides,
@@ -117,11 +117,13 @@ describe("settings-general", () => {
       rowSwitch("settings.general.allow-signup")
     );
     expect(signup).toBeChecked();
-    expect(rowSwitch(EMAIL_VERIFICATION_LABEL)).toBeChecked();
+    expect(rowSwitch(EMAIL_VERIFICATION_LABEL)).not.toBeChecked();
   });
 
   it("sends a field-level update for only the email-verification path when toggled off", async () => {
-    mock.getSetting.mockResolvedValue(settingResponse(profile()));
+    mock.getSetting.mockResolvedValue(
+      settingResponse(profile({ requireEmailVerification: true }))
+    );
     mock.updateSetting.mockResolvedValue(
       settingResponse(profile({ requireEmailVerification: false }))
     );
@@ -142,7 +144,9 @@ describe("settings-general", () => {
   });
 
   it("keeps the switch off after a successful save (no bounce-back)", async () => {
-    mock.getSetting.mockResolvedValue(settingResponse(profile()));
+    mock.getSetting.mockResolvedValue(
+      settingResponse(profile({ requireEmailVerification: true }))
+    );
     mock.updateSetting.mockResolvedValue(
       settingResponse(profile({ requireEmailVerification: false }))
     );

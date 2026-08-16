@@ -427,9 +427,9 @@ func listSettingV2Impl(ctx context.Context, txn *sql.Tx, find *FindSettingMessag
 // RequireEmailVerification reports whether self-service signup must verify the
 // email address by clicking a link before the account can sign in. It only
 // takes effect when signup itself is enabled (disallow_signup false); a nil
-// (unset) value means enabled, which is the default.
+// (unset) value means disabled, which is the default for new installations.
 func RequireEmailVerification(setting *models.WorkspaceProfileSetting) bool {
-	return setting == nil || setting.RequireEmailVerification == nil || *setting.RequireEmailVerification
+	return setting != nil && setting.RequireEmailVerification != nil && *setting.RequireEmailVerification
 }
 
 // GetSMTPSetting returns the workspace SMTP payload. An empty Host means the

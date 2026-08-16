@@ -53,7 +53,7 @@ function workspaceInfo(overrides?: Partial<GetWorkspaceInfoResponse>) {
     disallowSignup: false,
     enforceIdentityDomain: false,
     domains: [],
-    requireEmailVerification: true,
+    requireEmailVerification: false,
     ...overrides,
   });
 }

@@ -88,7 +88,7 @@ func TestMergeWorkspaceProfilePaths(t *testing.T) {
 	require.NotNil(t, dst.RequireEmailVerification)
 	assert.True(t, *dst.RequireEmailVerification)
 
-	// And cleared back to nil (the "enabled" default) by masking it with a nil value.
+	// And cleared back to nil (the "disabled" default) by masking it with a nil value.
 	src.RequireEmailVerification = nil
 	require.NoError(t, mergeWorkspaceProfilePaths([]string{"value.workspace_profile.require_email_verification"}, src, dst))
 	assert.Nil(t, dst.RequireEmailVerification)

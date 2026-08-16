@@ -53,10 +53,10 @@ func TestSettingPayloadDefaults(t *testing.T) {
 }
 
 // TestRequireEmailVerification guards the nil-default semantics: an unset
-// field (nil) means verification is enabled by default.
+// field (nil) means verification is disabled by default.
 func TestRequireEmailVerification(t *testing.T) {
-	assert.True(t, RequireEmailVerification(nil))
-	assert.True(t, RequireEmailVerification(&models.WorkspaceProfileSetting{}))
+	assert.False(t, RequireEmailVerification(nil))
+	assert.False(t, RequireEmailVerification(&models.WorkspaceProfileSetting{}))
 	assert.True(t, RequireEmailVerification(&models.WorkspaceProfileSetting{RequireEmailVerification: boolPtr(true)}))
 	assert.False(t, RequireEmailVerification(&models.WorkspaceProfileSetting{RequireEmailVerification: boolPtr(false)}))
 }

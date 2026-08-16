@@ -33,7 +33,7 @@ const PROFILE = create(WorkspaceProfileSettingSchema, {
   externalUrl: "https://example.com",
   disallowSignup: true,
   domains: ["example.com"],
-  requireEmailVerification: true,
+  requireEmailVerification: false,
 });
 
 beforeEach(() => {

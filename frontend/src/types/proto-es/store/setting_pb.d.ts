@@ -83,7 +83,7 @@ export declare type WorkspaceProfileSetting = Message<"laelia.store.WorkspacePro
    * link sent to the inbox before the account can sign in. Only takes effect
    * when disallow_signup is false (self-service signup enabled); admin-created
    * users and the first workspace user are always verified. Nil means
-   * "enabled" (the default).
+   * "disabled" (the default).
    *
    * @generated from field: optional bool require_email_verification = 10;
    */
