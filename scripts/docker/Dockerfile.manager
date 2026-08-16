@@ -22,7 +22,8 @@ WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN apk add --no-cache curl bash gzip
+# unzip is required by build-pi.sh for the windows pi archive.
+RUN apk add --no-cache curl bash gzip unzip
 RUN ./scripts/build-embedded-machines.sh /out/embedded_machine
 
 FROM golang:1.26.5-alpine3.23 AS manager-build
@@ -35,6 +36,9 @@ WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+# Mirror scripts/build_laelia.sh: start from clean embed directories so stale
+# local build artifacts can never leak into the image.
+RUN rm -rf ./backend/manager/server/dist ./backend/manager/server/embedded_machine
 COPY --from=frontend /frontend-build/dist ./backend/manager/server/dist
 COPY --from=machine-build /out/embedded_machine ./backend/manager/server/embedded_machine
 RUN CGO_ENABLED=0 go build -tags "embed_frontend embed_machine" -ldflags "-w -s" -p=16 \

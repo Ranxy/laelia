@@ -10,10 +10,9 @@
 # download and the pi GitHub download through the proxy. It is passed as a
 # custom build arg only to the Go build stages, so the final image never
 # contains proxy settings and the apt steps of the runtime stage stay
-# proxy-free. PI_PROXY, when set, overrides the proxy for the pi download
-# only. APT_MIRROR swaps the machine image's Debian apt source for a faster
-# local mirror. CODEX_NPM_SPEC pins the codex CLI version installed in the
-# machine image (default @openai/codex@0.146.0).
+# proxy-free. APT_MIRROR swaps the machine image's Debian apt source for a
+# faster local mirror. CODEX_NPM_SPEC pins the codex CLI version installed in
+# the machine image (default @openai/codex@0.146.0).
 #
 # Note: do NOT export global HTTP_PROXY/HTTPS_PROXY to proxy docker builds;
 # BuildKit auto-injects those standard args into every build stage, including
@@ -24,9 +23,6 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 . ./scripts/build_docker_common.sh
 collect_common_build_args
 
-if [[ -n "${PI_PROXY:-}" ]]; then
-	BUILD_ARGS+=(--build-arg "PI_PROXY=${PI_PROXY}")
-fi
 if [[ -n "${APT_MIRROR:-}" ]]; then
 	BUILD_ARGS+=(--build-arg "APT_MIRROR=${APT_MIRROR}")
 fi

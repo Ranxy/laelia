@@ -9,3 +9,5 @@ build
 temp
 docs/review
 backend/agent/pi/embedded/dist
+backend/agent/pi/embedded/dist-*
+backend/manager/server/embedded_machine

@@ -140,9 +140,9 @@ Notes:
   it with `LAELIA_CODEX_HOME` (it exports CODEX_HOME for the daemon). Without
   it codex falls back to `~/.codex` under the container home.
 - `LAELIA_BUILD_PROXY` is the single build proxy (pi download + docker Go
-  stages). `PI_PROXY` is a legacy alias that overrides just the pi download.
-  Do not use a global `HTTPS_PROXY` for docker builds: BuildKit auto-injects
-  standard proxy args into every stage, including the final runtime images.
+  stages). Do not use a global `HTTPS_PROXY` for docker builds: BuildKit
+  auto-injects standard proxy args into every stage, including the final
+  runtime images.
 
 ### Database
 

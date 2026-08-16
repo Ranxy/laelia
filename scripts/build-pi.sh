@@ -58,9 +58,8 @@ fi
 
 # LAELIA_BUILD_PROXY is the single build proxy, so restricted networks can
 # accelerate GitHub without exporting a global HTTPS_PROXY that would also be
-# picked up by docker builds and other tools. PI_PROXY is a legacy alias and
-# wins when both are set, letting callers override just this download.
-proxy_url="${PI_PROXY:-${LAELIA_BUILD_PROXY:-}}"
+# picked up by docker builds and other tools.
+proxy_url="${LAELIA_BUILD_PROXY:-}"
 curl_opts=(-fsSL)
 if [[ -n "${proxy_url}" ]]; then
   curl_opts+=(--proxy "${proxy_url}")

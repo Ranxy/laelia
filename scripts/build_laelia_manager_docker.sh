@@ -6,8 +6,11 @@
 #   LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_manager_docker.sh
 #
 # LAELIA_BUILD_PROXY is the single build proxy: it routes the Go module
-# download through the proxy. It is passed as a custom build arg only to the Go
-# build stage, so the final image never contains proxy settings.
+# download and the pi GitHub download through the proxy. It is passed as a
+# custom build arg only to the Go build stages, so the final image never
+# contains proxy settings. (APT_MIRROR is not used here: the manager image is
+# Alpine-based and has no apt steps; it belongs to
+# scripts/build_laelia_machine_docker.sh.)
 #
 # Note: do NOT export global HTTP_PROXY/HTTPS_PROXY to proxy docker builds;
 # BuildKit auto-injects those standard args into every build stage, including

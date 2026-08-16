@@ -8,9 +8,6 @@ ARG VERSION=local
 ARG GIT_COMMIT=unknown
 ARG TARGETOS
 ARG TARGETARCH
-# Optional per-step override for the pi download only; when empty,
-# build-pi.sh falls back to LAELIA_BUILD_PROXY.
-ARG PI_PROXY
 ARG LAELIA_BUILD_PROXY
 ENV http_proxy=${LAELIA_BUILD_PROXY} https_proxy=${LAELIA_BUILD_PROXY} no_proxy=localhost,127.0.0.1
 ENV HTTP_PROXY=${LAELIA_BUILD_PROXY} HTTPS_PROXY=${LAELIA_BUILD_PROXY} NO_PROXY=localhost,127.0.0.1
@@ -23,7 +20,6 @@ RUN apk add --no-cache curl bash
 # and writes it to backend/agent/pi/embedded/dist-<goos>-<goarch>, which the
 # release-tagged machine build then embeds.
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
-ENV PI_PROXY=${PI_PROXY}
 RUN ./scripts/build-pi.sh
 RUN CGO_ENABLED=0 go build -tags release -ldflags "-w -s" -p=16 \
 	-o /out/laelia-machine ./backend/agent/bin/agent/main.go

@@ -35,7 +35,6 @@ Build options:
 | --- | --- |
 | `VERSION` | Image tag version (default: `local`) |
 | `LAELIA_BUILD_PROXY` | Build-time proxy for Go module downloads and the pi download |
-| `PI_PROXY` | Override for the pi download only (machine image) |
 | `APT_MIRROR` | Debian mirror used for the machine image's apt packages |
 | `CODEX_NPM_SPEC` | Codex CLI version spec installed in the machine image |
 
