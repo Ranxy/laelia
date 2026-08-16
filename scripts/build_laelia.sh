@@ -18,11 +18,6 @@ cp -r frontend/dist backend/manager/server/dist
 
 scripts/build-embedded-machines.sh "${EMBED_DIR}"
 
-echo "Building current-platform machine ($(go env GOOS)/$(go env GOARCH))..."
-scripts/build-pi.sh
-CGO_ENABLED=0 go build -tags release -ldflags "-w -s" -p=16 \
-	-o "${OUTPUT_DIR}/laelia-machine" ./backend/agent/bin/agent/main.go
-
 echo "Building manager (${VERSION})..."
 CGO_ENABLED=0 go build -tags "embed_frontend embed_machine" -ldflags "-w -s" -p=16 \
 	-o "${OUTPUT_DIR}/laelia" ./backend/manager/bin/server/main.go
@@ -30,5 +25,4 @@ CGO_ENABLED=0 go build -tags "embed_frontend embed_machine" -ldflags "-w -s" -p=
 echo ""
 echo "Build complete:"
 echo "  ${OUTPUT_DIR}/laelia        (manager, frontend + machine binaries embedded)"
-echo "  ${OUTPUT_DIR}/laelia-machine (current-platform machine, pi embedded)"
 echo "  ${EMBED_DIR}/               (per-platform machine binaries + manifest)"
