@@ -1,32 +1,37 @@
-# Deploy with Docker
+> **Language / 语言:** [English](deploy.md) | [中文](deploy_zh.md)
 
-Laelia has two deployable components, both packaged as Docker images:
+# Deploy
 
-- `laelia/manager` — the web UI and manager API. It stores all state in
-  PostgreSQL and embeds the frontend.
-- `laelia/machine` — an agent host. It connects to the manager, runs one or
-  more agents, and embeds the pi runtime.
+Laelia has two deployable components:
 
-The images are built from this repository; no prebuilt registry images are
-published yet.
+- **Manager** — the web UI and manager API. It stores all state in PostgreSQL
+  and embeds the frontend plus the per-platform machine binaries. It can be
+  run as a Docker image (`laelia/manager`) or as a native binary built with
+  `scripts/build_laelia.sh`.
+- **Machine** — an agent host. It connects to the manager, runs one or more
+  agents, and embeds the pi runtime. Machines are installed on hosts with the
+  script shown on the manager's *Create Machine* page; there is no separate
+  machine Docker image.
+
+The manager image is built from this repository; no prebuilt registry images
+are published yet.
 
 ## Prerequisites
 
-- Docker with BuildKit enabled (Docker 20.10+; recent Docker Desktop/Engine
-  enable it by default).
 - PostgreSQL 13+ (14+ recommended), reachable from the manager.
-- Outbound network access from the build machine for Go modules, pnpm, and the
-  pi download, or a build proxy (`LAELIA_BUILD_PROXY`).
+- To build/run the manager as a Docker image: Docker with BuildKit enabled
+  (Docker 20.10+; recent Docker Desktop/Engine enable it by default).
+- To build the manager binary: Go toolchain, pnpm, and outbound access for Go
+  modules, pnpm, and the pi download (or a build proxy `LAELIA_BUILD_PROXY`).
 - Each machine host needs outbound access to the manager and to the hosted LLM
   providers used by its agents.
 
-## 1. Build the images
+## 1. Build the manager
 
-The two images are built independently:
+### 1a. Build the manager Docker image
 
 ```bash
 scripts/build_laelia_manager_docker.sh   # -> laelia/manager:local + laelia/manager:latest
-scripts/build_laelia_machine_docker.sh   # -> laelia/machine:local + laelia/machine:latest
 ```
 
 Build options:
@@ -35,19 +40,33 @@ Build options:
 | --- | --- |
 | `VERSION` | Image tag version (default: `local`) |
 | `LAELIA_BUILD_PROXY` | Build-time proxy for Go module downloads and the pi download |
-| `APT_MIRROR` | Debian mirror used for the machine image's apt packages |
-| `CODEX_NPM_SPEC` | Codex CLI version spec installed in the machine image |
 
 Example:
 
 ```bash
 VERSION=1.2.0 LAELIA_BUILD_PROXY=http://proxy.example.com:8080 scripts/build_laelia_manager_docker.sh
-VERSION=1.2.0 LAELIA_BUILD_PROXY=http://proxy.example.com:8080 scripts/build_laelia_machine_docker.sh
 ```
 
 Do not export a global `HTTPS_PROXY` for `docker build`: BuildKit injects it
 into every stage, including the final runtime images. `LAELIA_BUILD_PROXY` is
 scoped to the build stages that need it.
+
+### 1b. Build the manager binary
+
+To run the manager as a native binary instead of a container, use
+`scripts/build_laelia.sh`. It builds the frontend, cross-compiles and embeds
+the per-platform machine binaries, and produces a single self-contained
+manager binary:
+
+```bash
+scripts/build_laelia.sh                 # -> build/laelia (manager binary)
+LAELIA_BUILD_PROXY=http://proxy.example.com:8080 scripts/build_laelia.sh
+```
+
+The output `build/laelia` is the manager binary with the frontend and machine
+binaries embedded. It serves the same `/machine/install.sh`,
+`/machine/install.ps1`, and `/machine/manifest.json` endpoints as the Docker
+image, so machine hosts can be installed directly from it.
 
 ## 2. Prepare PostgreSQL
 
@@ -92,6 +111,13 @@ docker run -d --name laelia-manager \
   laelia/manager:local
 ```
 
+If you built the native binary instead, run it with the same environment:
+
+```bash
+LAELIA_PG_URL='postgresql://laelia:<password>@<db-host>:5432/laelia' \
+  ./build/laelia --port 8181
+```
+
 The image runs as an unprivileged user and checks `/healthz`. Verify with:
 
 ```bash
@@ -134,48 +160,77 @@ Notes:
 
 Machines authenticate with the manager through an OAuth2-style **device code
 flow** — there are no registration tokens. In the manager UI, go to Machines
-and click *Create Machine*: the page shows the command to run on the host and
-waits for the machine to appear. On the host, run:
+and click *Create Machine*. The page shows two commands for the host:
+
+1. **Install** — installs the `laelia-machine` binary from the manager.
+2. **Setup** — runs `laelia-machine --manager <url> setup` to authenticate and
+   start the machine.
+
+The page waits for the machine to appear after you approve the login.
+
+### Install the machine binary
+
+On the host, run the install command shown on the page. It downloads the
+prebuilt `laelia-machine` binary from the manager, verifies its SHA-256 against
+the manifest, and installs it to `~/.local/bin`:
 
 ```bash
-docker run -d --name laelia-machine \
-  --restart unless-stopped \
-  -e LAELIA_MANAGER_URL='https://laelia.example.com' \
-  -v laelia-machine-data:/home/laelia \
-  laelia/machine:local
+# Linux / macOS
+curl -fsSL https://laelia.example.com/machine/install.sh | sh
+
+# Windows (PowerShell)
+irm https://laelia.example.com/machine/install.ps1 | iex
 ```
 
-The entrypoint runs `laelia-machine setup --no-browser`: it prints an approval
-URL (e.g. `https://laelia.example.com/login/device?user_code=XXXX-XXXX`) to the
-container logs, waits for a logged-in user to open it and approve, then runs
-the machine in the foreground. On later restarts the saved login is validated
-automatically ("already logged in") and the machine starts directly.
+The install script is served by the manager and already contains the manager
+URL, so no environment variables are needed. Optional overrides:
+`LAELIA_MACHINE_INSTALL_DIR` (install directory, default `~/.local/bin`) and
+`LAELIA_MACHINE_FORCE=1` (reinstall even if already present).
 
-Environment variables:
+### Run `laelia-machine setup`
 
-| Variable | Description |
+After installation, run the setup command shown on the page:
+
+```bash
+laelia-machine --manager https://laelia.example.com setup
+```
+
+`setup` starts the device-code flow: it prints an approval URL (e.g.
+`https://laelia.example.com/login/device?user_code=XXXX-XXXX`) and a user code,
+waits for a logged-in user to open it and approve, then runs the machine in the
+foreground. On later restarts the saved login is validated automatically
+("already logged in") and the machine starts directly.
+
+CLI options:
+
+| Option | Description |
 | --- | --- |
-| `LAELIA_MANAGER_URL` | Manager base URL. For `http://` URLs the entrypoint automatically adds `--allow-http`. |
-| `LAELIA_INSECURE` | `true` to skip TLS certificate verification (self-signed setups; development only). |
-| `LAELIA_DEBUG` | `true` for debug logging. |
-| `LAELIA_HOME` | Laelia data root directory (use an absolute path). When set, `machine.json`, `daemon.sock`, agent workspaces, and the materialized pi runtime all live under this directory. Defaults to `~/.laelia`. |
+| `--manager <url>` | Manager base URL (default `https://localhost:8181`). For `http://` URLs add `--allow-http`. |
+| `--insecure` | Skip TLS certificate verification (self-signed setups; development only). |
+| `--allow-http` | Allow plain HTTP connections (development only). |
+| `--debug` | Enable debug logging. |
+| `--force` | Wipe local machine state and register a brand-new machine (setup only). |
+| `--no-browser` | Do not auto-open the approval URL in a browser (setup only). |
+
+The machine data root is controlled by the `LAELIA_HOME` environment variable
+(use an absolute path). When set, `machine.json`, `daemon.sock`, agent
+workspaces, and the materialized pi runtime all live under this directory.
+Defaults to `~/.laelia`.
 
 The machine makes outbound connections only; no port needs to be published.
-Mount a volume at `$LAELIA_HOME` so agent workspaces, the persisted login
-state (`machine.json`), and the materialized pi runtime survive container
-restarts. If you prefer a bind mount, create the directory and
-`chown 1001:1001` it first.
+Keep `$LAELIA_HOME` on a persistent filesystem so agent workspaces, the
+persisted login state (`machine.json`), and the materialized pi runtime survive
+restarts.
 
-If the container is recreated without the volume, the login state is lost:
-the machine re-runs the device flow and registers a brand-new machine (the
-old machine row stays on the manager, offline). To re-authenticate an
-existing machine instead, keep the volume and, if its login was revoked, run
-`laelia-machine setup` on the host again and approve with the machine's owner
-or a workspace admin.
+If the local state is lost, the machine re-runs the device flow and registers
+a brand-new machine (the old machine row stays on the manager, offline). To
+re-authenticate an existing machine instead, keep `$LAELIA_HOME` and, if its
+login was revoked, run `laelia-machine --manager <url> setup` on the host again
+and approve with the machine's owner or a workspace admin.
 
 Machine-manager channels are bidirectional and require HTTP/2. When the manager
 is behind a reverse proxy, the proxy must forward HTTP/2 (see below); otherwise
-point `LAELIA_MANAGER_URL` directly at the manager, for example
+point `--manager` directly at the manager, for example
 `http://laelia-manager:8181` on a shared Docker network.
 
 After the machine shows online, create agents on it from the UI. Configure the
@@ -260,30 +315,37 @@ volume on a directory the unprivileged user can write (for example
 Manager:
 
 1. Back up PostgreSQL.
-2. Build or pull the new image.
+2. Build or pull the new image (or rebuild the binary with
+   `scripts/build_laelia.sh`).
 3. Stop and remove the container, then start it with the same `LAELIA_PG_URL`
    and the new image tag. Pending migrations apply automatically on startup.
+   For a native binary, replace the old `build/laelia` and restart the process.
 
 Machine:
 
-1. Stop and remove the container.
-2. Start it with the new image and the same `/home/laelia` volume. The
-   persisted refresh token lets it reconnect; you only need a new registration
-   token if the volume was lost or the token was rotated/revoked.
+1. Re-run the install command from the manager's *Create Machine* page (or
+   re-run the install script) to update the `laelia-machine` binary.
+2. Run `laelia-machine --manager <url> setup` again. The persisted refresh
+   token lets it reconnect; you only need to re-authenticate if the local
+   state was lost or the token was rotated/revoked.
 
 ## 7. Air-gapped environments
 
-If the target host cannot reach a registry, transfer the images:
+If the target host cannot reach a registry, transfer the manager image:
 
 ```bash
-docker save laelia/manager:local laelia/machine:local | gzip > laelia-images.tar.gz
+docker save laelia/manager:local | gzip > laelia-manager-image.tar.gz
 ```
 
 Copy the archive to the target host and load it:
 
 ```bash
-docker load < laelia-images.tar.gz
+docker load < laelia-manager-image.tar.gz
 ```
+
+For a native manager, copy the `build/laelia` binary instead. Machine hosts
+install `laelia-machine` from the manager itself, so as long as they can reach
+the manager they do not need a separate image or binary transfer.
 
 ## Troubleshooting
 
@@ -293,10 +355,10 @@ docker load < laelia-images.tar.gz
   missing or empty; pass it with `-e`.
 - Database connection or migration errors — verify the URI, database encoding,
   and that the user can create tables and the `pg_trgm` extension (section 2).
-- Machine cannot connect — check that `LAELIA_MANAGER_URL` is reachable and
+- Machine cannot connect — check that the `--manager` URL is reachable and
   that HTTP/2 is preserved through any proxy; with self-signed certificates
-  set `LAELIA_INSECURE=true` (development only). If the machine container was
-  recreated without its volume, rotate the token in the UI.
+  use `--insecure` (development only). If the local machine state was lost,
+  re-run `laelia-machine --manager <url> setup` to re-authenticate.
 - Command output stalls in the web UI behind Nginx — use `proxy_buffering off`
   and long `proxy_read_timeout`/`proxy_send_timeout`.
 - 502 Bad Gateway — `proxy_pass` must point at the actual manager
