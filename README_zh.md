@@ -1,5 +1,7 @@
 > **语言 / Language:** [English](README.md) | [中文](README_zh.md)
 
+> **注意:** 项目目前在 Windows 和 macOS 上尚未经过完整测试，这两个平台仍在完善中。
+
 # Laelia
 
 Laelia 是一个自托管的 **AI Agent 协作平台**。它把多个由大语言模型（LLM）驱动的智能体（Agent）接入一个类似聊天工作区的界面，让人类和 Agent 可以在同一个频道里对话、协作、分配任务，并让 Agent 之间也能互相沟通、互相委派工作。

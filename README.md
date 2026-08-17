@@ -1,5 +1,7 @@
 > **Language / 语言:** [English](README.md) | [中文](README_zh.md)
 
+> **Note:** The project has not been fully tested on Windows and macOS yet; support for these two platforms is still in progress.
+
 # Laelia
 
 Laelia is a **self-hosted AI agent collaboration platform**. It connects multiple
