@@ -77,6 +77,10 @@ type Supervisor struct {
 	status       Status
 	mu           sync.Mutex
 	stopWatcher  chan struct{}
+	// shutdown is closed by the control endpoint when `laelia-machine stop`
+	// asks this supervisor to exit; Run selects on it alongside ctx.Done().
+	shutdown     chan struct{}
+	shutdownOnce sync.Once
 }
 
 // New creates a supervisor that runs the worker as exePath + workerArgs.
@@ -94,6 +98,7 @@ func New(exePath string, workerArgs, daemonArgs []string, foreground bool) (*Sup
 		foreground: foreground,
 		logPath:    filepath.Join(logDir, "daemon.log"),
 		addrPath:   home.Join(AddrFile),
+		shutdown:   make(chan struct{}),
 	}, nil
 }
 
@@ -120,7 +125,11 @@ func (s *Supervisor) Run(ctx context.Context) error {
 	s.stopWatcher = make(chan struct{})
 	go s.watchWorker()
 
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+	case <-s.shutdown:
+		slog.Info("shutdown requested via control endpoint")
+	}
 	slog.Info("machine supervisor stopping")
 	s.stopWorker()
 	close(s.stopWatcher)
@@ -143,6 +152,7 @@ func (s *Supervisor) startControlServer() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/upgrade", s.handleUpgrade)
 	mux.HandleFunc("/status", s.handleStatus)
+	mux.HandleFunc("/shutdown", s.handleShutdown)
 	s.httpServer = &http.Server{Handler: mux}
 	go func() {
 		if err := s.httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
@@ -201,6 +211,20 @@ func (s *Supervisor) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(st)
+}
+
+// handleShutdown stops the supervisor: it acknowledges the request, then
+// closes the shutdown channel so Run unwinds (stops the worker, removes the
+// addr file, exits). The response is written before the channel is closed so
+// the caller reliably receives the acknowledgement.
+func (s *Supervisor) handleShutdown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "stopping"})
+	s.shutdownOnce.Do(func() { close(s.shutdown) })
 }
 
 func (s *Supervisor) setStatus(stage, errMsg string) {
@@ -569,6 +593,26 @@ func TriggerUpgrade(req UpgradeRequest) (*Status, error) {
 		return nil, errors.Wrap(err, "decode upgrade response")
 	}
 	return &st, nil
+}
+
+// Stop asks the running supervisor to shut down gracefully: it stops the
+// worker (SIGTERM, then kill after the grace period) and exits, removing the
+// addr file. It returns an error when no supervisor is running or the request
+// cannot be delivered.
+func Stop() error {
+	addr, err := supervisorAddr()
+	if err != nil {
+		return err
+	}
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Post("http://"+addr+"/shutdown", "application/json", nil)
+	if err != nil {
+		return errors.Wrap(err, "post shutdown to supervisor")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return errors.Errorf("shutdown returned %s", resp.Status)
+	}
+	return nil
 }
 
 // PollStatus reads the current upgrade status from the supervisor.

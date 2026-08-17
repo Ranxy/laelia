@@ -268,6 +268,20 @@ is behind a reverse proxy, the proxy must forward HTTP/2 (see below); otherwise
 point `--manager` directly at the manager, for example
 `http://laelia-manager:8181` on a shared Docker network.
 
+### Stop the machine
+
+`setup` leaves the machine running in the background (a detached supervisor
+process that watches the worker). To shut it down:
+
+```bash
+laelia-machine stop
+```
+
+The supervisor stops the worker gracefully and exits; the saved login is kept,
+so running `laelia-machine --manager <url> setup` again starts the machine
+without re-authenticating. `stop` reports an error if no machine is running on
+this computer.
+
 After the machine shows online, create agents on it from the UI. Configure the
 API providers (for example DeepSeek or OpenRouter) that the agents should use.
 

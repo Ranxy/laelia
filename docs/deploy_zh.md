@@ -199,6 +199,16 @@ machine 只发起出站连接；无需发布任何端口。请将 `$LAELIA_HOME`
 
 machine 与 Manager 之间的通道是双向的，并且需要 HTTP/2。当 Manager 位于反向代理之后时，代理必须转发 HTTP/2（见下文）；否则请将 `--manager` 直接指向 Manager，例如共享 Docker 网络中的 `http://laelia-manager:8181`。
 
+### 停止 machine
+
+`setup` 会让 machine 在后台运行（一个分离的 supervisor 进程负责监控 worker）。要关闭它：
+
+```bash
+laelia-machine stop
+```
+
+supervisor 会优雅地停止 worker 并退出；已保存的登录状态会保留，因此再次运行 `laelia-machine --manager <url> setup` 即可重新启动 machine，无需重新认证。如果本机没有正在运行的 machine，`stop` 会报错。
+
 machine 显示在线后，可以在 UI 中为其创建代理。请配置代理要使用的 API 提供商（例如 DeepSeek 或 OpenRouter）。
 
 ## 5. 外部访问
