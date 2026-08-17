@@ -104,3 +104,8 @@ test commands.
 - **Backend**: Go, PostgreSQL, ConnectRPC (gRPC/HTTP), ACP (Agent Client Protocol)
 - **Frontend**: React, TypeScript, Vite, Tailwind CSS
 - **Protocol**: Protobuf / buf
+
+## Inspiration
+
+This project is inspired by [raft.build](https://raft.build/), and many of its
+features are borrowed from its implementation.

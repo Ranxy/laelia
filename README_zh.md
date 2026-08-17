@@ -72,3 +72,7 @@ go build -ldflags "-w -s" -p=16 -o ./build/laelia ./backend/manager/bin/server/m
 - **后端**：Go、PostgreSQL、ConnectRPC（gRPC/HTTP）、ACP（Agent Client Protocol）
 - **前端**：React、TypeScript、Vite、Tailwind CSS
 - **协议**：Protobuf / buf
+
+## 灵感来源
+
+这个项目的灵感来自 [raft.build](https://raft.build/)，项目中的很多功能也是从其实现中借鉴而来的。
