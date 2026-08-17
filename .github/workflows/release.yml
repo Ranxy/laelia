@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and upload manager binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Build frontend and embedded machine binaries
+        run: VERSION="${GITHUB_REF_NAME}" scripts/build_laelia.sh build
+
+      - name: Cross-compile manager binaries
+        run: |
+          set -euo pipefail
+          mv build/laelia build/laelia-linux-amd64
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags "embed_frontend embed_machine" -ldflags "-w -s" -p=16 -o build/laelia-windows-amd64.exe ./backend/manager/bin/server/main.go
+          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -tags "embed_frontend embed_machine" -ldflags "-w -s" -p=16 -o build/laelia-darwin-arm64 ./backend/manager/bin/server/main.go
+
+      - name: Generate checksums
+        run: |
+          cd build
+          sha256sum laelia-linux-amd64 laelia-windows-amd64.exe laelia-darwin-arm64 > SHA256SUMS
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/laelia-linux-amd64
+            build/laelia-windows-amd64.exe
+            build/laelia-darwin-arm64
+            build/SHA256SUMS
