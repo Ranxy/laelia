@@ -580,7 +580,14 @@
     "transfer-owner-target": "New owner",
     "transfer-owner-target-placeholder": "Select a user",
     "transfer-owner-title": "Transfer Ownership",
-    "add-agent-api-base-url-required": "Please enter an API base URL for the custom provider."
+    "add-agent-api-base-url-required": "Please enter an API base URL for the custom provider.",
+    "upgrade-available-description": "Current version {{current}}, latest version {{latest}}. The machine will download the new binary from the manager and restart itself.",
+    "upgrade-available-title": "Machine version is out of date",
+    "upgrade-badge": "Upgrade available",
+    "upgrade-cta": "Upgrade",
+    "upgrade-failed": "Machine upgrade failed",
+    "upgrade-in-progress-title": "Upgrading machine",
+    "upgrade-stage": "Stage: {{stage}} → {{version}}. The machine will reconnect automatically when done."
   },
   "members": {
     "add-agent": "Add agent",

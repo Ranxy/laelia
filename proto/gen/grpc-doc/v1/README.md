@@ -416,6 +416,9 @@
     - [TransferMachineOwnershipRequest](#laelia-v1-TransferMachineOwnershipRequest)
     - [TransferMachineOwnershipResponse](#laelia-v1-TransferMachineOwnershipResponse)
     - [UpdateMachineRequest](#laelia-v1-UpdateMachineRequest)
+    - [UpgradeMachineRequest](#laelia-v1-UpgradeMachineRequest)
+    - [UpgradeProgress](#laelia-v1-UpgradeProgress)
+    - [UpgradeRequest](#laelia-v1-UpgradeRequest)
   
     - [MachineStatus.ConnectionState](#laelia-v1-MachineStatus-ConnectionState)
   
@@ -6716,6 +6719,9 @@ permanently remove its workspace directory under the machine data root.
 | can_edit | [bool](#bool) |  | can_edit reports whether the current caller holds laelia.machines.edit (workspace-scope). |
 | can_create_agent | [bool](#bool) |  | can_create_agent reports whether the current caller may create agents on this machine: the machine&#39;s creator, a workspace admin, or a principal bound to roles/machineAgentCreator in the machine&#39;s IAM policy. |
 | can_manage | [bool](#bool) |  | can_manage reports whether the current caller may manage this machine&#39;s IAM policy (the machine&#39;s creator or a workspace admin). |
+| latest_version | [string](#string) |  | latest_version is the machine binary version embedded in this manager (from the build manifest). Empty when the manager has no embedded binaries, in which case upgrades are not offered. |
+| upgrade_available | [bool](#bool) |  | upgrade_available reports whether the connected machine&#39;s reported version is older than latest_version. |
+| upgrade_status | [UpgradeProgress](#laelia-v1-UpgradeProgress) |  | upgrade_status is the live progress of an in-flight (or last completed) self-upgrade triggered via UpgradeMachine. |
 
 
 
@@ -6888,6 +6894,7 @@ permanently remove its workspace directory under the machine data root.
 | providers_discovered | [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered) |  | response to DiscoverProviders |
 | disconnect_notice | [MachineDisconnectNotice](#laelia-v1-MachineDisconnectNotice) |  | graceful shutdown |
 | machine_workspace_scan_response | [MachineWorkspaceScanResponse](#laelia-v1-MachineWorkspaceScanResponse) |  | response to ManagerMachineStreamMessage.machine_workspace_scan_request |
+| upgrade_progress | [UpgradeProgress](#laelia-v1-UpgradeProgress) |  | self-upgrade progress report, response to ManagerMachineStreamMessage.upgrade_request |
 
 
 
@@ -6914,6 +6921,8 @@ the count of agents bound to the machine.
 | can_edit | [bool](#bool) |  | can_edit reports whether the current caller holds laelia.machines.edit (workspace-scope). |
 | can_manage | [bool](#bool) |  | can_manage reports whether the current caller may manage this machine&#39;s IAM policy (the machine&#39;s creator or a workspace admin). |
 | can_delete | [bool](#bool) |  | can_delete reports whether the current caller may delete this machine: the machine&#39;s creator or a holder of laelia.machines.delete. |
+| latest_version | [string](#string) |  | latest_version / upgrade_available mirror Machine.latest_version and Machine.upgrade_available for the list view&#39;s upgrade badge. |
+| upgrade_available | [bool](#bool) |  |  |
 
 
 
@@ -6987,6 +6996,7 @@ MachineWorkspaceSummary is one agent workspace directory&#39;s usage summary.
 | reload_agent_assignment | [ReloadAgentAssignment](#laelia-v1-ReloadAgentAssignment) |  | full re-sync of one agent |
 | machine_workspace_scan_request | [MachineWorkspaceScanRequest](#laelia-v1-MachineWorkspaceScanRequest) |  | scan per-agent workspace directories on this machine |
 | delete_agent_workspace | [DeleteAgentWorkspace](#laelia-v1-DeleteAgentWorkspace) |  | stop the runner and delete an agent&#39;s workspace directory |
+| upgrade_request | [UpgradeRequest](#laelia-v1-UpgradeRequest) |  | self-upgrade to the manager&#39;s embedded binary |
 
 
 
@@ -7161,6 +7171,61 @@ after a config or display-name change, or to re-establish a runner).
 
 
 
+
+<a name="laelia-v1-UpgradeMachineRequest"></a>
+
+### UpgradeMachineRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| reason | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpgradeProgress"></a>
+
+### UpgradeProgress
+UpgradeProgress is the machine&#39;s report on a self-upgrade. stage is one of:
+&#34;requested&#34;, &#34;downloading&#34;, &#34;installing&#34;, &#34;restarting&#34;, &#34;done&#34;, &#34;failed&#34;;
+error carries the failure reason when stage is &#34;failed&#34;.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| version | [string](#string) |  |  |
+| stage | [string](#string) |  |  |
+| error | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpgradeRequest"></a>
+
+### UpgradeRequest
+UpgradeRequest tells the machine to upgrade itself to the manager&#39;s
+embedded binary for its platform. The machine&#39;s supervisor process
+downloads the binary from the manager&#39;s /machine/bin download endpoints,
+verifies the sha256, installs it, and restarts the machine process.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| version | [string](#string) |  | version is the binary version the machine should upgrade to (matches the manager&#39;s manifest version). |
+| target | [string](#string) |  | target is the platform triple the machine should download (e.g. &#34;linux-x64&#34;), matching the manager&#39;s manifest targets. |
+| sha256 | [string](#string) |  | sha256 is the expected hex sha256 of the gzipped binary, from the manager&#39;s manifest; the machine verifies the download against it. |
+
+
+
+
+
  
 
 
@@ -7207,6 +7272,7 @@ own AgentChannel over the machine&#39;s access token.
 | ForceDisconnectMachine | [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Force-disconnects a machine: terminate all its sessions and fail all in-flight commands for every agent hosted on it. Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
 | ListMachineAgents | [ListMachineAgentsRequest](#laelia-v1-ListMachineAgentsRequest) | [ListMachineAgentsResponse](#laelia-v1-ListMachineAgentsResponse) | List the agents hosted on a machine. |
 | RefreshMachineProviders | [RefreshMachineProvidersRequest](#laelia-v1-RefreshMachineProvidersRequest) | [RefreshMachineProvidersResponse](#laelia-v1-RefreshMachineProvidersResponse) | Ask the machine app to re-probe its host for installed LLM agent providers and their models. Returns the freshly discovered provider list (also persisted into machine.info.available_providers). Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
+| UpgradeMachine | [UpgradeMachineRequest](#laelia-v1-UpgradeMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | UpgradeMachine asks an online machine to upgrade itself: the manager sends an UpgradeRequest over the machine control stream and the machine&#39;s supervisor process downloads the new binary from the manager, installs it, and restarts. Progress is reported through Machine.upgrade_status. |
 | ListMachineWorkspaces | [ListMachineWorkspacesRequest](#laelia-v1-ListMachineWorkspacesRequest) | [ListMachineWorkspacesResponse](#laelia-v1-ListMachineWorkspacesResponse) | ListMachineWorkspaces summarizes every per-agent workspace directory on a machine (~/.laelia/&lt;machineID&gt;/). Workspace content is sensitive: authorized in the handler for the machine&#39;s creator or a workspace admin (isMachineAdmin, matching Machine.can_manage); no permission annotation. |
 | ConnectMachine | [ConnectMachineRequest](#laelia-v1-ConnectMachineRequest) | [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse) | Machine initial connection using a registration token. Returns access &#43; refresh tokens, the machine session id, and the full list of agents the machine must host (so the machine app can open an AgentChannel for each). |
 | MachineHeartbeat | [MachineHeartbeatRequest](#laelia-v1-MachineHeartbeatRequest) | [MachineHeartbeatResponse](#laelia-v1-MachineHeartbeatResponse) |  |

@@ -580,7 +580,14 @@
     "transfer-owner-target": "新所有者",
     "transfer-owner-target-placeholder": "选择用户",
     "transfer-owner-title": "转移所有权",
-    "add-agent-api-base-url-required": "自定义 provider 需要填写 API 基础地址。"
+    "add-agent-api-base-url-required": "自定义 provider 需要填写 API 基础地址。",
+    "upgrade-available-description": "当前版本 {{current}},最新版本 {{latest}}。机器将从 manager 下载新的二进制文件并自动重启。",
+    "upgrade-available-title": "机器版本已过期",
+    "upgrade-badge": "可升级",
+    "upgrade-cta": "升级",
+    "upgrade-failed": "机器升级失败",
+    "upgrade-in-progress-title": "机器升级中",
+    "upgrade-stage": "阶段: {{stage}} → {{version}}。完成后机器会自动重新连接。"
   },
   "members": {
     "add-agent": "添加 Agent",

@@ -32,6 +32,7 @@ import (
 
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/provider"
+	"github.com/Ranxy/laelia/backend/agent/version"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
@@ -208,7 +209,7 @@ func New(managerURL, machineID, refreshToken string, insecure bool, allowHTTP bo
 		binaryDir:        binaryDir,
 		backoff:          NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
 		runners:          make(map[string]*agentRunner),
-		machineVersion:   "0.2.0",
+		machineVersion:   version.Version,
 	}, nil
 }
 

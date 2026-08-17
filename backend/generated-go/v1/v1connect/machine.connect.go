@@ -63,6 +63,9 @@ const (
 	// MachineServiceRefreshMachineProvidersProcedure is the fully-qualified name of the
 	// MachineService's RefreshMachineProviders RPC.
 	MachineServiceRefreshMachineProvidersProcedure = "/laelia.v1.MachineService/RefreshMachineProviders"
+	// MachineServiceUpgradeMachineProcedure is the fully-qualified name of the MachineService's
+	// UpgradeMachine RPC.
+	MachineServiceUpgradeMachineProcedure = "/laelia.v1.MachineService/UpgradeMachine"
 	// MachineServiceListMachineWorkspacesProcedure is the fully-qualified name of the MachineService's
 	// ListMachineWorkspaces RPC.
 	MachineServiceListMachineWorkspacesProcedure = "/laelia.v1.MachineService/ListMachineWorkspaces"
@@ -123,6 +126,11 @@ type MachineServiceClient interface {
 	// (workspace-scope); no permission annotation so the creator short-circuit
 	// can run.
 	RefreshMachineProviders(context.Context, *connect.Request[v1.RefreshMachineProvidersRequest]) (*connect.Response[v1.RefreshMachineProvidersResponse], error)
+	// UpgradeMachine asks an online machine to upgrade itself: the manager sends
+	// an UpgradeRequest over the machine control stream and the machine's
+	// supervisor process downloads the new binary from the manager, installs it,
+	// and restarts. Progress is reported through Machine.upgrade_status.
+	UpgradeMachine(context.Context, *connect.Request[v1.UpgradeMachineRequest]) (*connect.Response[emptypb.Empty], error)
 	// ListMachineWorkspaces summarizes every per-agent workspace directory on a
 	// machine (~/.laelia/<machineID>/). Workspace content is sensitive:
 	// authorized in the handler for the machine's creator or a workspace admin
@@ -202,6 +210,12 @@ func NewMachineServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(machineServiceMethods.ByName("RefreshMachineProviders")),
 			connect.WithClientOptions(opts...),
 		),
+		upgradeMachine: connect.NewClient[v1.UpgradeMachineRequest, emptypb.Empty](
+			httpClient,
+			baseURL+MachineServiceUpgradeMachineProcedure,
+			connect.WithSchema(machineServiceMethods.ByName("UpgradeMachine")),
+			connect.WithClientOptions(opts...),
+		),
 		listMachineWorkspaces: connect.NewClient[v1.ListMachineWorkspacesRequest, v1.ListMachineWorkspacesResponse](
 			httpClient,
 			baseURL+MachineServiceListMachineWorkspacesProcedure,
@@ -246,6 +260,7 @@ type machineServiceClient struct {
 	forceDisconnectMachine   *connect.Client[v1.ForceDisconnectMachineRequest, emptypb.Empty]
 	listMachineAgents        *connect.Client[v1.ListMachineAgentsRequest, v1.ListMachineAgentsResponse]
 	refreshMachineProviders  *connect.Client[v1.RefreshMachineProvidersRequest, v1.RefreshMachineProvidersResponse]
+	upgradeMachine           *connect.Client[v1.UpgradeMachineRequest, emptypb.Empty]
 	listMachineWorkspaces    *connect.Client[v1.ListMachineWorkspacesRequest, v1.ListMachineWorkspacesResponse]
 	connectMachine           *connect.Client[v1.ConnectMachineRequest, v1.ConnectMachineResponse]
 	machineHeartbeat         *connect.Client[v1.MachineHeartbeatRequest, v1.MachineHeartbeatResponse]
@@ -296,6 +311,11 @@ func (c *machineServiceClient) ListMachineAgents(ctx context.Context, req *conne
 // RefreshMachineProviders calls laelia.v1.MachineService.RefreshMachineProviders.
 func (c *machineServiceClient) RefreshMachineProviders(ctx context.Context, req *connect.Request[v1.RefreshMachineProvidersRequest]) (*connect.Response[v1.RefreshMachineProvidersResponse], error) {
 	return c.refreshMachineProviders.CallUnary(ctx, req)
+}
+
+// UpgradeMachine calls laelia.v1.MachineService.UpgradeMachine.
+func (c *machineServiceClient) UpgradeMachine(ctx context.Context, req *connect.Request[v1.UpgradeMachineRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.upgradeMachine.CallUnary(ctx, req)
 }
 
 // ListMachineWorkspaces calls laelia.v1.MachineService.ListMachineWorkspaces.
@@ -363,6 +383,11 @@ type MachineServiceHandler interface {
 	// (workspace-scope); no permission annotation so the creator short-circuit
 	// can run.
 	RefreshMachineProviders(context.Context, *connect.Request[v1.RefreshMachineProvidersRequest]) (*connect.Response[v1.RefreshMachineProvidersResponse], error)
+	// UpgradeMachine asks an online machine to upgrade itself: the manager sends
+	// an UpgradeRequest over the machine control stream and the machine's
+	// supervisor process downloads the new binary from the manager, installs it,
+	// and restarts. Progress is reported through Machine.upgrade_status.
+	UpgradeMachine(context.Context, *connect.Request[v1.UpgradeMachineRequest]) (*connect.Response[emptypb.Empty], error)
 	// ListMachineWorkspaces summarizes every per-agent workspace directory on a
 	// machine (~/.laelia/<machineID>/). Workspace content is sensitive:
 	// authorized in the handler for the machine's creator or a workspace admin
@@ -438,6 +463,12 @@ func NewMachineServiceHandler(svc MachineServiceHandler, opts ...connect.Handler
 		connect.WithSchema(machineServiceMethods.ByName("RefreshMachineProviders")),
 		connect.WithHandlerOptions(opts...),
 	)
+	machineServiceUpgradeMachineHandler := connect.NewUnaryHandler(
+		MachineServiceUpgradeMachineProcedure,
+		svc.UpgradeMachine,
+		connect.WithSchema(machineServiceMethods.ByName("UpgradeMachine")),
+		connect.WithHandlerOptions(opts...),
+	)
 	machineServiceListMachineWorkspacesHandler := connect.NewUnaryHandler(
 		MachineServiceListMachineWorkspacesProcedure,
 		svc.ListMachineWorkspaces,
@@ -488,6 +519,8 @@ func NewMachineServiceHandler(svc MachineServiceHandler, opts ...connect.Handler
 			machineServiceListMachineAgentsHandler.ServeHTTP(w, r)
 		case MachineServiceRefreshMachineProvidersProcedure:
 			machineServiceRefreshMachineProvidersHandler.ServeHTTP(w, r)
+		case MachineServiceUpgradeMachineProcedure:
+			machineServiceUpgradeMachineHandler.ServeHTTP(w, r)
 		case MachineServiceListMachineWorkspacesProcedure:
 			machineServiceListMachineWorkspacesHandler.ServeHTTP(w, r)
 		case MachineServiceConnectMachineProcedure:
@@ -541,6 +574,10 @@ func (UnimplementedMachineServiceHandler) ListMachineAgents(context.Context, *co
 
 func (UnimplementedMachineServiceHandler) RefreshMachineProviders(context.Context, *connect.Request[v1.RefreshMachineProvidersRequest]) (*connect.Response[v1.RefreshMachineProvidersResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineService.RefreshMachineProviders is not implemented"))
+}
+
+func (UnimplementedMachineServiceHandler) UpgradeMachine(context.Context, *connect.Request[v1.UpgradeMachineRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineService.UpgradeMachine is not implemented"))
 }
 
 func (UnimplementedMachineServiceHandler) ListMachineWorkspaces(context.Context, *connect.Request[v1.ListMachineWorkspacesRequest]) (*connect.Response[v1.ListMachineWorkspacesResponse], error) {

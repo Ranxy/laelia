@@ -300,6 +300,7 @@ export interface MachineSlice {
   revokeMachineToken: (name: string, reason?: string) => Promise<void>;
   forceDisconnectMachine: (name: string, reason?: string) => Promise<void>;
   refreshMachineProviders: (name: string) => Promise<AgentProviderInfo[]>;
+  upgradeMachine: (name: string, reason?: string) => Promise<void>;
   listMachineAgents: (name: string) => Promise<AgentSummary[]>;
 }
 

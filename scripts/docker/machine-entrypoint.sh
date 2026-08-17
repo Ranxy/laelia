@@ -2,12 +2,13 @@
 # laelia-machine docker entrypoint: maps environment variables to CLI flags.
 # The machine authenticates via the OAuth2 device-code flow: `setup` prints an
 # approval URL to the container logs and waits for a logged-in user to approve
-# it in a browser, then runs in the foreground. No token is ever baked into an
-# image or command line.
+# it in a browser, then continues as the foreground supervisor process (it is
+# PID 1 in the container, so it must not daemonize). No token is ever baked
+# into an image or command line.
 # LAELIA_HOME is inherited as-is by laelia-machine and selects the data root.
 set -euo pipefail
 
-args=(setup --no-browser)
+args=(setup --no-browser --foreground)
 if [[ -n "${LAELIA_MANAGER_URL:-}" ]]; then
 	args+=(--manager "${LAELIA_MANAGER_URL}")
 	if [[ "${LAELIA_MANAGER_URL}" == http://* ]]; then

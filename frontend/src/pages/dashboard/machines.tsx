@@ -12,6 +12,7 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -149,6 +150,11 @@ export function MachinesPage() {
                           <MachineConnectionBadge
                             state={machine.status?.state}
                           />
+                          {machine.upgradeAvailable && (
+                            <Badge variant="warning" className="text-xs">
+                              {t("machine.upgrade-badge")}
+                            </Badge>
+                          )}
                           <span className="text-xs text-control-light">
                             {t("machine.agent-count", {
                               count: machine.agentCount,

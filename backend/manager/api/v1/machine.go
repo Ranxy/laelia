@@ -21,6 +21,7 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
+	"github.com/Ranxy/laelia/backend/manager/component/machinebuild"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -601,6 +602,69 @@ func (s *MachineService) ListMachineWorkspaces(ctx context.Context, req *connect
 	}
 }
 
+// machineDownloadTarget maps the machine's reported os/arch to the build
+// target name used by the embedded machine manifest (mirrors
+// scripts/build-embedded-machines.sh's target matrix).
+func machineDownloadTarget(osName, arch string) string {
+	switch osName + "/" + arch {
+	case "linux/amd64":
+		return "linux-x64"
+	case "windows/amd64":
+		return "windows-x64"
+	case "darwin/arm64":
+		return "darwin-arm64"
+	default:
+		return osName + "-" + arch
+	}
+}
+
+// UpgradeMachine pushes a self-upgrade command to an online machine. The
+// machine's supervisor process downloads the new binary from this manager,
+// verifies the manifest checksums, installs it, and restarts itself. The RPC
+// returns as soon as the command is delivered; the frontend follows progress
+// through Machine.upgrade_status.
+func (s *MachineService) UpgradeMachine(ctx context.Context, req *connect.Request[v1pb.UpgradeMachineRequest]) (*connect.Response[emptypb.Empty], error) {
+	resourceID, err := common.GetMachineResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	machine, err := s.store.GetMachineByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get machine, error: %v", err))
+	}
+	if machine == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !isMachineAdmin(ctx, s.iam, user, machine) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can upgrade this machine"))
+	}
+	if s.dispatcher == nil || !s.dispatcher.IsMachineConnected(machine.ID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("machine is not connected; cannot upgrade"))
+	}
+
+	latest := machinebuild.LatestVersion()
+	current := machine.Info.GetVersion()
+	if !machinebuild.UpgradeAvailable(current, latest) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("machine is already up to date"))
+	}
+	target := machineDownloadTarget(machine.Info.GetOs(), machine.Info.GetArch())
+	entry, ok := machinebuild.GetTarget(target)
+	if !ok {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Errorf("no embedded machine binary for target %q", target))
+	}
+
+	if err := s.dispatcher.SendUpgradeRequest(machine.ID, &v1pb.UpgradeRequest{
+		Version: latest,
+		Target:  target,
+		Sha256:  entry.Gz.Sha256,
+	}); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Wrap(err, "failed to send upgrade request"))
+	}
+	s.dispatcher.RecordMachineUpgrade(machine.ID, &v1pb.UpgradeProgress{Version: latest, Stage: "requested"})
+	return connect.NewResponse(&emptypb.Empty{}), nil
+}
+
 // ConnectMachine registers a machine session. The machine authenticates via
 // its access token (minted by RefreshMachineToken from the refresh token the
 // device approval issued); there is no bootstrap/registration path anymore.
@@ -653,13 +717,14 @@ func (s *MachineService) ConnectMachine(ctx context.Context, req *connect.Reques
 	}
 
 	if err := s.store.CreateMachineSession(ctx, &store.MachineSessionMessage{
-		SessionID:   sessionID,
-		MachineID:   machine.ID,
-		TokenFamily: machine.ResourceID,
-		State:       "ACTIVE",
-		SourceIP:    sourceIP,
-		Fingerprint: req.Msg.Fingerprint,
-		ConnectedAt: now,
+		SessionID:    sessionID,
+		MachineID:    machine.ID,
+		TokenFamily:  machine.ResourceID,
+		State:        "ACTIVE",
+		SourceIP:     sourceIP,
+		Fingerprint:  req.Msg.Fingerprint,
+		AgentVersion: req.Msg.Info.GetVersion(),
+		ConnectedAt:  now,
 	}); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to create machine session, error: %v", err))
 	}
@@ -939,6 +1004,14 @@ func (s *MachineService) convertToMachine(ctx context.Context, m *store.MachineM
 	if m.CreatedBy != 0 {
 		out.CreatedBy = resolveUserResource(ctx, s.store, m.CreatedBy)
 	}
+	latest := machinebuild.LatestVersion()
+	out.LatestVersion = latest
+	out.UpgradeAvailable = machinebuild.UpgradeAvailable(m.Info.GetVersion(), latest)
+	if s.dispatcher != nil {
+		if st := s.dispatcher.MachineUpgradeStatus(m.ID); st != nil {
+			out.UpgradeStatus = st
+		}
+	}
 	return out
 }
 
@@ -958,6 +1031,9 @@ func (s *MachineService) convertToMachineSummary(ctx context.Context, m *store.M
 	if m.CreatedBy != 0 {
 		out.CreatedBy = resolveUserResource(ctx, s.store, m.CreatedBy)
 	}
+	latest := machinebuild.LatestVersion()
+	out.LatestVersion = latest
+	out.UpgradeAvailable = machinebuild.UpgradeAvailable(m.Info.GetVersion(), latest)
 	return out
 }
 

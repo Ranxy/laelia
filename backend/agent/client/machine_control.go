@@ -10,6 +10,7 @@ import (
 
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/home"
+	"github.com/Ranxy/laelia/backend/agent/supervisor"
 	"github.com/Ranxy/laelia/backend/agent/workspace"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
@@ -110,6 +111,9 @@ func (c *MachineClient) runControlStream(ctx context.Context, _ *daemonsrv.Serve
 			case *v1pb.ManagerMachineStreamMessage_Pong:
 				// pong received, link acknowledged
 
+			case *v1pb.ManagerMachineStreamMessage_UpgradeRequest:
+				go c.handleUpgradeRequest(ctx, sendStream, m.UpgradeRequest)
+
 			default:
 				slog.Warn("unknown message type from manager on machine control stream")
 			}
@@ -144,6 +148,56 @@ func (c *MachineClient) runControlStream(ctx context.Context, _ *daemonsrv.Serve
 			}
 		}
 	}
+}
+
+// handleUpgradeRequest forwards a manager-pushed self-upgrade to the local
+// supervisor process and relays its progress back over the control stream as
+// UpgradeProgress messages, polling until a terminal stage.
+func (c *MachineClient) handleUpgradeRequest(ctx context.Context, send func(*v1pb.MachineStreamMessage) error, req *v1pb.UpgradeRequest) {
+	if req == nil {
+		return
+	}
+	slog.Info("upgrade requested by manager", "version", req.Version, "target", req.Target)
+
+	sendProgress := func(stage, errMsg string) {
+		if err := send(&v1pb.MachineStreamMessage{
+			Message: &v1pb.MachineStreamMessage_UpgradeProgress{
+				UpgradeProgress: &v1pb.UpgradeProgress{Version: req.Version, Stage: stage, Error: errMsg},
+			},
+		}); err != nil {
+			slog.Error("failed to send upgrade progress", "error", err)
+		}
+	}
+
+	st, err := supervisor.TriggerUpgrade(supervisor.UpgradeRequest{
+		Version:    req.Version,
+		Target:     req.Target,
+		Sha256:     req.Sha256,
+		ManagerURL: c.managerURL,
+	})
+	if err != nil {
+		slog.Error("failed to trigger local upgrade", "error", err)
+		sendProgress("failed", "no local supervisor available: "+err.Error())
+		return
+	}
+	sendProgress(st.Stage, st.Error)
+
+	for !st.Terminal() {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Second):
+		}
+		st, err = supervisor.PollStatus()
+		if err != nil {
+			slog.Warn("lost contact with supervisor during upgrade; it continues in the background", "error", err)
+			// The supervisor keeps going (the restart phases need no polling);
+			// stop reporting rather than reporting a spurious failure.
+			return
+		}
+		sendProgress(st.Stage, st.Error)
+	}
+	slog.Info("upgrade finished", "stage", st.Stage, "error", st.Error)
 }
 
 // hotReloadAgentConfig updates one agent runner's ACP config in place; the next

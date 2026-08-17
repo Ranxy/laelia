@@ -5,12 +5,14 @@ import (
 )
 
 var flags struct {
-	managerURL string
-	insecure   bool
-	allowHTTP  bool
-	debug      bool
-	force      bool
-	noBrowser  bool
+	managerURL       string
+	insecure         bool
+	allowHTTP        bool
+	debug            bool
+	force            bool
+	noBrowser        bool
+	setupForeground  bool
+	daemonForeground bool
 }
 
 var rootCmd = &cobra.Command{

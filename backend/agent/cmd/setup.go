@@ -17,6 +17,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/agent/client"
 	"github.com/Ranxy/laelia/backend/agent/state"
+	"github.com/Ranxy/laelia/backend/agent/version"
 	"github.com/Ranxy/laelia/backend/common/log"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
@@ -80,7 +81,7 @@ func setupMachine() error {
 		switch probeRefreshToken(managerURL, st) {
 		case probeOK:
 			fmt.Printf("Already logged in as machine %s (%s)\n", st.MachineID, st.Hostname)
-			return runMachine()
+			return daemonize()
 		case probePermanent:
 			_, _ = fmt.Println("The saved login is no longer valid; re-authenticating this machine...")
 			// Keep the machine id so the device flow re-authenticates the
@@ -94,7 +95,7 @@ func setupMachine() error {
 			}
 		case probeTransient:
 			slog.Warn("could not validate the saved login (manager unreachable); starting anyway", "manager", managerURL)
-			return runMachine()
+			return daemonize()
 		default:
 			return errors.New("unexpected refresh-token probe result")
 		}
@@ -103,7 +104,7 @@ func setupMachine() error {
 	if err := deviceLogin(managerURL, st); err != nil {
 		return err
 	}
-	return runMachine()
+	return daemonize()
 }
 
 type probeResult int
@@ -174,7 +175,7 @@ func deviceLogin(managerURL string, st *state.State) error {
 		Os:          osName,
 		Arch:        arch,
 		Ip:          client.OutboundIP(),
-		Version:     "0.2.0",
+		Version:     version.Version,
 		Fingerprint: fingerprint,
 		MachineId:   machineID,
 	}))

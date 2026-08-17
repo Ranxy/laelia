@@ -217,6 +217,27 @@ export declare type RefreshMachineProvidersResponse = Message<"laelia.v1.Refresh
 export declare const RefreshMachineProvidersResponseSchema: GenMessage<RefreshMachineProvidersResponse>;
 
 /**
+ * @generated from message laelia.v1.UpgradeMachineRequest
+ */
+export declare type UpgradeMachineRequest = Message<"laelia.v1.UpgradeMachineRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string reason = 2;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message laelia.v1.UpgradeMachineRequest.
+ * Use `create(UpgradeMachineRequestSchema)` to create a new message.
+ */
+export declare const UpgradeMachineRequestSchema: GenMessage<UpgradeMachineRequest>;
+
+/**
  * @generated from message laelia.v1.ListMachineWorkspacesRequest
  */
 export declare type ListMachineWorkspacesRequest = Message<"laelia.v1.ListMachineWorkspacesRequest"> & {
@@ -577,6 +598,31 @@ export declare type Machine = Message<"laelia.v1.Machine"> & {
    * @generated from field: bool can_manage = 14;
    */
   canManage: boolean;
+
+  /**
+   * latest_version is the machine binary version embedded in this manager
+   * (from the build manifest). Empty when the manager has no embedded
+   * binaries, in which case upgrades are not offered.
+   *
+   * @generated from field: string latest_version = 15;
+   */
+  latestVersion: string;
+
+  /**
+   * upgrade_available reports whether the connected machine's reported version
+   * is older than latest_version.
+   *
+   * @generated from field: bool upgrade_available = 16;
+   */
+  upgradeAvailable: boolean;
+
+  /**
+   * upgrade_status is the live progress of an in-flight (or last completed)
+   * self-upgrade triggered via UpgradeMachine.
+   *
+   * @generated from field: laelia.v1.UpgradeProgress upgrade_status = 17;
+   */
+  upgradeStatus?: UpgradeProgress | undefined;
 };
 
 /**
@@ -653,6 +699,19 @@ export declare type MachineSummary = Message<"laelia.v1.MachineSummary"> & {
    * @generated from field: bool can_delete = 9;
    */
   canDelete: boolean;
+
+  /**
+   * latest_version / upgrade_available mirror Machine.latest_version and
+   * Machine.upgrade_available for the list view's upgrade badge.
+   *
+   * @generated from field: string latest_version = 11;
+   */
+  latestVersion: string;
+
+  /**
+   * @generated from field: bool upgrade_available = 12;
+   */
+  upgradeAvailable: boolean;
 };
 
 /**
@@ -660,6 +719,76 @@ export declare type MachineSummary = Message<"laelia.v1.MachineSummary"> & {
  * Use `create(MachineSummarySchema)` to create a new message.
  */
 export declare const MachineSummarySchema: GenMessage<MachineSummary>;
+
+/**
+ * UpgradeRequest tells the machine to upgrade itself to the manager's
+ * embedded binary for its platform. The machine's supervisor process
+ * downloads the binary from the manager's /machine/bin download endpoints,
+ * verifies the sha256, installs it, and restarts the machine process.
+ *
+ * @generated from message laelia.v1.UpgradeRequest
+ */
+export declare type UpgradeRequest = Message<"laelia.v1.UpgradeRequest"> & {
+  /**
+   * version is the binary version the machine should upgrade to (matches the
+   * manager's manifest version).
+   *
+   * @generated from field: string version = 1;
+   */
+  version: string;
+
+  /**
+   * target is the platform triple the machine should download (e.g.
+   * "linux-x64"), matching the manager's manifest targets.
+   *
+   * @generated from field: string target = 2;
+   */
+  target: string;
+
+  /**
+   * sha256 is the expected hex sha256 of the gzipped binary, from the
+   * manager's manifest; the machine verifies the download against it.
+   *
+   * @generated from field: string sha256 = 3;
+   */
+  sha256: string;
+};
+
+/**
+ * Describes the message laelia.v1.UpgradeRequest.
+ * Use `create(UpgradeRequestSchema)` to create a new message.
+ */
+export declare const UpgradeRequestSchema: GenMessage<UpgradeRequest>;
+
+/**
+ * UpgradeProgress is the machine's report on a self-upgrade. stage is one of:
+ * "requested", "downloading", "installing", "restarting", "done", "failed";
+ * error carries the failure reason when stage is "failed".
+ *
+ * @generated from message laelia.v1.UpgradeProgress
+ */
+export declare type UpgradeProgress = Message<"laelia.v1.UpgradeProgress"> & {
+  /**
+   * @generated from field: string version = 1;
+   */
+  version: string;
+
+  /**
+   * @generated from field: string stage = 2;
+   */
+  stage: string;
+
+  /**
+   * @generated from field: string error = 3;
+   */
+  error: string;
+};
+
+/**
+ * Describes the message laelia.v1.UpgradeProgress.
+ * Use `create(UpgradeProgressSchema)` to create a new message.
+ */
+export declare const UpgradeProgressSchema: GenMessage<UpgradeProgress>;
 
 /**
  * @generated from message laelia.v1.MachineInfo
@@ -867,6 +996,14 @@ export declare type MachineStreamMessage = Message<"laelia.v1.MachineStreamMessa
      */
     value: MachineWorkspaceScanResponse;
     case: "machineWorkspaceScanResponse";
+  } | {
+    /**
+     * self-upgrade progress report, response to ManagerMachineStreamMessage.upgrade_request
+     *
+     * @generated from field: laelia.v1.UpgradeProgress upgrade_progress = 6;
+     */
+    value: UpgradeProgress;
+    case: "upgradeProgress";
   } | { case: undefined; value?: undefined };
 };
 
@@ -945,6 +1082,14 @@ export declare type ManagerMachineStreamMessage = Message<"laelia.v1.ManagerMach
      */
     value: DeleteAgentWorkspace;
     case: "deleteAgentWorkspace";
+  } | {
+    /**
+     * self-upgrade to the manager's embedded binary
+     *
+     * @generated from field: laelia.v1.UpgradeRequest upgrade_request = 9;
+     */
+    value: UpgradeRequest;
+    case: "upgradeRequest";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1263,6 +1408,19 @@ export declare const MachineService: GenService<{
     methodKind: "unary";
     input: typeof RefreshMachineProvidersRequestSchema;
     output: typeof RefreshMachineProvidersResponseSchema;
+  },
+  /**
+   * UpgradeMachine asks an online machine to upgrade itself: the manager sends
+   * an UpgradeRequest over the machine control stream and the machine's
+   * supervisor process downloads the new binary from the manager, installs it,
+   * and restarts. Progress is reported through Machine.upgrade_status.
+   *
+   * @generated from rpc laelia.v1.MachineService.UpgradeMachine
+   */
+  upgradeMachine: {
+    methodKind: "unary";
+    input: typeof UpgradeMachineRequestSchema;
+    output: typeof EmptySchema;
   },
   /**
    * ListMachineWorkspaces summarizes every per-agent workspace directory on a

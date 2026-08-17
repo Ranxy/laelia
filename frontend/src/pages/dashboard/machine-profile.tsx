@@ -124,6 +124,11 @@ export function MachineProfilePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
 
+  // Self-upgrade state: the trigger is local, the progress comes from
+  // machine.upgradeStatus refreshed by polling while an upgrade runs.
+  const [upgrading, setUpgrading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState("");
+
   // Add-agent sheet state. The sheet carries the full ACP config (provider,
   // model, persona, env, custom command) so an agent can be fully configured at
   // creation time instead of requiring a second visit to the agent profile.
@@ -299,6 +304,30 @@ export function MachineProfilePage() {
     return binding?.members ?? [];
   }, [policyState]);
 
+  // The active upgrade stage reported by the machine, polled from
+  // machine.upgradeStatus while a triggered upgrade is in flight.
+  const upgradeStage = machine?.upgradeStatus?.stage ?? "";
+  const upgradeInProgress = [
+    "requested",
+    "downloading",
+    "installing",
+    "restarting",
+  ].includes(upgradeStage);
+
+  // Poll the machine while an upgrade runs: the machine briefly goes offline
+  // and reconnects on the new version, so the page keeps refetching until the
+  // stage reaches a terminal value or the reported version catches up.
+  useEffect(() => {
+    if (!upgradeInProgress) return;
+    const id = setInterval(() => {
+      void (async () => {
+        const next = await getMachine(machineName);
+        if (next) setMachine(next);
+      })();
+    }, 3000);
+    return () => clearInterval(id);
+  }, [upgradeInProgress, getMachine, machineName]);
+
   if (!machine) {
     return (
       <div className="h-full overflow-y-auto p-6">
@@ -387,6 +416,24 @@ export function MachineProfilePage() {
       );
     } finally {
       setRefreshing(false);
+    }
+  }
+
+  async function handleUpgrade() {
+    setUpgrading(true);
+    setUpgradeError("");
+    try {
+      await useAppStore.getState().upgradeMachine(machineName);
+      // Refresh immediately so the "requested" status shows, then the poll
+      // effect above takes over.
+      const next = await getMachine(machineName);
+      if (next) setMachine(next);
+    } catch (err) {
+      setUpgradeError(
+        err instanceof Error ? err.message : t("machine.upgrade-failed")
+      );
+    } finally {
+      setUpgrading(false);
     }
   }
 
@@ -660,6 +707,50 @@ export function MachineProfilePage() {
             description={t("machine.profile.edit-not-allowed")}
           />
         )}
+
+        {machine.upgradeAvailable && !upgradeInProgress && (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Alert
+              variant="warning"
+              title={t("machine.upgrade-available-title")}
+              description={t("machine.upgrade-available-description", {
+                current: info?.version ?? "-",
+                latest: machine.latestVersion,
+              })}
+            />
+            {canManage && (
+              <Button
+                onClick={() => void handleUpgrade()}
+                disabled={upgrading}
+                className="shrink-0"
+              >
+                {upgrading ? <Loader2 className="size-4 animate-spin" /> : null}
+                {t("machine.upgrade-cta")}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {upgradeInProgress && (
+          <Alert
+            variant="info"
+            title={t("machine.upgrade-in-progress-title")}
+            description={t("machine.upgrade-stage", {
+              stage: upgradeStage,
+              version: machine.upgradeStatus?.version ?? "",
+            })}
+          />
+        )}
+
+        {upgradeStage === "failed" && (
+          <Alert
+            variant="error"
+            title={t("machine.upgrade-failed")}
+            description={machine.upgradeStatus?.error || ""}
+          />
+        )}
+
+        {upgradeError && <Alert variant="error" description={upgradeError} />}
 
         <div className="flex flex-col gap-6">
           {/* Identity & host info */}

@@ -228,6 +228,12 @@ type Dispatcher struct {
 	pendingWorkspaceLists *pendingReplies[*v1pb.WorkspaceListResponse]
 	pendingWorkspaceReads *pendingReplies[*v1pb.WorkspaceReadResponse]
 	pendingMachineScans   *pendingReplies[*v1pb.MachineWorkspaceScanResponse]
+
+	// machineUpgrades holds the live (or last completed) self-upgrade progress
+	// per machine id, reported by the machine over its control stream and read
+	// by GetMachine for the frontend. Reset whenever the machine (re)connects.
+	upgradeMu       sync.Mutex
+	machineUpgrades map[int]*v1pb.UpgradeProgress
 }
 
 func New(s *store.Store) *Dispatcher {
@@ -245,6 +251,7 @@ func New(s *store.Store) *Dispatcher {
 		pendingWorkspaceLists: newPendingReplies[*v1pb.WorkspaceListResponse](),
 		pendingWorkspaceReads: newPendingReplies[*v1pb.WorkspaceReadResponse](),
 		pendingMachineScans:   newPendingReplies[*v1pb.MachineWorkspaceScanResponse](),
+		machineUpgrades:       make(map[int]*v1pb.UpgradeProgress),
 		lifecycleCtx:          ctx,
 		lifecycleCancel:       cancel,
 	}
@@ -362,6 +369,11 @@ func (d *Dispatcher) RegisterMachine(machineID int, machineResourceID string, se
 	sess.send.Store(&fn)
 
 	d.machines[machineID] = sess
+	// A (re)connect ends any previously reported upgrade: the machine either
+	// just came back on the new version or never finished the old attempt.
+	d.upgradeMu.Lock()
+	delete(d.machineUpgrades, machineID)
+	d.upgradeMu.Unlock()
 	slog.Info("machine registered for control dispatch", "machineID", machineID)
 	return sess
 }
@@ -592,6 +604,42 @@ func (d *Dispatcher) CompletePendingDiscover(msg *v1pb.ProvidersDiscovered) {
 		default:
 		}
 	}
+}
+
+// SendUpgradeRequest pushes a self-upgrade command to a connected machine's
+// control stream. The machine's supervisor downloads the new binary from the
+// manager, installs it, and restarts; progress flows back as UpgradeProgress
+// messages recorded via RecordMachineUpgrade.
+func (d *Dispatcher) SendUpgradeRequest(machineID int, req *v1pb.UpgradeRequest) error {
+	d.mu.RLock()
+	sess, ok := d.machines[machineID]
+	d.mu.RUnlock()
+	if !ok {
+		return errors.New("machine is not connected")
+	}
+	return sess.Send(&v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_UpgradeRequest{
+			UpgradeRequest: req,
+		},
+	})
+}
+
+// RecordMachineUpgrade stores the latest self-upgrade progress for a machine.
+func (d *Dispatcher) RecordMachineUpgrade(machineID int, progress *v1pb.UpgradeProgress) {
+	if progress == nil {
+		return
+	}
+	d.upgradeMu.Lock()
+	d.machineUpgrades[machineID] = progress
+	d.upgradeMu.Unlock()
+}
+
+// MachineUpgradeStatus returns the recorded self-upgrade progress for a
+// machine, or nil when none was reported since its last connect.
+func (d *Dispatcher) MachineUpgradeStatus(machineID int) *v1pb.UpgradeProgress {
+	d.upgradeMu.Lock()
+	defer d.upgradeMu.Unlock()
+	return d.machineUpgrades[machineID]
 }
 
 // SendDiscoverProviders sends a DiscoverProviders control message to the

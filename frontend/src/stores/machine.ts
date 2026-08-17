@@ -13,6 +13,7 @@ import {
   RevokeMachineTokenRequestSchema,
   TransferMachineOwnershipRequestSchema,
   UpdateMachineRequestSchema,
+  UpgradeMachineRequestSchema,
 } from "@/types/proto-es/v1/machine_pb";
 import type { AppSliceCreator, MachineSlice } from "./types";
 
@@ -114,6 +115,15 @@ export const createMachineSlice: AppSliceCreator<MachineSlice> = (
       create(RefreshMachineProvidersRequestSchema, { name })
     );
     return res.providers;
+  },
+
+  // upgradeMachine asks the machine to self-upgrade to the manager's embedded
+  // binary. Fire-and-forget: progress is followed via getMachine polling
+  // (Machine.upgradeStatus).
+  async upgradeMachine(name: string, reason?: string) {
+    await machineServiceClient.upgradeMachine(
+      create(UpgradeMachineRequestSchema, { name, reason: reason ?? "" })
+    );
   },
 
   // listMachineAgents returns *every* agent bound to the machine, draining the

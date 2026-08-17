@@ -9,6 +9,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 
+	"github.com/Ranxy/laelia/backend/manager/component/machinebuild"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
@@ -21,6 +22,12 @@ const managerURLPlaceholder = "__LAELIA_MANAGER_URL__"
 // install scripts. Downloads are intentionally unauthenticated: the installer
 // runs on a fresh host before the machine has any credentials.
 func registerMachineDownloadRoutes(e *echo.Echo, stores *store.Store) {
+	// Publish the embedded build info (version + checksums) to the API layer
+	// for the self-upgrade feature. No-op when binaries are not embedded.
+	if manifest, err := machineManifest(); err == nil {
+		machinebuild.SetManifest(manifest)
+	}
+
 	e.GET("/machine/install.sh", func(c *echo.Context) error {
 		managerURL, err := externalManagerURL(c, stores)
 		if err != nil {

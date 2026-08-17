@@ -93,6 +93,10 @@ func (s *MachineStreamService) MachineChannel(
 		case *v1pb.MachineStreamMessage_MachineWorkspaceScanResponse:
 			s.dispatcher.CompletePendingMachineWorkspaceScan(m.MachineWorkspaceScanResponse)
 
+		case *v1pb.MachineStreamMessage_UpgradeProgress:
+			s.dispatcher.RecordMachineUpgrade(machine.ID, m.UpgradeProgress)
+			slog.Info("machine upgrade progress", "machineID", machine.ID, "version", m.UpgradeProgress.GetVersion(), "stage", m.UpgradeProgress.GetStage(), "error", m.UpgradeProgress.GetError())
+
 		case *v1pb.MachineStreamMessage_DisconnectNotice:
 			slog.Info("machine announced graceful disconnect", "machineID", machine.ID, "reason", m.DisconnectNotice.GetReason())
 			return nil
