@@ -67,9 +67,11 @@ flow is:
 
 1. **Prepare PostgreSQL**: create a UTF-8 database; the manager runs schema
    migrations automatically on startup.
-2. **Build and start the manager**: build a Docker image with
-   `scripts/build_laelia_manager_docker.sh`, or a native binary with
-   `scripts/build_laelia.sh`; start it with the database connection in
+2. **Get the manager**: download the prebuilt binary for your platform from
+   GitHub Releases (`laelia-linux-amd64`, `laelia-darwin-arm64`,
+   `laelia-windows-amd64.exe`), or build it yourself as a Docker image
+   (`scripts/build_laelia_manager_docker.sh`) or a native binary
+   (`scripts/build_laelia.sh`); start it with the database connection in
    `LAELIA_PG_URL`.
 3. **Add a machine**: on the target computer, run the install command and
    `laelia-machine --manager <url> setup` shown on the manager's *Create

@@ -12,13 +12,41 @@ Manager 镜像从本仓库构建；目前尚未发布预构建的 registry 镜�
 ## 前置条件
 
 - PostgreSQL 13+（推荐 14+），Manager 需要能够访问。
+- 使用 GitHub Releases 上的预编译 Manager 二进制：无需任何构建工具链，下载即可运行。
 - 以 Docker 镜像方式构建/运行 Manager：需要启用 BuildKit 的 Docker（Docker 20.10+；新版 Docker Desktop/Engine 默认已启用）。
-- 以二进制方式构建 Manager：需要 Go 工具链、pnpm，以及访问 Go modules、pnpm 和 pi 下载的网络（或使用构建代理 `LAELIA_BUILD_PROXY`）。
+- 自行构建 Manager 二进制：需要 Go 工具链、pnpm，以及访问 Go modules、pnpm 和 pi 下载的网络（或使用构建代理 `LAELIA_BUILD_PROXY`）。
 - 每台 machine 宿主机需要能够访问 Manager，以及其代理所使用的托管 LLM 提供商。
 
 ## 1. 构建 Manager
 
-### 1a. 构建 Manager Docker 镜像
+### 1a. 下载预编译的 Manager 二进制（推荐）
+
+每个平台的预编译 Manager 二进制发布在 GitHub Releases 上，无需构建工具链：
+
+| 平台 | 文件 |
+| --- | --- |
+| Linux (amd64) | `laelia-linux-amd64` |
+| macOS (Apple Silicon) | `laelia-darwin-arm64` |
+| Windows (amd64) | `laelia-windows-amd64.exe` |
+
+```bash
+# Linux (amd64)
+curl -fsSL -o laelia https://github.com/Ranxy/laelia/releases/latest/download/laelia-linux-amd64
+chmod +x laelia
+
+# macOS (Apple Silicon)
+curl -fsSL -o laelia https://github.com/Ranxy/laelia/releases/latest/download/laelia-darwin-arm64
+chmod +x laelia
+```
+
+```powershell
+# Windows（PowerShell）
+curl.exe -fsSL -o laelia.exe https://github.com/Ranxy/laelia/releases/latest/download/laelia-windows-amd64.exe
+```
+
+预编译二进制与 `scripts/build_laelia.sh` 产出的自包含 Manager 一致：内嵌前端和各平台 machine 二进制，并同样提供 `/machine/install.sh`、`/machine/install.ps1` 和 `/machine/manifest.json` 端点，可以直接从它安装 machine 宿主机。
+
+### 1b. 构建 Manager Docker 镜像
 
 ```bash
 scripts/build_laelia_manager_docker.sh   # -> laelia/manager:local + laelia/manager:latest
@@ -39,7 +67,7 @@ VERSION=1.2.0 LAELIA_BUILD_PROXY=http://proxy.example.com:8080 scripts/build_lae
 
 不要为 `docker build` 导出全局 `HTTPS_PROXY`：BuildKit 会将其注入到每个构建阶段，包括最终运行时镜像。`LAELIA_BUILD_PROXY` 只作用于需要它的构建阶段。
 
-### 1b. 构建 Manager 二进制
+### 1c. 构建 Manager 二进制
 
 如果希望以原生二进制而不是容器方式运行 Manager，请使用 `scripts/build_laelia.sh`。它会构建前端、交叉编译并内嵌各平台的 machine 二进制，最终生成一个自包含的 Manager 二进制：
 

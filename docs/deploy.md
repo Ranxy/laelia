@@ -19,16 +19,51 @@ are published yet.
 ## Prerequisites
 
 - PostgreSQL 13+ (14+ recommended), reachable from the manager.
+- To use the prebuilt manager binary from GitHub Releases: none — just
+  download and run it.
 - To build/run the manager as a Docker image: Docker with BuildKit enabled
   (Docker 20.10+; recent Docker Desktop/Engine enable it by default).
-- To build the manager binary: Go toolchain, pnpm, and outbound access for Go
-  modules, pnpm, and the pi download (or a build proxy `LAELIA_BUILD_PROXY`).
+- To build the manager binary yourself: Go toolchain, pnpm, and outbound
+  access for Go modules, pnpm, and the pi download (or a build proxy
+  `LAELIA_BUILD_PROXY`).
 - Each machine host needs outbound access to the manager and to the hosted LLM
   providers used by its agents.
 
 ## 1. Build the manager
 
-### 1a. Build the manager Docker image
+### 1a. Download the prebuilt manager binary (recommended)
+
+Prebuilt manager binaries are published on GitHub Releases — no build toolchain
+needed:
+
+| Platform | Asset |
+| --- | --- |
+| Linux (amd64) | `laelia-linux-amd64` |
+| macOS (Apple Silicon) | `laelia-darwin-arm64` |
+| Windows (amd64) | `laelia-windows-amd64.exe` |
+
+```bash
+# Linux (amd64)
+curl -fsSL -o laelia https://github.com/Ranxy/laelia/releases/latest/download/laelia-linux-amd64
+chmod +x laelia
+
+# macOS (Apple Silicon)
+curl -fsSL -o laelia https://github.com/Ranxy/laelia/releases/latest/download/laelia-darwin-arm64
+chmod +x laelia
+```
+
+```powershell
+# Windows (PowerShell)
+curl.exe -fsSL -o laelia.exe https://github.com/Ranxy/laelia/releases/latest/download/laelia-windows-amd64.exe
+```
+
+The prebuilt binary is the same self-contained manager produced by
+`scripts/build_laelia.sh`: it embeds the frontend and the per-platform machine
+binaries, and serves the same `/machine/install.sh`, `/machine/install.ps1`,
+and `/machine/manifest.json` endpoints, so machine hosts can be installed
+directly from it.
+
+### 1b. Build the manager Docker image
 
 ```bash
 scripts/build_laelia_manager_docker.sh   # -> laelia/manager:local + laelia/manager:latest
@@ -51,7 +86,7 @@ Do not export a global `HTTPS_PROXY` for `docker build`: BuildKit injects it
 into every stage, including the final runtime images. `LAELIA_BUILD_PROXY` is
 scoped to the build stages that need it.
 
-### 1b. Build the manager binary
+### 1c. Build the manager binary
 
 To run the manager as a native binary instead of a container, use
 `scripts/build_laelia.sh`. It builds the frontend, cross-compiles and embeds

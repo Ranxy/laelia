@@ -46,7 +46,7 @@ rm -rf /tmp/laelia-test-1
 完整的部署说明见 [docs/deploy.md](docs/deploy.md)（[中文版](docs/deploy_zh.md)）。核心流程如下：
 
 1. **准备 PostgreSQL**：创建一个 UTF-8 数据库，Manager 启动时会自动执行 schema 迁移。
-2. **构建并启动 Manager**：用 `scripts/build_laelia_manager_docker.sh` 构建 Docker 镜像，或 `scripts/build_laelia.sh` 构建原生二进制；通过 `LAELIA_PG_URL` 指定数据库连接后启动。
+2. **获取 Manager**：推荐直接从 GitHub Releases 下载预编译二进制（`laelia-linux-amd64`、`laelia-darwin-arm64`、`laelia-windows-amd64.exe`）；也可以自行构建 Docker 镜像（`scripts/build_laelia_manager_docker.sh`）或原生二进制（`scripts/build_laelia.sh`）。通过 `LAELIA_PG_URL` 指定数据库连接后启动。
 3. **添加 Machine**：在 Manager UI 的 *创建 Machine* 页面，把页面显示的安装命令和 `laelia-machine --manager <url> setup` 命令在目标电脑上运行，然后在浏览器中批准登录即可。
 4. **创建 Agent**：Machine 上线后，在 UI 上为它创建 Agent，配置要使用的 LLM API 提供商（如 DeepSeek、OpenRouter），Agent 即可加入频道开始工作。
 
