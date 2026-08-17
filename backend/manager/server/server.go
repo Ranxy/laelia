@@ -230,7 +230,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 
 	// Stop heartbeat buffer
-	if s.stateCfg.HeartbeatBuffer != nil {
+	if s.stateCfg != nil && s.stateCfg.HeartbeatBuffer != nil {
 		s.stateCfg.HeartbeatBuffer.Stop()
 	}
 
