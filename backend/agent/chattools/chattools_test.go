@@ -199,13 +199,13 @@ func TestFormatMemberLine(t *testing.T) {
 			MemberType: 1, DisplayName: "Alice", MemberRole: 1, Description: "后端工程师, 专注 agent 构建",
 		}))
 
-	// Agent member: the agents/<id> handle appears; a multi-line persona is
+	// Agent member: the @<handle> mention token appears; a multi-line persona is
 	// emitted in full, one indented line per source line — no truncation.
 	got := formatMemberLine(&v1pb.ChannelMember{
 		MemberType: 2, MemberId: "abc-123", DisplayName: "backend-bot", MemberRole: 2,
 		Description: "精通后端, 专注构建 agent。\n前端任务请转给 @ui-expert。",
 	})
-	want := "- [agent] backend-bot [agents/abc-123] (member)\n" +
+	want := "- [agent] backend-bot @abc-123 (member)\n" +
 		"  精通后端, 专注构建 agent。\n" +
 		"  前端任务请转给 @ui-expert。\n"
 	assert.Equal(t, want, got)
@@ -215,7 +215,7 @@ func TestFormatMemberLine(t *testing.T) {
 		formatMemberLine(&v1pb.ChannelMember{MemberType: 1, DisplayName: "Bob", MemberRole: 0}))
 
 	// No description → no indented block.
-	assert.Equal(t, "- [agent] dev [agents/9] (member)\n",
+	assert.Equal(t, "- [agent] dev @9 (member)\n",
 		formatMemberLine(&v1pb.ChannelMember{MemberType: 2, MemberId: "9", DisplayName: "dev", MemberRole: 2}))
 
 	// A user member with a preferred language renders a (language: xx-XX) tag so
@@ -224,7 +224,7 @@ func TestFormatMemberLine(t *testing.T) {
 		formatMemberLine(&v1pb.ChannelMember{MemberType: 1, DisplayName: "Alice", MemberRole: 2, PreferredLanguage: v1pb.PreferredLanguage_PREFERRED_LANGUAGE_ZH_CN}))
 
 	// Agents never render a language tag (their language is always UNSPECIFIED).
-	assert.Equal(t, "- [agent] dev [agents/9] (member)\n",
+	assert.Equal(t, "- [agent] dev @9 (member)\n",
 		formatMemberLine(&v1pb.ChannelMember{MemberType: 2, MemberId: "9", DisplayName: "dev", MemberRole: 2, PreferredLanguage: v1pb.PreferredLanguage_PREFERRED_LANGUAGE_EN_US}))
 
 	// UNSPECIFIED (unset) renders no language tag.
@@ -233,6 +233,11 @@ func TestFormatMemberLine(t *testing.T) {
 
 	// nil is safe.
 	assert.Equal(t, "", formatMemberLine(nil))
+
+	// A user member WITH a handle shows @<handle> so the agent can mention
+	// them — previously users had no handle in the roster at all.
+	assert.Equal(t, "- [user] Alice @alice-user-1 (member)\n",
+		formatMemberLine(&v1pb.ChannelMember{MemberType: 1, MemberId: "alice-user-1", Handle: "alice-user-1", DisplayName: "Alice", MemberRole: 2}))
 }
 
 func TestPreferredLanguageString(t *testing.T) {

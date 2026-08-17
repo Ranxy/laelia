@@ -1013,8 +1013,8 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 	// and merge with client-supplied mentions so user→user/@agent mentions reliably
 	// drive thread subscription and activity generation even when the client does
 	// not construct Mention structs. Self-mention (the caller's own id) is dropped.
-	parsedMentions := s.parseContentMentions(ctx, convID, req.Msg.Content, "")
-	mentions := mergeMentions(parsedMentions, req.Msg.Mentions, user.Handle)
+	parsedMentions := s.parseContentMentions(ctx, convID, req.Msg.Content)
+	mentions := mergeMentions(parsedMentions, req.Msg.Mentions)
 
 	// Atomically bump conversation.version and write the user message with that
 	// room_version. This is the single source of truth for the room cursor. When

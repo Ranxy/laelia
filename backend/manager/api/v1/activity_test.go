@@ -124,32 +124,57 @@ func TestStoreToV1ActivityState(t *testing.T) {
 	})
 }
 
-// TestMergeMentions guards the union/dedup/self-drop contract of mergeMentions:
-// server-parsed and client mentions are unioned by type:id (first seen wins),
-// and a self-mention (type=="user" with the caller's own handle) is dropped so
-// a user never generates a MENTION activity for their own message.
+// TestMergeMentions guards the union/dedup contract of mergeMentions:
+// server-parsed and client mentions are unioned by type:id (first seen wins).
+// Self-mentions are NOT dropped here — they are kept so the frontend can render
+// @self as a badge; activity generation (generateActivityRows) skips the sender
+// so a user never gets a MENTION activity for their own message.
 func TestMergeMentions(t *testing.T) {
-	parsed := []*v1pb.Mention{{Type: "user", Id: "alice-user-1", Name: "Alice"}, {Type: "agent", Id: "bot-agent-1", Name: "Bot"}}
-	client := []*v1pb.Mention{{Type: "user", Id: "alice-user-1", Name: "Alice Dup"}, {Type: "user", Id: "bob-user-2", Name: "Bob"}}
+	// Realistic data: parseContentMentions sets Name = the literal token the
+	// author typed (a handle or a display name); the client picker sets Name =
+	// the handle. Dedup is by type:id+Name so the same member mentioned with
+	// different text tokens is kept once per token.
+	parsed := []*v1pb.Mention{
+		{Type: "user", Id: "alice-user-1", Name: "alice-user-1"}, // typed as handle
+		{Type: "agent", Id: "bot-agent-1", Name: "bot-agent-1"},
+	}
+	client := []*v1pb.Mention{
+		{Type: "user", Id: "alice-user-1", Name: "alice-user-1"}, // picker: same token → deduped
+		{Type: "user", Id: "bob-user-2", Name: "bob-user-2"},
+	}
 
-	merged := mergeMentions(parsed, client, "")
-	assert.Len(t, merged, 3, "dedup by type:id keeps 3 distinct members")
-	assert.Equal(t, "Alice", merged[0].Name, "first-seen display name wins on dedup")
+	merged := mergeMentions(parsed, client)
+	assert.Len(t, merged, 3, "dedup by type:id+Name keeps 3 distinct (member,token) pairs")
+	assert.Equal(t, "alice-user-1", merged[0].Name, "first-seen name wins on dedup")
 	assert.Equal(t, "bot-agent-1", merged[1].Id)
 	assert.Equal(t, "bob-user-2", merged[2].Id)
 
-	// Self-mention dropped when selfHandle matches a user mention.
-	withSelf := mergeMentions(parsed, []*v1pb.Mention{{Type: "user", Id: "alice-user-1"}}, "alice-user-1")
-	for _, m := range withSelf {
-		assert.False(t, m.Type == "user" && m.Id == "alice-user-1", "self-mention must be dropped")
-	}
+	// Same member, different text tokens (handle + display name) → BOTH kept.
+	handleAndName := mergeMentions(
+		[]*v1pb.Mention{{Type: "agent", Id: "jane-agent-1", Name: "jane-agent-1"}},
+		[]*v1pb.Mention{{Type: "agent", Id: "jane-agent-1", Name: "jane"}},
+	)
+	assert.Len(t, handleAndName, 2, "same member with different tokens must both be kept")
+	assert.Equal(t, "jane-agent-1", handleAndName[0].Name)
+	assert.Equal(t, "jane", handleAndName[1].Name)
 
-	// Agent mention with the caller's user handle is NOT dropped (self-drop is user-only).
-	agentSelf := mergeMentions(nil, []*v1pb.Mention{{Type: "agent", Id: "alice-user-1"}}, "alice-user-1")
-	assert.Len(t, agentSelf, 1, "agent mention is not a self-mention even if id collides")
+	// Self-mention is KEPT (not dropped) so the frontend can render it; the
+	// activity layer is responsible for not notifying the sender.
+	withSelf := mergeMentions(parsed, []*v1pb.Mention{{Type: "user", Id: "alice-user-1", Name: "alice-user-1"}})
+	found := false
+	for _, m := range withSelf {
+		if m.Type == "user" && m.Id == "alice-user-1" {
+			found = true
+		}
+	}
+	assert.True(t, found, "self-mention must be kept for rendering, not dropped")
+
+	// Agent mention with a user's handle is kept too.
+	agentSelf := mergeMentions(nil, []*v1pb.Mention{{Type: "agent", Id: "alice-user-1", Name: "alice-user-1"}})
+	assert.Len(t, agentSelf, 1, "agent mention kept")
 
 	// Nil-safe.
-	assert.Empty(t, mergeMentions(nil, nil, ""))
+	assert.Empty(t, mergeMentions(nil, nil))
 }
 
 // sqlNullTime returns a valid sql.NullTime for tests that just need "set".

@@ -78,18 +78,31 @@ func preferredLanguageString(l v1pb.PreferredLanguage) string {
 }
 
 // formatMemberLine renders one roster entry: the header line (type, display
-// name, agents/<id> handle for agents, role when meaningful), followed by the
-// member's full description as an indented block when present — for users this
-// is their self-description, for agents it is the complete persona_prompt. The
-// full text is emitted untruncated so the agent gets every co-agent's persona in
-// the one call that produced this roster.
+// name, @<handle> mention token for every member, role when meaningful),
+// followed by the member's full description as an indented block when present —
+// for users this is their self-description, for agents it is the complete
+// persona_prompt. The full text is emitted untruncated so the agent gets every
+// co-agent's persona in the one call that produced this roster.
+//
+// The @<handle> token is shown for ALL members (users and agents alike) and is
+// the exact text to copy into a reply to mention that member. Before the
+// handle migration only agents had an [agents/<id>] suffix and users had no
+// handle at all, so agents could not address users by handle and often fell
+// back to display names — which no longer resolve. Surfacing @<handle>
+// universally closes that gap.
 func formatMemberLine(m *v1pb.ChannelMember) string {
 	if m == nil {
 		return ""
 	}
 	line := fmt.Sprintf("- [%s] %s", memberTypeString(m.MemberType), m.DisplayName)
-	if m.MemberType == memberTypeAgent && m.MemberId != "" {
-		line += fmt.Sprintf(" [agents/%s]", m.MemberId)
+	// handle is the member's mention handle (identical to member_id); show it
+	// as @<handle> so the agent can copy it straight into a reply.
+	handle := m.Handle
+	if handle == "" {
+		handle = m.MemberId
+	}
+	if handle != "" {
+		line += fmt.Sprintf(" @%s", handle)
 	}
 	if role := memberRoleString(m.MemberRole); role != "" {
 		line += fmt.Sprintf(" (%s)", role)

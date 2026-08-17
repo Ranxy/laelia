@@ -31,12 +31,14 @@ func TestListPeerAgentsRendersRoster(t *testing.T) {
 	c := &fakeAgentListClient{agents: []*v1pb.PeerAgent{
 		{
 			Name:            "agents/rei-agent-1",
+			Handle:          "rei-agent-1",
 			DisplayName:     "rei",
 			PersonaPrompt:   "精通后端, 专注构建 agent。\n前端任务请转给 @ui-expert。",
 			ConnectionState: v1pb.AgentStatus_ONLINE,
 		},
 		{
 			Name:            "agents/ui-expert-agent-1",
+			Handle:          "ui-expert-agent-1",
 			DisplayName:     "ui-expert",
 			PersonaPrompt:   "",
 			ConnectionState: v1pb.AgentStatus_OFFLINE,
@@ -48,11 +50,11 @@ func TestListPeerAgentsRendersRoster(t *testing.T) {
 	// Header carries the count.
 	assert.Contains(t, out, "Peer agents (2):")
 	// rei: handle + online state, then the full (multi-line, untruncated) persona.
-	assert.Contains(t, out, "- [agent] rei [agents/rei-agent-1] (online)")
+	assert.Contains(t, out, "- [agent] rei @rei-agent-1 (online)")
 	assert.Contains(t, out, "  精通后端, 专注构建 agent。")
 	assert.Contains(t, out, "  前端任务请转给 @ui-expert。")
 	// ui-expert: no persona → no indented block; offline state.
-	assert.Contains(t, out, "- [agent] ui-expert [agents/ui-expert-agent-1] (offline)")
+	assert.Contains(t, out, "- [agent] ui-expert @ui-expert-agent-1 (offline)")
 	// The delegation hint names dm:@<handle>; handles are unique so no
 	// display-name disambiguation fallback exists.
 	assert.Contains(t, out, "message send dm:@<handle>")

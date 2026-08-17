@@ -932,7 +932,7 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 		// `@someone`; the manager parses those tokens into structured Mentions
 		// (the agent never sets Mentions itself). Parsed mentions are persisted on
 		// the message and drive thread subscription / wake routing below.
-		mentions := s.parseContentMentions(ctx, convUUID, req.Msg.Content, agent.ResourceID)
+		mentions := s.parseContentMentions(ctx, convUUID, req.Msg.Content)
 
 		msg, newVersion, createErr := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
 			ConversationID:      convUUID,

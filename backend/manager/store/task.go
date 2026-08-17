@@ -565,6 +565,18 @@ func (s *Store) fillTaskInfo(ctx context.Context, msgs []*ChatMessage) error {
 		case 1:
 			ti.AssigneeName = userName
 			ti.AssigneeResourceID = userHandle
+		case 0:
+			// assignee_type is NULL: either an unassigned task (no assignee
+			// at all) or a legacy task assigned before the assignee_type
+			// column existed (assignee_agent_id set but assignee_type not
+			// backfilled). Fall back to the agent assignee when present so
+			// legacy data still renders; a truly unassigned task leaves the
+			// name/resource empty.
+			if agentID.Valid {
+				ti.AssigneeType = 2
+				ti.AssigneeName = agentName
+				ti.AssigneeResourceID = agentResID
+			}
 		default:
 			return errors.New("Incorrect AssigneeType")
 		}

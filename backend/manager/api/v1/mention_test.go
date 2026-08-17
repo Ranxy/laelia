@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
 // TestTokenizeMentions guards the `@<handle>` extraction that
@@ -31,6 +33,18 @@ func TestTokenizeMentions(t *testing.T) {
 		{"trailing @ with no name", "see you @", []string{}},
 		{"duplicate tokens preserved in order", "@alice-user-1 @alice-user-1 @bob-user-2", []string{"alice-user-1", "alice-user-1", "bob-user-2"}},
 		{"punctuation stops bare token", "hey @alice-user-1, can you?", []string{"alice-user-1"}},
+		// A trailing '.' is sentence-ending punctuation, not part of the
+		// handle. Without the trailing-dot strip the token would be
+		// "para-agent-1." and the handle lookup would miss, silently dropping
+		// the mention (the exact bug where agent messages with "@handle." at
+		// the end of a sentence had no mentions field).
+		{"trailing sentence period is stripped", "Waiting for my role from @para-agent-1.", []string{"para-agent-1"}},
+		{"trailing period then space", "ping @para-agent-1. ok", []string{"para-agent-1"}},
+		{"trailing double period stripped", "see @para-agent-1.. weird", []string{"para-agent-1"}},
+		// An internal '.' (followed by a name rune) is preserved — it may be
+		// part of a hypothetical handle like "team.lead-user-1".
+		{"internal period preserved", "escalate to @team.lead-user-1 now", []string{"team.lead-user-1"}},
+		{"internal period then trailing period", "ask @team.lead-user-1. please", []string{"team.lead-user-1"}},
 		// A bare display name without a handle suffix is not a mention token
 		// only if it fails the name-rune scan; "alice" alone is still a token
 		// (resolution decides whether it names a member).
@@ -56,4 +70,102 @@ func TestMentionTypeString(t *testing.T) {
 func TestNormalizeMentionName(t *testing.T) {
 	assert.Equal(t, "alice-user-1", normalizeMentionName("  Alice-User-1 "))
 	assert.Equal(t, "rei-agent-1", normalizeMentionName("REI-AGENT-1"))
+}
+
+// TestBuildDisplayNameIndexWithResolver guards the display-name fallback index
+// that parseContentMentions uses when handle matching fails: unambiguous
+// display names resolve, ambiguous ones (two members sharing a name) are
+// excluded so a display name can never misroute, and empty names are skipped.
+func TestBuildDisplayNameIndexWithResolver(t *testing.T) {
+	members := []*store.ConversationMember{
+		{MemberType: store.MemberTypeAgent, MemberID: "rei-agent-1"},
+		{MemberType: store.MemberTypeUser, MemberID: "alice-user-1"},
+		{MemberType: store.MemberTypeAgent, MemberID: "bot-agent-1"},
+		{MemberType: store.MemberTypeUser, MemberID: "empty-user-1"},
+	}
+	resolve := func(_ int32, memberID string) string {
+		switch memberID {
+		case "rei-agent-1":
+			return "Rei"
+		case "alice-user-1":
+			return "Alice"
+		case "bot-agent-1":
+			return "Rei" // same display name as rei → ambiguous
+		case "empty-user-1":
+			return "" // empty display name → skipped
+		}
+		return ""
+	}
+	idx := buildDisplayNameIndexWithResolver(members, resolve)
+
+	// "rei" is ambiguous (Rei and bot both have display name "Rei") → excluded.
+	_, ok := idx["rei"]
+	assert.False(t, ok, "ambiguous display name must be excluded")
+
+	// "alice" is unique → resolves to the alice member.
+	m, ok := idx["alice"]
+	assert.True(t, ok, "unique display name must resolve")
+	assert.Equal(t, "alice-user-1", m.MemberID)
+
+	// Empty display name → not in the index.
+	_, ok = idx[""]
+	assert.False(t, ok, "empty display name must be skipped")
+}
+
+// TestResolveMentionTokenFallback verifies the two-pass resolution order used
+// by parseContentMentions: a token that matches a handle resolves by handle,
+// and a token that does NOT match any handle but matches a display name
+// resolves by display name (the case where an agent wrote @<display name>
+// instead of @<handle>).
+func TestResolveMentionTokenFallback(t *testing.T) {
+	// Members: agent "rei-agent-1" (display name "Rei"), user "alice-user-1"
+	// (display name "Alice").
+	members := []*store.ConversationMember{
+		{MemberType: store.MemberTypeAgent, MemberID: "rei-agent-1"},
+		{MemberType: store.MemberTypeUser, MemberID: "alice-user-1"},
+	}
+	resolve := func(_ int32, memberID string) string {
+		switch memberID {
+		case "rei-agent-1":
+			return "Rei"
+		case "alice-user-1":
+			return "Alice"
+		}
+		return ""
+	}
+
+	byHandle := make(map[string]*store.ConversationMember, len(members))
+	for _, m := range members {
+		byHandle[normalizeMentionName(m.MemberID)] = m
+	}
+	byDisplayName := buildDisplayNameIndexWithResolver(members, resolve)
+
+	// Helper mirroring parseContentMentions' resolution order.
+	resolveToken := func(token string) (*store.ConversationMember, bool) {
+		key := normalizeMentionName(token)
+		if m, ok := byHandle[key]; ok {
+			return m, true
+		}
+		m, ok := byDisplayName[key]
+		return m, ok
+	}
+
+	// Handle match: "rei-agent-1" is a known handle.
+	m, ok := resolveToken("rei-agent-1")
+	assert.True(t, ok)
+	assert.Equal(t, store.MemberTypeAgent, m.MemberType)
+
+	// Display-name fallback: "Rei" is NOT a handle, but it IS a display name.
+	m, ok = resolveToken("Rei")
+	assert.True(t, ok, "display name must resolve when handle match fails")
+	assert.Equal(t, "rei-agent-1", m.MemberID)
+
+	// Unknown token: neither handle nor display name.
+	_, ok = resolveToken("nobody")
+	assert.False(t, ok)
+
+	// Case-insensitive: "ALICE" matches display name "Alice".
+	m, ok = resolveToken("ALICE")
+	assert.True(t, ok)
+	assert.Equal(t, "alice-user-1", m.MemberID)
 }

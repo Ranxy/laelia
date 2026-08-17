@@ -90,3 +90,138 @@ describe("contentWithMentionTags with labelFor", () => {
     );
   });
 });
+
+// Regression tests for the bugs that previously left some @mentions rendered
+// as plain text ("@someone" / "@xxx-agent-N") instead of badges:
+//   1. repeated mention — the same member @mentioned several times was only
+//      rendered once (the backend dedups to a single Mention, and the old
+//      matcher tried each mention exactly once);
+//   2. prefix handles — "ran-user-1" was matched inside "@ran-user-10", eating
+//      the longer handle and leaving "0" as stray text;
+//   3. missing leading boundary — a "@" inside an email local-part or a word
+//      could be mistaken for a mention.
+const user1: MentionRef = { type: "user", id: "u-1", name: "ran-user-1" };
+const user10: MentionRef = { type: "user", id: "u-10", name: "ran-user-10" };
+
+describe("splitByMentions repeated mentions", () => {
+  it("renders every occurrence of a repeated handle, not just the first", () => {
+    const segs = splitByMentions("@alice hi @alice again @alice", [alice]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["@alice", " hi ", "@alice", " again ", "@alice"]);
+  });
+
+  it("renders every occurrence through contentWithMentionTags too", () => {
+    expect(contentWithMentionTags("@alice hi @alice", [alice])).toBe(
+      '<mention type="user" id="u-1" name="alice">@alice</mention> hi <mention type="user" id="u-1" name="alice">@alice</mention>'
+    );
+  });
+});
+
+describe("splitByMentions prefix handles", () => {
+  it("matches the longer handle when a shorter one is a prefix", () => {
+    const segs = splitByMentions("ping @ran-user-10 then @ran-user-1", [
+      user1,
+      user10,
+    ]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["ping ", "@ran-user-10", " then ", "@ran-user-1"]);
+  });
+
+  it("still matches the short handle when the long one is absent", () => {
+    const segs = splitByMentions("ping @ran-user-1 ok", [user1, user10]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["ping ", "@ran-user-1", " ok"]);
+  });
+});
+
+describe("splitByMentions boundaries", () => {
+  it("does not match a @handle embedded in an email local-part", () => {
+    const segs = splitByMentions("contact alice@x.com or @alice", [alice]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["contact alice@x.com or ", "@alice"]);
+  });
+
+  it("does not match a @handle preceded by a letter", () => {
+    const segs = splitByMentions("foo@bar @alice", [
+      { type: "user", id: "u-bar", name: "bar" },
+      alice,
+    ]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["foo@bar ", "@alice"]);
+  });
+});
+
+// Regression: a trailing '.' (sentence-ending period) after a handle must not
+// block mention rendering. '.' is a valid INTERNAL handle separator
+// (team.lead-user-1) but a trailing '.' is punctuation. Before the fix the
+// trailing boundary treated '.' as a handle continuation, so "@para-agent-1."
+// at the end of a sentence never rendered as a badge even when the backend
+// resolved the mention.
+const paraAgent: MentionRef = {
+  type: "agent",
+  id: "agents/para",
+  name: "para-agent-1",
+};
+const teamLead: MentionRef = {
+  type: "user",
+  id: "u-team",
+  name: "team.lead-user-1",
+};
+
+describe("splitByMentions trailing sentence period", () => {
+  it("renders a handle followed by a sentence period", () => {
+    const segs = splitByMentions("Waiting for my role from @para-agent-1.", [
+      paraAgent,
+    ]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["Waiting for my role from ", "@para-agent-1", "."]);
+  });
+
+  it("renders a handle followed by a period and space", () => {
+    const segs = splitByMentions("ping @para-agent-1. ok", [paraAgent]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["ping ", "@para-agent-1", ". ok"]);
+  });
+
+  it("still renders a handle followed by other punctuation (bang)", () => {
+    const segs = splitByMentions("Looking forward to @para-agent-1!", [
+      paraAgent,
+    ]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["Looking forward to ", "@para-agent-1", "!"]);
+  });
+
+  it("preserves an internal dot and strips a trailing dot", () => {
+    const segs = splitByMentions("ask @team.lead-user-1. please", [teamLead]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["ask ", "@team.lead-user-1", ". please"]);
+  });
+
+  it("renders a handle with an internal dot (no trailing dot)", () => {
+    const segs = splitByMentions("escalate to @team.lead-user-1 now", [
+      teamLead,
+    ]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["escalate to ", "@team.lead-user-1", " now"]);
+  });
+
+  it("renders the handle through contentWithMentionTags too", () => {
+    expect(
+      contentWithMentionTags("Waiting for my role from @para-agent-1.", [
+        paraAgent,
+      ])
+    ).toBe(
+      'Waiting for my role from <mention type="agent" id="agents/para" name="para-agent-1">@para-agent-1</mention>.'
+    );
+  });
+});

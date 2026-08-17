@@ -40,7 +40,7 @@ func ListPeerAgents(ctx context.Context, d Deps, _ ListPeerAgentsInput) (string,
 }
 
 // formatPeerAgentLine renders one peer-agent entry: a header line carrying the
-// [agent] type, display name, agents/<id> handle (copyable straight into
+// [agent] type, display name, @<handle> mention token (copyable straight into
 // dm:@<handle>), and connection state; followed by the agent's complete
 // persona_prompt as an indented block, emitted untruncated so one roster call
 // carries every co-agent's persona.
@@ -48,12 +48,16 @@ func formatPeerAgentLine(a *v1pb.PeerAgent) string {
 	if a == nil {
 		return ""
 	}
-	handle := strings.TrimSpace(a.GetName()) // "agents/<resource-id>"
+	handle := strings.TrimSpace(a.GetHandle())
 	if handle == "" {
-		handle = "agents/?"
+		handle = strings.TrimSpace(a.GetName()) // fall back to "agents/<id>" form
 	}
-	line := fmt.Sprintf("- [agent] %s [%s] (%s)\n",
-		strings.TrimSpace(a.GetDisplayName()), handle, connectionStateString(a.GetConnectionState()))
+	handlePart := ""
+	if handle != "" {
+		handlePart = fmt.Sprintf(" @%s", handle)
+	}
+	line := fmt.Sprintf("- [agent] %s%s (%s)\n",
+		strings.TrimSpace(a.GetDisplayName()), handlePart, connectionStateString(a.GetConnectionState()))
 	if persona := strings.TrimSpace(a.GetPersonaPrompt()); persona != "" {
 		for _, l := range strings.Split(persona, "\n") {
 			line += "  " + l + "\n"

@@ -451,6 +451,15 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 		if err != nil || user == nil {
 			continue
 		}
+		// Skip a self-mention: a user @mentioning themself should still
+		// render as a badge (the mention is persisted on the message), but
+		// must not generate a MENTION activity in their own feed. Only user
+		// messages (Role==1) have PrincipalID == sender's user id; for agent
+		// messages PrincipalID is the conversation owner, so an agent
+		// @mentioning the owner is NOT a self-mention and must still notify.
+		if msg.Role == 1 && user.ID == msg.PrincipalID {
+			continue
+		}
 		mentionCats[user.ID] |= ActivityCategoryMention
 	}
 	// DIRECT: a top-level plain message in a 1:1 DM (user<->user type=4 or
