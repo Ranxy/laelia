@@ -71,11 +71,18 @@ function registerMarkdownComponents(): void {
   setCustomComponents({
     // biome-ignore lint/suspicious/noExplicitAny: markstream custom component API is loosely typed
     code_block: ({ node, isDark, ctx }: any) => (
+      // Keep only the copy action; the other header controls are unused and
+      // their collapse/expand handling is currently broken in markstream-react.
       <MarkdownCodeBlockNode
         node={node}
         isDark={isDark}
         stream={ctx?.codeBlockStream}
         {...(ctx?.codeBlockProps ?? {})}
+        showCollapseButton={false}
+        showExpandButton={false}
+        showPreviewButton={false}
+        showFontSizeButtons={false}
+        enableFontSizeControl={false}
       />
     ),
     mention: MentionChip,
