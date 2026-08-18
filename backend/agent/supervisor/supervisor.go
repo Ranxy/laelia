@@ -35,6 +35,10 @@ import (
 // socket so Windows works without extra dependencies.
 var AddrFile = "supervisor.addr"
 
+// errSupervisorStopping is returned by startWorker when the supervisor is
+// already shutting down; watchWorker treats it as a clean exit, not a failure.
+var errSupervisorStopping = errors.New("supervisor stopping")
+
 // UpgradeRequest is the control payload the business process forwards when
 // the manager pushes an UpgradeRequest over the MachineChannel.
 type UpgradeRequest struct {
@@ -76,7 +80,12 @@ type Supervisor struct {
 	workerPaused bool
 	status       Status
 	mu           sync.Mutex
-	stopWatcher  chan struct{}
+	// stopping is set when the supervisor is shutting down (stop command or
+	// signal). startWorker checks it under mu and refuses to spawn a new
+	// worker, so watchWorker cannot race the shutdown by respawning the
+	// business process between stopWorker and close(stopWatcher).
+	stopping    bool
+	stopWatcher chan struct{}
 	// shutdown is closed by the control endpoint when `laelia-machine stop`
 	// asks this supervisor to exit; Run selects on it alongside ctx.Done().
 	shutdown     chan struct{}
@@ -131,8 +140,19 @@ func (s *Supervisor) Run(ctx context.Context) error {
 		slog.Info("shutdown requested via control endpoint")
 	}
 	slog.Info("machine supervisor stopping")
-	s.stopWorker()
+
+	// Stop the watcher BEFORE killing the worker. watchWorker selects on the
+	// same worker `done` channel that stopWorker waits on; if we killed first,
+	// the worker exit would wake watchWorker into its "worker exited; restarting"
+	// path before stopWatcher is closed, respawning a new worker that nobody
+	// then kills (it gets orphaned with a new pid). Setting `stopping` and
+	// closing stopWatcher first makes watchWorker take its shutdown branch and
+	// return without respawning.
+	s.mu.Lock()
+	s.stopping = true
+	s.mu.Unlock()
 	close(s.stopWatcher)
+	s.stopWorker()
 	return nil
 }
 
@@ -263,6 +283,9 @@ func (s *Supervisor) watchWorker() {
 		}
 		done, err := s.startWorker()
 		if err != nil {
+			if err == errSupervisorStopping {
+				return
+			}
 			slog.Error("failed to spawn worker", "error", err)
 			select {
 			case <-s.stopWatcher:
@@ -301,6 +324,18 @@ func (s *Supervisor) watchWorker() {
 }
 
 func (s *Supervisor) startWorker() (chan struct{}, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Refuse to spawn while shutting down. Holding mu across cmd.Start and the
+	// workerCmd/workerDone assignment also closes the race where stopWorker
+	// read a stale workerCmd just before an in-flight spawn assigned the new
+	// one: stopWorker now either sees the freshly assigned cmd (and kills it)
+	// or this call aborts before spawning.
+	if s.stopping {
+		return nil, errSupervisorStopping
+	}
+
 	cmd := exec.Command(s.exePath, s.workerArgs...)
 	cmd.Env = os.Environ()
 	logFile, err := os.OpenFile(s.logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
@@ -317,10 +352,8 @@ func (s *Supervisor) startWorker() (chan struct{}, error) {
 		_ = cmd.Wait()
 		close(done)
 	}()
-	s.mu.Lock()
 	s.workerCmd = cmd
 	s.workerDone = done
-	s.mu.Unlock()
 	slog.Info("worker started", "pid", cmd.Process.Pid)
 	return done, nil
 }
