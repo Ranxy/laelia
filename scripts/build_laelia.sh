@@ -19,7 +19,7 @@ cp -r frontend/dist backend/manager/server/dist
 scripts/build-embedded-machines.sh "${EMBED_DIR}"
 
 echo "Building manager (${VERSION})..."
-CGO_ENABLED=0 go build -tags "embed_frontend embed_machine" -ldflags "-w -s" -p=16 \
+CGO_ENABLED=0 go build -tags "embed_frontend embed_machine" -ldflags "-w -s -X github.com/Ranxy/laelia/backend/manager/version.Version=${VERSION} -X github.com/Ranxy/laelia/backend/manager/version.GitCommit=${GIT_COMMIT} -X github.com/Ranxy/laelia/backend/manager/version.BuildTime=${BUILD_TIME}" -p=16 \
 	-o "${OUTPUT_DIR}/laelia" ./backend/manager/bin/server/main.go
 
 echo ""

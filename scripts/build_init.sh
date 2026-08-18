@@ -3,4 +3,5 @@
 set -euo pipefail
 
 VERSION="${VERSION:-local}"
-GIT_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+GIT_COMMIT="${GIT_COMMIT:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
+BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"

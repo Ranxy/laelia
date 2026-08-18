@@ -477,7 +477,10 @@
     "toggle-secret-visibility": "Toggle visibility",
     "type-to-search": "Type to search...",
     "stop": "Stop",
-    "start": "Start"
+    "start": "Start",
+    "version": "Version",
+    "hash": "Hash",
+    "build-time": "Build Time"
   },
   "landing": {},
   "machine": {
@@ -587,7 +590,9 @@
     "upgrade-cta": "Upgrade",
     "upgrade-failed": "Machine upgrade failed",
     "upgrade-in-progress-title": "Upgrading machine",
-    "upgrade-stage": "Stage: {{stage}} → {{version}}. The machine will reconnect automatically when done."
+    "upgrade-stage": "Stage: {{stage}} → {{version}}. The machine will reconnect automatically when done.",
+    "detail-hash": "Hash",
+    "detail-build-time": "Build Time"
   },
   "members": {
     "add-agent": "Add agent",

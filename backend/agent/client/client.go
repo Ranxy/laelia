@@ -552,11 +552,15 @@ func (c *MachineClient) collectMachineInfo() *v1pb.MachineInfo {
 	c.mu.RUnlock()
 
 	return &v1pb.MachineInfo{
-		Hostname:           hostname,
-		Os:                 runtime.GOOS,
-		Arch:               runtime.GOARCH,
-		Version:            c.machineVersion,
-		Ip:                 getOutboundIP(),
+		Hostname: hostname,
+		Os:       runtime.GOOS,
+		Arch:     runtime.GOARCH,
+		Version:  c.machineVersion,
+		Ip:       getOutboundIP(),
+		Labels: map[string]string{
+			"git_commit": version.GitCommit,
+			"build_time": version.BuildTime,
+		},
 		AvailableProviders: discoveredToProto(providers, discoveredAt),
 	}
 }

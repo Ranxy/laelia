@@ -779,6 +779,16 @@ export function MachineProfilePage() {
                     {info.version}
                   </Field>
                 )}
+                {info?.labels?.["git_commit"] && (
+                  <Field label={t("machine.detail-hash")}>
+                    {info.labels["git_commit"]}
+                  </Field>
+                )}
+                {info?.labels?.["build_time"] && (
+                  <Field label={t("machine.detail-build-time")}>
+                    {info.labels["build_time"]}
+                  </Field>
+                )}
                 {machine.status?.connectedTime && (
                   <Field label={t("machine.detail-connected")}>
                     {formatTimestamp(machine.status.connectedTime)}

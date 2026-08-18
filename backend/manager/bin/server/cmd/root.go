@@ -15,6 +15,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/common/log"
 	"github.com/Ranxy/laelia/backend/manager/server"
+	"github.com/Ranxy/laelia/backend/manager/version"
 )
 
 // -----------------------------------Global constant BEGIN----------------------------------------
@@ -61,12 +62,18 @@ var (
 		// pprofAddr is the bind address for the standalone pprof server, e.g.
 		// "127.0.0.1:6060". Empty disables pprof. Only effective with --debug.
 		pprofAddr string
+		// version prints build metadata and exits.
+		version bool
 	}
 
 	rootCmd = &cobra.Command{
 		Use:   "database management server",
 		Short: "database management server",
 		Run: func(_ *cobra.Command, _ []string) {
+			if flags.version {
+				printVersion()
+				return
+			}
 			start()
 		},
 	}
@@ -85,6 +92,13 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flags.tlsDomain, "tls-domain", "", "TLS public domain (enables ACME/Let's Encrypt auto-cert)")
 	rootCmd.PersistentFlags().BoolVar(&flags.trustProxy, "trust-proxy", false, "trust X-Forwarded-For/X-Real-IP as the source IP (enable only behind a trusted reverse proxy)")
 	rootCmd.PersistentFlags().StringVar(&flags.pprofAddr, "pprof-addr", "", "bind address for the standalone pprof server (e.g. 127.0.0.1:6060); empty disables pprof. Only effective with --debug; never exposed on the public port")
+	rootCmd.PersistentFlags().BoolVar(&flags.version, "version", false, "print version, git commit, and build time")
+}
+
+func printVersion() {
+	fmt.Printf("version: %s\n", version.Version)
+	fmt.Printf("git commit: %s\n", version.GitCommit)
+	fmt.Printf("build time: %s\n", version.BuildTime)
 }
 
 func start() {

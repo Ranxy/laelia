@@ -66,6 +66,10 @@ export default defineConfig({
         target: "http://localhost:8181",
         changeOrigin: true,
       },
+      "/api/version": {
+        target: "http://localhost:8181",
+        changeOrigin: true,
+      },
     },
     allowedHosts:["localhost","laeliapage.metaxisdata.com"],
   },

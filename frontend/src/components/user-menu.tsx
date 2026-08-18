@@ -69,11 +69,18 @@ export function useLogout() {
   }, [logout, navigate]);
 }
 
+interface BuildInfo {
+  version: string;
+  git_commit: string;
+  build_time: string;
+}
+
 export function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const currentUser = useAppStore((s) => s.currentUser);
   const [open, setOpen] = useState(false);
+  const [buildInfo, setBuildInfo] = useState<BuildInfo | null>(null);
   const {
     isAdmin,
     enabled: debugEnabled,
@@ -81,6 +88,14 @@ export function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
     toggle: handleDebugToggle,
   } = useDebugConfig();
   const signOut = useLogout();
+
+  useEffect(() => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
+    fetch(`${baseUrl}/api/version`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: BuildInfo | null) => setBuildInfo(data))
+      .catch(() => {});
+  }, []);
 
   async function handleLogout() {
     setOpen(false);
@@ -120,6 +135,18 @@ export function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
             {currentUser.email}
           </div>
         </div>
+        {buildInfo && (
+          <div className="space-y-0.5 border-t border-control-border px-3 py-2 text-xs text-control-light">
+            <div>
+              {t("common.version")}: {buildInfo.version}
+            </div>
+            <div className="truncate">
+              {t("common.hash")}: {buildInfo.git_commit.slice(0, 8)}
+            </div>
+            <div>{t("common.build-time")}</div>
+            <div className="truncate">{buildInfo.build_time}</div>
+          </div>
+        )}
         <DropdownMenuSeparator />
 
         <DropdownMenuItem

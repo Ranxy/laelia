@@ -477,7 +477,10 @@
     "toggle-secret-visibility": "切换可见性",
     "type-to-search": "输入以搜索...",
     "stop": "停止",
-    "start": "启动"
+    "start": "启动",
+    "version": "版本",
+    "hash": "Hash",
+    "build-time": "构建时间"
   },
   "landing": {},
   "machine": {
@@ -587,7 +590,9 @@
     "upgrade-cta": "升级",
     "upgrade-failed": "机器升级失败",
     "upgrade-in-progress-title": "机器升级中",
-    "upgrade-stage": "阶段: {{stage}} → {{version}}。完成后机器会自动重新连接。"
+    "upgrade-stage": "阶段: {{stage}} → {{version}}。完成后机器会自动重新连接。",
+    "detail-hash": "Hash",
+    "detail-build-time": "构建时间"
   },
   "members": {
     "add-agent": "添加 Agent",

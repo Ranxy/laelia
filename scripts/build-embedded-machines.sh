@@ -48,7 +48,7 @@ for entry in "${TARGETS[@]}"; do
   gz_path="${EMBED_DIR}/${gz_name}"
 
   GOOS="${goos}" GOARCH="${goarch}" CGO_ENABLED=0 go build -tags release \
-    -ldflags "-w -s -X github.com/Ranxy/laelia/backend/agent/version.Version=${VERSION}" -p=16 \
+    -ldflags "-w -s -X github.com/Ranxy/laelia/backend/agent/version.Version=${VERSION} -X github.com/Ranxy/laelia/backend/agent/version.GitCommit=${GIT_COMMIT} -X github.com/Ranxy/laelia/backend/agent/version.BuildTime=${BUILD_TIME}" -p=16 \
     -o "${bin_path}" ./backend/agent/bin/agent/main.go
 
   gzip -9 -c "${bin_path}" > "${gz_path}"

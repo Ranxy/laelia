@@ -12,10 +12,12 @@ RUN pnpm build
 FROM golang:1.26.5-alpine3.23 AS machine-build
 ARG VERSION=local
 ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
 # LAELIA_BUILD_PROXY is a custom arg so the proxy only reaches stages that
 # declare it; BuildKit would otherwise auto-inject standard proxy args into
 # every stage, including the final runtime image.
 ARG LAELIA_BUILD_PROXY
+ENV VERSION=${VERSION} GIT_COMMIT=${GIT_COMMIT} BUILD_TIME=${BUILD_TIME}
 ENV http_proxy=${LAELIA_BUILD_PROXY} https_proxy=${LAELIA_BUILD_PROXY} no_proxy=localhost,127.0.0.1
 ENV HTTP_PROXY=${LAELIA_BUILD_PROXY} HTTPS_PROXY=${LAELIA_BUILD_PROXY} NO_PROXY=localhost,127.0.0.1
 WORKDIR /build
@@ -29,7 +31,9 @@ RUN ./scripts/build-embedded-machines.sh /out/embedded_machine
 FROM golang:1.26.5-alpine3.23 AS manager-build
 ARG VERSION=local
 ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
 ARG LAELIA_BUILD_PROXY
+ENV BUILD_TIME=${BUILD_TIME}
 ENV http_proxy=${LAELIA_BUILD_PROXY} https_proxy=${LAELIA_BUILD_PROXY} no_proxy=localhost,127.0.0.1
 ENV HTTP_PROXY=${LAELIA_BUILD_PROXY} HTTPS_PROXY=${LAELIA_BUILD_PROXY} NO_PROXY=localhost,127.0.0.1
 WORKDIR /build
@@ -41,14 +45,16 @@ COPY . .
 RUN rm -rf ./backend/manager/server/dist ./backend/manager/server/embedded_machine
 COPY --from=frontend /frontend-build/dist ./backend/manager/server/dist
 COPY --from=machine-build /out/embedded_machine ./backend/manager/server/embedded_machine
-RUN CGO_ENABLED=0 go build -tags "embed_frontend embed_machine" -ldflags "-w -s" -p=16 \
+RUN CGO_ENABLED=0 go build -tags "embed_frontend embed_machine" -ldflags "-w -s -X github.com/Ranxy/laelia/backend/manager/version.Version=${VERSION} -X github.com/Ranxy/laelia/backend/manager/version.GitCommit=${GIT_COMMIT} -X github.com/Ranxy/laelia/backend/manager/version.BuildTime=${BUILD_TIME}" -p=16 \
 	-o /out/laelia ./backend/manager/bin/server/main.go
 
 FROM alpine:3.23 AS manager
 ARG VERSION=local
 ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
 LABEL org.opencontainers.image.version=${VERSION}
 LABEL org.opencontainers.image.revision=${GIT_COMMIT}
+LABEL org.opencontainers.image.created=${BUILD_TIME}
 RUN apk add --no-cache ca-certificates curl \
 	&& adduser -D -u 1000 laelia
 COPY --from=manager-build /out/laelia /usr/local/bin/laelia

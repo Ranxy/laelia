@@ -15,6 +15,7 @@ import (
 	"github.com/Ranxy/laelia/backend/common/log"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
+	"github.com/Ranxy/laelia/backend/manager/version"
 
 	connectcors "connectrpc.com/cors"
 )
@@ -47,6 +48,14 @@ func configureEchoRouters(
 	// Machine binary download routes must be registered before the SPA static
 	// middleware so they are not swallowed by the HTML5 fallback.
 	registerMachineDownloadRoutes(e, stores)
+
+	e.GET("/api/version", func(c *echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]string{
+			"version":    version.Version,
+			"git_commit": version.GitCommit,
+			"build_time": version.BuildTime,
+		})
+	})
 
 	embedFrontend(e)
 

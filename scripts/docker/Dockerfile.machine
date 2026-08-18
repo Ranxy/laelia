@@ -6,9 +6,11 @@
 FROM golang:1.26.5-alpine3.23 AS machine-build
 ARG VERSION=local
 ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
 ARG TARGETOS
 ARG TARGETARCH
 ARG LAELIA_BUILD_PROXY
+ENV BUILD_TIME=${BUILD_TIME}
 ENV http_proxy=${LAELIA_BUILD_PROXY} https_proxy=${LAELIA_BUILD_PROXY} no_proxy=localhost,127.0.0.1
 ENV HTTP_PROXY=${LAELIA_BUILD_PROXY} HTTPS_PROXY=${LAELIA_BUILD_PROXY} NO_PROXY=localhost,127.0.0.1
 WORKDIR /build
@@ -21,18 +23,20 @@ RUN apk add --no-cache curl bash
 # release-tagged machine build then embeds.
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 RUN ./scripts/build-pi.sh
-RUN CGO_ENABLED=0 go build -tags release -ldflags "-w -s" -p=16 \
+RUN CGO_ENABLED=0 go build -tags release -ldflags "-w -s -X github.com/Ranxy/laelia/backend/agent/version.Version=${VERSION} -X github.com/Ranxy/laelia/backend/agent/version.GitCommit=${GIT_COMMIT} -X github.com/Ranxy/laelia/backend/agent/version.BuildTime=${BUILD_TIME}" -p=16 \
 	-o /out/laelia-machine ./backend/agent/bin/agent/main.go
 
 FROM node:24.12.0-slim AS machine
 ARG VERSION=local
 ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
 ARG APT_MIRROR
 # Codex CLI version spec for the codex ACP v2 provider (npm package). Pin a
 # version for reproducible rebuilds; override with CODEX_NPM_SPEC.
 ARG CODEX_NPM_SPEC=@openai/codex@0.146.0
 LABEL org.opencontainers.image.version=${VERSION}
 LABEL org.opencontainers.image.revision=${GIT_COMMIT}
+LABEL org.opencontainers.image.created=${BUILD_TIME}
 # Agent runtime: pi is a glibc-linked standalone binary (debian base), and the
 # agents' shell tool needs a real dev environment: python3, node/npm (already
 # in the base image, as is bash), compilers/make, and common CLI utilities.
