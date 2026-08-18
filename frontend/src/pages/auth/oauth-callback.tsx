@@ -35,7 +35,8 @@ export function OAuthCallbackPage() {
           idpName: stored.idpName,
           code,
         });
-        const target = stored.redirect && stored.redirect !== "/" ? stored.redirect : "/";
+        const target =
+          stored.redirect && stored.redirect !== "/" ? stored.redirect : "/";
         navigate(target, { replace: true });
       } catch (err) {
         setError(

@@ -66,7 +66,9 @@ function useSettingsMenuItems(): MenuItem[] {
   const canViewIam = useHasPermission("laelia.iam.getPolicy");
   const canViewGroups = useHasPermission("laelia.groups.list");
   const canViewApiProviders = useHasPermission("laelia.apiProviders.list");
-  const canViewIdentityProviders = useHasPermission("laelia.identityProviders.list");
+  const canViewIdentityProviders = useHasPermission(
+    "laelia.identityProviders.list"
+  );
   const canViewAudit = useHasPermission("laelia.auditLogs.search");
   const canViewPushConfig = useHasPermission("laelia.pushConfig.update");
 

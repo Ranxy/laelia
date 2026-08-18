@@ -21,7 +21,10 @@ function generateSecureToken(): string {
 }
 
 function storeOAuthState(state: OAuthState): void {
-  localStorage.setItem(`${OAUTH_STATE_PREFIX}${state.token}`, JSON.stringify(state));
+  localStorage.setItem(
+    `${OAUTH_STATE_PREFIX}${state.token}`,
+    JSON.stringify(state)
+  );
 }
 
 export function retrieveOAuthState(token: string): OAuthState | null {

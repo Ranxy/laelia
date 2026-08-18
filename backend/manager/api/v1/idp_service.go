@@ -161,6 +161,7 @@ func (s *IdentityProviderService) UpdateIdentityProvider(ctx context.Context, re
 				if req.Msg.IdentityProvider.Config.GetLdapConfig().GetBindPassword() == "" && patch.Config.GetLdapConfig() != nil {
 					patch.Config.GetLdapConfig().BindPassword = current.Config.GetLdapConfig().GetBindPassword()
 				}
+			default:
 			}
 		default:
 		}

@@ -92,7 +92,8 @@ export function SignInPage() {
         </p>
       </div>
 
-      {providers.filter((p) => p.type === IdentityProviderType.OAUTH2).length > 0 && (
+      {providers.filter((p) => p.type === IdentityProviderType.OAUTH2).length >
+        0 && (
         <div className="flex flex-col gap-2 px-1">
           {providers
             .filter((p) => p.type === IdentityProviderType.OAUTH2)

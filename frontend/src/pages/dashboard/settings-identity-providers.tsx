@@ -68,7 +68,10 @@ function emptyForm(): IdpForm {
 }
 
 function idpToForm(p: IdentityProvider): IdpForm {
-  const oauth = p.config?.config?.case === "oauth2Config" ? p.config.config.value : undefined;
+  const oauth =
+    p.config?.config?.case === "oauth2Config"
+      ? p.config.config.value
+      : undefined;
   return {
     title: p.title,
     domain: p.domain,
@@ -83,8 +86,12 @@ function idpToForm(p: IdentityProvider): IdpForm {
   };
 }
 
-function typeLabel(t: IdentityProviderType, tFn: (k: string) => string): string {
-  if (t === IdentityProviderType.OAUTH2) return tFn("settings.identity-providers.type-oauth2");
+function typeLabel(
+  t: IdentityProviderType,
+  tFn: (k: string) => string
+): string {
+  if (t === IdentityProviderType.OAUTH2)
+    return tFn("settings.identity-providers.type-oauth2");
   if (t === IdentityProviderType.OIDC) return "OIDC";
   if (t === IdentityProviderType.LDAP) return "LDAP";
   return "—";
@@ -110,7 +117,9 @@ export function SettingsIdentityProvidersPage() {
   const [saving, setSaving] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<IdentityProvider | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<IdentityProvider | null>(
+    null
+  );
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
@@ -159,10 +168,14 @@ export function SettingsIdentityProvidersPage() {
 
   const validateForm = (form: IdpForm): string | null => {
     if (!form.title.trim()) return t("settings.identity-providers.field-title");
-    if (!form.clientId.trim()) return t("settings.identity-providers.field-client-id");
-    if (!form.authUrl.trim()) return t("settings.identity-providers.field-auth-url");
-    if (!form.tokenUrl.trim()) return t("settings.identity-providers.field-token-url");
-    if (!form.userInfoUrl.trim()) return t("settings.identity-providers.field-user-info-url");
+    if (!form.clientId.trim())
+      return t("settings.identity-providers.field-client-id");
+    if (!form.authUrl.trim())
+      return t("settings.identity-providers.field-auth-url");
+    if (!form.tokenUrl.trim())
+      return t("settings.identity-providers.field-token-url");
+    if (!form.userInfoUrl.trim())
+      return t("settings.identity-providers.field-user-info-url");
     return null;
   };
 
@@ -279,7 +292,9 @@ export function SettingsIdentityProvidersPage() {
   if (!canList) {
     return (
       <SettingsPage title={t("settings.identity-providers.title")}>
-        <PermissionNotice message={t("settings.identity-providers.not-allowed")} />
+        <PermissionNotice
+          message={t("settings.identity-providers.not-allowed")}
+        />
       </SettingsPage>
     );
   }
@@ -299,14 +314,18 @@ export function SettingsIdentityProvidersPage() {
       >
         <Input
           value={form.domain}
-          placeholder={t("settings.identity-providers.field-domain-placeholder")}
+          placeholder={t(
+            "settings.identity-providers.field-domain-placeholder"
+          )}
           onChange={(e) => setForm({ ...form, domain: e.target.value })}
         />
       </FieldRow>
       <FieldRow label={t("settings.identity-providers.field-client-id")}>
         <Input
           value={form.clientId}
-          placeholder={t("settings.identity-providers.field-client-id-placeholder")}
+          placeholder={t(
+            "settings.identity-providers.field-client-id-placeholder"
+          )}
           onChange={(e) => setForm({ ...form, clientId: e.target.value })}
         />
       </FieldRow>
@@ -329,42 +348,58 @@ export function SettingsIdentityProvidersPage() {
       <FieldRow label={t("settings.identity-providers.field-auth-url")}>
         <Input
           value={form.authUrl}
-          placeholder={t("settings.identity-providers.field-auth-url-placeholder")}
+          placeholder={t(
+            "settings.identity-providers.field-auth-url-placeholder"
+          )}
           onChange={(e) => setForm({ ...form, authUrl: e.target.value })}
         />
       </FieldRow>
       <FieldRow label={t("settings.identity-providers.field-token-url")}>
         <Input
           value={form.tokenUrl}
-          placeholder={t("settings.identity-providers.field-token-url-placeholder")}
+          placeholder={t(
+            "settings.identity-providers.field-token-url-placeholder"
+          )}
           onChange={(e) => setForm({ ...form, tokenUrl: e.target.value })}
         />
       </FieldRow>
       <FieldRow label={t("settings.identity-providers.field-user-info-url")}>
         <Input
           value={form.userInfoUrl}
-          placeholder={t("settings.identity-providers.field-user-info-url-placeholder")}
+          placeholder={t(
+            "settings.identity-providers.field-user-info-url-placeholder"
+          )}
           onChange={(e) => setForm({ ...form, userInfoUrl: e.target.value })}
         />
       </FieldRow>
       <FieldRow label={t("settings.identity-providers.field-scopes")}>
         <Input
           value={form.scopes}
-          placeholder={t("settings.identity-providers.field-scopes-placeholder")}
+          placeholder={t(
+            "settings.identity-providers.field-scopes-placeholder"
+          )}
           onChange={(e) => setForm({ ...form, scopes: e.target.value })}
         />
       </FieldRow>
-      <FieldRow label={t("settings.identity-providers.field-identifier-mapping")}>
+      <FieldRow
+        label={t("settings.identity-providers.field-identifier-mapping")}
+      >
         <Input
           value={form.identifier}
-          placeholder={t("settings.identity-providers.field-identifier-mapping-placeholder")}
+          placeholder={t(
+            "settings.identity-providers.field-identifier-mapping-placeholder"
+          )}
           onChange={(e) => setForm({ ...form, identifier: e.target.value })}
         />
       </FieldRow>
-      <FieldRow label={t("settings.identity-providers.field-display-name-mapping")}>
+      <FieldRow
+        label={t("settings.identity-providers.field-display-name-mapping")}
+      >
         <Input
           value={form.displayName}
-          placeholder={t("settings.identity-providers.field-display-name-mapping-placeholder")}
+          placeholder={t(
+            "settings.identity-providers.field-display-name-mapping-placeholder"
+          )}
           onChange={(e) => setForm({ ...form, displayName: e.target.value })}
         />
       </FieldRow>
@@ -402,9 +437,13 @@ export function SettingsIdentityProvidersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("settings.identity-providers.field-title")}</TableHead>
+                <TableHead>
+                  {t("settings.identity-providers.field-title")}
+                </TableHead>
                 <TableHead>{t("settings.identity-providers.type")}</TableHead>
-                <TableHead>{t("settings.identity-providers.field-domain")}</TableHead>
+                <TableHead>
+                  {t("settings.identity-providers.field-domain")}
+                </TableHead>
                 <TableHead className="w-24" />
               </TableRow>
             </TableHeader>
@@ -413,11 +452,11 @@ export function SettingsIdentityProvidersPage() {
                 <TableRow key={p.name}>
                   <TableCell className="font-medium">{p.title}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">
-                      {typeLabel(p.type, t)}
-                    </Badge>
+                    <Badge variant="secondary">{typeLabel(p.type, t)}</Badge>
                   </TableCell>
-                  <TableCell className="text-control-light">{p.domain || "—"}</TableCell>
+                  <TableCell className="text-control-light">
+                    {p.domain || "—"}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       {canUpdate && (
@@ -428,7 +467,9 @@ export function SettingsIdentityProvidersPage() {
                             if (p.type !== IdentityProviderType.OAUTH2) {
                               toastManager.add({
                                 type: "error",
-                                title: t("settings.identity-providers.unsupported-type"),
+                                title: t(
+                                  "settings.identity-providers.unsupported-type"
+                                ),
                               });
                               return;
                             }
@@ -464,7 +505,9 @@ export function SettingsIdentityProvidersPage() {
       <Sheet open={createOpen} onOpenChange={setCreateOpen}>
         <SheetContent width="standard">
           <SheetHeader>
-            <SheetTitle>{t("settings.identity-providers.create-title")}</SheetTitle>
+            <SheetTitle>
+              {t("settings.identity-providers.create-title")}
+            </SheetTitle>
             <SheetDescription>
               {t("settings.identity-providers.create-description")}
             </SheetDescription>

@@ -31,20 +31,29 @@ export function OAuthLoginPage() {
 
     (async () => {
       try {
-        const res = await identityProviderServiceClient.listIdentityProviders({});
+        const res = await identityProviderServiceClient.listIdentityProviders(
+          {}
+        );
         const provider = (res.identityProviders ?? []).find(
-          (p) => p.name === `idps/${providerId}` || p.name.endsWith(`/${providerId}`)
+          (p) =>
+            p.name === `idps/${providerId}` || p.name.endsWith(`/${providerId}`)
         );
         if (!provider) {
-          setError(t("auth.oauth-login.provider-not-found", { provider: providerId }));
+          setError(
+            t("auth.oauth-login.provider-not-found", { provider: providerId })
+          );
           return;
         }
         if (provider.type !== IdentityProviderType.OAUTH2) {
-          setError(t("auth.oauth-login.unsupported-type", { provider: provider.title }));
+          setError(
+            t("auth.oauth-login.unsupported-type", { provider: provider.title })
+          );
           return;
         }
         if (!startOAuthLogin(provider, redirect)) {
-          setError(t("auth.oauth-login.invalid-config", { provider: provider.title }));
+          setError(
+            t("auth.oauth-login.invalid-config", { provider: provider.title })
+          );
         }
         // startOAuthLogin navigates away on success; nothing else to do.
       } catch (err) {
