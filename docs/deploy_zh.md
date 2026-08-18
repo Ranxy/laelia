@@ -170,6 +170,8 @@ irm https://laelia.example.com/machine/install.ps1 | iex
 
 安装脚本由 Manager 提供，并且已经包含 Manager URL，因此无需设置环境变量。可选覆盖项：`LAELIA_MACHINE_INSTALL_DIR`（安装目录，默认 `~/.local/bin`）和 `LAELIA_MACHINE_FORCE=1`（即使已安装也重新安装）。
 
+> **Windows 注意：** pi 代理在 Windows 上无需 Git Bash。Laelia 会安装一个 pi 扩展，把 `bash` 工具替换为原生 PowerShell 5.1 后端，因此 agent 使用 PowerShell 语法（不要使用 Bash heredoc 或 Unix-only 命令）。
+
 ### 运行 `laelia-machine setup`
 
 安装完成后，运行页面显示的 setup 命令：

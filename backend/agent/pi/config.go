@@ -80,6 +80,12 @@ var piAllowEnv = []string{
 	"HTTP_PROXY",
 	"HTTPS_PROXY",
 	"NO_PROXY",
+	// Windows-specific variables pi and its PowerShell bash backend need to
+	// resolve system executables even when the daemon runs with a stripped PATH.
+	"SystemRoot",
+	"windir",
+	"ComSpec",
+	"PATHEXT",
 }
 
 // PiConfig is the fully-resolved configuration for a long-lived pi RPC session.
@@ -242,6 +248,10 @@ func (c *PiConfig) buildPiEnv(commandID string) []string {
 			values[k] = v
 		}
 	}
+	// On Windows the daemon may run as a service/background process with an
+	// incomplete PATH; merge the Machine/User environment scopes so pi and the
+	// laelia-machine CLI it shells out to can find user-installed tools.
+	mergeWindowsUserEnvironment(values)
 	filtered := map[string]string{}
 	for _, key := range piAllowEnv {
 		if v, ok := values[key]; ok {

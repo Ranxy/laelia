@@ -162,6 +162,9 @@ func (s *Session) Start(commandID string) error {
 	if err := writeManagedMcpExtension(s.cfg); err != nil {
 		slog.Warn("pi: failed to write managed mcp extension; continuing without mcp", "agent", s.cfg.AgentID, "error", err)
 	}
+	if err := writeWindowsShellExtension(s.cfg); err != nil {
+		slog.Warn("pi: failed to write windows powershell extension", "agent", s.cfg.AgentID, "error", err)
+	}
 
 	cmd := exec.CommandContext(s.ctx, s.cfg.PiBinaryPath, s.cfg.launchArgs()...)
 	cmd.Dir = s.cfg.WorkingDir

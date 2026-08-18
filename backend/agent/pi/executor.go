@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -725,26 +726,45 @@ func (e *PiExecutor) nextSeq() int32 { return e.seqNo.Add(1) }
 // re-anchor prompt (both pi-only paths; ACP never sees it).
 const piSteeringPrompt = `While you are working, new messages may be delivered into your current turn as a short notice (e.g. "[Laelia inbox notice: ...]"). When you see one, run ` + "`laelia-machine message check`" + ` (or ` + "`laelia-machine thread check`" + ` if the notice mentions a thread reply) at a natural breakpoint and process the new messages before ending your turn.`
 
+// piWindowsPowerShellPrompt tells pi agents on Windows that the "bash" tool is
+// actually PowerShell 5.1, so they use PowerShell syntax instead of Bash
+// heredocs/Unix-only commands.
+const piWindowsPowerShellPrompt = `On this Windows machine, the "bash" tool is a compatibility name: it executes native Windows PowerShell 5.1. Use PowerShell syntax (e.g. here-strings, not Bash heredocs) and avoid Unix-only commands.`
+
 // turnPromptText mirrors acp_executor.turnPromptText: cold turn sends the full
 // init prompt (identity + persona + communication + procedure + memory) plus
 // the batch; warm turn sends only the batch.
 func (e *PiExecutor) turnPromptText(resumed bool) string {
 	batch := strings.TrimSpace(e.req.TurnPrompt)
+	windowsNote := ""
+	if runtime.GOOS == "windows" {
+		windowsNote = piWindowsPowerShellPrompt
+	}
 	if resumed {
 		anchor := strings.TrimSpace(e.req.ReanchorPrompt)
 		if anchor == "" {
 			return batch
 		}
-		if batch == "" {
-			return anchor + "\n\n" + piSteeringPrompt
+		parts := []string{anchor}
+		if windowsNote != "" {
+			parts = append(parts, windowsNote)
 		}
-		return anchor + "\n\n" + piSteeringPrompt + "\n\n" + batch
+		parts = append(parts, piSteeringPrompt)
+		if batch != "" {
+			parts = append(parts, batch)
+		}
+		return strings.Join(parts, "\n\n")
 	}
 	initPrompt := executor.BuildPrompt(e.identity, e.req.OwnerDisplayName, e.cfg.PersonaPrompt)
-	if batch == "" {
-		return initPrompt + "\n\n" + piSteeringPrompt
+	parts := []string{initPrompt}
+	if windowsNote != "" {
+		parts = append(parts, windowsNote)
 	}
-	return initPrompt + "\n\n" + piSteeringPrompt + "\n\n" + batch
+	parts = append(parts, piSteeringPrompt)
+	if batch != "" {
+		parts = append(parts, batch)
+	}
+	return strings.Join(parts, "\n\n")
 }
 
 // finish flushes and emits the terminal FinalSummary event and Result, then

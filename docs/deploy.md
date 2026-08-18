@@ -222,6 +222,11 @@ URL, so no environment variables are needed. Optional overrides:
 `LAELIA_MACHINE_INSTALL_DIR` (install directory, default `~/.local/bin`) and
 `LAELIA_MACHINE_FORCE=1` (reinstall even if already present).
 
+> **Windows note:** pi agents work on Windows without Git Bash. Laelia installs
+> a pi extension that overrides the `bash` tool with a native PowerShell 5.1
+> backend, so the agent uses PowerShell syntax (no Bash heredocs or Unix-only
+> commands).
+
 ### Run `laelia-machine setup`
 
 After installation, run the setup command shown on the page:
