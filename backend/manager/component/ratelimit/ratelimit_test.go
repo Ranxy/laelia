@@ -313,3 +313,24 @@ func TestRateLimit_LoginUsesLoginBucket(t *testing.T) {
 		t.Fatalf("expected ResourceExhausted, got %s: %v", code, err)
 	}
 }
+
+// TestPublicReadProcedureClassification verifies that the anonymous login-page
+// read endpoints are classified as public-read procedures (and thus get the
+// generous public bucket instead of the tight connect bucket).
+func TestPublicReadProcedureClassification(t *testing.T) {
+	cases := []struct {
+		procedure string
+		public    bool
+	}{
+		{"/laelia.v1.SettingService/GetWorkspaceInfo", true},
+		{"/laelia.v1.IdentityProviderService/ListIdentityProviders", true},
+		{"/laelia.v1.AuthService/Login", false},
+		{"/laelia.v1.DeviceService/StartDeviceLogin", false},
+		{"/laelia.v1.AgentService/ConnectAgent", false},
+	}
+	for _, tc := range cases {
+		if got := isPublicReadProcedure(tc.procedure); got != tc.public {
+			t.Errorf("isPublicReadProcedure(%q) = %v, want %v", tc.procedure, got, tc.public)
+		}
+	}
+}

@@ -26,6 +26,8 @@ type Config struct {
 	LoginBurst     int
 	DeviceRate     float64
 	DeviceBurst    int
+	PublicRate     float64
+	PublicBurst    int
 	APIRate        float64
 	APIBurst       int
 	TrustProxy     bool
@@ -48,6 +50,12 @@ func DefaultConfig() Config {
 		// bounding a single source's fan-out.
 		DeviceRate:  1.0,
 		DeviceBurst: 30,
+		// Public read endpoints (GetWorkspaceInfo, ListIdentityProviders) are
+		// called by the unauthenticated login page on every render. They get
+		// their own per-IP bucket so a few page refreshes don't exhaust the
+		// tight "connect" bucket (burst 5) used for agent registration.
+		PublicRate:  1.0,
+		PublicBurst: 30,
 		APIRate:     1000.0 / 60.0,
 		APIBurst:    100,
 		TrustProxy:  false,
@@ -63,6 +71,7 @@ type RateLimiter struct {
 	userLimiters     *lru.Cache[string, *rate.Limiter]
 	deviceLimiters   *lru.Cache[string, *rate.Limiter] // device flow bucket
 	loginLimiters    *lru.Cache[string, *rate.Limiter] // password login bucket
+	publicLimiters   *lru.Cache[string, *rate.Limiter] // public read bucket
 	mu               sync.Mutex
 }
 
@@ -91,6 +100,10 @@ func New(cfg Config) (*RateLimiter, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create login rate limiter cache")
 	}
+	publicCache, err := lru.New[string, *rate.Limiter](10000)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create public rate limiter cache")
+	}
 
 	return &RateLimiter{
 		cfg:              cfg,
@@ -101,6 +114,7 @@ func New(cfg Config) (*RateLimiter, error) {
 		userLimiters:     userCache,
 		deviceLimiters:   deviceCache,
 		loginLimiters:    loginCache,
+		publicLimiters:   publicCache,
 	}, nil
 }
 
@@ -136,6 +150,11 @@ func (rl *RateLimiter) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 			limiter := rl.getLoginLimiter(sourceIP)
 			if !limiter.Allow() {
 				return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("login rate limit exceeded"))
+			}
+		case isPublicReadProcedure(procedure):
+			limiter := rl.getPublicLimiter(sourceIP)
+			if !limiter.Allow() {
+				return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("public read rate limit exceeded"))
 			}
 		default:
 			// Authenticated callers are keyed on the principal the auth
@@ -253,6 +272,18 @@ func (rl *RateLimiter) getLoginLimiter(ip string) *rate.Limiter {
 	return limiter
 }
 
+func (rl *RateLimiter) getPublicLimiter(ip string) *rate.Limiter {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	if limiter, ok := rl.publicLimiters.Get(ip); ok {
+		return limiter
+	}
+	limiter := rate.NewLimiter(rate.Limit(rl.cfg.PublicRate), rl.cfg.PublicBurst)
+	rl.publicLimiters.Add(ip, limiter)
+	return limiter
+}
+
 func (rl *RateLimiter) getUserLimiter(userID string) *rate.Limiter {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -311,6 +342,15 @@ func isDeviceProcedure(procedure string) bool {
 	return strings.HasSuffix(procedure, "StartDeviceLogin") ||
 		strings.HasSuffix(procedure, "PollDeviceLogin") ||
 		strings.HasSuffix(procedure, "GetDeviceLoginStatus")
+}
+
+// isPublicReadProcedure matches anonymous read-only endpoints that the
+// unauthenticated login page calls on every render. They are deliberately
+// given a more generous per-IP bucket than the "connect" bucket so normal page
+// refreshes don't trip 429s.
+func isPublicReadProcedure(procedure string) bool {
+	return procedure == "/laelia.v1.SettingService/GetWorkspaceInfo" ||
+		procedure == "/laelia.v1.IdentityProviderService/ListIdentityProviders"
 }
 
 func extractIdentifier(ctx context.Context, key common.ContextKey) string {
