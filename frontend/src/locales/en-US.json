@@ -468,6 +468,7 @@
     "cancel": "Cancel",
     "close": "Close",
     "copy": "Copy Command",
+    "copied": "Copied",
     "create": "Create",
     "creating": "Creating...",
     "debug-mode": "Debug mode",
@@ -574,6 +575,9 @@
     "profile": {
       "edit-not-allowed": "Only the machine's creator or a workspace admin can manage this machine.",
       "load-failed": "Failed to load this machine. It may have been deleted or the request failed.",
+      "offline-command-hint": "Open a terminal on the target computer and run:",
+      "offline-install-hint": "Run this on the computer you want to connect:",
+      "offline-install-note": "Only run this if the machine app is not installed on the machine, or if you want to reinstall it.",
       "section-identity": "Identity & Status",
       "section-token": "Token & Connection"
     },

@@ -468,6 +468,7 @@
     "cancel": "取消",
     "close": "关闭",
     "copy": "复制命令",
+    "copied": "已复制",
     "create": "创建",
     "creating": "创建中...",
     "debug-mode": "调试模式",
@@ -574,6 +575,9 @@
     "profile": {
       "edit-not-allowed": "仅机器的创建者或工作区管理员可管理此机器。",
       "load-failed": "加载机器失败。它可能已被删除,或请求出错。",
+      "offline-command-hint": "在目标电脑的终端中运行：",
+      "offline-install-hint": "在要连接的电脑上运行：",
+      "offline-install-note": "仅当机器上尚未安装机器应用，或你想重新安装时才需要执行此命令。",
       "section-identity": "身份与状态",
       "section-token": "令牌与连接"
     },

@@ -1,6 +1,14 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
-import { Loader2, Plus, Shield, User as UserIcon, X } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Loader2,
+  Plus,
+  Shield,
+  User as UserIcon,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -64,6 +72,11 @@ import {
   settingServiceClient,
 } from "@/connect";
 import { formatTimestamp } from "@/lib/command-status";
+import {
+  buildMachineInstallCommand,
+  buildMachineSetupCommand,
+  machineInstallOSFromInfo,
+} from "@/lib/machine-token";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -79,7 +92,10 @@ import {
   type PiModel,
 } from "@/types/proto-es/v1/agent_pb";
 import { type Group } from "@/types/proto-es/v1/group_service_pb";
-import { type Machine } from "@/types/proto-es/v1/machine_pb";
+import {
+  type Machine,
+  MachineStatus_ConnectionState,
+} from "@/types/proto-es/v1/machine_pb";
 
 // AGENT_CREATOR_ROLE is the machine-scope IAM role bound on a machine's IAM
 // policy to grant creating agents on that machine. Only this role's bindings
@@ -109,6 +125,8 @@ export function MachineProfilePage() {
   const [revoking, setRevoking] = useState(false);
   const [forcing, setForcing] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [installCopied, setInstallCopied] = useState(false);
+  const [setupCopied, setSetupCopied] = useState(false);
 
   // Ownership transfer state. The flow is deliberately two-step: the first
   // dialog picks the target + reason, the second AlertDialog confirms the
@@ -358,6 +376,17 @@ export function MachineProfilePage() {
   const availableProviders: AgentProviderInfo[] =
     info?.availableProviders ?? [];
 
+  // Offline reconnection commands. They mirror the new-machine page: the
+  // install command depends on the machine's reported OS, while the setup
+  // command is the same everywhere.
+  const installOS = machineInstallOSFromInfo(info?.os);
+  const installCommand = installOS
+    ? buildMachineInstallCommand(installOS)
+    : "";
+  const setupCommand = buildMachineSetupCommand();
+  const isOffline =
+    machine.status?.state === MachineStatus_ConnectionState.OFFLINE;
+
   // Add-agent form derived state. Provider is required; model is required only
   // when the selected provider exposes a model config option with advertised
   // models (a provider that does not expose model selection via the protocol
@@ -434,6 +463,27 @@ export function MachineProfilePage() {
       );
     } finally {
       setUpgrading(false);
+    }
+  }
+
+  async function handleCopyInstall() {
+    if (!installCommand) return;
+    try {
+      await navigator.clipboard.writeText(installCommand);
+      setInstallCopied(true);
+      setTimeout(() => setInstallCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable; the command is visible for manual copy.
+    }
+  }
+
+  async function handleCopySetup() {
+    try {
+      await navigator.clipboard.writeText(setupCommand);
+      setSetupCopied(true);
+      setTimeout(() => setSetupCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable; the command is visible for manual copy.
     }
   }
 
@@ -818,34 +868,93 @@ export function MachineProfilePage() {
                     {t("machine.profile.edit-not-allowed")}
                   </p>
                 ) : (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setActionError("");
-                        setRevokeOpen(true);
-                      }}
-                    >
-                      {t("machine.revoke-token")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setActionError("");
-                        setForceOpen(true);
-                      }}
-                    >
-                      {t("machine.force-disconnect")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={openTransferPicker}
-                    >
-                      {t("machine.transfer-owner")}
-                    </Button>
+                  <div className="flex flex-col gap-4">
+                    {isOffline && (
+                      <div className="flex flex-col gap-4">
+                        {installCommand && (
+                          <div className="flex flex-col gap-2">
+                            <p className="text-sm text-control-light">
+                              {t("machine.profile.offline-install-note")}
+                            </p>
+                            <p className="text-sm text-control-light">
+                              {t("machine.profile.offline-install-hint")}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <code className="flex-1 rounded bg-white border border-control-border px-3 py-2 font-mono text-xs break-all text-black dark:bg-zinc-900 dark:text-white">
+                                {installCommand}
+                              </code>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleCopyInstall()}
+                              >
+                                {installCopied ? (
+                                  <Check className="size-4 text-success" />
+                                ) : (
+                                  <Copy className="size-4" />
+                                )}
+                                {installCopied
+                                  ? t("common.copied")
+                                  : t("common.copy")}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex flex-col gap-2">
+                          <p className="text-sm text-control-light">
+                            {t("machine.profile.offline-command-hint")}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 rounded bg-white border border-control-border px-3 py-2 font-mono text-xs break-all text-black dark:bg-zinc-900 dark:text-white">
+                              {setupCommand}
+                            </code>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void handleCopySetup()}
+                            >
+                              {setupCopied ? (
+                                <Check className="size-4 text-success" />
+                              ) : (
+                                <Copy className="size-4" />
+                              )}
+                              {setupCopied
+                                ? t("common.copied")
+                                : t("common.copy")}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setActionError("");
+                          setRevokeOpen(true);
+                        }}
+                      >
+                        {t("machine.revoke-token")}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setActionError("");
+                          setForceOpen(true);
+                        }}
+                      >
+                        {t("machine.force-disconnect")}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={openTransferPicker}
+                      >
+                        {t("machine.transfer-owner")}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </Card>

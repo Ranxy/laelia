@@ -47,7 +47,10 @@ vi.mock("@/lib/use-is-desktop", () => ({
 }));
 
 vi.mock("@/lib/machine-token", () => ({
+  buildMachineInstallCommand: (os: string) => `INSTALL-${os}`,
   buildMachineSetupCommand: () => "SETUP-CMD",
+  machineInstallOSFromInfo: (os: string | undefined) =>
+    os === "windows" ? "windows" : os === "darwin" ? "macos" : "linux",
 }));
 
 vi.mock("@/components/connection-badge", () => ({
@@ -271,6 +274,69 @@ describe("MachineProfilePage", () => {
     expect(screen.getByText("darwin/arm64")).toBeInTheDocument();
     expect(screen.getByText("10.0.0.5")).toBeInTheDocument();
     expect(screen.getByText("2.1.0")).toBeInTheDocument();
+  });
+
+  it("shows offline reconnection commands in the token card", async () => {
+    mock.getMachine.mockResolvedValue(
+      machine({
+        status: {
+          state: MachineStatus_ConnectionState.OFFLINE,
+          lastHeartbeatTime: undefined,
+          connectedTime: undefined,
+          errorMessage: "",
+          activeSessionId: "",
+        },
+      })
+    );
+    renderPage();
+
+    expect(
+      await screen.findByText("machine.profile.offline-install-note")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("machine.profile.offline-install-hint")
+    ).toBeInTheDocument();
+    expect(screen.getByText("INSTALL-macos")).toBeInTheDocument();
+    expect(
+      screen.getByText("machine.profile.offline-command-hint")
+    ).toBeInTheDocument();
+    expect(screen.getByText("SETUP-CMD")).toBeInTheDocument();
+  });
+
+  it("uses the Windows install command for an offline Windows machine", async () => {
+    mock.getMachine.mockResolvedValue(
+      machine({
+        info: {
+          ...machine().info,
+          os: "windows",
+        } as unknown as MachineInfo,
+        status: {
+          state: MachineStatus_ConnectionState.OFFLINE,
+          lastHeartbeatTime: undefined,
+          connectedTime: undefined,
+          errorMessage: "",
+          activeSessionId: "",
+        },
+      })
+    );
+    renderPage();
+
+    expect(
+      await screen.findByText("machine.profile.offline-install-note")
+    ).toBeInTheDocument();
+    expect(screen.getByText("INSTALL-windows")).toBeInTheDocument();
+  });
+
+  it("does not show offline reconnection commands while the machine is online", async () => {
+    renderPage();
+
+    expect(await screen.findByText("Mac Mini")).toBeInTheDocument();
+    expect(
+      screen.queryByText("machine.profile.offline-install-note")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("machine.profile.offline-command-hint")
+    ).not.toBeInTheDocument();
   });
 
   it("shows the edit-not-allowed alert when the caller has no capability", async () => {
