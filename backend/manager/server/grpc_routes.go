@@ -20,7 +20,6 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/component/mailer"
-	"github.com/Ranxy/laelia/backend/manager/component/ratelimit"
 	"github.com/Ranxy/laelia/backend/manager/component/roomhub"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
@@ -90,13 +89,6 @@ func configureV1Routers(
 	stores.SetWebPushSender(webpushSender)
 	notificationService := apiv1.NewNotificationService(stores, webpushSender, iamManager)
 
-	rateLimiterCfg := ratelimit.DefaultConfig()
-	rateLimiterCfg.TrustProxy = profile.TrustProxy
-	rateLimiter, err := ratelimit.New(rateLimiterCfg)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create rate limiter")
-	}
-
 	onPanic := func(_ context.Context, s connect.Spec, _ http.Header, p any) error {
 		stack := stacktrace.TakeStacktrace(20 /* n */, 5 /* skip */)
 		slog.Error("v1 server panic error", "method", s.Procedure, log.WithError(errors.Errorf("error: %v\n%s", p, stack)))
@@ -132,7 +124,6 @@ func configureV1Routers(
 			apiv1.NewDebugInterceptor(),
 			ipValidator,
 			auth.New(stores, secret, stateCfg, profile),
-			rateLimiter,
 			apiv1.NewIAMInterceptor(iam.NewManager(stores)),
 			auditInterceptor,
 		),
