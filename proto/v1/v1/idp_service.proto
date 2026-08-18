@@ -1,0 +1,317 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "v1/annotation.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+// IdentityProviderService manages external identity providers (OAuth2/OIDC/LDAP)
+// used for SSO authentication. It is the admin-facing configuration surface:
+// workspace admins can create/update/delete providers and the login page lists
+// the enabled ones (ListIdentityProviders is public).
+service IdentityProviderService {
+  // Gets an identity provider by name.
+  // Permissions required: laelia.identityProviders.get
+  rpc GetIdentityProvider(GetIdentityProviderRequest) returns (IdentityProvider) {
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.identityProviders.get";
+  }
+
+  // Lists all configured identity providers. Public so the login page can
+  // render the enabled SSO targets without credentials.
+  rpc ListIdentityProviders(ListIdentityProvidersRequest) returns (ListIdentityProvidersResponse) {
+    option (laelia.v1.allow_without_credential) = true;
+  }
+
+  // Creates a new identity provider.
+  // Permissions required: laelia.identityProviders.create
+  rpc CreateIdentityProvider(CreateIdentityProviderRequest) returns (IdentityProvider) {
+    option (google.api.method_signature) = "identity_provider,identity_provider_id";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.identityProviders.create";
+    option (laelia.v1.audit) = true;
+  }
+
+  // Updates an identity provider.
+  // Permissions required: laelia.identityProviders.update
+  rpc UpdateIdentityProvider(UpdateIdentityProviderRequest) returns (IdentityProvider) {
+    option (google.api.method_signature) = "identity_provider,update_mask";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.identityProviders.update";
+    option (laelia.v1.audit) = true;
+  }
+
+  // Deletes an identity provider.
+  // Permissions required: laelia.identityProviders.delete
+  rpc DeleteIdentityProvider(DeleteIdentityProviderRequest) returns (google.protobuf.Empty) {
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.identityProviders.delete";
+    option (laelia.v1.audit) = true;
+  }
+
+  // Tests the connection and configuration of an identity provider.
+  // Permissions required: laelia.identityProviders.update
+  rpc TestIdentityProvider(TestIdentityProviderRequest) returns (TestIdentityProviderResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.identityProviders.update";
+  }
+}
+
+message GetIdentityProviderRequest {
+  // The name of the identity provider to retrieve.
+  // Format: idps/{idp}
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/IdP"}
+  ];
+}
+
+message ListIdentityProvidersRequest {}
+
+message ListIdentityProvidersResponse {
+  // The identity providers from the specified request.
+  repeated IdentityProvider identity_providers = 1;
+}
+
+message CreateIdentityProviderRequest {
+  // The identity provider to create.
+  IdentityProvider identity_provider = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The ID to use for the identity provider, which will become the final
+  // component of the identity provider's resource name.
+  string identity_provider_id = 2;
+
+  // If set to true, the request will be validated without actually creating
+  // the identity provider.
+  bool validate_only = 3;
+}
+
+message UpdateIdentityProviderRequest {
+  // The identity provider to update.
+  // The identity provider's `name` field is used to identify the identity
+  // provider to update. Format: idps/{identity_provider}
+  IdentityProvider identity_provider = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The list of fields to update.
+  google.protobuf.FieldMask update_mask = 2;
+
+  // If set to true, and the identity provider is not found, a new identity
+  // provider will be created. In this situation, `update_mask` is ignored.
+  bool allow_missing = 3;
+}
+
+message DeleteIdentityProviderRequest {
+  // The name of the identity provider to delete.
+  // Format: idps/{identity_provider}
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/IdP"}
+  ];
+}
+
+message TestIdentityProviderRequest {
+  // The identity provider to test connection including uncreated.
+  IdentityProvider identity_provider = 1;
+
+  oneof context {
+    OAuth2IdentityProviderTestRequestContext oauth2_context = 2;
+    // OIDC authentication context for test connection.
+    OIDCIdentityProviderTestRequestContext oidc_context = 3;
+    // LDAP credentials context for test connection.
+    LDAPIdentityProviderTestRequestContext ldap_context = 4;
+  }
+}
+
+message OAuth2IdentityProviderTestRequestContext {
+  // Authorize code from website.
+  string code = 1;
+}
+
+message OIDCIdentityProviderTestRequestContext {
+  // Authorize code from OIDC provider.
+  string code = 1;
+}
+
+message LDAPIdentityProviderTestRequestContext {
+  // The username of a directory user, substituted into the user filter.
+  string username = 1;
+  // The password of the directory user.
+  string password = 2;
+}
+
+message TestIdentityProviderResponse {
+  // The map of claims returned by the identity provider.
+  map<string, string> claims = 1;
+  // The matched user info from the claims.
+  map<string, string> user_info = 2;
+}
+
+message IdentityProvider {
+  option (google.api.resource) = {
+    type: "laelia/IdP"
+    pattern: "idps/{idp}"
+  };
+
+  // The name of the identity provider.
+  // Format: idps/{idp}
+  string name = 1;
+
+  // The display title of the identity provider.
+  string title = 2;
+
+  // The domain for email matching when using this identity provider.
+  string domain = 3;
+
+  // The type of identity provider protocol.
+  IdentityProviderType type = 4;
+
+  // The configuration details for the identity provider.
+  IdentityProviderConfig config = 5;
+}
+
+enum IdentityProviderType {
+  // Unspecified identity provider type.
+  IDENTITY_PROVIDER_TYPE_UNSPECIFIED = 0;
+  // OAuth 2.0 authentication protocol.
+  OAUTH2 = 1;
+  // OpenID Connect authentication protocol.
+  OIDC = 2;
+  // LDAP directory service authentication.
+  LDAP = 3;
+}
+
+message IdentityProviderConfig {
+  oneof config {
+    // OAuth2 protocol configuration.
+    OAuth2IdentityProviderConfig oauth2_config = 1;
+    // OIDC protocol configuration.
+    OIDCIdentityProviderConfig oidc_config = 2;
+    // LDAP protocol configuration.
+    LDAPIdentityProviderConfig ldap_config = 3;
+  }
+}
+
+// OAuth2IdentityProviderConfig is the structure for OAuth2 identity provider config.
+message OAuth2IdentityProviderConfig {
+  // The authorization endpoint URL for OAuth2 flow.
+  string auth_url = 1;
+
+  // The token endpoint URL for exchanging authorization code.
+  string token_url = 2;
+
+  // The user information endpoint URL.
+  string user_info_url = 3;
+
+  // The OAuth2 client identifier.
+  string client_id = 4;
+
+  // The OAuth2 client secret for authentication.
+  string client_secret = 5;
+
+  // The list of OAuth2 scopes to request.
+  repeated string scopes = 6;
+
+  // Mapping configuration for user attributes from OAuth2 response.
+  FieldMapping field_mapping = 7;
+
+  // Whether to skip TLS certificate verification.
+  bool skip_tls_verify = 8;
+
+  // The authentication style for client credentials.
+  OAuth2AuthStyle auth_style = 9;
+}
+
+// OIDCIdentityProviderConfig is the structure for OIDC identity provider config.
+message OIDCIdentityProviderConfig {
+  // The OIDC issuer URL for the identity provider.
+  string issuer = 1;
+
+  // The OIDC client identifier.
+  string client_id = 2;
+
+  // The OIDC client secret for authentication.
+  string client_secret = 3;
+
+  // The scopes that the OIDC provider supports.
+  repeated string scopes = 4;
+
+  // Mapping configuration for user attributes from OIDC claims.
+  FieldMapping field_mapping = 5;
+
+  // Whether to skip TLS certificate verification.
+  bool skip_tls_verify = 6;
+
+  // The authentication style for client credentials.
+  OAuth2AuthStyle auth_style = 7;
+}
+
+// LDAPIdentityProviderConfig is the structure for LDAP identity provider config.
+message LDAPIdentityProviderConfig {
+  // Host is the hostname or IP address of the LDAP server, e.g.,
+  // "ldap.example.com".
+  string host = 1;
+  // Port is the port number of the LDAP server, e.g., 389. When not set, the
+  // default port of the corresponding security protocol will be used, i.e. 389
+  // for StartTLS and 636 for LDAPS.
+  int32 port = 2;
+  // SkipTLSVerify controls whether to skip TLS certificate verification.
+  bool skip_tls_verify = 3;
+  // BindDN is the DN of the user to bind as a service account to perform
+  // search requests.
+  string bind_dn = 4;
+  // BindPassword is the password of the user to bind as a service account.
+  string bind_password = 5;
+  // BaseDN is the base DN to search for users, e.g., "ou=users,dc=example,dc=com".
+  string base_dn = 6;
+  // UserFilter is the filter to search for users, e.g., "(uid=%s)".
+  string user_filter = 7;
+  // SecurityProtocol is the security protocol to be used for establishing
+  // connections with the LDAP server.
+  SecurityProtocol security_protocol = 8;
+  // FieldMapping is the mapping of the user attributes returned by the LDAP
+  // server.
+  FieldMapping field_mapping = 9;
+
+  enum SecurityProtocol {
+    SECURITY_PROTOCOL_UNSPECIFIED = 0;
+    START_TLS = 1; // StartTLS is the security protocol that starts with an unencrypted connection and then upgrades to TLS.
+    LDAPS = 2; // LDAPS is the security protocol that uses TLS from the beginning.
+  }
+}
+
+// FieldMapping saves the field names from user info API of identity provider.
+// As we save all raw json string of user info response data into
+// `principal.idp_user_info`, we can extract the relevant data based with
+// `FieldMapping`.
+message FieldMapping {
+  // Identifier is the field name of the unique identifier in 3rd-party idp user info. Required.
+  string identifier = 1;
+
+  // DisplayName is the field name of display name in 3rd-party idp user info. Optional.
+  string display_name = 2;
+
+  // Phone is the field name of primary phone in 3rd-party idp user info. Optional.
+  string phone = 3;
+
+  // Groups is the field name of groups in 3rd-party idp user info. Optional.
+  // Mainly used for OIDC: https://developer.okta.com/docs/guides/customize-tokens-groups-claim/main/
+  string groups = 4;
+}
+
+enum OAuth2AuthStyle {
+  OAUTH2_AUTH_STYLE_UNSPECIFIED = 0;
+  // IN_PARAMS sends the "client_id" and "client_secret" in the POST body
+  // as application/x-www-form-urlencoded parameters.
+  IN_PARAMS = 1;
+  // IN_HEADER sends the client_id and client_password using HTTP Basic Authorization.
+  // This is an optional style described in the OAuth2 RFC 6749 section 2.3.1.
+  IN_HEADER = 2;
+}

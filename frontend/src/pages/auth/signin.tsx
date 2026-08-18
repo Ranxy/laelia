@@ -4,9 +4,12 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { settingServiceClient } from "@/connect";
+import { identityProviderServiceClient, settingServiceClient } from "@/connect";
+import { startOAuthLogin } from "@/lib/oauth";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
+import type { IdentityProvider } from "@/types/proto-es/v1/idp_service_pb";
+import { IdentityProviderType } from "@/types/proto-es/v1/idp_service_pb";
 
 export function SignInPage() {
   const { t } = useTranslation();
@@ -19,6 +22,7 @@ export function SignInPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [signupDisallowed, setSignupDisallowed] = useState(false);
+  const [providers, setProviders] = useState<IdentityProvider[]>([]);
 
   // The signup policy is public (GetWorkspaceInfo needs no auth): hide the
   // signup entry when the workspace disallows self-service registration.
@@ -32,6 +36,23 @@ export function SignInPage() {
       .catch(() => {
         // Keep the signup link on failure; the backend still enforces the
         // policy on the signup attempt itself.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Public endpoint: lists configured SSO targets so the login page can render
+  // "Continue with …" buttons.
+  useEffect(() => {
+    let cancelled = false;
+    identityProviderServiceClient
+      .listIdentityProviders({})
+      .then((res) => {
+        if (!cancelled) setProviders(res.identityProviders ?? []);
+      })
+      .catch(() => {
+        // Non-fatal: the password form remains available.
       });
     return () => {
       cancelled = true;
@@ -70,6 +91,37 @@ export function SignInPage() {
           {t("auth.sign-in.title")}
         </p>
       </div>
+
+      {providers.filter((p) => p.type === IdentityProviderType.OAUTH2).length > 0 && (
+        <div className="flex flex-col gap-2 px-1">
+          {providers
+            .filter((p) => p.type === IdentityProviderType.OAUTH2)
+            .map((p) => (
+              <Button
+                key={p.name}
+                type="button"
+                variant="outline"
+                size="lg"
+                className="w-full"
+                onClick={() => {
+                  if (!startOAuthLogin(p, redirectTo)) {
+                    toastManager.add({
+                      type: "error",
+                      title: t("auth.sign-in.oauth-invalid"),
+                    });
+                  }
+                }}
+              >
+                {t("auth.sign-in.continue-with", { provider: p.title })}
+              </Button>
+            ))}
+          <div className="flex items-center gap-3 text-xs text-control-light">
+            <span className="h-px flex-1 bg-control-border" />
+            {t("auth.sign-in.or")}
+            <span className="h-px flex-1 bg-control-border" />
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-y-6 px-1">
         <div>

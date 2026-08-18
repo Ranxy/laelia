@@ -100,6 +100,36 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
   {
+    resource: "apiProviders",
+    permissions: [
+      "laelia.apiProviders.create",
+      "laelia.apiProviders.get",
+      "laelia.apiProviders.list",
+      "laelia.apiProviders.update",
+      "laelia.apiProviders.delete",
+    ],
+  },
+  {
+    resource: "identityProviders",
+    permissions: [
+      "laelia.identityProviders.create",
+      "laelia.identityProviders.get",
+      "laelia.identityProviders.list",
+      "laelia.identityProviders.update",
+      "laelia.identityProviders.delete",
+    ],
+  },
+  {
+    resource: "mcpServers",
+    permissions: [
+      "laelia.mcpServers.create",
+      "laelia.mcpServers.get",
+      "laelia.mcpServers.list",
+      "laelia.mcpServers.update",
+      "laelia.mcpServers.delete",
+    ],
+  },
+  {
     resource: "settings",
     permissions: ["laelia.settings.get", "laelia.settings.update"],
   },

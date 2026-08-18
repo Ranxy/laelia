@@ -54,6 +54,7 @@ function workspaceInfo(overrides?: Partial<GetWorkspaceInfoResponse>) {
     enforceIdentityDomain: false,
     domains: [],
     requireEmailVerification: false,
+    externalUrl: "",
     ...overrides,
   });
 }

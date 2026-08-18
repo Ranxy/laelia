@@ -68,6 +68,7 @@ beforeEach(() => {
         "laelia.iam.getPolicy",
         "laelia.groups.list",
         "laelia.apiProviders.list",
+        "laelia.identityProviders.list",
         "laelia.auditLogs.search",
         "laelia.pushConfig.update",
       ],
@@ -97,6 +98,9 @@ describe("settings-menu", () => {
     expect(screen.getByText("sidebar.settings-groups")).toBeInTheDocument();
     expect(
       screen.getByText("sidebar.settings-api-providers")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("sidebar.settings-identity-providers")
     ).toBeInTheDocument();
     expect(
       screen.getByText("sidebar.settings-mcp-servers")

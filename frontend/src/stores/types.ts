@@ -109,7 +109,11 @@ export interface AuthSlice {
   isLoggedIn: boolean;
   sessionLoaded: boolean;
 
-  login: (email: string, password: string) => Promise<void>;
+  login: (
+    email: string,
+    password: string,
+    idp?: { idpName: string; code: string }
+  ) => Promise<void>;
   logout: () => Promise<void>;
   register: (email: string, title: string, password: string) => Promise<void>;
   verifyEmail: (token: string) => Promise<void>;

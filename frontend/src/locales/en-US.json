@@ -189,7 +189,10 @@
       "failed": "Sign in failed",
       "failed-description": "Please check your credentials.",
       "new-user": "Don't have an account?",
-      "title": "Sign in to your account"
+      "title": "Sign in to your account",
+      "continue-with": "Continue with {{provider}}",
+      "or": "or",
+      "oauth-invalid": "This provider is not configured correctly for sign-in."
     },
     "sign-up": {
       "allowed-domains": "Registration is limited to emails ending in: {{domains}}",
@@ -223,6 +226,23 @@
       "success": "Your email is verified. You can now sign in.",
       "title": "Verify your email",
       "verifying": "Verifying your email…"
+    },
+    "oauth-callback": {
+      "invalid-state": "The sign-in request is invalid or has expired. Please try again.",
+      "login-failed": "Sign in with the provider failed.",
+      "failed": "Sign-in failed",
+      "back-to-signin": "Back to sign in",
+      "signing-in": "Signing you in…"
+    },
+    "oauth-login": {
+      "failed": "Unable to start sign-in",
+      "missing-provider": "Missing provider in the URL.",
+      "provider-not-found": "Identity provider \"{{provider}}\" was not found.",
+      "unsupported-type": "Provider \"{{provider}}\" is not an OAuth2 provider.",
+      "invalid-config": "Provider \"{{provider}}\" is not configured correctly for sign-in.",
+      "load-failed": "Failed to load identity providers.",
+      "back-to-signin": "Back to sign in",
+      "redirecting": "Redirecting to the provider…"
     }
   },
   "channel": {
@@ -1111,7 +1131,53 @@
       "use-tls": "Use TLS (port 465 implicit TLS, other ports STARTTLS)",
       "username": "Username"
     },
-    "title": "Settings"
+    "title": "Settings",
+    "identity-providers": {
+      "create": "Create provider",
+      "create-description": "Configure an OAuth2 / SSO identity provider.",
+      "create-failed": "Failed to create provider",
+      "create-title": "Create provider",
+      "created": "Provider created",
+      "delete-confirm-description": "Delete the provider \"{{title}}\"? Users will no longer be able to sign in with it.",
+      "delete-confirm-title": "Delete provider",
+      "delete-failed": "Failed to delete provider",
+      "deleted": "Provider deleted",
+      "description": "Manage external identity providers (SSO). Configure the OAuth2 targets users can sign in with.",
+      "edit-description": "Update the provider's OAuth2 configuration.",
+      "edit-title": "Edit provider: {{title}}",
+      "empty": "No identity providers configured yet.",
+      "field-auth-url": "Authorization URL",
+      "field-auth-url-placeholder": "https://provider.example.com/oauth/authorize",
+      "field-client-id": "Client ID",
+      "field-client-id-placeholder": "your-oauth-client-id",
+      "field-client-secret": "Client secret",
+      "field-client-secret-kept": "Secret stored (masked). Type a new secret to replace it.",
+      "field-client-secret-placeholder": "Leave empty to keep the stored secret",
+      "field-display-name-mapping": "Display name field",
+      "field-display-name-mapping-placeholder": "e.g. name",
+      "field-domain": "Domain",
+      "field-domain-hint": "Optional. Restrict this provider to a specific email domain.",
+      "field-domain-placeholder": "example.com",
+      "field-identifier-mapping": "Identifier / email field",
+      "field-identifier-mapping-placeholder": "e.g. email",
+      "field-scopes": "Scopes",
+      "field-scopes-placeholder": "openid email profile",
+      "field-title": "Title",
+      "field-title-placeholder": "Google / GitHub / Custom OAuth",
+      "field-token-url": "Token URL",
+      "field-token-url-placeholder": "https://provider.example.com/oauth/token",
+      "field-user-info-url": "User info URL",
+      "field-user-info-url-placeholder": "https://provider.example.com/oauth/userinfo",
+      "load-failed": "Failed to load identity providers",
+      "save-failed": "Failed to save provider",
+      "saved": "Provider saved",
+      "title": "Identity providers",
+      "type": "Type",
+      "type-oauth2": "OAuth2",
+      "not-allowed": "Not allowed",
+      "unsupported-type": "Only OAuth2 providers can be edited yet.",
+      "invalid-id": "The title must contain Latin letters or digits to form a provider ID."
+    }
   },
   "setup": {
     "action": {
@@ -1147,7 +1213,8 @@
     "settings-roles": "Roles",
     "settings-smtp": "SMTP",
     "settings-storage": "Storage",
-    "settings-users": "Users"
+    "settings-users": "Users",
+    "settings-identity-providers": "Identity providers"
   },
   "tasks": {
     "empty": "No tasks yet",

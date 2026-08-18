@@ -23,6 +23,7 @@ import {
   SETTINGS_ROUTE_GENERAL,
   SETTINGS_ROUTE_GROUPS,
   SETTINGS_ROUTE_IAM,
+  SETTINGS_ROUTE_IDENTITY_PROVIDERS,
   SETTINGS_ROUTE_MCP_SERVERS,
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_PROFILE,
@@ -125,6 +126,10 @@ export const ROUTE_INFO: Record<string, RouteInfo> = {
   },
   [SETTINGS_ROUTE_API_PROVIDERS]: {
     titleKey: "sidebar.settings-api-providers",
+    backTo: "/settings",
+  },
+  [SETTINGS_ROUTE_IDENTITY_PROVIDERS]: {
+    titleKey: "sidebar.settings-identity-providers",
     backTo: "/settings",
   },
   [SETTINGS_ROUTE_MCP_SERVERS]: {

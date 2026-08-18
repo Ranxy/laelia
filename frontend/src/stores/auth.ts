@@ -20,11 +20,29 @@ export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
   isLoggedIn: false,
   sessionLoaded: false,
 
-  async login(email: string, password: string) {
+  async login(
+    email: string,
+    password: string,
+    idp?: { idpName: string; code: string }
+  ) {
     const res = await authServiceClient.login(
-      create(LoginRequestSchema, { email, password, web: true })
+      create(LoginRequestSchema, {
+        email,
+        password,
+        web: true,
+        ...(idp
+          ? {
+              idpName: idp.idpName,
+              idpContext: {
+                context: {
+                  case: "oauth2Context" as const,
+                  value: { code: idp.code },
+                },
+              },
+            }
+          : {}),
+      })
     );
-
     // Seed the session from the login response so navigation can proceed.
     // The login response's User omits caller-scoped fields (permissions,
     // workspace_admin, debug_mode) which GetCurrentUser is the only endpoint
@@ -37,7 +55,7 @@ export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
     });
     try {
       const user = await userServiceClient.getCurrentUser({});
-      set({ currentUser: user });
+      set({ currentUser: user, isLoggedIn: true });
     } catch {
       // Keep the login-response user; the session cookie is already set, so
       // the caller stays logged in even if the enrichment fetch fails.
@@ -96,7 +114,14 @@ export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
       const user = await userServiceClient.getCurrentUser({});
       set({ currentUser: user, isLoggedIn: true });
     } catch {
-      set({ currentUser: null, isLoggedIn: false });
+      // A stale fetch (e.g. loadSession racing with an in-flight OAuth login)
+      // must not clobber an already-established session.
+      set((state) => {
+        if (state.currentUser) {
+          return {};
+        }
+        return { currentUser: null, isLoggedIn: false };
+      });
     }
   },
 

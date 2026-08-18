@@ -28,6 +28,7 @@ import {
   SETTINGS_ROUTE_GENERAL,
   SETTINGS_ROUTE_GROUPS,
   SETTINGS_ROUTE_IAM,
+  SETTINGS_ROUTE_IDENTITY_PROVIDERS,
   SETTINGS_ROUTE_MCP_SERVERS,
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_PROFILE,
@@ -377,6 +378,14 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         lazy: () =>
           import("@/pages/dashboard/settings-api-providers").then((m) => ({
             Component: m.SettingsApiProvidersPage,
+          })),
+      },
+      {
+        path: "identity-providers",
+        handle: { name: SETTINGS_ROUTE_IDENTITY_PROVIDERS },
+        lazy: () =>
+          import("@/pages/dashboard/settings-identity-providers").then((m) => ({
+            Component: m.SettingsIdentityProvidersPage,
           })),
       },
       {

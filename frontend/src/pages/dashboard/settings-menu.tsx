@@ -66,6 +66,7 @@ function useSettingsMenuItems(): MenuItem[] {
   const canViewIam = useHasPermission("laelia.iam.getPolicy");
   const canViewGroups = useHasPermission("laelia.groups.list");
   const canViewApiProviders = useHasPermission("laelia.apiProviders.list");
+  const canViewIdentityProviders = useHasPermission("laelia.identityProviders.list");
   const canViewAudit = useHasPermission("laelia.auditLogs.search");
   const canViewPushConfig = useHasPermission("laelia.pushConfig.update");
 
@@ -127,6 +128,11 @@ function useSettingsMenuItems(): MenuItem[] {
           icon: Blocks,
           label: t("sidebar.settings-api-providers"),
         },
+        canViewIdentityProviders && {
+          to: "/settings/identity-providers",
+          icon: Shield,
+          label: t("sidebar.settings-identity-providers"),
+        },
         {
           to: "/settings/mcp-servers",
           icon: Server,
@@ -151,6 +157,7 @@ function useSettingsMenuItems(): MenuItem[] {
       canViewIam,
       canViewGroups,
       canViewApiProviders,
+      canViewIdentityProviders,
       canViewAudit,
       canViewPushConfig,
       canViewMachines,

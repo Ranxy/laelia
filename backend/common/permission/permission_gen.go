@@ -74,6 +74,11 @@ const (
 	McpServersList             Permission = "laelia.mcpServers.list"
 	McpServersUpdate           Permission = "laelia.mcpServers.update"
 	McpServersDelete           Permission = "laelia.mcpServers.delete"
+	IdentityProvidersCreate    Permission = "laelia.identityProviders.create"
+	IdentityProvidersGet       Permission = "laelia.identityProviders.get"
+	IdentityProvidersList      Permission = "laelia.identityProviders.list"
+	IdentityProvidersUpdate    Permission = "laelia.identityProviders.update"
+	IdentityProvidersDelete    Permission = "laelia.identityProviders.delete"
 )
 
 // allPermissions is the complete, authoritative list of valid permission
@@ -149,6 +154,11 @@ var allPermissions = []Permission{
 	McpServersList,
 	McpServersUpdate,
 	McpServersDelete,
+	IdentityProvidersCreate,
+	IdentityProvidersGet,
+	IdentityProvidersList,
+	IdentityProvidersUpdate,
+	IdentityProvidersDelete,
 }
 
 var allPermissionsMap = func() map[Permission]bool {

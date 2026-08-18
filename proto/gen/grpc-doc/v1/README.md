@@ -374,6 +374,33 @@
   
     - [IamService](#laelia-v1-IamService)
   
+- [v1/idp_service.proto](#v1_idp_service-proto)
+    - [CreateIdentityProviderRequest](#laelia-v1-CreateIdentityProviderRequest)
+    - [DeleteIdentityProviderRequest](#laelia-v1-DeleteIdentityProviderRequest)
+    - [FieldMapping](#laelia-v1-FieldMapping)
+    - [GetIdentityProviderRequest](#laelia-v1-GetIdentityProviderRequest)
+    - [IdentityProvider](#laelia-v1-IdentityProvider)
+    - [IdentityProviderConfig](#laelia-v1-IdentityProviderConfig)
+    - [LDAPIdentityProviderConfig](#laelia-v1-LDAPIdentityProviderConfig)
+    - [LDAPIdentityProviderTestRequestContext](#laelia-v1-LDAPIdentityProviderTestRequestContext)
+    - [ListIdentityProvidersRequest](#laelia-v1-ListIdentityProvidersRequest)
+    - [ListIdentityProvidersResponse](#laelia-v1-ListIdentityProvidersResponse)
+    - [OAuth2IdentityProviderConfig](#laelia-v1-OAuth2IdentityProviderConfig)
+    - [OAuth2IdentityProviderTestRequestContext](#laelia-v1-OAuth2IdentityProviderTestRequestContext)
+    - [OIDCIdentityProviderConfig](#laelia-v1-OIDCIdentityProviderConfig)
+    - [OIDCIdentityProviderTestRequestContext](#laelia-v1-OIDCIdentityProviderTestRequestContext)
+    - [TestIdentityProviderRequest](#laelia-v1-TestIdentityProviderRequest)
+    - [TestIdentityProviderResponse](#laelia-v1-TestIdentityProviderResponse)
+    - [TestIdentityProviderResponse.ClaimsEntry](#laelia-v1-TestIdentityProviderResponse-ClaimsEntry)
+    - [TestIdentityProviderResponse.UserInfoEntry](#laelia-v1-TestIdentityProviderResponse-UserInfoEntry)
+    - [UpdateIdentityProviderRequest](#laelia-v1-UpdateIdentityProviderRequest)
+  
+    - [IdentityProviderType](#laelia-v1-IdentityProviderType)
+    - [LDAPIdentityProviderConfig.SecurityProtocol](#laelia-v1-LDAPIdentityProviderConfig-SecurityProtocol)
+    - [OAuth2AuthStyle](#laelia-v1-OAuth2AuthStyle)
+  
+    - [IdentityProviderService](#laelia-v1-IdentityProviderService)
+  
 - [v1/machine.proto](#v1_machine-proto)
     - [AgentAssignment](#laelia-v1-AgentAssignment)
     - [AgentConfigUpdate](#laelia-v1-AgentConfigUpdate)
@@ -6469,6 +6496,405 @@ cannot express the creator&#39;s implicit authority.
 
 
 
+<a name="v1_idp_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/idp_service.proto
+
+
+
+<a name="laelia-v1-CreateIdentityProviderRequest"></a>
+
+### CreateIdentityProviderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| identity_provider | [IdentityProvider](#laelia-v1-IdentityProvider) |  | The identity provider to create. |
+| identity_provider_id | [string](#string) |  | The ID to use for the identity provider, which will become the final component of the identity provider&#39;s resource name. |
+| validate_only | [bool](#bool) |  | If set to true, the request will be validated without actually creating the identity provider. |
+
+
+
+
+
+
+<a name="laelia-v1-DeleteIdentityProviderRequest"></a>
+
+### DeleteIdentityProviderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the identity provider to delete. Format: idps/{identity_provider} |
+
+
+
+
+
+
+<a name="laelia-v1-FieldMapping"></a>
+
+### FieldMapping
+FieldMapping saves the field names from user info API of identity provider.
+As we save all raw json string of user info response data into
+`principal.idp_user_info`, we can extract the relevant data based with
+`FieldMapping`.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| identifier | [string](#string) |  | Identifier is the field name of the unique identifier in 3rd-party idp user info. Required. |
+| display_name | [string](#string) |  | DisplayName is the field name of display name in 3rd-party idp user info. Optional. |
+| phone | [string](#string) |  | Phone is the field name of primary phone in 3rd-party idp user info. Optional. |
+| groups | [string](#string) |  | Groups is the field name of groups in 3rd-party idp user info. Optional. Mainly used for OIDC: https://developer.okta.com/docs/guides/customize-tokens-groups-claim/main/ |
+
+
+
+
+
+
+<a name="laelia-v1-GetIdentityProviderRequest"></a>
+
+### GetIdentityProviderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the identity provider to retrieve. Format: idps/{idp} |
+
+
+
+
+
+
+<a name="laelia-v1-IdentityProvider"></a>
+
+### IdentityProvider
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the identity provider. Format: idps/{idp} |
+| title | [string](#string) |  | The display title of the identity provider. |
+| domain | [string](#string) |  | The domain for email matching when using this identity provider. |
+| type | [IdentityProviderType](#laelia-v1-IdentityProviderType) |  | The type of identity provider protocol. |
+| config | [IdentityProviderConfig](#laelia-v1-IdentityProviderConfig) |  | The configuration details for the identity provider. |
+
+
+
+
+
+
+<a name="laelia-v1-IdentityProviderConfig"></a>
+
+### IdentityProviderConfig
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| oauth2_config | [OAuth2IdentityProviderConfig](#laelia-v1-OAuth2IdentityProviderConfig) |  | OAuth2 protocol configuration. |
+| oidc_config | [OIDCIdentityProviderConfig](#laelia-v1-OIDCIdentityProviderConfig) |  | OIDC protocol configuration. |
+| ldap_config | [LDAPIdentityProviderConfig](#laelia-v1-LDAPIdentityProviderConfig) |  | LDAP protocol configuration. |
+
+
+
+
+
+
+<a name="laelia-v1-LDAPIdentityProviderConfig"></a>
+
+### LDAPIdentityProviderConfig
+LDAPIdentityProviderConfig is the structure for LDAP identity provider config.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| host | [string](#string) |  | Host is the hostname or IP address of the LDAP server, e.g., &#34;ldap.example.com&#34;. |
+| port | [int32](#int32) |  | Port is the port number of the LDAP server, e.g., 389. When not set, the default port of the corresponding security protocol will be used, i.e. 389 for StartTLS and 636 for LDAPS. |
+| skip_tls_verify | [bool](#bool) |  | SkipTLSVerify controls whether to skip TLS certificate verification. |
+| bind_dn | [string](#string) |  | BindDN is the DN of the user to bind as a service account to perform search requests. |
+| bind_password | [string](#string) |  | BindPassword is the password of the user to bind as a service account. |
+| base_dn | [string](#string) |  | BaseDN is the base DN to search for users, e.g., &#34;ou=users,dc=example,dc=com&#34;. |
+| user_filter | [string](#string) |  | UserFilter is the filter to search for users, e.g., &#34;(uid=%s)&#34;. |
+| security_protocol | [LDAPIdentityProviderConfig.SecurityProtocol](#laelia-v1-LDAPIdentityProviderConfig-SecurityProtocol) |  | SecurityProtocol is the security protocol to be used for establishing connections with the LDAP server. |
+| field_mapping | [FieldMapping](#laelia-v1-FieldMapping) |  | FieldMapping is the mapping of the user attributes returned by the LDAP server. |
+
+
+
+
+
+
+<a name="laelia-v1-LDAPIdentityProviderTestRequestContext"></a>
+
+### LDAPIdentityProviderTestRequestContext
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| username | [string](#string) |  | The username of a directory user, substituted into the user filter. |
+| password | [string](#string) |  | The password of the directory user. |
+
+
+
+
+
+
+<a name="laelia-v1-ListIdentityProvidersRequest"></a>
+
+### ListIdentityProvidersRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-ListIdentityProvidersResponse"></a>
+
+### ListIdentityProvidersResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| identity_providers | [IdentityProvider](#laelia-v1-IdentityProvider) | repeated | The identity providers from the specified request. |
+
+
+
+
+
+
+<a name="laelia-v1-OAuth2IdentityProviderConfig"></a>
+
+### OAuth2IdentityProviderConfig
+OAuth2IdentityProviderConfig is the structure for OAuth2 identity provider config.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| auth_url | [string](#string) |  | The authorization endpoint URL for OAuth2 flow. |
+| token_url | [string](#string) |  | The token endpoint URL for exchanging authorization code. |
+| user_info_url | [string](#string) |  | The user information endpoint URL. |
+| client_id | [string](#string) |  | The OAuth2 client identifier. |
+| client_secret | [string](#string) |  | The OAuth2 client secret for authentication. |
+| scopes | [string](#string) | repeated | The list of OAuth2 scopes to request. |
+| field_mapping | [FieldMapping](#laelia-v1-FieldMapping) |  | Mapping configuration for user attributes from OAuth2 response. |
+| skip_tls_verify | [bool](#bool) |  | Whether to skip TLS certificate verification. |
+| auth_style | [OAuth2AuthStyle](#laelia-v1-OAuth2AuthStyle) |  | The authentication style for client credentials. |
+
+
+
+
+
+
+<a name="laelia-v1-OAuth2IdentityProviderTestRequestContext"></a>
+
+### OAuth2IdentityProviderTestRequestContext
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| code | [string](#string) |  | Authorize code from website. |
+
+
+
+
+
+
+<a name="laelia-v1-OIDCIdentityProviderConfig"></a>
+
+### OIDCIdentityProviderConfig
+OIDCIdentityProviderConfig is the structure for OIDC identity provider config.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| issuer | [string](#string) |  | The OIDC issuer URL for the identity provider. |
+| client_id | [string](#string) |  | The OIDC client identifier. |
+| client_secret | [string](#string) |  | The OIDC client secret for authentication. |
+| scopes | [string](#string) | repeated | The scopes that the OIDC provider supports. |
+| field_mapping | [FieldMapping](#laelia-v1-FieldMapping) |  | Mapping configuration for user attributes from OIDC claims. |
+| skip_tls_verify | [bool](#bool) |  | Whether to skip TLS certificate verification. |
+| auth_style | [OAuth2AuthStyle](#laelia-v1-OAuth2AuthStyle) |  | The authentication style for client credentials. |
+
+
+
+
+
+
+<a name="laelia-v1-OIDCIdentityProviderTestRequestContext"></a>
+
+### OIDCIdentityProviderTestRequestContext
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| code | [string](#string) |  | Authorize code from OIDC provider. |
+
+
+
+
+
+
+<a name="laelia-v1-TestIdentityProviderRequest"></a>
+
+### TestIdentityProviderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| identity_provider | [IdentityProvider](#laelia-v1-IdentityProvider) |  | The identity provider to test connection including uncreated. |
+| oauth2_context | [OAuth2IdentityProviderTestRequestContext](#laelia-v1-OAuth2IdentityProviderTestRequestContext) |  |  |
+| oidc_context | [OIDCIdentityProviderTestRequestContext](#laelia-v1-OIDCIdentityProviderTestRequestContext) |  | OIDC authentication context for test connection. |
+| ldap_context | [LDAPIdentityProviderTestRequestContext](#laelia-v1-LDAPIdentityProviderTestRequestContext) |  | LDAP credentials context for test connection. |
+
+
+
+
+
+
+<a name="laelia-v1-TestIdentityProviderResponse"></a>
+
+### TestIdentityProviderResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| claims | [TestIdentityProviderResponse.ClaimsEntry](#laelia-v1-TestIdentityProviderResponse-ClaimsEntry) | repeated | The map of claims returned by the identity provider. |
+| user_info | [TestIdentityProviderResponse.UserInfoEntry](#laelia-v1-TestIdentityProviderResponse-UserInfoEntry) | repeated | The matched user info from the claims. |
+
+
+
+
+
+
+<a name="laelia-v1-TestIdentityProviderResponse-ClaimsEntry"></a>
+
+### TestIdentityProviderResponse.ClaimsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-TestIdentityProviderResponse-UserInfoEntry"></a>
+
+### TestIdentityProviderResponse.UserInfoEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateIdentityProviderRequest"></a>
+
+### UpdateIdentityProviderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| identity_provider | [IdentityProvider](#laelia-v1-IdentityProvider) |  | The identity provider to update. The identity provider&#39;s `name` field is used to identify the identity provider to update. Format: idps/{identity_provider} |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The list of fields to update. |
+| allow_missing | [bool](#bool) |  | If set to true, and the identity provider is not found, a new identity provider will be created. In this situation, `update_mask` is ignored. |
+
+
+
+
+
+ 
+
+
+<a name="laelia-v1-IdentityProviderType"></a>
+
+### IdentityProviderType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| IDENTITY_PROVIDER_TYPE_UNSPECIFIED | 0 | Unspecified identity provider type. |
+| OAUTH2 | 1 | OAuth 2.0 authentication protocol. |
+| OIDC | 2 | OpenID Connect authentication protocol. |
+| LDAP | 3 | LDAP directory service authentication. |
+
+
+
+<a name="laelia-v1-LDAPIdentityProviderConfig-SecurityProtocol"></a>
+
+### LDAPIdentityProviderConfig.SecurityProtocol
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| SECURITY_PROTOCOL_UNSPECIFIED | 0 |  |
+| START_TLS | 1 | StartTLS is the security protocol that starts with an unencrypted connection and then upgrades to TLS. |
+| LDAPS | 2 | LDAPS is the security protocol that uses TLS from the beginning. |
+
+
+
+<a name="laelia-v1-OAuth2AuthStyle"></a>
+
+### OAuth2AuthStyle
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| OAUTH2_AUTH_STYLE_UNSPECIFIED | 0 |  |
+| IN_PARAMS | 1 | IN_PARAMS sends the &#34;client_id&#34; and &#34;client_secret&#34; in the POST body as application/x-www-form-urlencoded parameters. |
+| IN_HEADER | 2 | IN_HEADER sends the client_id and client_password using HTTP Basic Authorization. This is an optional style described in the OAuth2 RFC 6749 section 2.3.1. |
+
+
+ 
+
+ 
+
+
+<a name="laelia-v1-IdentityProviderService"></a>
+
+### IdentityProviderService
+IdentityProviderService manages external identity providers (OAuth2/OIDC/LDAP)
+used for SSO authentication. It is the admin-facing configuration surface:
+workspace admins can create/update/delete providers and the login page lists
+the enabled ones (ListIdentityProviders is public).
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetIdentityProvider | [GetIdentityProviderRequest](#laelia-v1-GetIdentityProviderRequest) | [IdentityProvider](#laelia-v1-IdentityProvider) | Gets an identity provider by name. Permissions required: laelia.identityProviders.get |
+| ListIdentityProviders | [ListIdentityProvidersRequest](#laelia-v1-ListIdentityProvidersRequest) | [ListIdentityProvidersResponse](#laelia-v1-ListIdentityProvidersResponse) | Lists all configured identity providers. Public so the login page can render the enabled SSO targets without credentials. |
+| CreateIdentityProvider | [CreateIdentityProviderRequest](#laelia-v1-CreateIdentityProviderRequest) | [IdentityProvider](#laelia-v1-IdentityProvider) | Creates a new identity provider. Permissions required: laelia.identityProviders.create |
+| UpdateIdentityProvider | [UpdateIdentityProviderRequest](#laelia-v1-UpdateIdentityProviderRequest) | [IdentityProvider](#laelia-v1-IdentityProvider) | Updates an identity provider. Permissions required: laelia.identityProviders.update |
+| DeleteIdentityProvider | [DeleteIdentityProviderRequest](#laelia-v1-DeleteIdentityProviderRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Deletes an identity provider. Permissions required: laelia.identityProviders.delete |
+| TestIdentityProvider | [TestIdentityProviderRequest](#laelia-v1-TestIdentityProviderRequest) | [TestIdentityProviderResponse](#laelia-v1-TestIdentityProviderResponse) | Tests the connection and configuration of an identity provider. Permissions required: laelia.identityProviders.update |
+
+ 
+
+
+
 <a name="v1_machine-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -8106,6 +8532,7 @@ signup is offered and which email suffixes are accepted.
 | enforce_identity_domain | [bool](#bool) |  | Whether the email suffix restriction is enforced for signup. |
 | domains | [string](#string) | repeated | The allowed email suffixes (e.g. &#34;example.com&#34;) when enforce_identity_domain is set. |
 | require_email_verification | [bool](#bool) |  | Whether self-service signup must verify the email address by clicking a link before the account can sign in. Only meaningful when disallow_signup is false. |
+| external_url | [string](#string) |  | The workspace external URL. Public so the login page can build the OAuth redirect_uri from the same canonical base the backend uses for token exchange, instead of relying on the browser&#39;s current origin. |
 
 
 

@@ -68,6 +68,11 @@
     {"name": "McpServersGet", "id": "laelia.mcpServers.get"},
     {"name": "McpServersList", "id": "laelia.mcpServers.list"},
     {"name": "McpServersUpdate", "id": "laelia.mcpServers.update"},
-    {"name": "McpServersDelete", "id": "laelia.mcpServers.delete"}
+    {"name": "McpServersDelete", "id": "laelia.mcpServers.delete"},
+    {"name": "IdentityProvidersCreate", "id": "laelia.identityProviders.create"},
+    {"name": "IdentityProvidersGet", "id": "laelia.identityProviders.get"},
+    {"name": "IdentityProvidersList", "id": "laelia.identityProviders.list"},
+    {"name": "IdentityProvidersUpdate", "id": "laelia.identityProviders.update"},
+    {"name": "IdentityProvidersDelete", "id": "laelia.identityProviders.delete"}
   ]
 }

@@ -310,6 +310,15 @@ export declare type GetWorkspaceInfoResponse = Message<"laelia.v1.GetWorkspaceIn
    * @generated from field: bool require_email_verification = 4;
    */
   requireEmailVerification: boolean;
+
+  /**
+   * The workspace external URL. Public so the login page can build the OAuth
+   * redirect_uri from the same canonical base the backend uses for token
+   * exchange, instead of relying on the browser's current origin.
+   *
+   * @generated from field: string external_url = 5;
+   */
+  externalUrl: string;
 };
 
 /**

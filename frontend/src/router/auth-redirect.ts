@@ -23,7 +23,11 @@ export function isAuthPath(pathname: string): boolean {
 // a logged-out user must be able to open the URL from the machine's terminal
 // and sign in there, while a logged-in user must not be bounced off it.
 export function isPublicPath(pathname: string): boolean {
-  return pathname.startsWith("/login/device");
+  return (
+    pathname.startsWith("/login/device") ||
+    pathname.startsWith("/oauth/callback") ||
+    pathname.startsWith("/oauth/login")
+  );
 }
 
 /**

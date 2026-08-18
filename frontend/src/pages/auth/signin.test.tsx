@@ -9,12 +9,16 @@ import { SignInPage } from "./signin";
 
 const mock = vi.hoisted(() => ({
   getWorkspaceInfo: vi.fn(),
+  listIdentityProviders: vi.fn(),
   login: vi.fn(),
   getCurrentUser: vi.fn(),
 }));
 
 vi.mock("@/connect", () => ({
   settingServiceClient: { getWorkspaceInfo: mock.getWorkspaceInfo },
+  identityProviderServiceClient: {
+    listIdentityProviders: mock.listIdentityProviders,
+  },
   authServiceClient: { login: mock.login },
   userServiceClient: { getCurrentUser: mock.getCurrentUser },
 }));
@@ -59,6 +63,8 @@ beforeEach(() => {
     sessionLoaded: true,
   });
   mock.getWorkspaceInfo.mockReset();
+  mock.listIdentityProviders.mockReset();
+  mock.listIdentityProviders.mockResolvedValue({ identityProviders: [] });
   mock.login.mockReset();
   mock.getCurrentUser.mockReset();
   toastMock.add.mockReset();

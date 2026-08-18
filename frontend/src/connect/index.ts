@@ -14,6 +14,7 @@ import { ApiProviderService } from "@/types/proto-es/v1/api_provider_service_pb"
 import { McpServerService } from "@/types/proto-es/v1/mcp_pb";
 import { AuditLogService } from "@/types/proto-es/v1/audit_log_service_pb";
 import { NotificationService } from "@/types/proto-es/v1/notification_pb";
+import { IdentityProviderService } from "@/types/proto-es/v1/idp_service_pb";
 import { createAuthInterceptor } from "./auth-interceptor";
 
 // Guards against a stampede of concurrent 401s each triggering a redirect.
@@ -30,6 +31,18 @@ async function onUnauthenticated() {
   if (authRedirecting) {
     return;
   }
+  // On public auth surfaces (sign-in, OAuth callback, device login) a 401 is
+  // expected during an in-flight login. In particular RootLayout's loadSession()
+  // fires GetCurrentUser before the OAuth login completes; that 401 must not
+  // reset the store or yank the user back to sign-in mid-login.
+  if (
+    window.location.pathname.startsWith("/auth/") ||
+    window.location.pathname.startsWith("/oauth/callback") ||
+    window.location.pathname.startsWith("/oauth/login") ||
+    window.location.pathname.startsWith("/login/device")
+  ) {
+    return;
+  }
   authRedirecting = true;
   try {
     const { useAppStore } = await import("@/stores");
@@ -44,12 +57,10 @@ async function onUnauthenticated() {
       isLoggedIn: false,
       sessionLoaded: true,
     });
-    if (!window.location.pathname.startsWith("/auth/")) {
-      const redirect = encodeURIComponent(
-        window.location.pathname + window.location.search
-      );
-      window.location.assign(`/auth/signin?redirect=${redirect}`);
-    }
+    const redirect = encodeURIComponent(
+      window.location.pathname + window.location.search
+    );
+    window.location.assign(`/auth/signin?redirect=${redirect}`);
   } finally {
     authRedirecting = false;
   }
@@ -79,5 +90,10 @@ export const mcpServerServiceClient = createClient(McpServerService, transport);
 export const auditLogServiceClient = createClient(AuditLogService, transport);
 export const notificationServiceClient = createClient(
   NotificationService,
+  transport
+);
+
+export const identityProviderServiceClient = createClient(
+  IdentityProviderService,
   transport
 );

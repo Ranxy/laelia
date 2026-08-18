@@ -691,8 +691,12 @@ type GetWorkspaceInfoResponse struct {
 	// link before the account can sign in. Only meaningful when disallow_signup
 	// is false.
 	RequireEmailVerification bool `protobuf:"varint,4,opt,name=require_email_verification,json=requireEmailVerification,proto3" json:"require_email_verification,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// The workspace external URL. Public so the login page can build the OAuth
+	// redirect_uri from the same canonical base the backend uses for token
+	// exchange, instead of relying on the browser's current origin.
+	ExternalUrl   string `protobuf:"bytes,5,opt,name=external_url,json=externalUrl,proto3" json:"external_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetWorkspaceInfoResponse) Reset() {
@@ -753,6 +757,13 @@ func (x *GetWorkspaceInfoResponse) GetRequireEmailVerification() bool {
 	return false
 }
 
+func (x *GetWorkspaceInfoResponse) GetExternalUrl() string {
+	if x != nil {
+		return x.ExternalUrl
+	}
+	return ""
+}
+
 var File_v1_setting_proto protoreflect.FileDescriptor
 
 const file_v1_setting_proto_rawDesc = "" +
@@ -791,12 +802,13 @@ const file_v1_setting_proto_rawDesc = "" +
 	"\aenabled\x18\x01 \x01(\bB\x03\xe0A\x02R\aenabled\"5\n" +
 	"\x19UpdateDebugConfigResponse\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\"\x19\n" +
-	"\x17GetWorkspaceInfoRequest\"\xd3\x01\n" +
+	"\x17GetWorkspaceInfoRequest\"\xf6\x01\n" +
 	"\x18GetWorkspaceInfoResponse\x12'\n" +
 	"\x0fdisallow_signup\x18\x01 \x01(\bR\x0edisallowSignup\x126\n" +
 	"\x17enforce_identity_domain\x18\x02 \x01(\bR\x15enforceIdentityDomain\x12\x18\n" +
 	"\adomains\x18\x03 \x03(\tR\adomains\x12<\n" +
-	"\x1arequire_email_verification\x18\x04 \x01(\bR\x18requireEmailVerification2\x90\x05\n" +
+	"\x1arequire_email_verification\x18\x04 \x01(\bR\x18requireEmailVerification\x12!\n" +
+	"\fexternal_url\x18\x05 \x01(\tR\vexternalUrl2\x90\x05\n" +
 	"\x0eSettingService\x12D\n" +
 	"\n" +
 	"GetSetting\x12\x1c.laelia.v1.GetSettingRequest\x1a\x12.laelia.v1.Setting\"\x04\x90\xea0\x01\x12h\n" +

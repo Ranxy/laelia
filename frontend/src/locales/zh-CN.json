@@ -189,7 +189,10 @@
       "failed": "登录失败",
       "failed-description": "请检查您的登录凭据。",
       "new-user": "还没有账户？",
-      "title": "登录您的账户"
+      "title": "登录您的账户",
+      "continue-with": "使用 {{provider}} 继续",
+      "or": "或",
+      "oauth-invalid": "该提供商未正确配置，无法用于登录。"
     },
     "sign-up": {
       "allowed-domains": "仅允许以下邮箱后缀注册：{{domains}}",
@@ -223,6 +226,23 @@
       "success": "邮箱验证成功，现在可以登录了。",
       "title": "验证邮箱",
       "verifying": "正在验证邮箱…"
+    },
+    "oauth-callback": {
+      "invalid-state": "登录请求无效或已过期，请重试。",
+      "login-failed": "使用提供商登录失败。",
+      "failed": "登录失败",
+      "back-to-signin": "返回登录",
+      "signing-in": "正在登录…"
+    },
+    "oauth-login": {
+      "failed": "无法开始登录",
+      "missing-provider": "URL 中缺少提供商。",
+      "provider-not-found": "未找到身份提供商“{{provider}}”。",
+      "unsupported-type": "提供商“{{provider}}”不是 OAuth2 提供商。",
+      "invalid-config": "提供商“{{provider}}”未正确配置，无法用于登录。",
+      "load-failed": "加载身份提供商失败。",
+      "back-to-signin": "返回登录",
+      "redirecting": "正在跳转到提供商…"
     }
   },
   "channel": {
@@ -1111,7 +1131,53 @@
       "use-tls": "使用 TLS（465 端口隐式 TLS，其他端口 STARTTLS）",
       "username": "用户名"
     },
-    "title": "设置"
+    "title": "设置",
+    "identity-providers": {
+      "create": "创建提供商",
+      "create-description": "配置 OAuth2 / SSO 身份提供商。",
+      "create-failed": "创建提供商失败",
+      "create-title": "创建提供商",
+      "created": "提供商已创建",
+      "delete-confirm-description": "删除提供商 \"{{title}}\"？用户将无法再使用它登录。",
+      "delete-confirm-title": "删除提供商",
+      "delete-failed": "删除提供商失败",
+      "deleted": "提供商已删除",
+      "description": "管理外部身份提供商（SSO）。配置用户可用于登录的 OAuth2 目标。",
+      "edit-description": "更新提供商的 OAuth2 配置。",
+      "edit-title": "编辑提供商：{{title}}",
+      "empty": "尚未配置任何身份提供商。",
+      "field-auth-url": "授权 URL",
+      "field-auth-url-placeholder": "https://provider.example.com/oauth/authorize",
+      "field-client-id": "Client ID",
+      "field-client-id-placeholder": "your-oauth-client-id",
+      "field-client-secret": "客户端密钥",
+      "field-client-secret-kept": "密钥已存储（已掩码）。输入新密钥以替换。",
+      "field-client-secret-placeholder": "留空以保留已存储的密钥",
+      "field-display-name-mapping": "显示名字段",
+      "field-display-name-mapping-placeholder": "例如 name",
+      "field-domain": "域名",
+      "field-domain-hint": "可选。将该提供商限制到特定邮箱域名。",
+      "field-domain-placeholder": "example.com",
+      "field-identifier-mapping": "标识符/邮箱字段",
+      "field-identifier-mapping-placeholder": "例如 email",
+      "field-scopes": "Scopes",
+      "field-scopes-placeholder": "openid email profile",
+      "field-title": "标题",
+      "field-title-placeholder": "Google / GitHub / 自定义 OAuth",
+      "field-token-url": "令牌 URL",
+      "field-token-url-placeholder": "https://provider.example.com/oauth/token",
+      "field-user-info-url": "用户信息 URL",
+      "field-user-info-url-placeholder": "https://provider.example.com/oauth/userinfo",
+      "load-failed": "加载身份提供商失败",
+      "save-failed": "保存提供商失败",
+      "saved": "提供商已保存",
+      "title": "身份提供商",
+      "type": "类型",
+      "type-oauth2": "OAuth2",
+      "not-allowed": "无权访问",
+      "unsupported-type": "目前仅支持编辑 OAuth2 提供商。",
+      "invalid-id": "标题需包含拉丁字母或数字以生成提供商 ID。"
+    }
   },
   "setup": {
     "action": {
@@ -1147,7 +1213,8 @@
     "settings-roles": "角色",
     "settings-smtp": "SMTP",
     "settings-storage": "存储配置",
-    "settings-users": "用户管理"
+    "settings-users": "用户管理",
+    "settings-identity-providers": "身份提供商"
   },
   "tasks": {
     "empty": "暂无任务",
