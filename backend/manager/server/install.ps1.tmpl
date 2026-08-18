@@ -118,12 +118,61 @@ function Add-ToUserPath([string]$Directory) {
   Write-Step "added $Directory to the user PATH (new terminals will pick it up)"
 }
 
+function Get-RunningLaeliaMachineProcesses {
+  @(Get-Process -Name $CommandName -ErrorAction SilentlyContinue)
+}
+
+function Stop-RunningLaeliaMachine {
+  $processes = Get-RunningLaeliaMachineProcesses
+  if ($processes.Count -eq 0) {
+    return
+  }
+
+  $exePath = $processes[0].Path
+  $installedPath = Join-Path $InstallDir $BinaryName
+  if ($exePath -and (Test-Path -LiteralPath $exePath)) {
+    Write-Step "stopping $exePath"
+    & $exePath stop
+  } elseif (Test-Path -LiteralPath $installedPath) {
+    Write-Step "stopping $installedPath"
+    & $installedPath stop
+  } else {
+    Write-Step "stopping $CommandName"
+    & $CommandName stop
+  }
+  if ($LASTEXITCODE -ne 0) {
+    Fail "failed to stop $BinaryName (exit code $LASTEXITCODE)"
+  }
+
+  $deadline = (Get-Date).AddSeconds(30)
+  while ((Get-RunningLaeliaMachineProcesses).Count -gt 0 -and (Get-Date) -lt $deadline) {
+    Start-Sleep -Milliseconds 200
+  }
+  if ((Get-RunningLaeliaMachineProcesses).Count -gt 0) {
+    Fail "$BinaryName is still running after stop; close it manually and try again"
+  }
+  Write-Step "$BinaryName stopped"
+}
+
 try {
   if (-not $ManagerUrl) {
     Fail 'manager URL is not set; re-fetch this script from your manager'
   }
   $target = Get-Target
   Write-Step "detected target: $target"
+
+  # Windows cannot replace an executable while it is running, so ask before stopping it.
+  $runningProcesses = Get-RunningLaeliaMachineProcesses
+  if ($runningProcesses.Count -gt 0) {
+    Write-Step "$BinaryName is currently running. Continuing will stop it and the agent will disconnect."
+    $answer = Read-Host "Do you want to continue? [y/N]"
+    if ($null -ne $answer) { $answer = $answer.Trim() }
+    if ($answer -notmatch '^(y|yes)$') {
+      Write-Step "Installation cancelled."
+      return
+    }
+    Stop-RunningLaeliaMachine
+  }
 
   $base = "$ManagerUrl/machine"
   Write-Step "resolving manifest from $base/manifest.json"
@@ -167,5 +216,5 @@ try {
   }
 } catch {
   [Console]::Error.WriteLine($_.Exception.Message)
-  exit 1
+  return
 }
