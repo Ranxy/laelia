@@ -92,6 +92,10 @@ type MachineClient struct {
 	// message. Machine-scoped: every hosted agent selects from this list.
 	discoveredProviders []provider.Discovered
 	discoveredAt        time.Time
+	// providerUpdateCh carries the result of the startup background provider
+	// probe to the MachineChannel control stream so the manager can persist the
+	// fresh list even when the probe finishes after ConnectMachine.
+	providerUpdateCh chan []provider.Discovered
 
 	// runners is the live set of per-agent drain loops, keyed by bare agent id.
 	// The MachineChannel receive pump mutates this on AgentAssignment /
@@ -210,6 +214,7 @@ func New(managerURL, machineID, refreshToken string, insecure bool, allowHTTP bo
 		backoff:          NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
 		runners:          make(map[string]*agentRunner),
 		machineVersion:   version.Version,
+		providerUpdateCh: make(chan []provider.Discovered, 1),
 	}, nil
 }
 
@@ -432,12 +437,26 @@ func (c *MachineClient) Run(ctx context.Context) error {
 	c.daemon = daemonSrv
 	defer daemonSrv.Stop()
 
-	// Probe the host once for installed LLM agent providers + models so the
-	// first MachineInfo report carries them. On-demand re-probing is driven by
-	// the MachineChannel DiscoverProviders control message.
-	discoverCtx, discoverCancel := context.WithTimeout(ctx, 2*time.Minute)
-	c.refreshProviders(discoverCtx)
-	discoverCancel()
+	if c.providerUpdateCh == nil {
+		c.providerUpdateCh = make(chan []provider.Discovered, 1)
+	}
+
+	// Probe the host once for installed LLM agent providers + models in the
+	// background so the first connect is not blocked by a slow provider scan
+	// (e.g. npx downloading the Claude ACP wrapper on first run). The result is
+	// cached for the first MachineInfo report if it finishes in time, and is
+	// also pushed to the manager over the MachineChannel once the control
+	// stream is up. On-demand re-probing is driven by the MachineChannel
+	// DiscoverProviders control message.
+	go func() {
+		discoverCtx, discoverCancel := context.WithTimeout(ctx, 2*time.Minute)
+		defer discoverCancel()
+		discovered := c.refreshProviders(discoverCtx)
+		select {
+		case c.providerUpdateCh <- discovered:
+		case <-ctx.Done():
+		}
+	}()
 
 	for {
 		select {

@@ -691,6 +691,12 @@ func (s *MachineService) ConnectMachine(ctx context.Context, req *connect.Reques
 	}
 	if req.Msg.Info != nil {
 		patch.Info = convertToStoreMachineInfo(req.Msg.Info)
+		// The machine now connects before its slow provider scan finishes. Keep
+		// any previously discovered providers until the background probe pushes a
+		// fresh list, so a reconnect does not temporarily wipe machine.info.
+		if len(patch.Info.AvailableProviders) == 0 && machine.Info != nil && len(machine.Info.AvailableProviders) > 0 {
+			patch.Info.AvailableProviders = machine.Info.AvailableProviders
+		}
 	} else {
 		patch.Info = &storepb.MachineInfo{}
 	}

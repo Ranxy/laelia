@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/pkg/errors"
@@ -86,9 +87,38 @@ func (s *MachineStreamService) MachineChannel(
 			}
 
 		case *v1pb.MachineStreamMessage_ProvidersDiscovered:
-			// Completes a pending RefreshMachineProviders round-trip; the
-			// DiscoverProviders request is correlated by request_id.
-			s.dispatcher.CompletePendingDiscover(m.ProvidersDiscovered)
+			if m.ProvidersDiscovered.GetRequestId() != "" {
+				// Completes a pending RefreshMachineProviders round-trip; the
+				// DiscoverProviders request is correlated by request_id.
+				s.dispatcher.CompletePendingDiscover(m.ProvidersDiscovered)
+				break
+			}
+			// Unsolicited push from the machine's startup background probe: the
+			// machine connects immediately (so it shows ONLINE) and reports the
+			// discovered providers as soon as the scan finishes. Persist them so
+			// the UI does not need a manual refresh to see providers. Use a
+			// detached timeout so a concurrently closing stream cannot cancel the
+			// persistence halfway.
+			updateCtx, updateCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			current, err := s.store.GetMachine(updateCtx, machine.ID)
+			if err != nil {
+				updateCancel()
+				slog.Error("failed to load machine for provider update", "machineID", machine.ID, "error", err)
+				break
+			}
+			if current == nil {
+				updateCancel()
+				slog.Warn("machine disappeared before provider update", "machineID", machine.ID)
+				break
+			}
+			patchInfo := cloneStoreMachineInfo(current.Info)
+			patchInfo.AvailableProviders = convertToStoreProviders(m.ProvidersDiscovered.GetProviders())
+			if _, err := s.store.UpdateMachine(updateCtx, current, &store.UpdateMachineMessage{Info: patchInfo}); err != nil {
+				updateCancel()
+				slog.Error("failed to persist machine provider update", "machineID", machine.ID, "error", err)
+				break
+			}
+			updateCancel()
 
 		case *v1pb.MachineStreamMessage_MachineWorkspaceScanResponse:
 			s.dispatcher.CompletePendingMachineWorkspaceScan(m.MachineWorkspaceScanResponse)

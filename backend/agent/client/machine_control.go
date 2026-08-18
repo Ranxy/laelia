@@ -18,8 +18,9 @@ import (
 
 // runControlStream opens the machine-level MachineChannel bidi stream and pumps
 // it for the lifetime of one connection. It sends MachineReady on open, pings
-// on a ticker, and replies to DiscoverProviders with a fresh host probe. On
-// the receive side it drives the agent roster: AgentAssignment / ReloadAgentAssignment
+// on a ticker, pushes the startup background provider probe result, and
+// replies to DiscoverProviders with a fresh host probe. On the receive side it
+// drives the agent roster: AgentAssignment / ReloadAgentAssignment
 // spawn or re-config a runner, RemoveAgent tears one down, AgentConfigUpdate
 // hot-reloads a runner's ACP config. It returns when the stream ends or ctx is
 // cancelled; the caller (Run) treats a non-nil return as a death signal that
@@ -134,6 +135,20 @@ func (c *MachineClient) runControlStream(ctx context.Context, _ *daemonsrv.Serve
 			return nil
 		case err := <-errCh:
 			return err
+		case discovered := <-c.providerUpdateCh:
+			// Startup background probe finished after the control stream opened
+			// (or was queued before it opened). Push the fresh list to the manager
+			// so machine.info.available_providers is updated without requiring a
+			// manual RefreshMachineProviders round-trip.
+			if err := sendStream(&v1pb.MachineStreamMessage{
+				Message: &v1pb.MachineStreamMessage_ProvidersDiscovered{
+					ProvidersDiscovered: &v1pb.ProvidersDiscovered{
+						Providers: discoveredToProto(discovered, time.Now()),
+					},
+				},
+			}); err != nil {
+				return err
+			}
 		case <-pingTicker.C:
 			pingSeq++
 			if err := sendStream(&v1pb.MachineStreamMessage{

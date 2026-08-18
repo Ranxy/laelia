@@ -24,20 +24,25 @@ func (*ClaudeCodeProvider) BuildCommand(_ string) (string, []string) {
 }
 
 func (p *ClaudeCodeProvider) Detect(ctx context.Context) (*Detected, bool, error) {
-	// The ACP server is launched through npx, so npx on PATH is the real
-	// requirement. A locally installed `claude` CLI is a secondary signal but
-	// not required (the npm wrapper bundles its own agent).
-	path, err := exec.LookPath("npx")
+	// The ACP server is launched through npx, so npx on PATH is required.
+	// The wrapper is only useful when the actual Claude Code CLI is installed
+	// too; requiring `claude` prevents machines that merely have Node/npx from
+	// being reported as having Claude Code.
+	npxPath, err := exec.LookPath("npx")
 	if err != nil {
 		//nolint:nilerr // npx not on PATH -> provider absent, not a probe error
 		return nil, false, nil
 	}
-	version := runVersionCmd(ctx, "npx", "--version")
+	if _, err := exec.LookPath("claude"); err != nil {
+		//nolint:nilerr // claude CLI not on PATH -> provider absent, not a probe error
+		return nil, false, nil
+	}
+	version := runVersionCmd(ctx, "claude", "--version")
 	return &Detected{
 		ProviderID:     p.ID(),
 		DisplayName:    p.DisplayName(),
 		Version:        version,
-		ExecutablePath: path,
+		ExecutablePath: npxPath,
 	}, true, nil
 }
 
