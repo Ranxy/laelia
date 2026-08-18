@@ -33,6 +33,7 @@ const (
 	AgentStatus_OFFLINE                      AgentStatus_ConnectionState = 2
 	AgentStatus_ERROR                        AgentStatus_ConnectionState = 3
 	AgentStatus_KICKED                       AgentStatus_ConnectionState = 4 // evicted by a new connection
+	AgentStatus_STOPPED                      AgentStatus_ConnectionState = 5 // disabled via StopAgent; not processing sessions
 )
 
 // Enum value maps for AgentStatus_ConnectionState.
@@ -43,6 +44,7 @@ var (
 		2: "OFFLINE",
 		3: "ERROR",
 		4: "KICKED",
+		5: "STOPPED",
 	}
 	AgentStatus_ConnectionState_value = map[string]int32{
 		"CONNECTION_STATE_UNSPECIFIED": 0,
@@ -50,6 +52,7 @@ var (
 		"OFFLINE":                      2,
 		"ERROR":                        3,
 		"KICKED":                       4,
+		"STOPPED":                      5,
 	}
 )
 
@@ -4161,13 +4164,13 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x1csupports_autonomous_decision\x18\t \x01(\bR\x1asupportsAutonomousDecision\x12\x1f\n" +
 	"\vsupports_pi\x18\n" +
 	" \x01(\bR\n" +
-	"supportsPi\"\x90\x03\n" +
+	"supportsPi\"\x9d\x03\n" +
 	"\vAgentStatus\x12<\n" +
 	"\x05state\x18\x01 \x01(\x0e2&.laelia.v1.AgentStatus.ConnectionStateR\x05state\x12J\n" +
 	"\x13last_heartbeat_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x11lastHeartbeatTime\x12A\n" +
 	"\x0econnected_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\rconnectedTime\x12#\n" +
 	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\x12*\n" +
-	"\x11active_session_id\x18\x05 \x01(\tR\x0factiveSessionId\"c\n" +
+	"\x11active_session_id\x18\x05 \x01(\tR\x0factiveSessionId\"p\n" +
 	"\x0fConnectionState\x12 \n" +
 	"\x1cCONNECTION_STATE_UNSPECIFIED\x10\x00\x12\n" +
 	"\n" +
@@ -4175,7 +4178,8 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\aOFFLINE\x10\x02\x12\t\n" +
 	"\x05ERROR\x10\x03\x12\n" +
 	"\n" +
-	"\x06KICKED\x10\x04\"\xab\x02\n" +
+	"\x06KICKED\x10\x04\x12\v\n" +
+	"\aSTOPPED\x10\x05\"\xab\x02\n" +
 	"\fAgentMetrics\x12\x1f\n" +
 	"\vcpu_percent\x18\x01 \x01(\x01R\n" +
 	"cpuPercent\x12*\n" +

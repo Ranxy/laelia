@@ -4519,8 +4519,12 @@ type PeerAgent struct {
 	DisplayName     string                      `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	PersonaPrompt   string                      `protobuf:"bytes,3,opt,name=persona_prompt,json=personaPrompt,proto3" json:"persona_prompt,omitempty"`
 	ConnectionState AgentStatus_ConnectionState `protobuf:"varint,4,opt,name=connection_state,json=connectionState,proto3,enum=laelia.v1.AgentStatus_ConnectionState" json:"connection_state,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// enabled reports whether the peer is running (false = stopped via
+	// StopAgent). A stopped peer's connection_state is STOPPED regardless of
+	// whether its machine is still connected.
+	Enabled       bool `protobuf:"varint,6,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PeerAgent) Reset() {
@@ -4586,6 +4590,13 @@ func (x *PeerAgent) GetConnectionState() AgentStatus_ConnectionState {
 		return x.ConnectionState
 	}
 	return AgentStatus_CONNECTION_STATE_UNSPECIFIED
+}
+
+func (x *PeerAgent) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
 }
 
 // ListPeerAgents returns every other agent (the caller excluded) with the
@@ -11542,13 +11553,14 @@ const file_v1_command_proto_rawDesc = "" +
 	"peer_agent\x18\x01 \x01(\tB\x14\xe0A\x02\xfaA\x0e\n" +
 	"\flaelia/AgentR\tpeerAgent\"Y\n" +
 	"\x1aGetOrCreateAgentDMResponse\x12;\n" +
-	"\fconversation\x18\x01 \x01(\v2\x17.laelia.v1.ConversationR\fconversation\"\xd4\x01\n" +
+	"\fconversation\x18\x01 \x01(\v2\x17.laelia.v1.ConversationR\fconversation\"\xee\x01\n" +
 	"\tPeerAgent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06handle\x18\x05 \x01(\tR\x06handle\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12%\n" +
 	"\x0epersona_prompt\x18\x03 \x01(\tR\rpersonaPrompt\x12Q\n" +
-	"\x10connection_state\x18\x04 \x01(\x0e2&.laelia.v1.AgentStatus.ConnectionStateR\x0fconnectionState\"\x17\n" +
+	"\x10connection_state\x18\x04 \x01(\x0e2&.laelia.v1.AgentStatus.ConnectionStateR\x0fconnectionState\x12\x18\n" +
+	"\aenabled\x18\x06 \x01(\bR\aenabled\"\x17\n" +
 	"\x15ListPeerAgentsRequest\"F\n" +
 	"\x16ListPeerAgentsResponse\x12,\n" +
 	"\x06agents\x18\x01 \x03(\v2\x14.laelia.v1.PeerAgentR\x06agents\"1\n" +

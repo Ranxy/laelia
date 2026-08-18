@@ -35,6 +35,7 @@ func TestListPeerAgentsRendersRoster(t *testing.T) {
 			DisplayName:     "rei",
 			PersonaPrompt:   "精通后端, 专注构建 agent。\n前端任务请转给 @ui-expert。",
 			ConnectionState: v1pb.AgentStatus_ONLINE,
+			Enabled:         true,
 		},
 		{
 			Name:            "agents/ui-expert-agent-1",
@@ -42,19 +43,31 @@ func TestListPeerAgentsRendersRoster(t *testing.T) {
 			DisplayName:     "ui-expert",
 			PersonaPrompt:   "",
 			ConnectionState: v1pb.AgentStatus_OFFLINE,
+			Enabled:         true,
+		},
+		{
+			Name:            "agents/archived-agent-1",
+			Handle:          "archived-agent-1",
+			DisplayName:     "archived",
+			PersonaPrompt:   "",
+			ConnectionState: v1pb.AgentStatus_STOPPED,
+			Enabled:         false,
 		},
 	}}
 
 	out, err := ListPeerAgents(context.Background(), Deps{Client: c}, ListPeerAgentsInput{})
 	require.NoError(t, err)
 	// Header carries the count.
-	assert.Contains(t, out, "Peer agents (2):")
+	assert.Contains(t, out, "Peer agents (3):")
 	// rei: handle + online state, then the full (multi-line, untruncated) persona.
 	assert.Contains(t, out, "- [agent] rei @rei-agent-1 (online)")
 	assert.Contains(t, out, "  精通后端, 专注构建 agent。")
 	assert.Contains(t, out, "  前端任务请转给 @ui-expert。")
 	// ui-expert: no persona → no indented block; offline state.
 	assert.Contains(t, out, "- [agent] ui-expert @ui-expert-agent-1 (offline)")
+	// archived: stopped state carries an explicit do-not-delegate hint.
+	assert.Contains(t, out, "- [agent] archived @archived-agent-1 (stopped)")
+	assert.Contains(t, out, "do NOT delegate work to this agent")
 	// The delegation hint names dm:@<handle>; handles are unique so no
 	// display-name disambiguation fallback exists.
 	assert.Contains(t, out, "message send dm:@<handle>")
@@ -82,6 +95,7 @@ func TestConnectionStateString(t *testing.T) {
 	assert.Equal(t, "offline", connectionStateString(v1pb.AgentStatus_OFFLINE))
 	assert.Equal(t, "error", connectionStateString(v1pb.AgentStatus_ERROR))
 	assert.Equal(t, "kicked", connectionStateString(v1pb.AgentStatus_KICKED))
+	assert.Equal(t, "stopped", connectionStateString(v1pb.AgentStatus_STOPPED))
 	assert.Equal(t, "unknown", connectionStateString(v1pb.AgentStatus_CONNECTION_STATE_UNSPECIFIED))
 }
 

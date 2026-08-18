@@ -871,7 +871,7 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 	resp := &v1pb.ConnectAgentResponse{
 		SessionId:     sessionID,
 		NextNonce:     nonce,
-		InitialStatus: convertToV1AgentStatus(updated.Status, updated.Deleted, true),
+		InitialStatus: convertToV1AgentStatus(updated.Status, updated.Deleted, true, updated.Enabled),
 		AcpConfig:     resolvedAcp,
 	}
 	if accessToken != "" {
@@ -1256,7 +1256,7 @@ func (s *AgentService) convertToAgent(ctx context.Context, agent *store.AgentMes
 		state = v1pb.State_DELETED
 	}
 
-	status := convertToV1AgentStatus(agent.Status, agent.Deleted, connected)
+	status := convertToV1AgentStatus(agent.Status, agent.Deleted, connected, agent.Enabled)
 
 	result := &v1pb.Agent{
 		Name:                    name,
@@ -1320,7 +1320,7 @@ func convertToAgentSummary(ctx context.Context, s *store.Store, agent *store.Age
 		Handle:                  agent.ResourceID,
 		State:                   state,
 		Title:                   agent.Name,
-		Status:                  convertToV1AgentStatus(agent.Status, agent.Deleted, connected),
+		Status:                  convertToV1AgentStatus(agent.Status, agent.Deleted, connected, agent.Enabled),
 		AllowAddToChannel:       agent.AllowAddToChannel,
 		FollowOwnerPermissions:  agent.FollowOwnerPermissions,
 		CanManageChannelMembers: agent.CanManageChannelMembers,
@@ -1570,11 +1570,11 @@ func convertToStoreAgentCapability(capability *v1pb.AgentCapability) *storepb.Ag
 	}
 }
 
-func convertToV1AgentStatus(status *storepb.AgentStatus, deleted bool, connected bool) *v1pb.AgentStatus {
+func convertToV1AgentStatus(status *storepb.AgentStatus, deleted bool, connected bool, enabled bool) *v1pb.AgentStatus {
 	if status == nil {
 		return nil
 	}
-	state := computeConnectionState(status, deleted, connected)
+	state := computeConnectionState(status, deleted, connected, enabled)
 
 	var lastHeartbeatTime *timestamppb.Timestamp
 	if status.LastHeartbeatAt > 0 {
@@ -1598,17 +1598,23 @@ func convertToV1AgentStatus(status *storepb.AgentStatus, deleted bool, connected
 // machine-hosts-many model the machine heartbeats, not the agent, so liveness
 // is taken from `connected` (the agent's live AgentChannel in the dispatcher),
 // not from status.LastHeartbeatAt (which is no longer written and would always
-// read as offline). Explicit ERROR/KICKED terminal states and deletion take
-// precedence over the live-stream signal.
-func computeConnectionState(status *storepb.AgentStatus, deleted bool, connected bool) v1pb.AgentStatus_ConnectionState {
+// read as offline). Deletion and being stopped (StopAgent, enabled=false) are
+// lifecycle states that take precedence over the live-stream signal and over
+// any stale ERROR/KICKED connection state: a stopped agent is not processing
+// sessions even if its machine is still connected or its last connection ended
+// in an error.
+func computeConnectionState(status *storepb.AgentStatus, deleted bool, connected bool, enabled bool) v1pb.AgentStatus_ConnectionState {
+	if deleted {
+		return v1pb.AgentStatus_OFFLINE
+	}
+	if !enabled {
+		return v1pb.AgentStatus_STOPPED
+	}
 	if status.State == storepb.AgentStatus_ERROR {
 		return v1pb.AgentStatus_ERROR
 	}
 	if status.State == storepb.AgentStatus_KICKED {
 		return v1pb.AgentStatus_KICKED
-	}
-	if deleted {
-		return v1pb.AgentStatus_OFFLINE
 	}
 	if connected {
 		return v1pb.AgentStatus_ONLINE

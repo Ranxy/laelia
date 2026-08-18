@@ -826,6 +826,7 @@ message AgentStatus {
     OFFLINE = 2;
     ERROR = 3;
     KICKED = 4; // evicted by a new connection
+    STOPPED = 5; // disabled via StopAgent; not processing sessions
   }
   ConnectionState state = 1;
   google.protobuf.Timestamp last_heartbeat_time = 2;

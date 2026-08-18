@@ -20,7 +20,10 @@ type ListPeerAgentsInput struct{}
 // uses before delegating work to a peer via `message send dm:@<handle>`. It is
 // the cross-conversation counterpart of `members` (which is scoped to one
 // channel/thread): one call returns every co-agent's persona, so the agent can
-// pick the right peer and address it without a second round-trip.
+// pick the right peer and address it without a second round-trip. A peer that
+// has been stopped (StopAgent) is listed with state "(stopped)": it is not
+// processing sessions, so delegating to it will not get a reply until it is
+// started again.
 func ListPeerAgents(ctx context.Context, d Deps, _ ListPeerAgentsInput) (string, error) {
 	resp, err := d.Client.ListPeerAgents(ctx, connect.NewRequest(&v1pb.ListPeerAgentsRequest{}))
 	if err != nil {
@@ -41,9 +44,11 @@ func ListPeerAgents(ctx context.Context, d Deps, _ ListPeerAgentsInput) (string,
 
 // formatPeerAgentLine renders one peer-agent entry: a header line carrying the
 // [agent] type, display name, @<handle> mention token (copyable straight into
-// dm:@<handle>), and connection state; followed by the agent's complete
-// persona_prompt as an indented block, emitted untruncated so one roster call
-// carries every co-agent's persona.
+// dm:@<handle>), and connection state (online/offline/error/kicked/stopped);
+// followed by the agent's complete persona_prompt as an indented block,
+// emitted untruncated so one roster call carries every co-agent's persona.
+// Stopped peers additionally get a "(stopped — not processing sessions)" hint
+// line so the caller does not delegate to them.
 func formatPeerAgentLine(a *v1pb.PeerAgent) string {
 	if a == nil {
 		return ""
@@ -58,6 +63,12 @@ func formatPeerAgentLine(a *v1pb.PeerAgent) string {
 	}
 	line := fmt.Sprintf("- [agent] %s%s (%s)\n",
 		strings.TrimSpace(a.GetDisplayName()), handlePart, connectionStateString(a.GetConnectionState()))
+	// A stopped peer is not processing sessions: say so explicitly so the
+	// caller does not delegate to it and then wait for a reply that never
+	// comes.
+	if a.GetConnectionState() == v1pb.AgentStatus_STOPPED {
+		line += "  (stopped — not processing sessions; do NOT delegate work to this agent)\n"
+	}
 	if persona := strings.TrimSpace(a.GetPersonaPrompt()); persona != "" {
 		for _, l := range strings.Split(persona, "\n") {
 			line += "  " + l + "\n"
@@ -80,6 +91,8 @@ func connectionStateString(s v1pb.AgentStatus_ConnectionState) string {
 		return "error"
 	case v1pb.AgentStatus_KICKED:
 		return "kicked"
+	case v1pb.AgentStatus_STOPPED:
+		return "stopped"
 	}
 	return "unknown"
 }

@@ -12,7 +12,7 @@ interface ConnectionBadgeProps {
 
 function ConnectionBadge({ state, enabled }: ConnectionBadgeProps) {
   const { t } = useTranslation();
-  if (enabled === false) {
+  if (enabled === false || state === AgentStatus_ConnectionState.STOPPED) {
     return <Badge variant="secondary">{t("agent.lifecycle.stopped")}</Badge>;
   }
   switch (state) {

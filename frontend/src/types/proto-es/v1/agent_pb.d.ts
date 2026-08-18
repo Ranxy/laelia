@@ -1898,6 +1898,13 @@ export enum AgentStatus_ConnectionState {
    * @generated from enum value: KICKED = 4;
    */
   KICKED = 4,
+
+  /**
+   * disabled via StopAgent; not processing sessions
+   *
+   * @generated from enum value: STOPPED = 5;
+   */
+  STOPPED = 5,
 }
 
 /**

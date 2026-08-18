@@ -4946,6 +4946,12 @@ names (mcpServers/{id}). </p></td>
                 <td>4</td>
                 <td><p>evicted by a new connection</p></td>
               </tr>
+
+              <tr>
+                <td>STOPPED</td>
+                <td>5</td>
+                <td><p>disabled via StopAgent; not processing sessions</p></td>
+              </tr>
             
           </tbody>
         </table>
@@ -11839,6 +11845,15 @@ address the peer. </p></td>
                   <td><a href="#laelia.v1.AgentStatus.ConnectionState">AgentStatus.ConnectionState</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+
+                <tr>
+                  <td>enabled</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>enabled reports whether the peer is running (false = stopped via
+StopAgent). A stopped peer&#39;s connection_state is STOPPED regardless of
+whether its machine is still connected. </p></td>
                 </tr>
               
             </tbody>

@@ -2056,6 +2056,15 @@ export declare type PeerAgent = Message<"laelia.v1.PeerAgent"> & {
    * @generated from field: laelia.v1.AgentStatus.ConnectionState connection_state = 4;
    */
   connectionState: AgentStatus_ConnectionState;
+
+  /**
+   * enabled reports whether the peer is running (false = stopped via
+   * StopAgent). A stopped peer's connection_state is STOPPED regardless of
+   * whether its machine is still connected.
+   *
+   * @generated from field: bool enabled = 6;
+   */
+  enabled: boolean;
 };
 
 /**

@@ -1704,6 +1704,7 @@ ReadAgentWorkspaceFile RPC.
 | OFFLINE | 2 |  |
 | ERROR | 3 |  |
 | KICKED | 4 | evicted by a new connection |
+| STOPPED | 5 | disabled via StopAgent; not processing sessions |
 
 
  
@@ -4779,6 +4780,7 @@ which excludes the caller.
 | display_name | [string](#string) |  |  |
 | persona_prompt | [string](#string) |  |  |
 | connection_state | [AgentStatus.ConnectionState](#laelia-v1-AgentStatus-ConnectionState) |  |  |
+| enabled | [bool](#bool) |  | enabled reports whether the peer is running (false = stopped via StopAgent). A stopped peer&#39;s connection_state is STOPPED regardless of whether its machine is still connected. |
 
 
 
