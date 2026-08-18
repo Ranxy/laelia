@@ -21,7 +21,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -338,6 +337,7 @@ func (s *Supervisor) startWorker() (chan struct{}, error) {
 
 	cmd := exec.Command(s.exePath, s.workerArgs...)
 	cmd.Env = os.Environ()
+	prepareWorker(cmd)
 	logFile, err := os.OpenFile(s.logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err == nil {
 		cmd.Stdout = logFile
@@ -358,8 +358,10 @@ func (s *Supervisor) startWorker() (chan struct{}, error) {
 	return done, nil
 }
 
-// stopWorker gracefully terminates the worker: SIGTERM, then a hard kill
-// after stopTimeout.
+// stopWorker gracefully terminates the worker: a platform stop signal, then a
+// hard kill after stopTimeout. On Windows os.Process.Signal cannot deliver
+// SIGTERM, so signalWorker sends CTRL_BREAK instead; if that is unavailable
+// (e.g. no console) we skip the long grace period and force-kill immediately.
 func (s *Supervisor) stopWorker() {
 	s.mu.Lock()
 	cmd := s.workerCmd
@@ -370,7 +372,14 @@ func (s *Supervisor) stopWorker() {
 	if cmd == nil || cmd.Process == nil {
 		return
 	}
-	_ = cmd.Process.Signal(syscall.SIGTERM)
+	if err := signalWorker(cmd); err != nil {
+		slog.Warn("graceful stop signal failed; killing worker", "error", err)
+		_ = cmd.Process.Kill()
+		if done != nil {
+			<-done
+		}
+		return
+	}
 	if done != nil {
 		select {
 		case <-done:
