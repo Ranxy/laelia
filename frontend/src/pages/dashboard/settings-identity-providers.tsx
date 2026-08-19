@@ -87,13 +87,13 @@ function idpToForm(p: IdentityProvider): IdpForm {
 }
 
 function typeLabel(
-  t: IdentityProviderType,
-  tFn: (k: string) => string
+  type: IdentityProviderType,
+  t: (k: string) => string
 ): string {
-  if (t === IdentityProviderType.OAUTH2)
-    return tFn("settings.identity-providers.type-oauth2");
-  if (t === IdentityProviderType.OIDC) return "OIDC";
-  if (t === IdentityProviderType.LDAP) return "LDAP";
+  if (type === IdentityProviderType.OAUTH2)
+    return t("settings.identity-providers.type-oauth2");
+  if (type === IdentityProviderType.OIDC) return "OIDC";
+  if (type === IdentityProviderType.LDAP) return "LDAP";
   return "—";
 }
 
