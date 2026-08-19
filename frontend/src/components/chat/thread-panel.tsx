@@ -68,7 +68,6 @@ const ThreadReplies = memo(function ThreadReplies({
   onPreviewImage,
   debugMode,
   currentPrincipalId,
-  mentionLabel,
   onSenderClick,
 }: {
   replies: ChatMessageUI[];
@@ -118,7 +117,6 @@ const ThreadReplies = memo(function ThreadReplies({
               streamingEvents={rowProps.streamingEvents}
               onViewDetails={onViewDetails}
               onSenderClick={onSenderClick}
-              mentionLabel={mentionLabel}
               MentionBadge={MentionBadge}
               markdownCustomId="thread-chat"
               onPreviewAttachment={onPreviewAttachment}

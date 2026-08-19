@@ -582,6 +582,7 @@ func (s *Store) CreateUser(ctx context.Context, create *UserMessage) (*UserMessa
 			EmailVerifiedAt: create.EmailVerifiedAt,
 		}
 		s.cacheActiveUser(user)
+		s.InvalidateGlobalMentionIndex()
 		return user, nil
 	}
 	return nil, errors.New("failed to allocate a unique user handle after 32 attempts")
@@ -703,6 +704,7 @@ func (s *Store) UpdateUser(ctx context.Context, currentUser *UserMessage, patch 
 	}
 
 	s.cacheActiveUser(user)
+	s.InvalidateGlobalMentionIndex()
 	return user, nil
 }
 

@@ -12,6 +12,16 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
+// mentionCandidate is an intermediate resolved mention before the final display
+// name is chosen. DisplayName is the member's canonical display name; the final
+// Mention.Name may fall back to the handle when two mentioned members share a
+// display name.
+type mentionCandidate struct {
+	Type        string
+	Id          string
+	DisplayName string
+}
+
 // parseContentMentions scans message content for `@<handle>` tokens the agent
 // typed and resolves them to conversation members, returning structured
 // Mentions the manager then uses for thread subscription and wake routing. The
@@ -24,7 +34,7 @@ import (
 //     `@ran-user-1`, `@rei-agent-1`). Stops at whitespace or other
 //     punctuation.
 //
-// Resolution is two-pass:
+// Resolution is three-pass:
 //  1. Primary: exact, case-insensitive match on the member's mention handle
 //     (the member id). Handles are unique per type, so this is unambiguous.
 //  2. Fallback: case-insensitive match on the member's display name, used only
@@ -34,19 +44,26 @@ import (
 //     still reach for when the roster leads with a display name. Ambiguous
 //     display names (two members sharing one) are never resolved by name, so a
 //     display name can never misroute.
+//  3. Global fallback: when the token is not a member of this conversation,
+//     resolve it against the global agent/user directory by handle (and, when
+//     unambiguous, by display name). This lets an agent mention a peer that is
+//     not a member of the current channel/DM (e.g. listing members of another
+//     channel) and still have the @mention rendered as a badge. The global
+//     directory is cached in the store and rebuilt only when an agent/user is
+//     created, updated, or deleted.
 //
-// The fallback index is built lazily — only when at least one token misses the
-// handle index — so the common case (the agent typed handles) pays no display
-// name resolution cost.
+// The member/global fallback indexes are built lazily — only when at least one
+// token misses the earlier index — so the common case (the agent typed handles
+// of conversation members) pays no extra lookup cost.
 //
-// The Mention.Name is the literal token the author typed after `@` (not the
-// canonical handle), so the frontend can always match the exact text in the
-// message body regardless of letter case or whether a handle or display name
-// was used. The canonical id (Mention.Id) still carries the handle for click
-// dispatch and detail-sheet lookup. The posting agent and the sending user
-// are NOT excluded here — the routing layer already skips the poster, and
-// activity generation skips self-mentions, so keeping them lets the frontend
-// render @self as a badge.
+// The Mention.Name is the display text shown in the badge: normally the
+// member's display name, or the handle when the same message mentions two
+// different members who share a display name. The canonical handle is always
+// in Mention.Id, so the frontend can match both @handle and @display-name
+// forms from a single Mention. The posting agent and the sending user are NOT
+// excluded here — the routing layer already skips the poster, and activity
+// generation skips self-mentions, so keeping them lets the frontend render
+// @self as a badge.
 func (s *CommandService) parseContentMentions(ctx context.Context, convID uuid.UUID, content string) []*v1pb.Mention {
 	members, err := s.store.ListConversationMembers(ctx, convID)
 	if err != nil {
@@ -69,8 +86,28 @@ func (s *CommandService) parseContentMentions(ctx context.Context, convID uuid.U
 	// members is dropped so it can never misroute.
 	var byDisplayName map[string]*store.ConversationMember
 
-	var mentions []*v1pb.Mention
+	// Global agent/user directory, built lazily on the first conversation miss.
+	// It lets @mentions of non-members (e.g. agents listed from another
+	// channel) still resolve for rendering.
+	var globalIndex *store.GlobalMentionIndex
+	var candidates []mentionCandidate
+
 	seen := make(map[string]bool)
+	addCandidate := func(mType, mID, displayName string) {
+		if mID == "" {
+			return
+		}
+		key := mType + ":" + mID
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		if displayName == "" {
+			displayName = mID
+		}
+		candidates = append(candidates, mentionCandidate{Type: mType, Id: mID, DisplayName: displayName})
+	}
+
 	for _, token := range tokenizeMentions(content) {
 		key := normalizeMentionName(token)
 		if key == "" {
@@ -86,32 +123,70 @@ func (s *CommandService) parseContentMentions(ctx context.Context, convID uuid.U
 			}
 			m, ok = byDisplayName[key]
 			if !ok {
-				// Unknown handle and no display-name match: skip.
+				// Global fallback: the token is not a member of this
+				// conversation. First try the cheap, cached handle lookups
+				// against the global agent/user directory (this is the common
+				// case — an agent typing @<handle> of a peer outside the
+				// current channel). Only when the handle is unknown do we
+				// build the full directory for the display-name fallback.
+				if globalIndex == nil {
+					if agent, agentErr := s.store.GetAgentByResourceID(ctx, key); agentErr == nil && agent != nil && !agent.Deleted {
+						addCandidate("agent", agent.ResourceID, agent.Name)
+						continue
+					}
+					if user, userErr := s.store.GetUserByHandle(ctx, key); userErr == nil && user != nil && !user.MemberDeleted {
+						addCandidate("user", user.Handle, user.Name)
+						continue
+					}
+					globalIndex, _ = s.store.GetGlobalMentionIndex(ctx)
+				}
+				if globalIndex != nil {
+					if gm, ok2 := globalIndex.Get(key); ok2 {
+						addCandidate(gm.Type, gm.Id, gm.Name)
+						continue
+					}
+				}
+				// Unknown handle and no display-name match anywhere: skip.
 				continue
 			}
 		}
-		// Dedup by type:id + the literal token, NOT just type:id: the same
-		// member may be @mentioned twice with different text (once by handle
-		// "@jane-agent-1" and once by display name "@jane"). Each distinct
-		// text token needs its own Mention so the frontend can match every
-		// occurrence in the content. Repeated identical tokens ("@x @x") still
-		// dedup — the frontend renders all occurrences from a single entry.
-		// Duplicate member entries are harmless downstream: thread subscription
-		// (addAgent/addUser already dedup by id) and activity generation
-		// (mentionCats[id] |= is idempotent) both absorb them.
-		dedup := mentionTypeString(m.MemberType) + ":" + m.MemberID + ":" + token
-		if seen[dedup] {
-			continue
+		addCandidate(mentionTypeString(m.MemberType), m.MemberID, resolveMemberDisplayName(ctx, s.store, m.MemberType, m.MemberID))
+	}
+
+	return buildMentionsWithDisplayNames(candidates)
+}
+
+// buildMentionsWithDisplayNames converts resolved candidates into the final
+// Mention list. By default Name is the member's display name. When the same
+// message mentions two different members who share a display name, Name falls
+// back to the handle so the UI can disambiguate.
+func buildMentionsWithDisplayNames(candidates []mentionCandidate) []*v1pb.Mention {
+	nameCounts := make(map[string]int, len(candidates))
+	for _, c := range candidates {
+		displayName := c.DisplayName
+		if displayName == "" {
+			displayName = c.Id
 		}
-		seen[dedup] = true
+		nameCounts[normalizeMentionName(displayName)]++
+	}
+	mentions := make([]*v1pb.Mention, 0, len(candidates))
+	for _, c := range candidates {
+		displayName := c.DisplayName
+		if displayName == "" {
+			displayName = c.Id
+		}
+		name := displayName
+		if nameCounts[normalizeMentionName(displayName)] > 1 {
+			name = c.Id
+		}
 		mentions = append(mentions, &v1pb.Mention{
-			Type: mentionTypeString(m.MemberType),
-			Id:   m.MemberID,
-			// Name is the literal text the author typed after @, so the
-			// frontend can match it verbatim in the content (handles are
-			// lowercased; the author may have typed different case or even a
-			// display name). The canonical handle is in Id.
-			Name: token,
+			Type: c.Type,
+			Id:   c.Id,
+			// Name is the display text shown in the badge. It is normally the
+			// member's display name; when two mentioned members share a display
+			// name it is the handle instead, so the UI can disambiguate. The
+			// canonical handle is always available in Id for click dispatch.
+			Name: name,
 		})
 	}
 	return mentions
@@ -225,13 +300,14 @@ func mentionTypeString(memberType int32) string {
 }
 
 // mergeMentions unions server-parsed mentions (from parseContentMentions) with
-// client-supplied mentions (e.g. from a mention picker), deduping by type:id
-// and preserving the first-seen name. Self-mentions are NOT dropped here — they
-// are kept so the frontend can render @self as a badge; activity generation
-// skips the sender so a user never gets a MENTION activity for @mentioning
-// themself. The client set is appended last so its names win on dedup collision
-// only when the server did not resolve the same member — in practice the server
-// resolves handles itself, so the two sets agree.
+// client-supplied mentions (e.g. from a mention picker), deduping by type:id.
+// A single Mention now carries both the canonical handle (Id) and the display
+// text (Name), so one entry per member is enough for the frontend to match
+// both @handle and @display-name forms. Self-mentions are NOT dropped here —
+// they are kept so the frontend can render @self as a badge; activity
+// generation skips the sender so a user never gets a MENTION activity for
+// @mentioning themself. The server-parsed set is added first so its display
+// name wins when the client also supplied the same member.
 func mergeMentions(parsed, client []*v1pb.Mention) []*v1pb.Mention {
 	seen := make(map[string]bool, len(parsed)+len(client))
 	out := make([]*v1pb.Mention, 0, len(parsed)+len(client))
@@ -239,11 +315,7 @@ func mergeMentions(parsed, client []*v1pb.Mention) []*v1pb.Mention {
 		if m == nil {
 			return
 		}
-		// Dedup by type:id + Name (the literal token), not just type:id:
-		// the same member may be @mentioned with different text (handle and
-		// display name), and each distinct token needs its own entry for the
-		// frontend to match every occurrence in the content.
-		key := m.Type + ":" + m.Id + ":" + m.Name
+		key := m.Type + ":" + m.Id
 		if seen[key] {
 			return
 		}

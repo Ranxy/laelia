@@ -395,6 +395,7 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 	}
 	s.agentIDCache.Add(agent.ID, agent)
 	s.agentResourceIDCache.Add(agent.ResourceID, agent)
+	s.InvalidateGlobalMentionIndex()
 	return agent, nil
 }
 
@@ -538,6 +539,7 @@ func (s *Store) UpdateAgent(ctx context.Context, current *AgentMessage, patch *U
 
 	s.agentIDCache.Add(agent.ID, agent)
 	s.agentResourceIDCache.Add(agent.ResourceID, agent)
+	s.InvalidateGlobalMentionIndex()
 	return agent, nil
 }
 

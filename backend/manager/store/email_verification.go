@@ -115,5 +115,6 @@ func (s *Store) DeleteUnverifiedUsersOlderThan(ctx context.Context, before time.
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to delete unverified users")
 	}
+	s.InvalidateGlobalMentionIndex()
 	return res.RowsAffected()
 }

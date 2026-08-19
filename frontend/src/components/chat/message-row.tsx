@@ -220,7 +220,6 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     onViewDetails,
     onMentionClick,
     onSenderClick,
-    mentionLabel,
     MentionBadge,
     markdownCustomId,
     onOpenThread,
@@ -365,13 +364,9 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
   const agentMentionContent = useMemo(
     () =>
       MentionBadge && !isUser
-        ? contentWithMentionTags(
-            displayContent ?? "",
-            msg.mentions ?? [],
-            mentionLabel
-          )
+        ? contentWithMentionTags(displayContent ?? "", msg.mentions ?? [])
         : null,
-    [MentionBadge, isUser, displayContent, msg.mentions, mentionLabel]
+    [MentionBadge, isUser, displayContent, msg.mentions]
   );
 
   const MentionBadgeCmp = MentionBadge;
@@ -603,7 +598,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                   return (
                     <MentionBadgeCmp
                       key={`${i}-${mention.name}`}
-                      name={mentionLabel?.(mention.name) ?? mention.name}
+                      name={mention.name}
                       onClick={() =>
                         onMentionClick?.(mention.type, mention.id, mention.name)
                       }

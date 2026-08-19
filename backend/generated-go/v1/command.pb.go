@@ -1996,9 +1996,10 @@ type Mention struct {
 	// id is the member's id: the agent resource id for agents, the user handle
 	// for users.
 	Id string `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
-	// name is the member's handle ("ran-user-1" / "rei-agent-1"), the value
-	// typed after "@" in message content. Mentions in content are resolved by
-	// this handle alone; display names never participate in mention resolution.
+	// name is the display text shown in the badge. It is normally the member's
+	// display name; when the same message mentions two different members who
+	// share a display name it is the handle instead, so the UI can disambiguate.
+	// The frontend matches both @id and @name forms from a single Mention.
 	Name          string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

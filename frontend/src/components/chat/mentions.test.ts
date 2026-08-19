@@ -6,13 +6,13 @@ import {
   splitByMentions,
 } from "@/components/chat/mentions";
 
-const alice: MentionRef = { type: "user", id: "u-1", name: "alice" };
-const bob: MentionRef = { type: "agent", id: "agents/a-9", name: "bob" };
+const alice: MentionRef = { type: "user", id: "alice-user-1", name: "alice" };
+const bob: MentionRef = { type: "agent", id: "bob-agent-1", name: "bob" };
 
 describe("mentionTagMarkdown", () => {
   it("emits a <mention> node carrying type/id/name as attributes", () => {
     expect(mentionTagMarkdown(alice)).toBe(
-      '<mention type="user" id="u-1" name="alice">@alice</mention>'
+      '<mention type="user" id="alice-user-1" name="alice">@alice</mention>'
     );
   });
 
@@ -33,7 +33,7 @@ describe("contentWithMentionTags", () => {
 
   it("rewrites a single mention to an inline <mention> node", () => {
     expect(contentWithMentionTags("Sure @alice, please review.", [alice])).toBe(
-      'Sure <mention type="user" id="u-1" name="alice">@alice</mention>, please review.'
+      'Sure <mention type="user" id="alice-user-1" name="alice">@alice</mention>, please review.'
     );
   });
 
@@ -41,13 +41,13 @@ describe("contentWithMentionTags", () => {
     expect(
       contentWithMentionTags("Hey @alice, ping @bob too.", [alice, bob])
     ).toBe(
-      'Hey <mention type="user" id="u-1" name="alice">@alice</mention>, ping <mention type="agent" id="agents/a-9" name="bob">@bob</mention> too.'
+      'Hey <mention type="user" id="alice-user-1" name="alice">@alice</mention>, ping <mention type="agent" id="bob-agent-1" name="bob">@bob</mention> too.'
     );
   });
 
   it("preserves surrounding markdown", () => {
     expect(contentWithMentionTags("Visit **@alice** now.", [alice])).toBe(
-      'Visit **<mention type="user" id="u-1" name="alice">@alice</mention>** now.'
+      'Visit **<mention type="user" id="alice-user-1" name="alice">@alice</mention>** now.'
     );
   });
 });
@@ -64,29 +64,13 @@ describe("splitByMentions parity", () => {
 describe("mentionTagMarkdown with label", () => {
   it("emits a label attribute and renders the label as text", () => {
     expect(mentionTagMarkdown(alice, "Alice Lee")).toBe(
-      '<mention type="user" id="u-1" name="alice" label="Alice Lee">@Alice Lee</mention>'
+      '<mention type="user" id="alice-user-1" name="alice" label="Alice Lee">@Alice Lee</mention>'
     );
   });
 
   it("HTML-escapes the label", () => {
     expect(mentionTagMarkdown(alice, 'A&B"<')).toBe(
-      '<mention type="user" id="u-1" name="alice" label="A&amp;B&quot;&lt;">@A&amp;B&quot;&lt;</mention>'
-    );
-  });
-});
-
-describe("contentWithMentionTags with labelFor", () => {
-  it("uses the label for each mention when provided", () => {
-    const labelFor = (handle: string) =>
-      handle === "alice" ? "Alice Lee" : undefined;
-    expect(
-      contentWithMentionTags(
-        "Hey @alice, ping @bob too.",
-        [alice, bob],
-        labelFor
-      )
-    ).toBe(
-      'Hey <mention type="user" id="u-1" name="alice" label="Alice Lee">@Alice Lee</mention>, ping <mention type="agent" id="agents/a-9" name="bob">@bob</mention> too.'
+      '<mention type="user" id="alice-user-1" name="alice" label="A&amp;B&quot;&lt;">@A&amp;B&quot;&lt;</mention>'
     );
   });
 });
@@ -113,7 +97,7 @@ describe("splitByMentions repeated mentions", () => {
 
   it("renders every occurrence through contentWithMentionTags too", () => {
     expect(contentWithMentionTags("@alice hi @alice", [alice])).toBe(
-      '<mention type="user" id="u-1" name="alice">@alice</mention> hi <mention type="user" id="u-1" name="alice">@alice</mention>'
+      '<mention type="user" id="alice-user-1" name="alice">@alice</mention> hi <mention type="user" id="alice-user-1" name="alice">@alice</mention>'
     );
   });
 });
@@ -223,5 +207,63 @@ describe("splitByMentions trailing sentence period", () => {
     ).toBe(
       'Waiting for my role from <mention type="agent" id="agents/para" name="para-agent-1">@para-agent-1</mention>.'
     );
+  });
+});
+
+// A single backend Mention now carries both the canonical handle (id) and the
+// display text (name). The frontend must match both forms so a message that
+// was written with @handle still renders when name is the display name.
+describe("splitByMentions handle + display-name from one Mention", () => {
+  const jet: MentionRef = {
+    type: "agent",
+    id: "jet-agent-1",
+    name: "jet",
+  };
+
+  it("matches the canonical handle from id", () => {
+    const segs = splitByMentions("ping @jet-agent-1 now", [jet]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["ping ", "@jet", " now"]);
+  });
+
+  it("matches the display name from name", () => {
+    const segs = splitByMentions("ping @jet now", [jet]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["ping ", "@jet", " now"]);
+  });
+
+  it("renders both forms through contentWithMentionTags", () => {
+    expect(
+      contentWithMentionTags("talk to @jet-agent-1 or @jet", [jet])
+    ).toBe(
+      'talk to <mention type="agent" id="jet-agent-1" name="jet">@jet</mention> or <mention type="agent" id="jet-agent-1" name="jet">@jet</mention>'
+    );
+  });
+});
+
+// When the same message mentions two different members who share a display
+// name, the backend sets name to the handle so badges stay unambiguous.
+describe("splitByMentions ambiguous display names fall back to handles", () => {
+  const jane1: MentionRef = {
+    type: "agent",
+    id: "jane-agent-1",
+    name: "jane-agent-1",
+  };
+  const jane2: MentionRef = {
+    type: "agent",
+    id: "jane-agent-2",
+    name: "jane-agent-2",
+  };
+
+  it("renders handles for same-named members", () => {
+    const segs = splitByMentions("@jane-agent-1 and @jane-agent-2", [
+      jane1,
+      jane2,
+    ]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["@jane-agent-1", " and ", "@jane-agent-2"]);
   });
 });

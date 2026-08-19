@@ -47,6 +47,12 @@ type Store struct {
 	userMcpConfigMu       sync.Mutex
 	userMcpConfigSetting  *SettingMessage
 	userMcpConfigCachedAt time.Time
+
+	// globalMentionIndex caches the global agent/user directory used for
+	// mention fallback. It is rebuilt lazily and invalidated on any agent/user
+	// create/update/delete.
+	globalMentionIndexMu sync.RWMutex
+	globalMentionIndex   *GlobalMentionIndex
 }
 
 func New(ctx context.Context, pgURL string, enableCache bool) (*Store, error) {

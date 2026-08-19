@@ -130,33 +130,33 @@ func TestStoreToV1ActivityState(t *testing.T) {
 // @self as a badge; activity generation (generateActivityRows) skips the sender
 // so a user never gets a MENTION activity for their own message.
 func TestMergeMentions(t *testing.T) {
-	// Realistic data: parseContentMentions sets Name = the literal token the
-	// author typed (a handle or a display name); the client picker sets Name =
-	// the handle. Dedup is by type:id+Name so the same member mentioned with
-	// different text tokens is kept once per token.
+	// Realistic data: parseContentMentions sets Name to the display text
+	// (normally the member's display name), while the client picker may send
+	// the handle. Dedup is by type:id so a single Mention per member carries
+	// both the handle (Id) and the display text (Name).
 	parsed := []*v1pb.Mention{
-		{Type: "user", Id: "alice-user-1", Name: "alice-user-1"}, // typed as handle
-		{Type: "agent", Id: "bot-agent-1", Name: "bot-agent-1"},
+		{Type: "user", Id: "alice-user-1", Name: "Alice"},
+		{Type: "agent", Id: "bot-agent-1", Name: "Bot"},
 	}
 	client := []*v1pb.Mention{
-		{Type: "user", Id: "alice-user-1", Name: "alice-user-1"}, // picker: same token → deduped
+		{Type: "user", Id: "alice-user-1", Name: "alice-user-1"}, // picker: same member → deduped
 		{Type: "user", Id: "bob-user-2", Name: "bob-user-2"},
 	}
 
 	merged := mergeMentions(parsed, client)
-	assert.Len(t, merged, 3, "dedup by type:id+Name keeps 3 distinct (member,token) pairs")
-	assert.Equal(t, "alice-user-1", merged[0].Name, "first-seen name wins on dedup")
+	assert.Len(t, merged, 3, "dedup by type:id keeps 3 distinct members")
+	assert.Equal(t, "Alice", merged[0].Name, "first-seen (server) display name wins on dedup")
 	assert.Equal(t, "bot-agent-1", merged[1].Id)
 	assert.Equal(t, "bob-user-2", merged[2].Id)
 
-	// Same member, different text tokens (handle + display name) → BOTH kept.
+	// Same member, different text tokens (handle + display name) → one entry,
+	// with the server-parsed display name preserved.
 	handleAndName := mergeMentions(
-		[]*v1pb.Mention{{Type: "agent", Id: "jane-agent-1", Name: "jane-agent-1"}},
 		[]*v1pb.Mention{{Type: "agent", Id: "jane-agent-1", Name: "jane"}},
+		[]*v1pb.Mention{{Type: "agent", Id: "jane-agent-1", Name: "jane-agent-1"}},
 	)
-	assert.Len(t, handleAndName, 2, "same member with different tokens must both be kept")
-	assert.Equal(t, "jane-agent-1", handleAndName[0].Name)
-	assert.Equal(t, "jane", handleAndName[1].Name)
+	assert.Len(t, handleAndName, 1, "same member with different tokens dedups to one entry")
+	assert.Equal(t, "jane", handleAndName[0].Name)
 
 	// Self-mention is KEPT (not dropped) so the frontend can render it; the
 	// activity layer is responsible for not notifying the sender.

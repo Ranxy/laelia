@@ -99,7 +99,7 @@ export function MentionDetailSheet({
   const displayName =
     type === "agent" ? (agent?.title ?? name) : (user?.title ?? name);
   const handle =
-    type === "agent" ? (agent?.handle ?? name) : (user?.handle ?? name);
+    type === "agent" ? (agent?.handle ?? id) : (user?.handle ?? id);
 
   // Avatar: use the entity's uploaded avatar resource name when available,
   // otherwise synthesize the canonical avatar resource name from its id so

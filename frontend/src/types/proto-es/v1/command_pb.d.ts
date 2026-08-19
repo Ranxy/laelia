@@ -738,9 +738,10 @@ export declare type Mention = Message<"laelia.v1.Mention"> & {
   id: string;
 
   /**
-   * name is the member's handle ("ran-user-1" / "rei-agent-1"), the value
-   * typed after "@" in message content. Mentions in content are resolved by
-   * this handle alone; display names never participate in mention resolution.
+   * name is the display text shown in the badge. It is normally the member's
+   * display name; when the same message mentions two different members who
+   * share a display name it is the handle instead, so the UI can disambiguate.
+   * The frontend matches both @id and @name forms from a single Mention.
    *
    * @generated from field: string name = 3;
    */

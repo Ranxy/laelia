@@ -169,3 +169,85 @@ func TestResolveMentionTokenFallback(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, "alice-user-1", m.MemberID)
 }
+
+// TestBuildGlobalMentionIndex guards the global agent/user fallback directory
+// used when a @mention does not match any member of the current conversation.
+// It must index every active agent/user by canonical handle, and by display
+// name only when that name is unambiguous across the whole directory.
+func TestBuildGlobalMentionIndex(t *testing.T) {
+	agents := []*store.AgentMessage{
+		{ResourceID: "jane-agent-1", Name: "jane"},
+		{ResourceID: "rei-agent-1", Name: "rei"},
+		{ResourceID: "amao-agent-1", Name: "amao"},
+		{ResourceID: "dup-agent-1", Name: "jane"}, // same display name as jane-agent-1
+	}
+	users := []*store.UserMessage{
+		{Handle: "ran-user-1", Name: "Ran"},
+		{Handle: "alice-user-1", Name: "Alice"},
+	}
+
+	idx := store.BuildGlobalMentionIndex(agents, users)
+
+	// Every handle is present with the correct type and id.
+	for handle, wantType := range map[string]string{
+		"jane-agent-1": "agent",
+		"rei-agent-1":  "agent",
+		"amao-agent-1": "agent",
+		"dup-agent-1":  "agent",
+		"ran-user-1":   "user",
+		"alice-user-1": "user",
+	} {
+		m, ok := idx.Get(handle)
+		assert.True(t, ok, "handle %q must be in global index", handle)
+		assert.Equal(t, wantType, m.Type)
+		assert.Equal(t, handle, m.Id)
+	}
+
+	// The global index carries display names so the UI can show @name instead
+	// of @handle for non-member mentions.
+	if m, ok := idx.Get("jane-agent-1"); ok {
+		assert.Equal(t, "jane", m.Name)
+	}
+	if m, ok := idx.Get("ran-user-1"); ok {
+		assert.Equal(t, "Ran", m.Name)
+	}
+
+	// Unique display names resolve; ambiguous ones are excluded.
+	m, ok := idx.Get("rei")
+	assert.True(t, ok, "unique display name rei must resolve")
+	assert.Equal(t, "rei-agent-1", m.Id)
+
+	m, ok = idx.Get("ran")
+	assert.True(t, ok, "unique display name ran must resolve")
+	assert.Equal(t, "ran-user-1", m.Id)
+
+	_, ok = idx.Get("jane")
+	assert.False(t, ok, "ambiguous display name jane must be excluded")
+}
+
+func TestBuildMentionsWithDisplayNames(t *testing.T) {
+	// Unique display names are shown as-is.
+	got := buildMentionsWithDisplayNames([]mentionCandidate{
+		{Type: "agent", Id: "jet-agent-1", DisplayName: "jet"},
+		{Type: "user", Id: "ran-user-1", DisplayName: "Ran"},
+	})
+	assert.Len(t, got, 2)
+	assert.Equal(t, "jet", got[0].Name)
+	assert.Equal(t, "Ran", got[1].Name)
+
+	// Two different ids sharing a display name fall back to handles.
+	ambiguous := buildMentionsWithDisplayNames([]mentionCandidate{
+		{Type: "agent", Id: "jane-agent-1", DisplayName: "jane"},
+		{Type: "agent", Id: "jane-agent-2", DisplayName: "jane"},
+	})
+	assert.Len(t, ambiguous, 2)
+	assert.Equal(t, "jane-agent-1", ambiguous[0].Name)
+	assert.Equal(t, "jane-agent-2", ambiguous[1].Name)
+
+	// Empty display name falls back to the handle.
+	empty := buildMentionsWithDisplayNames([]mentionCandidate{
+		{Type: "agent", Id: "x-agent-1", DisplayName: ""},
+	})
+	assert.Len(t, empty, 1)
+	assert.Equal(t, "x-agent-1", empty[0].Name)
+}
