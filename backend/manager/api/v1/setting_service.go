@@ -356,6 +356,7 @@ var workspaceProfilePaths = []string{
 	"value.workspace_profile.disallow_password_signin",
 	"value.workspace_profile.enable_metric_collection",
 	"value.workspace_profile.require_email_verification",
+	"value.workspace_profile.disallow_user_create_machine",
 }
 
 func mergeWorkspaceProfilePaths(paths []string, src, dst *models.WorkspaceProfileSetting) error {
@@ -381,6 +382,8 @@ func mergeWorkspaceProfilePaths(paths []string, src, dst *models.WorkspaceProfil
 			dst.EnableMetricCollection = src.GetEnableMetricCollection()
 		case "require_email_verification":
 			dst.RequireEmailVerification = src.RequireEmailVerification
+		case "disallow_user_create_machine":
+			dst.DisallowUserCreateMachine = src.GetDisallowUserCreateMachine()
 		default:
 			return invalidMaskPath("value.workspace_profile." + field)
 		}
@@ -673,10 +676,11 @@ func (s *SettingService) GetWorkspaceInfo(ctx context.Context, _ *connect.Reques
 		return nil, connect.NewError(connect.CodeInternal, pkgerrors.Wrap(err, "failed to get workspace general setting"))
 	}
 	return connect.NewResponse(&v1pb.GetWorkspaceInfoResponse{
-		DisallowSignup:           setting.DisallowSignup,
-		EnforceIdentityDomain:    setting.EnforceIdentityDomain,
-		Domains:                  setting.Domains,
-		RequireEmailVerification: store.RequireEmailVerification(setting),
+		DisallowSignup:            setting.DisallowSignup,
+		EnforceIdentityDomain:     setting.EnforceIdentityDomain,
+		Domains:                   setting.Domains,
+		RequireEmailVerification:  store.RequireEmailVerification(setting),
+		DisallowUserCreateMachine: setting.DisallowUserCreateMachine,
 	}), nil
 }
 

@@ -4765,8 +4765,8 @@ server value.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | type | [string](#string) |  |  |
-| id | [string](#string) |  | id is the member&#39;s id: the agent resource id for agents, the user handle for users. |
-| name | [string](#string) |  | name is the member&#39;s handle (&#34;ran-user-1&#34; / &#34;rei-agent-1&#34;), the value typed after &#34;@&#34; in message content. Mentions in content are resolved by this handle alone; display names never participate in mention resolution. |
+| id | [string](#string) |  | id is the member&#39;s id: the agent resource id for agents, the user handle for users. It is also the canonical @handle used to match mentions in message content. |
+| name | [string](#string) |  | name is the display text shown in the badge. It is normally the member&#39;s display name; when the same message mentions two different members who share a display name it is the handle instead, so the UI can disambiguate. The frontend matches both @id and @name forms from a single Mention. |
 
 
 
@@ -8538,6 +8538,7 @@ signup is offered and which email suffixes are accepted.
 | domains | [string](#string) | repeated | The allowed email suffixes (e.g. &#34;example.com&#34;) when enforce_identity_domain is set. |
 | require_email_verification | [bool](#bool) |  | Whether self-service signup must verify the email address by clicking a link before the account can sign in. Only meaningful when disallow_signup is false. |
 | external_url | [string](#string) |  | The workspace external URL. Public so the login page can build the OAuth redirect_uri from the same canonical base the backend uses for token exchange, instead of relying on the browser&#39;s current origin. |
+| disallow_user_create_machine | [bool](#bool) |  | Whether ordinary users (without laelia.machines.create) are disallowed from creating their own machines. Default false (allowed). |
 
 
 

@@ -1193,6 +1193,7 @@ returned by any RPC — GetPushConfig only exposes the public key.
 | disallow_password_signin | [bool](#bool) |  | Whether to disallow password signin. (Except workspace admins) |
 | enable_metric_collection | [bool](#bool) |  | Whether to enable metric collection for the workspace. |
 | require_email_verification | [bool](#bool) | optional | Whether self-service signup must verify the email address by clicking a link sent to the inbox before the account can sign in. Only takes effect when disallow_signup is false (self-service signup enabled); admin-created users and the first workspace user are always verified. Nil means &#34;disabled&#34; (the default). |
+| disallow_user_create_machine | [bool](#bool) |  | Disallow ordinary users (without laelia.machines.create) from creating their own machines through the device-code flow. Default false (allowed). |
 
 
 

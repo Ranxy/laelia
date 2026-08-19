@@ -547,6 +547,7 @@
     "detail-ip": "IP",
     "detail-last-heartbeat": "Last Heartbeat",
     "detail-name": "Name",
+    "detail-owner": "Owner",
     "detail-os": "OS",
     "detail-status": "Status",
     "detail-version": "Version",
@@ -858,6 +859,8 @@
     "general": {
       "allow-signup": "Allow self-service signup",
       "allow-signup-description": "When off, users cannot register themselves; only admins can create users.",
+      "allow-user-create-machine": "Allow users to create machines",
+      "allow-user-create-machine-description": "When on, ordinary users can create and manage their own machines.",
       "description": "Configure self-service signup and email suffix restrictions.",
       "domains": "Allowed email suffixes",
       "domains-hint": "One suffix per line, e.g. example.com",

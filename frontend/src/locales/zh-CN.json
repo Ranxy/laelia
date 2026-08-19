@@ -547,6 +547,7 @@
     "detail-ip": "IP",
     "detail-last-heartbeat": "最近心跳",
     "detail-name": "名称",
+    "detail-owner": "所有者",
     "detail-os": "系统",
     "detail-status": "状态",
     "detail-version": "版本",
@@ -858,6 +859,8 @@
     "general": {
       "allow-signup": "允许自助注册",
       "allow-signup-description": "关闭后用户无法自行注册，只能由管理员创建。",
+      "allow-user-create-machine": "允许用户创建机器",
+      "allow-user-create-machine-description": "开启后，普通用户可以创建并管理自己的机器。",
       "description": "配置自助注册与邮箱后缀限制。",
       "domains": "允许的邮箱后缀",
       "domains-hint": "每行一个邮箱后缀，例如 example.com",

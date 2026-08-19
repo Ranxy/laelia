@@ -16,6 +16,7 @@ interface GeneralForm {
   requireEmailVerification: boolean;
   enforceIdentityDomain: boolean;
   domains: string;
+  allowUserCreateMachine: boolean;
 }
 
 const EMPTY: GeneralForm = {
@@ -24,6 +25,7 @@ const EMPTY: GeneralForm = {
   requireEmailVerification: false,
   enforceIdentityDomain: false,
   domains: "",
+  allowUserCreateMachine: true,
 };
 
 // parseDomains splits a newline-separated suffix list, trimming whitespace,
@@ -51,6 +53,7 @@ export function SettingsGeneralPage() {
   const [savingEmailVerification, setSavingEmailVerification] = useState(false);
   const [savingDomains, setSavingDomains] = useState(false);
   const [savingExternalUrl, setSavingExternalUrl] = useState(false);
+  const [savingUserCreateMachine, setSavingUserCreateMachine] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +67,9 @@ export function SettingsGeneralPage() {
           requireEmailVerification: profile?.requireEmailVerification ?? false,
           enforceIdentityDomain: profile?.enforceIdentityDomain ?? false,
           domains: (profile?.domains ?? []).join("\n"),
+          allowUserCreateMachine: !(
+            profile?.disallowUserCreateMachine ?? false
+          ),
         };
         setForm(next);
         setSaved(next);
@@ -89,6 +95,7 @@ export function SettingsGeneralPage() {
       requireEmailVerification: profile?.requireEmailVerification ?? false,
       enforceIdentityDomain: profile?.enforceIdentityDomain ?? false,
       domains: (profile?.domains ?? []).join("\n"),
+      allowUserCreateMachine: !(profile?.disallowUserCreateMachine ?? false),
     };
     setForm(next);
     setSaved(next);
@@ -163,6 +170,26 @@ export function SettingsGeneralPage() {
       });
     } finally {
       setSavingEmailVerification(false);
+    }
+  }
+
+  async function handleToggleUserCreateMachine(v: boolean) {
+    const prev = form.allowUserCreateMachine;
+    setForm((f) => ({ ...f, allowUserCreateMachine: v }));
+    setSavingUserCreateMachine(true);
+    try {
+      await saveField({ disallowUserCreateMachine: !v }, [
+        "value.workspace_profile.disallow_user_create_machine",
+      ]);
+    } catch (err) {
+      setForm((f) => ({ ...f, allowUserCreateMachine: prev }));
+      toastManager.add({
+        type: "error",
+        title: t("settings.general.save-failed"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setSavingUserCreateMachine(false);
     }
   }
 
@@ -294,6 +321,23 @@ export function SettingsGeneralPage() {
               />
             </div>
           )}
+
+          <div className="flex items-center justify-between rounded-lg border border-control-border bg-background px-5 py-4 shadow-xs">
+            <div>
+              <div className="text-sm font-medium text-main">
+                {t("settings.general.allow-user-create-machine")}
+              </div>
+              <div className="mt-0.5 text-xs text-control-light">
+                {t("settings.general.allow-user-create-machine-description")}
+              </div>
+            </div>
+            <Switch
+              checked={form.allowUserCreateMachine}
+              onCheckedChange={handleToggleUserCreateMachine}
+              disabled={savingUserCreateMachine}
+              size="md"
+            />
+          </div>
 
           <div className="flex items-center justify-between rounded-lg border border-control-border bg-background px-5 py-4 shadow-xs">
             <div>

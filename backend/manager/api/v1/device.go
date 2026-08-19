@@ -12,6 +12,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/pkg/errors"
 
+	"github.com/Ranxy/laelia/backend/common/permission"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
@@ -214,6 +215,10 @@ func (s *DeviceService) ApproveDeviceLogin(ctx context.Context, req *connect.Req
 		// one; the CLI updates its state with the new machine id.
 	}
 
+	if err := s.requireCanCreateNewMachine(ctx, user); err != nil {
+		return nil, err
+	}
+
 	machineID, machineTitle, refreshToken, err := s.approveNewMachine(ctx, sess, user)
 	if err != nil {
 		return nil, err
@@ -252,6 +257,33 @@ func (s *DeviceService) approveReauth(ctx context.Context, sess *device.Session,
 		return "", "", "", connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to rotate machine tokens"))
 	}
 	return updated.ResourceID, updated.Name, refreshToken, nil
+}
+
+// requireCanCreateNewMachine enforces the workspace policy for ordinary users
+// creating their own machines. A caller holding laelia.machines.create is
+// always allowed; otherwise the workspace must not disallow user-created
+// machines (default allowed).
+func (s *DeviceService) requireCanCreateNewMachine(ctx context.Context, user *store.UserMessage) error {
+	if user == nil {
+		return connect.NewError(connect.CodeUnauthenticated, errors.New("sign in required to approve a device login"))
+	}
+	if s.iam != nil {
+		ok, err := s.iam.CheckPermission(ctx, permission.MachinesCreate, user, nil, nil)
+		if err != nil {
+			return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check machine create permission"))
+		}
+		if ok {
+			return nil
+		}
+	}
+	setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get workspace general setting"))
+	}
+	if setting.GetDisallowUserCreateMachine() {
+		return connect.NewError(connect.CodePermissionDenied, errors.New("machine creation is disabled for ordinary users"))
+	}
+	return nil
 }
 
 // approveNewMachine creates the machine row (title = hostname, info from the

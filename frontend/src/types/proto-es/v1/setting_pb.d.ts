@@ -319,6 +319,14 @@ export declare type GetWorkspaceInfoResponse = Message<"laelia.v1.GetWorkspaceIn
    * @generated from field: string external_url = 5;
    */
   externalUrl: string;
+
+  /**
+   * Whether ordinary users (without laelia.machines.create) are disallowed
+   * from creating their own machines. Default false (allowed).
+   *
+   * @generated from field: bool disallow_user_create_machine = 6;
+   */
+  disallowUserCreateMachine: boolean;
 };
 
 /**

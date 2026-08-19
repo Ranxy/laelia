@@ -12,12 +12,16 @@ import { MachinesPage } from "./machines";
 const mock = vi.hoisted(() => ({
   listMachines: vi.fn(),
   deleteMachine: vi.fn(),
+  getWorkspaceInfo: vi.fn(),
 }));
 
 vi.mock("@/connect", () => ({
   machineServiceClient: {
     listMachines: mock.listMachines,
     deleteMachine: mock.deleteMachine,
+  },
+  settingServiceClient: {
+    getWorkspaceInfo: mock.getWorkspaceInfo,
   },
 }));
 
@@ -69,6 +73,8 @@ beforeEach(() => {
   });
   mock.listMachines.mockReset();
   mock.deleteMachine.mockReset();
+  mock.getWorkspaceInfo.mockReset();
+  mock.getWorkspaceInfo.mockResolvedValue({ disallowUserCreateMachine: false });
 });
 
 describe("machines", () => {
@@ -161,12 +167,15 @@ describe("machines", () => {
     expect(req.name).toBe("machines/m1");
   });
 
-  it("hides the create affordance without the create permission", async () => {
+  it("hides the create affordance without the create permission when user-created machines are disabled", async () => {
     useAppStore.setState({
       currentUser: {
         name: "users/2",
         permissions: [],
       } as never,
+    });
+    mock.getWorkspaceInfo.mockResolvedValue({
+      disallowUserCreateMachine: true,
     });
     mock.listMachines.mockResolvedValue({ machines: [], nextPageToken: "" });
 
@@ -177,5 +186,26 @@ describe("machines", () => {
       screen.queryByRole("button", { name: "machine.create" })
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId("create-machine-fab")).not.toBeInTheDocument();
+  });
+
+  it("shows the create affordance to ordinary users when user-created machines are enabled", async () => {
+    useAppStore.setState({
+      currentUser: {
+        name: "users/2",
+        permissions: [],
+      } as never,
+    });
+    mock.getWorkspaceInfo.mockResolvedValue({
+      disallowUserCreateMachine: false,
+    });
+    mock.listMachines.mockResolvedValue({ machines: [], nextPageToken: "" });
+
+    renderPage();
+
+    await screen.findByText("common.no-data");
+    expect(
+      screen.getAllByRole("button", { name: "machine.create" }).length
+    ).toBeGreaterThan(0);
+    expect(screen.getByTestId("create-machine-fab")).toBeInTheDocument();
   });
 });

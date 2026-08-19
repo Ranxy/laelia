@@ -58,6 +58,10 @@ message WorkspaceProfileSetting {
   // users and the first workspace user are always verified. Nil means
   // "disabled" (the default).
   optional bool require_email_verification = 10;
+
+  // Disallow ordinary users (without laelia.machines.create) from creating
+  // their own machines through the device-code flow. Default false (allowed).
+  bool disallow_user_create_machine = 11;
 }
 
 // SMTPSetting holds the outbound SMTP connection details used to send

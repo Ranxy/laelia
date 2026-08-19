@@ -31,6 +31,7 @@ export const workspaceProfilePaths = [
   "value.workspace_profile.disallow_password_signin",
   "value.workspace_profile.enable_metric_collection",
   "value.workspace_profile.require_email_verification",
+  "value.workspace_profile.disallow_user_create_machine",
 ] as const;
 
 export const smtpConfigPaths = [

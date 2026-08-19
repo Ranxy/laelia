@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { settingServiceClient } from "@/connect";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
@@ -27,9 +28,12 @@ export function MachinesPage() {
   const machines = useAppStore((s) => s.machines);
   const loading = useAppStore((s) => s.machinesLoading);
   // Gate the create entry on the exact permission its flow requires
-  // (laelia.machines.create); per-machine canDelete (creator or
+  // (laelia.machines.create) or the workspace policy that lets ordinary users
+  // create their own machines; per-machine canDelete (creator or
   // laelia.machines.delete) is populated by ListMachines.
-  const canCreate = useHasPermission("laelia.machines.create");
+  const hasCreatePermission = useHasPermission("laelia.machines.create");
+  const [allowUserCreateMachine, setAllowUserCreateMachine] = useState(true);
+  const canCreate = hasCreatePermission || allowUserCreateMachine;
   const [listScrolled, setListScrolled] = useState(false);
   const [actionError, setActionError] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -46,6 +50,26 @@ export function MachinesPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // The machine-creation policy is public workspace info, so ordinary users
+  // can read it without admin settings access. Default to enabled while the
+  // request is in flight.
+  useEffect(() => {
+    let cancelled = false;
+    void settingServiceClient
+      .getWorkspaceInfo({})
+      .then((res) => {
+        if (!cancelled) {
+          setAllowUserCreateMachine(!res.disallowUserCreateMachine);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAllowUserCreateMachine(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Refresh while any machine is not yet online so the list flips to "online"
   // promptly once the machine app connects. Silent refreshes skip the loading

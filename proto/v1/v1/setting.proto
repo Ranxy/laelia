@@ -152,4 +152,8 @@ message GetWorkspaceInfoResponse {
   // redirect_uri from the same canonical base the backend uses for token
   // exchange, instead of relying on the browser's current origin.
   string external_url = 5;
+
+  // Whether ordinary users (without laelia.machines.create) are disallowed
+  // from creating their own machines. Default false (allowed).
+  bool disallow_user_create_machine = 6;
 }

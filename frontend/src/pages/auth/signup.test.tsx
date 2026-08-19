@@ -48,13 +48,16 @@ vi.mock("@/lib/toast", () => ({ toastManager: toastMock }));
 const EMAIL = "alice@example.com";
 const PASSWORD = "abc12345";
 
-function workspaceInfo(overrides?: Partial<GetWorkspaceInfoResponse>) {
+function workspaceInfo(
+  overrides?: Partial<Omit<GetWorkspaceInfoResponse, "$typeName" | "$unknown">>
+) {
   return create(GetWorkspaceInfoResponseSchema, {
     disallowSignup: false,
     enforceIdentityDomain: false,
     domains: [],
     requireEmailVerification: false,
     externalUrl: "",
+    disallowUserCreateMachine: false,
     ...overrides,
   });
 }

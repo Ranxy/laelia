@@ -45,6 +45,9 @@ const EMAIL_VERIFICATION_PATH =
   "value.workspace_profile.require_email_verification";
 const EXTERNAL_URL_LABEL = "settings.general.external-url";
 const EXTERNAL_URL_PATH = "value.workspace_profile.external_url";
+const USER_CREATE_MACHINE_LABEL = "settings.general.allow-user-create-machine";
+const USER_CREATE_MACHINE_PATH =
+  "value.workspace_profile.disallow_user_create_machine";
 
 type ProfileOverrides = Omit<
   Partial<WorkspaceProfileSetting>,
@@ -255,6 +258,51 @@ describe("settings-general", () => {
 
     renderPage();
     const sw = await waitFor(() => rowSwitch("settings.general.allow-signup"));
+    fireEvent.click(sw);
+
+    await waitFor(() => expect(sw).toBeChecked());
+    expect(toastMock.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "error",
+        title: "settings.general.save-failed",
+      })
+    );
+  });
+
+  it("renders the user-created machine switch from the profile", async () => {
+    mock.getSetting.mockResolvedValue(settingResponse(profile()));
+
+    renderPage();
+
+    const sw = await waitFor(() => rowSwitch(USER_CREATE_MACHINE_LABEL));
+    expect(sw).toBeChecked();
+  });
+
+  it("sends a field-level update for only the disallow-user-create-machine path when toggled", async () => {
+    mock.getSetting.mockResolvedValue(settingResponse(profile()));
+    mock.updateSetting.mockResolvedValue(
+      settingResponse(profile({ disallowUserCreateMachine: true }))
+    );
+
+    renderPage();
+    const sw = await waitFor(() => rowSwitch(USER_CREATE_MACHINE_LABEL));
+    fireEvent.click(sw);
+
+    await waitFor(() => expect(mock.updateSetting).toHaveBeenCalledTimes(1));
+    const req = mock.updateSetting.mock.calls[0][0] as UpdateSettingRequest;
+    expect(req.updateMask?.paths).toEqual([USER_CREATE_MACHINE_PATH]);
+    const sent = req.setting?.value?.value?.value as
+      | WorkspaceProfileSetting
+      | undefined;
+    expect(sent?.disallowUserCreateMachine).toBe(true);
+  });
+
+  it("rolls the user-created machine switch back and toasts when the save fails", async () => {
+    mock.getSetting.mockResolvedValue(settingResponse(profile()));
+    mock.updateSetting.mockRejectedValue(new Error("boom"));
+
+    renderPage();
+    const sw = await waitFor(() => rowSwitch(USER_CREATE_MACHINE_LABEL));
     fireEvent.click(sw);
 
     await waitFor(() => expect(sw).toBeChecked());

@@ -93,6 +93,11 @@ func TestMergeWorkspaceProfilePaths(t *testing.T) {
 	require.NoError(t, mergeWorkspaceProfilePaths([]string{"value.workspace_profile.require_email_verification"}, src, dst))
 	assert.Nil(t, dst.RequireEmailVerification)
 
+	// The user-created-machine policy is a plain bool field.
+	src.DisallowUserCreateMachine = true
+	require.NoError(t, mergeWorkspaceProfilePaths([]string{"value.workspace_profile.disallow_user_create_machine"}, src, dst))
+	assert.True(t, dst.DisallowUserCreateMachine)
+
 	// An empty mask updates every field.
 	all := &models.WorkspaceProfileSetting{ExternalUrl: "https://new.example.com", DisallowSignup: true, Domains: []string{"b.com"}}
 	dstAll := &models.WorkspaceProfileSetting{}

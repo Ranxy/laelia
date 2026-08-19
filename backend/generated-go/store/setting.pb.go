@@ -239,8 +239,11 @@ type WorkspaceProfileSetting struct {
 	// users and the first workspace user are always verified. Nil means
 	// "disabled" (the default).
 	RequireEmailVerification *bool `protobuf:"varint,10,opt,name=require_email_verification,json=requireEmailVerification,proto3,oneof" json:"require_email_verification,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// Disallow ordinary users (without laelia.machines.create) from creating
+	// their own machines through the device-code flow. Default false (allowed).
+	DisallowUserCreateMachine bool `protobuf:"varint,11,opt,name=disallow_user_create_machine,json=disallowUserCreateMachine,proto3" json:"disallow_user_create_machine,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *WorkspaceProfileSetting) Reset() {
@@ -339,6 +342,13 @@ func (x *WorkspaceProfileSetting) GetEnableMetricCollection() bool {
 func (x *WorkspaceProfileSetting) GetRequireEmailVerification() bool {
 	if x != nil && x.RequireEmailVerification != nil {
 		return *x.RequireEmailVerification
+	}
+	return false
+}
+
+func (x *WorkspaceProfileSetting) GetDisallowUserCreateMachine() bool {
+	if x != nil {
+		return x.DisallowUserCreateMachine
 	}
 	return false
 }
@@ -1151,7 +1161,7 @@ var File_store_setting_proto protoreflect.FileDescriptor
 
 const file_store_setting_proto_rawDesc = "" +
 	"\n" +
-	"\x13store/setting.proto\x12\flaelia.store\x1a\x1egoogle/protobuf/duration.proto\"\xc3\x04\n" +
+	"\x13store/setting.proto\x12\flaelia.store\x1a\x1egoogle/protobuf/duration.proto\"\x84\x05\n" +
 	"\x17WorkspaceProfileSetting\x12!\n" +
 	"\fexternal_url\x18\x01 \x01(\tR\vexternalUrl\x12'\n" +
 	"\x0fdisallow_signup\x18\x02 \x01(\bR\x0edisallowSignup\x12\x1f\n" +
@@ -1164,7 +1174,8 @@ const file_store_setting_proto_rawDesc = "" +
 	"\x18disallow_password_signin\x18\b \x01(\bR\x16disallowPasswordSignin\x128\n" +
 	"\x18enable_metric_collection\x18\t \x01(\bR\x16enableMetricCollection\x12A\n" +
 	"\x1arequire_email_verification\x18\n" +
-	" \x01(\bH\x00R\x18requireEmailVerification\x88\x01\x01B\x1d\n" +
+	" \x01(\bH\x00R\x18requireEmailVerification\x88\x01\x01\x12?\n" +
+	"\x1cdisallow_user_create_machine\x18\v \x01(\bR\x19disallowUserCreateMachineB\x1d\n" +
 	"\x1b_require_email_verification\"\x9a\x01\n" +
 	"\vSMTPSetting\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +

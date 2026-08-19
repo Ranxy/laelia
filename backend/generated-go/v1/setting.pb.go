@@ -694,9 +694,12 @@ type GetWorkspaceInfoResponse struct {
 	// The workspace external URL. Public so the login page can build the OAuth
 	// redirect_uri from the same canonical base the backend uses for token
 	// exchange, instead of relying on the browser's current origin.
-	ExternalUrl   string `protobuf:"bytes,5,opt,name=external_url,json=externalUrl,proto3" json:"external_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ExternalUrl string `protobuf:"bytes,5,opt,name=external_url,json=externalUrl,proto3" json:"external_url,omitempty"`
+	// Whether ordinary users (without laelia.machines.create) are disallowed
+	// from creating their own machines. Default false (allowed).
+	DisallowUserCreateMachine bool `protobuf:"varint,6,opt,name=disallow_user_create_machine,json=disallowUserCreateMachine,proto3" json:"disallow_user_create_machine,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *GetWorkspaceInfoResponse) Reset() {
@@ -764,6 +767,13 @@ func (x *GetWorkspaceInfoResponse) GetExternalUrl() string {
 	return ""
 }
 
+func (x *GetWorkspaceInfoResponse) GetDisallowUserCreateMachine() bool {
+	if x != nil {
+		return x.DisallowUserCreateMachine
+	}
+	return false
+}
+
 var File_v1_setting_proto protoreflect.FileDescriptor
 
 const file_v1_setting_proto_rawDesc = "" +
@@ -802,13 +812,14 @@ const file_v1_setting_proto_rawDesc = "" +
 	"\aenabled\x18\x01 \x01(\bB\x03\xe0A\x02R\aenabled\"5\n" +
 	"\x19UpdateDebugConfigResponse\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\"\x19\n" +
-	"\x17GetWorkspaceInfoRequest\"\xf6\x01\n" +
+	"\x17GetWorkspaceInfoRequest\"\xb7\x02\n" +
 	"\x18GetWorkspaceInfoResponse\x12'\n" +
 	"\x0fdisallow_signup\x18\x01 \x01(\bR\x0edisallowSignup\x126\n" +
 	"\x17enforce_identity_domain\x18\x02 \x01(\bR\x15enforceIdentityDomain\x12\x18\n" +
 	"\adomains\x18\x03 \x03(\tR\adomains\x12<\n" +
 	"\x1arequire_email_verification\x18\x04 \x01(\bR\x18requireEmailVerification\x12!\n" +
-	"\fexternal_url\x18\x05 \x01(\tR\vexternalUrl2\x90\x05\n" +
+	"\fexternal_url\x18\x05 \x01(\tR\vexternalUrl\x12?\n" +
+	"\x1cdisallow_user_create_machine\x18\x06 \x01(\bR\x19disallowUserCreateMachine2\x90\x05\n" +
 	"\x0eSettingService\x12D\n" +
 	"\n" +
 	"GetSetting\x12\x1c.laelia.v1.GetSettingRequest\x1a\x12.laelia.v1.Setting\"\x04\x90\xea0\x01\x12h\n" +

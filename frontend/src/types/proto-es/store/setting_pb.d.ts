@@ -88,6 +88,14 @@ export declare type WorkspaceProfileSetting = Message<"laelia.store.WorkspacePro
    * @generated from field: optional bool require_email_verification = 10;
    */
   requireEmailVerification?: boolean | undefined;
+
+  /**
+   * Disallow ordinary users (without laelia.machines.create) from creating
+   * their own machines through the device-code flow. Default false (allowed).
+   *
+   * @generated from field: bool disallow_user_create_machine = 11;
+   */
+  disallowUserCreateMachine: boolean;
 };
 
 /**

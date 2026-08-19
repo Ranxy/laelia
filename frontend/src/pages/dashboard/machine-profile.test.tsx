@@ -170,6 +170,7 @@ function renderPage(machineId = "m1") {
         children: [{ path: ":machineId", element: <MachineProfilePage /> }],
       },
       { path: "/members/agents/:agentId", element: <div>agent-route</div> },
+      { path: "/members/users/:userId", element: <div>user-route</div> },
     ],
     { initialEntries: [`/machines/${machineId}`] }
   );
@@ -275,6 +276,17 @@ describe("MachineProfilePage", () => {
     expect(screen.getByText("darwin/arm64")).toBeInTheDocument();
     expect(screen.getByText("10.0.0.5")).toBeInTheDocument();
     expect(screen.getByText("2.1.0")).toBeInTheDocument();
+  });
+
+  it("shows the machine owner and navigates to the user detail page", async () => {
+    renderPage();
+
+    expect(await screen.findByText("Alice")).toBeInTheDocument();
+    expect(screen.getByText("machine.detail-owner")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Alice" }));
+
+    expect(await screen.findByText("user-route")).toBeInTheDocument();
   });
 
   it("shows offline reconnection commands in the token card", async () => {
@@ -478,7 +490,7 @@ describe("MachineProfilePage", () => {
     });
     renderPage();
 
-    expect(await screen.findByText("Alice")).toBeInTheDocument();
+    expect((await screen.findAllByText("Alice")).length).toBeGreaterThan(0);
 
     fireEvent.click(
       screen.getByRole("button", { name: "machine.access-manage" })
@@ -488,7 +500,7 @@ describe("MachineProfilePage", () => {
     ).toBeInTheDocument();
     // The current member is listed in the sheet with a remove button.
     expect(
-      screen.getByRole("button", {
+      await screen.findByRole("button", {
         name: "machine.access-remove-member:Alice",
       })
     ).toBeInTheDocument();
@@ -511,7 +523,7 @@ describe("MachineProfilePage", () => {
     await screen.findByText("machine.access-manage-title");
 
     // Pick Alice from the member picker.
-    fireEvent.click(screen.getByText("Alice"));
+    fireEvent.click(screen.getAllByText("Alice").at(-1)!);
     fireEvent.click(screen.getByRole("button", { name: "common.save" }));
 
     await waitFor(() => {
@@ -542,7 +554,7 @@ describe("MachineProfilePage", () => {
       await screen.findByRole("button", { name: "machine.access-manage" })
     );
     await screen.findByText("machine.access-manage-title");
-    fireEvent.click(screen.getByText("Alice"));
+    fireEvent.click(screen.getAllByText("Alice").at(-1)!);
     fireEvent.click(screen.getByRole("button", { name: "common.save" }));
 
     await waitFor(() => {

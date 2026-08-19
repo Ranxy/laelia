@@ -305,9 +305,10 @@ export function MachineProfilePage() {
   }
 
   useEffect(() => {
-    if (!machine?.canManage || !machineId) return;
-    void loadPolicy();
+    if (!machineId) return;
     fetchUsers({ pageSize: 1000 });
+    if (!machine?.canManage) return;
+    void loadPolicy();
     void groupServiceClient
       .listGroups({ pageSize: 1000 })
       .then((res) => setGroups(res.groups ?? []));
@@ -650,6 +651,14 @@ export function MachineProfilePage() {
     }
   }
 
+  // userTitle resolves a user resource name (users/{id}) to the roster's
+  // display title, falling back to the raw name so a stale/deleted user never
+  // renders empty.
+  function userTitle(name: string): string {
+    if (!name) return "";
+    return users.find((u) => u.name === name)?.title || name;
+  }
+
   function memberLabel(member: string): string {
     if (member === "allUsers") return t("machine.access-member-all-users");
     if (member.startsWith("users/")) {
@@ -809,6 +818,24 @@ export function MachineProfilePage() {
             <Card title={t("machine.profile.section-identity")}>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
                 <Field label={t("machine.detail-name")}>{machine.title}</Field>
+                {machine.createdBy && (
+                  <Field label={t("machine.detail-owner")}>
+                    <button
+                      type="button"
+                      className="text-sm text-link hover:underline"
+                      onClick={() =>
+                        navigate(
+                          `/members/users/${machine.createdBy.replace(
+                            /^users\//,
+                            ""
+                          )}`
+                        )
+                      }
+                    >
+                      {userTitle(machine.createdBy)}
+                    </button>
+                  </Field>
+                )}
                 <Field label={t("machine.detail-status")}>
                   <MachineConnectionBadge state={machine.status?.state} />
                 </Field>

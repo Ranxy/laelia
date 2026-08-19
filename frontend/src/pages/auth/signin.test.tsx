@@ -73,7 +73,10 @@ beforeEach(() => {
 describe("sign-in", () => {
   it("submits credentials, seeds the session and navigates to the redirect target", async () => {
     mock.getWorkspaceInfo.mockResolvedValue(
-      create(GetWorkspaceInfoResponseSchema, { disallowSignup: false })
+      create(GetWorkspaceInfoResponseSchema, {
+        disallowSignup: false,
+        disallowUserCreateMachine: false,
+      })
     );
     mock.login.mockResolvedValue({
       user: create(UserSchema, { name: "users/1", email: EMAIL }),
@@ -104,7 +107,10 @@ describe("sign-in", () => {
 
   it("keeps the submit button disabled until both fields are filled", () => {
     mock.getWorkspaceInfo.mockResolvedValue(
-      create(GetWorkspaceInfoResponseSchema, { disallowSignup: false })
+      create(GetWorkspaceInfoResponseSchema, {
+        disallowSignup: false,
+        disallowUserCreateMachine: false,
+      })
     );
     renderPage();
 
@@ -122,7 +128,10 @@ describe("sign-in", () => {
 
   it("shows an error toast when login fails", async () => {
     mock.getWorkspaceInfo.mockResolvedValue(
-      create(GetWorkspaceInfoResponseSchema, { disallowSignup: false })
+      create(GetWorkspaceInfoResponseSchema, {
+        disallowSignup: false,
+        disallowUserCreateMachine: false,
+      })
     );
     mock.login.mockRejectedValue(new Error("bad credentials"));
 
@@ -142,7 +151,10 @@ describe("sign-in", () => {
 
   it("toggles password visibility", () => {
     mock.getWorkspaceInfo.mockResolvedValue(
-      create(GetWorkspaceInfoResponseSchema, { disallowSignup: false })
+      create(GetWorkspaceInfoResponseSchema, {
+        disallowSignup: false,
+        disallowUserCreateMachine: false,
+      })
     );
     renderPage();
 
@@ -156,7 +168,10 @@ describe("sign-in", () => {
 
   it("hides the signup link when the workspace disallows signup", async () => {
     mock.getWorkspaceInfo.mockResolvedValue(
-      create(GetWorkspaceInfoResponseSchema, { disallowSignup: true })
+      create(GetWorkspaceInfoResponseSchema, {
+        disallowSignup: true,
+        disallowUserCreateMachine: false,
+      })
     );
     renderPage();
 
@@ -167,7 +182,10 @@ describe("sign-in", () => {
 
   it("shows the signup link and navigates to signup with the redirect preserved", async () => {
     mock.getWorkspaceInfo.mockResolvedValue(
-      create(GetWorkspaceInfoResponseSchema, { disallowSignup: false })
+      create(GetWorkspaceInfoResponseSchema, {
+        disallowSignup: false,
+        disallowUserCreateMachine: false,
+      })
     );
     renderPage("/auth/signin?redirect=/members");
 
