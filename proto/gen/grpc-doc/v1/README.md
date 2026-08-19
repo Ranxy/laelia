@@ -678,6 +678,7 @@ RiskLevel is the risk level.
 | handle | [string](#string) |  | handle is the agent&#39;s human-readable, unique mention id (e.g. &#34;rei-agent-1&#34;), generated at creation and immutable thereafter. It is the {agent} segment of name (&#34;agents/{handle}&#34;), the value an agent types after &#34;@&#34; to mention or DM this agent, and the name of its workspace directory (~/.laelia/&lt;machine&gt;/&lt;handle&gt;/). Always populated; mirror of agent.resource_id. |
 | state | [State](#laelia-v1-State) |  |  |
 | title | [string](#string) |  |  |
+| description | [string](#string) |  | description is a short, public intro for this agent shown to other users and agents (who this agent is, what it is responsible for, its role). It is intentionally NOT injected into the agent&#39;s own prompt — persona_prompt is the private self prompt that defines the agent to itself and is hidden from non-owners/non-admins. |
 | info | [AgentInfo](#laelia-v1-AgentInfo) |  |  |
 | status | [AgentStatus](#laelia-v1-AgentStatus) |  |  |
 | created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
@@ -1007,6 +1008,7 @@ delete server-side while the list hides the button).
 | handle | [string](#string) |  | handle is the agent&#39;s readable id (&#34;rei-agent-1&#34;), the {agent} segment of name. See Agent.handle. Always populated. |
 | state | [State](#laelia-v1-State) |  |  |
 | title | [string](#string) |  |  |
+| description | [string](#string) |  | description is the public agent intro surfaced in list views, member pickers, and rosters so other users/agents know what this agent is for. See Agent.description. |
 | status | [AgentStatus](#laelia-v1-AgentStatus) |  |  |
 | provider | [string](#string) |  | provider/executable mirror acp_config.provider/executable on the full Agent, surfaced top-level so list consumers don&#39;t pull in AgentInfo. |
 | executable | [string](#string) |  |  |
@@ -3039,7 +3041,7 @@ the agent uses to anchor its execution events and link any posted replies.
 | handle | [string](#string) |  | handle is the member&#39;s readable mention id (&#34;ran-user-1&#34; for users, &#34;rei-agent-1&#34; for agents), identical to member_id. Duplicated as an explicit field so consumers do not need to know member_type to render it. |
 | member_role | [int32](#int32) |  |  |
 | joined_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| description | [string](#string) |  | description is the member&#39;s self-description: for users it is User.description, for agents it is the agent&#39;s full persona_prompt (from AgentACPConfig). Surfaced inline in the roster so an agent can perceive who is in a channel/thread — and each co-agent&#39;s persona — in a single lookup, and decide whom to address. |
+| description | [string](#string) |  | description is the member&#39;s public profile text: for users it is User.description, for agents it is Agent.description (the public intro that says what the agent is responsible for). The agent&#39;s private persona_prompt is intentionally NOT exposed here — it defines the agent to itself and is hidden from other users and agents. Surfaced inline in the roster so an agent can perceive who is in a channel/thread and decide whom to address. |
 | avatar | [string](#string) |  | avatar is the member&#39;s avatar resource name (users/{user}/avatar or agents/{agent}/avatar) when the member has uploaded one, empty otherwise (in which case the frontend renders a deterministic pixel identicon). Surfaced inline so the frontend can render roster avatars without a per-member lookup. |
 | preferred_language | [PreferredLanguage](#laelia-v1-PreferredLanguage) |  | preferred_language is the member&#39;s preferred language when the member is a user (from User.chat_preferences), UNSPECIFIED otherwise. Surfaced so an agent can perceive whom it is talking to and converse in that language. |
 
@@ -4430,8 +4432,9 @@ drain loop. The agent identity is resolved from the auth context.
 
 ### ListPeerAgentsRequest
 ListPeerAgents returns every other agent (the caller excluded) with the
-fields an agent needs to decide whom to address: display name, persona, and
-connection state. Agent-callable. Powers the &#34;agent list&#34; discovery tool.
+fields an agent needs to decide whom to address: display name, public
+description, and connection state. Agent-callable. Powers the &#34;agent list&#34;
+discovery tool.
 
 
 
@@ -4796,8 +4799,9 @@ calling ListChannelUpdates, which compares conversation.version to the cursor.
 
 ### PeerAgent
 PeerAgent is a roster entry for the calling agent: the name, display name,
-persona, and connection state of one peer agent. Returned by ListPeerAgents,
-which excludes the caller.
+public description, and connection state of one peer agent. Returned by
+ListPeerAgents, which excludes the caller. The peer&#39;s private persona_prompt
+is never populated here.
 
 
 | Field | Type | Label | Description |
@@ -4805,7 +4809,8 @@ which excludes the caller.
 | name | [string](#string) |  |  |
 | handle | [string](#string) |  | handle is the peer agent&#39;s readable id (&#34;rei-agent-1&#34;), the {agent} segment of name (&#34;agents/{handle}&#34;) and the value typed after &#34;@&#34; / &#34;dm:@&#34; to address the peer. |
 | display_name | [string](#string) |  |  |
-| persona_prompt | [string](#string) |  |  |
+| description | [string](#string) |  | description is the peer agent&#39;s public intro (Agent.description): what it is responsible for and its role, intended for other agents/humans to read. It is NOT the peer&#39;s private self prompt. |
+| persona_prompt | [string](#string) |  | persona_prompt is reserved for the agent&#39;s private self prompt and is intentionally left empty for other agents; use description instead. |
 | connection_state | [AgentStatus.ConnectionState](#laelia-v1-AgentStatus-ConnectionState) |  |  |
 | enabled | [bool](#bool) |  | enabled reports whether the peer is running (false = stopped via StopAgent). A stopped peer&#39;s connection_state is STOPPED regardless of whether its machine is still connected. |
 

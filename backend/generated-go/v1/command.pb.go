@@ -3289,10 +3289,12 @@ type ChannelMember struct {
 	Handle     string                 `protobuf:"bytes,9,opt,name=handle,proto3" json:"handle,omitempty"`
 	MemberRole int32                  `protobuf:"varint,4,opt,name=member_role,json=memberRole,proto3" json:"member_role,omitempty"`
 	JoinedAt   *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=joined_at,json=joinedAt,proto3" json:"joined_at,omitempty"`
-	// description is the member's self-description: for users it is User.description,
-	// for agents it is the agent's full persona_prompt (from AgentACPConfig). Surfaced
-	// inline in the roster so an agent can perceive who is in a channel/thread — and
-	// each co-agent's persona — in a single lookup, and decide whom to address.
+	// description is the member's public profile text: for users it is
+	// User.description, for agents it is Agent.description (the public intro that
+	// says what the agent is responsible for). The agent's private persona_prompt
+	// is intentionally NOT exposed here — it defines the agent to itself and is
+	// hidden from other users and agents. Surfaced inline in the roster so an
+	// agent can perceive who is in a channel/thread and decide whom to address.
 	Description string `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
 	// avatar is the member's avatar resource name (users/{user}/avatar or
 	// agents/{agent}/avatar) when the member has uploaded one, empty otherwise
@@ -4507,16 +4509,23 @@ func (x *GetOrCreateAgentDMResponse) GetConversation() *Conversation {
 }
 
 // PeerAgent is a roster entry for the calling agent: the name, display name,
-// persona, and connection state of one peer agent. Returned by ListPeerAgents,
-// which excludes the caller.
+// public description, and connection state of one peer agent. Returned by
+// ListPeerAgents, which excludes the caller. The peer's private persona_prompt
+// is never populated here.
 type PeerAgent struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// handle is the peer agent's readable id ("rei-agent-1"), the {agent} segment
 	// of name ("agents/{handle}") and the value typed after "@" / "dm:@" to
 	// address the peer.
-	Handle          string                      `protobuf:"bytes,5,opt,name=handle,proto3" json:"handle,omitempty"`
-	DisplayName     string                      `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Handle      string `protobuf:"bytes,5,opt,name=handle,proto3" json:"handle,omitempty"`
+	DisplayName string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	// description is the peer agent's public intro (Agent.description): what it
+	// is responsible for and its role, intended for other agents/humans to read.
+	// It is NOT the peer's private self prompt.
+	Description string `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
+	// persona_prompt is reserved for the agent's private self prompt and is
+	// intentionally left empty for other agents; use description instead.
 	PersonaPrompt   string                      `protobuf:"bytes,3,opt,name=persona_prompt,json=personaPrompt,proto3" json:"persona_prompt,omitempty"`
 	ConnectionState AgentStatus_ConnectionState `protobuf:"varint,4,opt,name=connection_state,json=connectionState,proto3,enum=laelia.v1.AgentStatus_ConnectionState" json:"connection_state,omitempty"`
 	// enabled reports whether the peer is running (false = stopped via
@@ -4578,6 +4587,13 @@ func (x *PeerAgent) GetDisplayName() string {
 	return ""
 }
 
+func (x *PeerAgent) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
 func (x *PeerAgent) GetPersonaPrompt() string {
 	if x != nil {
 		return x.PersonaPrompt
@@ -4600,8 +4616,9 @@ func (x *PeerAgent) GetEnabled() bool {
 }
 
 // ListPeerAgents returns every other agent (the caller excluded) with the
-// fields an agent needs to decide whom to address: display name, persona, and
-// connection state. Agent-callable. Powers the "agent list" discovery tool.
+// fields an agent needs to decide whom to address: display name, public
+// description, and connection state. Agent-callable. Powers the "agent list"
+// discovery tool.
 type ListPeerAgentsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -11553,11 +11570,12 @@ const file_v1_command_proto_rawDesc = "" +
 	"peer_agent\x18\x01 \x01(\tB\x14\xe0A\x02\xfaA\x0e\n" +
 	"\flaelia/AgentR\tpeerAgent\"Y\n" +
 	"\x1aGetOrCreateAgentDMResponse\x12;\n" +
-	"\fconversation\x18\x01 \x01(\v2\x17.laelia.v1.ConversationR\fconversation\"\xee\x01\n" +
+	"\fconversation\x18\x01 \x01(\v2\x17.laelia.v1.ConversationR\fconversation\"\x90\x02\n" +
 	"\tPeerAgent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06handle\x18\x05 \x01(\tR\x06handle\x12!\n" +
-	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12%\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12 \n" +
+	"\vdescription\x18\a \x01(\tR\vdescription\x12%\n" +
 	"\x0epersona_prompt\x18\x03 \x01(\tR\rpersonaPrompt\x12Q\n" +
 	"\x10connection_state\x18\x04 \x01(\x0e2&.laelia.v1.AgentStatus.ConnectionStateR\x0fconnectionState\x12\x18\n" +
 	"\aenabled\x18\x06 \x01(\bR\aenabled\"\x17\n" +

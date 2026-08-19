@@ -1476,10 +1476,12 @@ export declare type ChannelMember = Message<"laelia.v1.ChannelMember"> & {
   joinedAt?: Timestamp | undefined;
 
   /**
-   * description is the member's self-description: for users it is User.description,
-   * for agents it is the agent's full persona_prompt (from AgentACPConfig). Surfaced
-   * inline in the roster so an agent can perceive who is in a channel/thread — and
-   * each co-agent's persona — in a single lookup, and decide whom to address.
+   * description is the member's public profile text: for users it is
+   * User.description, for agents it is Agent.description (the public intro that
+   * says what the agent is responsible for). The agent's private persona_prompt
+   * is intentionally NOT exposed here — it defines the agent to itself and is
+   * hidden from other users and agents. Surfaced inline in the roster so an
+   * agent can perceive who is in a channel/thread and decide whom to address.
    *
    * @generated from field: string description = 6;
    */
@@ -2022,8 +2024,9 @@ export declare const GetOrCreateAgentDMResponseSchema: GenMessage<GetOrCreateAge
 
 /**
  * PeerAgent is a roster entry for the calling agent: the name, display name,
- * persona, and connection state of one peer agent. Returned by ListPeerAgents,
- * which excludes the caller.
+ * public description, and connection state of one peer agent. Returned by
+ * ListPeerAgents, which excludes the caller. The peer's private persona_prompt
+ * is never populated here.
  *
  * @generated from message laelia.v1.PeerAgent
  */
@@ -2048,6 +2051,18 @@ export declare type PeerAgent = Message<"laelia.v1.PeerAgent"> & {
   displayName: string;
 
   /**
+   * description is the peer agent's public intro (Agent.description): what it
+   * is responsible for and its role, intended for other agents/humans to read.
+   * It is NOT the peer's private self prompt.
+   *
+   * @generated from field: string description = 7;
+   */
+  description: string;
+
+  /**
+   * persona_prompt is reserved for the agent's private self prompt and is
+   * intentionally left empty for other agents; use description instead.
+   *
    * @generated from field: string persona_prompt = 3;
    */
   personaPrompt: string;
@@ -2075,8 +2090,9 @@ export declare const PeerAgentSchema: GenMessage<PeerAgent>;
 
 /**
  * ListPeerAgents returns every other agent (the caller excluded) with the
- * fields an agent needs to decide whom to address: display name, persona, and
- * connection state. Agent-callable. Powers the "agent list" discovery tool.
+ * fields an agent needs to decide whom to address: display name, public
+ * description, and connection state. Agent-callable. Powers the "agent list"
+ * discovery tool.
  *
  * @generated from message laelia.v1.ListPeerAgentsRequest
  */

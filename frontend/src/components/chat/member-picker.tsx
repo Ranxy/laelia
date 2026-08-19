@@ -57,7 +57,12 @@ function userOption(u: User): Option {
 
 function agentOption(a: AgentSummary): Option {
   const id = memberIdOf(a.name);
-  return { memberId: id, label: a.title || id, sublabel: undefined };
+  return {
+    memberId: id,
+    label: a.title || id,
+    // Show the public agent intro so pickers can tell what each agent is for.
+    sublabel: a.description || undefined,
+  };
 }
 
 export function MemberPicker({

@@ -189,9 +189,9 @@ func TestMemberRoleString(t *testing.T) {
 
 // TestFormatMemberLine locks the roster rendering the agent reads to decide whom
 // to @mention: type, display name, agents/<id> handle for agents, role when
-// meaningful, and the member's full description as an indented block — for users
-// their self-description, for agents their complete persona_prompt (untruncated,
-// so one roster call carries every co-agent's persona).
+// meaningful, and the member's public description as an indented block — for
+// users their self-description, for agents Agent.description (untruncated, so
+// one roster call carries every co-agent's public description).
 func TestFormatMemberLine(t *testing.T) {
 	// User owner with a single-line description: header line + indented block.
 	assert.Equal(t, "- [user] Alice (owner)\n  后端工程师, 专注 agent 构建\n",
@@ -199,8 +199,9 @@ func TestFormatMemberLine(t *testing.T) {
 			MemberType: 1, DisplayName: "Alice", MemberRole: 1, Description: "后端工程师, 专注 agent 构建",
 		}))
 
-	// Agent member: the @<handle> mention token appears; a multi-line persona is
-	// emitted in full, one indented line per source line — no truncation.
+	// Agent member: the @<handle> mention token appears; a multi-line public
+	// description is emitted in full, one indented line per source line — no
+	// truncation.
 	got := formatMemberLine(&v1pb.ChannelMember{
 		MemberType: 2, MemberId: "abc-123", DisplayName: "backend-bot", MemberRole: 2,
 		Description: "精通后端, 专注构建 agent。\n前端任务请转给 @ui-expert。",

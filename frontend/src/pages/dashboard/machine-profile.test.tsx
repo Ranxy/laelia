@@ -11,6 +11,7 @@ import {
 import {
   type Machine,
   type MachineInfo,
+  type MachineStatus,
   MachineStatus_ConnectionState,
 } from "@/types/proto-es/v1/machine_pb";
 import { MachineProfilePage } from "./machine-profile";
@@ -285,7 +286,7 @@ describe("MachineProfilePage", () => {
           connectedTime: undefined,
           errorMessage: "",
           activeSessionId: "",
-        },
+        } as unknown as MachineStatus,
       })
     );
     renderPage();
@@ -316,7 +317,7 @@ describe("MachineProfilePage", () => {
           connectedTime: undefined,
           errorMessage: "",
           activeSessionId: "",
-        },
+        } as unknown as MachineStatus,
       })
     );
     renderPage();
@@ -614,7 +615,8 @@ describe("MachineProfilePage", () => {
           personaPrompt: "Be concise",
         }),
         undefined,
-        false
+        false,
+        ""
       );
     });
     expect(
@@ -665,7 +667,8 @@ describe("MachineProfilePage", () => {
           globalProviderEntry: "entries/e1",
         }),
         undefined,
-        false
+        false,
+        ""
       );
     });
   });
@@ -722,7 +725,8 @@ describe("MachineProfilePage", () => {
           model: "deepseek-chat",
         }),
         undefined,
-        false
+        false,
+        ""
       );
     });
   });

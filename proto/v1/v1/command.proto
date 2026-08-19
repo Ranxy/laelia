@@ -538,10 +538,12 @@ message ChannelMember {
   string handle = 9;
   int32 member_role = 4;
   google.protobuf.Timestamp joined_at = 5;
-  // description is the member's self-description: for users it is User.description,
-  // for agents it is the agent's full persona_prompt (from AgentACPConfig). Surfaced
-  // inline in the roster so an agent can perceive who is in a channel/thread — and
-  // each co-agent's persona — in a single lookup, and decide whom to address.
+  // description is the member's public profile text: for users it is
+  // User.description, for agents it is Agent.description (the public intro that
+  // says what the agent is responsible for). The agent's private persona_prompt
+  // is intentionally NOT exposed here — it defines the agent to itself and is
+  // hidden from other users and agents. Surfaced inline in the roster so an
+  // agent can perceive who is in a channel/thread and decide whom to address.
   string description = 6;
   // avatar is the member's avatar resource name (users/{user}/avatar or
   // agents/{agent}/avatar) when the member has uploaded one, empty otherwise
@@ -735,8 +737,9 @@ message GetOrCreateAgentDMResponse {
 }
 
 // PeerAgent is a roster entry for the calling agent: the name, display name,
-// persona, and connection state of one peer agent. Returned by ListPeerAgents,
-// which excludes the caller.
+// public description, and connection state of one peer agent. Returned by
+// ListPeerAgents, which excludes the caller. The peer's private persona_prompt
+// is never populated here.
 message PeerAgent {
   string name = 1;
   // handle is the peer agent's readable id ("rei-agent-1"), the {agent} segment
@@ -744,6 +747,12 @@ message PeerAgent {
   // address the peer.
   string handle = 5;
   string display_name = 2;
+  // description is the peer agent's public intro (Agent.description): what it
+  // is responsible for and its role, intended for other agents/humans to read.
+  // It is NOT the peer's private self prompt.
+  string description = 7;
+  // persona_prompt is reserved for the agent's private self prompt and is
+  // intentionally left empty for other agents; use description instead.
   string persona_prompt = 3;
   AgentStatus.ConnectionState connection_state = 4;
   // enabled reports whether the peer is running (false = stopped via
@@ -753,8 +762,9 @@ message PeerAgent {
 }
 
 // ListPeerAgents returns every other agent (the caller excluded) with the
-// fields an agent needs to decide whom to address: display name, persona, and
-// connection state. Agent-callable. Powers the "agent list" discovery tool.
+// fields an agent needs to decide whom to address: display name, public
+// description, and connection state. Agent-callable. Powers the "agent list"
+// discovery tool.
 message ListPeerAgentsRequest {}
 
 message ListPeerAgentsResponse {

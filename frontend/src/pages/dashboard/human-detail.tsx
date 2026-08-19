@@ -522,9 +522,9 @@ function OwnedAgentRow({ agent }: { agent: AgentSummary }) {
         <span className="truncate text-sm font-medium text-main">
           {agent.title}
         </span>
-        {agent.provider && (
-          <span className="truncate text-xs text-control-light font-mono">
-            {agent.provider}
+        {agent.description && (
+          <span className="truncate text-xs text-control-light">
+            {agent.description}
           </span>
         )}
       </div>

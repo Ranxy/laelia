@@ -78,12 +78,14 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     machine: string,
     acpConfig?: AgentACPConfigInput,
     labels?: Record<string, string>,
-    allowAddToChannel?: boolean
+    allowAddToChannel?: boolean,
+    description?: string
   ) {
     const res = await agentServiceClient.createAgent(
       create(CreateAgentRequestSchema, {
         agent: create(AgentSchema, {
           title,
+          description,
           machine,
           labels,
           allowAddToChannel,
@@ -98,15 +100,16 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     return res;
   },
 
-  // updateAgent patches the agent's mutable flag fields. Only the keys present
+  // updateAgent patches the agent's mutable fields. Only the keys present
   // in `fields` are sent (the update_mask is built from them), so the caller
-  // never overwrites a flag it did not touch.
+  // never overwrites a field it did not touch.
   async updateAgent(
     name: string,
     fields: {
       allowAddToChannel?: boolean;
       followOwnerPermissions?: boolean;
       canManageChannelMembers?: boolean;
+      description?: string;
     }
   ) {
     const agent = create(AgentSchema, { name });
@@ -122,6 +125,10 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     if (fields.canManageChannelMembers !== undefined) {
       agent.canManageChannelMembers = fields.canManageChannelMembers;
       paths.push("can_manage_channel_members");
+    }
+    if (fields.description !== undefined) {
+      agent.description = fields.description;
+      paths.push("description");
     }
     return agentServiceClient.updateAgent(
       create(UpdateAgentRequestSchema, {

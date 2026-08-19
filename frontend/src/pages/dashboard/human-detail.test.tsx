@@ -85,6 +85,7 @@ function agent(overrides?: Partial<AgentSummary>): AgentSummary {
     name: "agents/a1",
     title: "Alpha",
     owner: "users/1",
+    description: "Builds AI tools",
     provider: "openai",
     ...overrides,
   } as unknown as AgentSummary;
@@ -192,7 +193,7 @@ describe("HumanDetailPage", () => {
     expect(screen.getByText("Designers")).toBeInTheDocument();
     expect(screen.getByText("Engineers")).toBeInTheDocument();
     expect(screen.getByText("Alpha")).toBeInTheDocument();
-    expect(screen.getByText("openai")).toBeInTheDocument();
+    expect(screen.getByText("Builds AI tools")).toBeInTheDocument();
     expect(screen.getByText("1")).toBeInTheDocument();
   });
 

@@ -592,6 +592,12 @@ message Agent {
   string handle = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
   State state = 2;
   string title = 3;
+  // description is a short, public intro for this agent shown to other users
+  // and agents (who this agent is, what it is responsible for, its role). It is
+  // intentionally NOT injected into the agent's own prompt — persona_prompt is
+  // the private self prompt that defines the agent to itself and is hidden from
+  // non-owners/non-admins.
+  string description = 24;
   // Token field removed: tokens are no longer returned in API responses.
   // Use RotateAgentToken to get a new bootstrap token.
   reserved 4;
@@ -695,6 +701,10 @@ message AgentSummary {
   string handle = 14;
   State state = 2;
   string title = 3;
+  // description is the public agent intro surfaced in list views, member
+  // pickers, and rosters so other users/agents know what this agent is for.
+  // See Agent.description.
+  string description = 16;
   AgentStatus status = 4;
   // provider/executable mirror acp_config.provider/executable on the full
   // Agent, surfaced top-level so list consumers don't pull in AgentInfo.

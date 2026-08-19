@@ -1217,6 +1217,17 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
   title: string;
 
   /**
+   * description is a short, public intro for this agent shown to other users
+   * and agents (who this agent is, what it is responsible for, its role). It is
+   * intentionally NOT injected into the agent's own prompt — persona_prompt is
+   * the private self prompt that defines the agent to itself and is hidden from
+   * non-owners/non-admins.
+   *
+   * @generated from field: string description = 24;
+   */
+  description: string;
+
+  /**
    * @generated from field: laelia.v1.AgentInfo info = 5;
    */
   info?: AgentInfo | undefined;
@@ -1413,6 +1424,15 @@ export declare type AgentSummary = Message<"laelia.v1.AgentSummary"> & {
    * @generated from field: string title = 3;
    */
   title: string;
+
+  /**
+   * description is the public agent intro surfaced in list views, member
+   * pickers, and rosters so other users/agents know what this agent is for.
+   * See Agent.description.
+   *
+   * @generated from field: string description = 16;
+   */
+  description: string;
 
   /**
    * @generated from field: laelia.v1.AgentStatus status = 4;

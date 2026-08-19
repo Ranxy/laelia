@@ -1519,16 +1519,17 @@ func resolveMemberDisplayName(ctx context.Context, s *store.Store, memberType in
 	return memberID
 }
 
-// resolveMemberProfile returns a member's self-description, avatar resource
+// resolveMemberProfile returns a member's public description, avatar resource
 // name, and preferred language from a single user/agent lookup. For users the
 // description is User.description, the avatar is users/{handle}/avatar when the
 // user has uploaded one (empty otherwise), and the language is the user's
 // chat_preferences preferred_language (UNSPECIFIED when unset); for agents the
-// description is the admin-authored persona_prompt, the avatar is
+// description is Agent.description (the public intro), the avatar is
 // agents/{agent}/avatar when uploaded (empty otherwise), and the language is
-// always UNSPECIFIED. Surfaced in channel/thread rosters so an agent can
-// perceive who a member is, render avatars without a per-user lookup, and
-// converse in the member's preferred language.
+// always UNSPECIFIED. The agent's private persona_prompt is intentionally NOT
+// exposed here. Surfaced in channel/thread rosters so an agent can perceive who
+// a member is, render avatars without a per-user lookup, and converse in the
+// member's preferred language.
 func resolveMemberProfile(ctx context.Context, s *store.Store, memberType int32, memberID string) (string, string, v1pb.PreferredLanguage) {
 	if memberType == store.MemberTypeUser {
 		u, err := s.GetUserByHandle(ctx, memberID)
@@ -1550,13 +1551,13 @@ func resolveMemberProfile(ctx context.Context, s *store.Store, memberType int32,
 		if agent.AvatarS3Key != "" {
 			avatar = common.FormatAgentAvatar(agent.ResourceID)
 		}
-		return agent.Info.GetAcpConfig().GetPersonaPrompt(), avatar, v1pb.PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED
+		return agent.Description, avatar, v1pb.PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED
 	}
 	return "", "", v1pb.PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED
 }
 
 // buildChannelMember assembles a v1 ChannelMember from a membership row, resolving
-// the display name and self-description. Shared by ListChannelMembers and
+// the display name and public description. Shared by ListChannelMembers and
 // ListThreadParticipants so both rosters render identity consistently.
 func buildChannelMember(ctx context.Context, s *store.Store, memberType int32, memberID string, role int32, joinedAt time.Time) *v1pb.ChannelMember {
 	description, avatar, language := resolveMemberProfile(ctx, s, memberType, memberID)

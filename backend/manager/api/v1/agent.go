@@ -163,6 +163,7 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 
 	agentMessage := &store.AgentMessage{
 		Name:              req.Msg.Agent.Title,
+		Description:       req.Msg.Agent.GetDescription(),
 		TokenVersion:      1,
 		MachineID:         machine.ID,
 		AllowAddToChannel: req.Msg.Agent.GetAllowAddToChannel(),
@@ -272,6 +273,12 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 	out := s.convertToAgent(ctx, agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
 	caller, _ := GetUserFromContext(ctx)
 	out.CanEdit = s.canEditAgent(ctx, caller, agent)
+	// persona_prompt is the agent's private self prompt: it defines the agent to
+	// itself and is only visible to the agent's owner or a workspace admin.
+	// Everyone else (including other agents) sees only the public description.
+	if !out.CanEdit && out.Info != nil && out.Info.AcpConfig != nil {
+		out.Info.AcpConfig.PersonaPrompt = ""
+	}
 	// The builtin-pi api_key is a plaintext secret. Admins see the full key;
 	// the owner sees a masked preview when the workspace toggle enables
 	// self-provided keys; everyone else sees nothing. Global-provider agents
@@ -294,10 +301,10 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 }
 
 // UpdateAgent patches one or more mutable agent fields (allow_add_to_channel,
-// follow_owner_permissions); any other update_mask path is rejected. The IAM
-// interceptor skips this RPC (no permission annotation — agents.edit is
-// admin-only), so authorization is enforced here for the agent's owner or a
-// workspace admin.
+// follow_owner_permissions, can_manage_channel_members, description); any other
+// update_mask path is rejected. The IAM interceptor skips this RPC (no
+// permission annotation — agents.edit is admin-only), so authorization is
+// enforced here for the agent's owner or a workspace admin.
 func (s *AgentService) UpdateAgent(ctx context.Context, req *connect.Request[v1pb.UpdateAgentRequest]) (*connect.Response[v1pb.Agent], error) {
 	if req.Msg.Agent == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("agent must be set"))
@@ -307,10 +314,9 @@ func (s *AgentService) UpdateAgent(ctx context.Context, req *connect.Request[v1p
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	// allow_add_to_channel, follow_owner_permissions, and
-	// can_manage_channel_members are the supported mutable fields; reject any
-	// other path. Empty mask defaults to allow_add_to_channel (the original sole
-	// field).
+	// allow_add_to_channel, follow_owner_permissions, can_manage_channel_members,
+	// and description are the supported mutable fields; reject any other path.
+	// Empty mask defaults to allow_add_to_channel (the original sole field).
 	paths := req.Msg.UpdateMask.GetPaths()
 	if len(paths) == 0 {
 		paths = []string{"allow_add_to_channel"}
@@ -327,8 +333,11 @@ func (s *AgentService) UpdateAgent(ctx context.Context, req *connect.Request[v1p
 		case "can_manage_channel_members":
 			canManage := req.Msg.Agent.GetCanManageChannelMembers()
 			patch.CanManageChannelMembers = &canManage
+		case "description":
+			desc := req.Msg.Agent.GetDescription()
+			patch.Description = &desc
 		default:
-			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("update_mask path %q is not supported; only allow_add_to_channel, follow_owner_permissions, and can_manage_channel_members", p))
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("update_mask path %q is not supported; only allow_add_to_channel, follow_owner_permissions, can_manage_channel_members, and description", p))
 		}
 	}
 
@@ -1263,6 +1272,7 @@ func (s *AgentService) convertToAgent(ctx context.Context, agent *store.AgentMes
 		Handle:                  agent.ResourceID,
 		State:                   state,
 		Title:                   agent.Name,
+		Description:             agent.Description,
 		Info:                    convertToV1AgentInfo(agent.Info),
 		Status:                  status,
 		CreatedAt:               timestamppb.New(agent.CreatedAt),
@@ -1320,6 +1330,7 @@ func convertToAgentSummary(ctx context.Context, s *store.Store, agent *store.Age
 		Handle:                  agent.ResourceID,
 		State:                   state,
 		Title:                   agent.Name,
+		Description:             agent.Description,
 		Status:                  convertToV1AgentStatus(agent.Status, agent.Deleted, connected, agent.Enabled),
 		AllowAddToChannel:       agent.AllowAddToChannel,
 		FollowOwnerPermissions:  agent.FollowOwnerPermissions,

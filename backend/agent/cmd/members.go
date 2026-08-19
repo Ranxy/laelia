@@ -17,9 +17,9 @@ func init() {
 // --root it lists the distinct senders of that thread. The conversation is a
 // positional argument, matching `message read` / `thread read` / `task list` so
 // an agent shells out the same way for every conversation-scoped command. Each
-// entry carries the member's full description inline (a user's self-description,
-// or an agent's complete persona_prompt), so one call is enough to decide whom
-// to @mention.
+// entry carries the member's full public description inline (a user's
+// self-description, or an agent's public intro), so one call is enough to
+// decide whom to @mention. The agent's private persona_prompt is not exposed.
 var membersRoot string
 
 var membersCmd = &cobra.Command{

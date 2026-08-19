@@ -146,6 +146,7 @@ CREATE TABLE agent (
     id serial PRIMARY KEY,
     resource_id text NOT NULL,
     name text NOT NULL,
+    description text NOT NULL DEFAULT '',
     token_version int NOT NULL DEFAULT 1,
     created_at timestamptz NOT NULL DEFAULT now(),
     deleted boolean NOT NULL DEFAULT FALSE,
@@ -184,6 +185,10 @@ CREATE UNIQUE INDEX idx_agent_unique_resource_id ON agent(resource_id);
 -- Idempotent ALTER for the agent avatar_s3_key column (fresh installs already get
 -- it from CREATE TABLE above).
 ALTER TABLE agent ADD COLUMN IF NOT EXISTS avatar_s3_key text NOT NULL DEFAULT '';
+
+-- Public agent description: shown to other users/agents, never injected into the
+-- agent's own prompt (persona_prompt in agent.info is the private self prompt).
+ALTER TABLE agent ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';
 
 -- allow_add_to_channel: whether other users may add this agent to a channel.
 -- Default FALSE = only the agent's owner or a workspace admin may add it.

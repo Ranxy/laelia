@@ -2504,6 +2504,17 @@ agent.resource_id. </p></td>
                 </tr>
               
                 <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>description is a short, public intro for this agent shown to other users
+and agents (who this agent is, what it is responsible for, its role). It is
+intentionally NOT injected into the agent&#39;s own prompt — persona_prompt is
+the private self prompt that defines the agent to itself and is hidden from
+non-owners/non-admins. </p></td>
+                </tr>
+              
+                <tr>
                   <td>info</td>
                   <td><a href="#laelia.v1.AgentInfo">AgentInfo</a></td>
                   <td></td>
@@ -3532,6 +3543,15 @@ name. See Agent.handle. Always populated. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>description is the public agent intro surfaced in list views, member
+pickers, and rosters so other users/agents know what this agent is for.
+See Agent.description. </p></td>
                 </tr>
               
                 <tr>
@@ -8108,10 +8128,12 @@ explicit field so consumers do not need to know member_type to render it. </p></
                   <td>description</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>description is the member&#39;s self-description: for users it is User.description,
-for agents it is the agent&#39;s full persona_prompt (from AgentACPConfig). Surfaced
-inline in the roster so an agent can perceive who is in a channel/thread — and
-each co-agent&#39;s persona — in a single lookup, and decide whom to address. </p></td>
+                  <td><p>description is the member&#39;s public profile text: for users it is
+User.description, for agents it is Agent.description (the public intro that
+says what the agent is responsible for). The agent&#39;s private persona_prompt
+is intentionally NOT exposed here — it defines the agent to itself and is
+hidden from other users and agents. Surfaced inline in the roster so an
+agent can perceive who is in a channel/thread and decide whom to address. </p></td>
                 </tr>
               
                 <tr>
@@ -11188,7 +11210,7 @@ fired reminders and process them. </p></td>
         
       
         <h3 id="laelia.v1.ListPeerAgentsRequest">ListPeerAgentsRequest</h3>
-        <p>ListPeerAgents returns every other agent (the caller excluded) with the</p><p>fields an agent needs to decide whom to address: display name, persona, and</p><p>connection state. Agent-callable. Powers the "agent list" discovery tool.</p>
+        <p>ListPeerAgents returns every other agent (the caller excluded) with the</p><p>fields an agent needs to decide whom to address: display name, public</p><p>description, and connection state. Agent-callable. Powers the "agent list"</p><p>discovery tool.</p>
 
         
 
@@ -11904,7 +11926,7 @@ source of truth. Empty means a normal channel-message wake. </p></td>
         
       
         <h3 id="laelia.v1.PeerAgent">PeerAgent</h3>
-        <p>PeerAgent is a roster entry for the calling agent: the name, display name,</p><p>persona, and connection state of one peer agent. Returned by ListPeerAgents,</p><p>which excludes the caller.</p>
+        <p>PeerAgent is a roster entry for the calling agent: the name, display name,</p><p>public description, and connection state of one peer agent. Returned by</p><p>ListPeerAgents, which excludes the caller. The peer's private persona_prompt</p><p>is never populated here.</p>
 
         
           <table class="field-table">
@@ -11937,10 +11959,20 @@ address the peer. </p></td>
                 </tr>
               
                 <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>description is the peer agent&#39;s public intro (Agent.description): what it
+is responsible for and its role, intended for other agents/humans to read.
+It is NOT the peer&#39;s private self prompt. </p></td>
+                </tr>
+              
+                <tr>
                   <td>persona_prompt</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>persona_prompt is reserved for the agent&#39;s private self prompt and is
+intentionally left empty for other agents; use description instead. </p></td>
                 </tr>
               
                 <tr>

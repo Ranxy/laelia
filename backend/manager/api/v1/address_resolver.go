@@ -135,8 +135,9 @@ func (s *CommandService) GetOrCreateAgentDM(ctx context.Context, req *connect.Re
 }
 
 // ListPeerAgents returns every other agent (the caller excluded) with the
-// display name, persona, and connection state an agent needs to decide whom to
-// address. Powers the "agent list" discovery tool.
+// display name, public description, and connection state an agent needs to
+// decide whom to address. The peer's private persona_prompt is never exposed.
+// Powers the "agent list" discovery tool.
 func (s *CommandService) ListPeerAgents(ctx context.Context, _ *connect.Request[v1pb.ListPeerAgentsRequest]) (*connect.Response[v1pb.ListPeerAgentsResponse], error) {
 	agent, err := requireCallingAgent(ctx)
 	if err != nil {
@@ -157,7 +158,8 @@ func (s *CommandService) ListPeerAgents(ctx context.Context, _ *connect.Request[
 			Name:          formatAgentName(a.ResourceID),
 			Handle:        a.ResourceID,
 			DisplayName:   a.Name,
-			PersonaPrompt: a.Info.GetAcpConfig().GetPersonaPrompt(),
+			Description:   a.Description,
+			PersonaPrompt: "", // private self prompt; never exposed to other agents
 			// computeConnectionState returns the same enum as
 			// convertToV1AgentStatus(...).GetState() without allocating the
 			// wrapping AgentStatus + timestamp protos. a.Status is always

@@ -22,9 +22,14 @@ var (
 )
 
 type AgentMessage struct {
-	ID           int
-	ResourceID   string
-	Name         string
+	ID         int
+	ResourceID string
+	Name       string
+	// Description is the public agent intro shown to other users and agents
+	// (what the agent is responsible for, its role). It is NOT injected into the
+	// agent's own prompt — persona_prompt in Info.AcpConfig is the private self
+	// prompt that defines the agent to itself.
+	Description  string
 	TokenVersion int
 	CreatedAt    time.Time
 	Deleted      bool
@@ -88,6 +93,7 @@ type FindAgentMessage struct {
 type UpdateAgentMessage struct {
 	ResourceID              *string
 	Name                    *string
+	Description             *string
 	Info                    *models.AgentInfo
 	Status                  *models.AgentStatus
 	TokenVersion            *int
@@ -192,6 +198,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 		agent.id,
 		agent.resource_id,
 		agent.name,
+		agent.description,
 		agent.token_version,
 		agent.created_at,
 		agent.deleted,
@@ -235,6 +242,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 			&agentMessage.ID,
 			&agentMessage.ResourceID,
 			&agentMessage.Name,
+			&agentMessage.Description,
 			&agentMessage.TokenVersion,
 			&agentMessage.CreatedAt,
 			&agentMessage.Deleted,
@@ -335,14 +343,15 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 	var agentID int
 	err = tx.QueryRowContext(ctx, `
 		INSERT INTO agent (
-			resource_id, name, token_version, info, status, created_by, owner_id, allow_add_to_channel, machine_id
+			resource_id, name, description, token_version, info, status, created_by, owner_id, allow_add_to_channel, machine_id
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (resource_id) DO NOTHING
 		RETURNING id, created_at
 	`,
 		resourceID,
 		create.Name,
+		create.Description,
 		create.TokenVersion,
 		infoBytes,
 		statusBytes,
@@ -372,6 +381,7 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 		ID:                      agentID,
 		ResourceID:              resourceID,
 		Name:                    create.Name,
+		Description:             create.Description,
 		TokenVersion:            create.TokenVersion,
 		CreatedAt:               create.CreatedAt,
 		Info:                    create.Info,
@@ -447,6 +457,9 @@ func (s *Store) UpdateAgent(ctx context.Context, current *AgentMessage, patch *U
 	}
 	if v := patch.Name; v != nil {
 		sets, args = append(sets, fmt.Sprintf("name = $%d", len(args)+1)), append(args, *v)
+	}
+	if v := patch.Description; v != nil {
+		sets, args = append(sets, fmt.Sprintf("description = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := patch.Info; v != nil {
 		infoBytes, err := json.Marshal(v)

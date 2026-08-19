@@ -153,6 +153,7 @@ export function MachineProfilePage() {
   const [addOpen, setAddOpen] = useState(false);
   const [listScrolled, setListScrolled] = useState(false);
   const [agentName, setAgentName] = useState("");
+  const [agentDescription, setAgentDescription] = useState("");
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
   const [globalProvider, setGlobalProvider] = useState("");
@@ -412,6 +413,7 @@ export function MachineProfilePage() {
   // from a blank state instead of the previous submission's values.
   function resetAddForm() {
     setAgentName("");
+    setAgentDescription("");
     setProvider("");
     setModel("");
     setGlobalProvider("");
@@ -634,7 +636,8 @@ export function MachineProfilePage() {
           apiBaseUrl: apiBaseUrl.trim(),
         },
         undefined,
-        allowAddToChannel
+        allowAddToChannel,
+        agentDescription.trim()
       );
       setAddedTitle(name);
       setAddOpen(false);
@@ -1137,6 +1140,21 @@ export function MachineProfilePage() {
                   }}
                 />
               </FieldRow>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">
+                  {t("agent.profile.description")}
+                </label>
+                <Textarea
+                  className="text-sm min-h-[80px]"
+                  placeholder={t("agent.profile.description-placeholder")}
+                  value={agentDescription}
+                  onChange={(e) => {
+                    setAgentDescription(e.target.value);
+                    setAddError("");
+                  }}
+                />
+              </div>
 
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium">

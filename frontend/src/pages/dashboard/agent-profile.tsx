@@ -126,6 +126,9 @@ export function AgentProfilePage() {
   >([]);
   const [personaDraft, setPersonaDraft] = useState("");
   const [personaEditing, setPersonaEditing] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [descriptionEditing, setDescriptionEditing] = useState(false);
+  const [savingDescription, setSavingDescription] = useState(false);
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
@@ -381,6 +384,9 @@ export function AgentProfilePage() {
     setCustomEnvEntries(next.customEnvEntries);
     setPersonaDraft(cfg?.personaPrompt ?? "");
     setPersonaEditing(false);
+    setDescriptionDraft(agent?.description ?? "");
+    setDescriptionEditing(false);
+    setSavingDescription(false);
     setSaveStatus("idle");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent?.name]);
@@ -647,6 +653,28 @@ export function AgentProfilePage() {
     );
   }
 
+  // Save the public description via UpdateAgent, then refetch the agent and the
+  // roster so pickers/rosters show the updated intro.
+  async function saveDescription() {
+    if (!canEdit) return;
+    setSavingDescription(true);
+    try {
+      const updateAgent = useAppStore.getState().updateAgent;
+      await updateAgent(agentName, { description: descriptionDraft.trim() });
+      setAgent(await getAgent(agentName));
+      fetchAgents({ pageSize: 100 }, { silent: true });
+      setDescriptionEditing(false);
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("agent.profile.description-save-failed"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setSavingDescription(false);
+    }
+  }
+
   // Toggle allow_add_to_channel via UpdateAgent, then refetch the agent and the
   // roster so the member picker (which filters on this flag) reflects it.
   async function handleToggleAllowAdd(next: boolean) {
@@ -857,6 +885,70 @@ export function AgentProfilePage() {
                   </Field>
                 )}
               </dl>
+
+              {/* Public description */}
+              <div className="flex flex-col gap-1 pt-2 border-t border-control-border">
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-semibold uppercase tracking-widest text-control-light">
+                    {t("agent.profile.description")}
+                  </div>
+                  {!descriptionEditing && (
+                    <button
+                      type="button"
+                      aria-label={t("agent.profile.edit-description")}
+                      title={t("agent.profile.edit-description")}
+                      className="text-control-light hover:text-control transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={!canEdit}
+                      onClick={() => setDescriptionEditing(true)}
+                    >
+                      <Pencil className="size-3" />
+                    </button>
+                  )}
+                </div>
+                {descriptionEditing ? (
+                  <div className="flex flex-col gap-2">
+                    <Textarea
+                      className="text-sm min-h-[100px]"
+                      placeholder={t("agent.profile.description-placeholder")}
+                      value={descriptionDraft}
+                      onChange={(e) => setDescriptionDraft(e.target.value)}
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        disabled={!canEdit || savingDescription}
+                        onClick={saveDescription}
+                      >
+                        {savingDescription ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          t("common.save")
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setDescriptionDraft(agent?.description ?? "");
+                          setDescriptionEditing(false);
+                        }}
+                      >
+                        {t("common.cancel")}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-main whitespace-pre-wrap">
+                    {descriptionDraft.trim() ? (
+                      descriptionDraft
+                    ) : (
+                      <span className="italic text-control-light">
+                        {t("agent.profile.description-empty")}
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
 
               {/* Persona prompt */}
               <div className="flex flex-col gap-1 pt-2 border-t border-control-border">

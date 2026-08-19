@@ -205,10 +205,10 @@ export function MentionDetailSheet({
                           {agent.info.version}
                         </DetailRow>
                       )}
-                      {agent.info?.acpConfig?.personaPrompt && (
-                        <DetailRow label="Persona">
+                      {agent.description && (
+                        <DetailRow label="Description">
                           <span className="whitespace-pre-wrap">
-                            {agent.info.acpConfig.personaPrompt}
+                            {agent.description}
                           </span>
                         </DetailRow>
                       )}

@@ -2684,9 +2684,15 @@ type Agent struct {
 	// "@" to mention or DM this agent, and the name of its workspace directory
 	// (~/.laelia/<machine>/<handle>/). Always populated; mirror of
 	// agent.resource_id.
-	Handle             string                 `protobuf:"bytes,22,opt,name=handle,proto3" json:"handle,omitempty"`
-	State              State                  `protobuf:"varint,2,opt,name=state,proto3,enum=laelia.v1.State" json:"state,omitempty"`
-	Title              string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Handle string `protobuf:"bytes,22,opt,name=handle,proto3" json:"handle,omitempty"`
+	State  State  `protobuf:"varint,2,opt,name=state,proto3,enum=laelia.v1.State" json:"state,omitempty"`
+	Title  string `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	// description is a short, public intro for this agent shown to other users
+	// and agents (who this agent is, what it is responsible for, its role). It is
+	// intentionally NOT injected into the agent's own prompt — persona_prompt is
+	// the private self prompt that defines the agent to itself and is hidden from
+	// non-owners/non-admins.
+	Description        string                 `protobuf:"bytes,24,opt,name=description,proto3" json:"description,omitempty"`
 	Info               *AgentInfo             `protobuf:"bytes,5,opt,name=info,proto3" json:"info,omitempty"`
 	Status             *AgentStatus           `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
 	CreatedAt          *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
@@ -2812,6 +2818,13 @@ func (x *Agent) GetState() State {
 func (x *Agent) GetTitle() string {
 	if x != nil {
 		return x.Title
+	}
+	return ""
+}
+
+func (x *Agent) GetDescription() string {
+	if x != nil {
+		return x.Description
 	}
 	return ""
 }
@@ -2959,10 +2972,14 @@ type AgentSummary struct {
 	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// handle is the agent's readable id ("rei-agent-1"), the {agent} segment of
 	// name. See Agent.handle. Always populated.
-	Handle string       `protobuf:"bytes,14,opt,name=handle,proto3" json:"handle,omitempty"`
-	State  State        `protobuf:"varint,2,opt,name=state,proto3,enum=laelia.v1.State" json:"state,omitempty"`
-	Title  string       `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
-	Status *AgentStatus `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	Handle string `protobuf:"bytes,14,opt,name=handle,proto3" json:"handle,omitempty"`
+	State  State  `protobuf:"varint,2,opt,name=state,proto3,enum=laelia.v1.State" json:"state,omitempty"`
+	Title  string `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	// description is the public agent intro surfaced in list views, member
+	// pickers, and rosters so other users/agents know what this agent is for.
+	// See Agent.description.
+	Description string       `protobuf:"bytes,16,opt,name=description,proto3" json:"description,omitempty"`
+	Status      *AgentStatus `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
 	// provider/executable mirror acp_config.provider/executable on the full
 	// Agent, surfaced top-level so list consumers don't pull in AgentInfo.
 	Provider   string `protobuf:"bytes,5,opt,name=provider,proto3" json:"provider,omitempty"`
@@ -3052,6 +3069,13 @@ func (x *AgentSummary) GetState() State {
 func (x *AgentSummary) GetTitle() string {
 	if x != nil {
 		return x.Title
+	}
+	return ""
+}
+
+func (x *AgentSummary) GetDescription() string {
+	if x != nil {
+		return x.Description
 	}
 	return ""
 }
@@ -4046,12 +4070,13 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\fHelloRequest\"Y\n" +
 	"\rHelloResponse\x12!\n" +
 	"\fcurrent_time\x18\x01 \x01(\x03R\vcurrentTime\x12%\n" +
-	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\xf1\a\n" +
+	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\x93\b\n" +
 	"\x05Agent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
 	"\x06handle\x18\x16 \x01(\tB\x03\xe0A\x03R\x06handle\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
-	"\x05title\x18\x03 \x01(\tR\x05title\x12(\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12 \n" +
+	"\vdescription\x18\x18 \x01(\tR\vdescription\x12(\n" +
 	"\x04info\x18\x05 \x01(\v2\x14.laelia.v1.AgentInfoR\x04info\x12.\n" +
 	"\x06status\x18\x06 \x01(\v2\x16.laelia.v1.AgentStatusR\x06status\x129\n" +
 	"\n" +
@@ -4078,12 +4103,13 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:!\xeaA\x1e\n" +
-	"\flaelia/Agent\x12\x0eagents/{agent}J\x04\b\x04\x10\x05R\x05token\"\xfa\x03\n" +
+	"\flaelia/Agent\x12\x0eagents/{agent}J\x04\b\x04\x10\x05R\x05token\"\x9c\x04\n" +
 	"\fAgentSummary\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06handle\x18\x0e \x01(\tR\x06handle\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
-	"\x05title\x18\x03 \x01(\tR\x05title\x12.\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12 \n" +
+	"\vdescription\x18\x10 \x01(\tR\vdescription\x12.\n" +
 	"\x06status\x18\x04 \x01(\v2\x16.laelia.v1.AgentStatusR\x06status\x12\x1a\n" +
 	"\bprovider\x18\x05 \x01(\tR\bprovider\x12\x1e\n" +
 	"\n" +

@@ -33,7 +33,7 @@ func TestListPeerAgentsRendersRoster(t *testing.T) {
 			Name:            "agents/rei-agent-1",
 			Handle:          "rei-agent-1",
 			DisplayName:     "rei",
-			PersonaPrompt:   "精通后端, 专注构建 agent。\n前端任务请转给 @ui-expert。",
+			Description:     "精通后端, 专注构建 agent。\n前端任务请转给 @ui-expert。",
 			ConnectionState: v1pb.AgentStatus_ONLINE,
 			Enabled:         true,
 		},
@@ -41,7 +41,7 @@ func TestListPeerAgentsRendersRoster(t *testing.T) {
 			Name:            "agents/ui-expert-agent-1",
 			Handle:          "ui-expert-agent-1",
 			DisplayName:     "ui-expert",
-			PersonaPrompt:   "",
+			Description:     "",
 			ConnectionState: v1pb.AgentStatus_OFFLINE,
 			Enabled:         true,
 		},
@@ -49,7 +49,7 @@ func TestListPeerAgentsRendersRoster(t *testing.T) {
 			Name:            "agents/archived-agent-1",
 			Handle:          "archived-agent-1",
 			DisplayName:     "archived",
-			PersonaPrompt:   "",
+			Description:     "",
 			ConnectionState: v1pb.AgentStatus_STOPPED,
 			Enabled:         false,
 		},
@@ -59,11 +59,11 @@ func TestListPeerAgentsRendersRoster(t *testing.T) {
 	require.NoError(t, err)
 	// Header carries the count.
 	assert.Contains(t, out, "Peer agents (3):")
-	// rei: handle + online state, then the full (multi-line, untruncated) persona.
+	// rei: handle + online state, then the full (multi-line, untruncated) public description.
 	assert.Contains(t, out, "- [agent] rei @rei-agent-1 (online)")
 	assert.Contains(t, out, "  精通后端, 专注构建 agent。")
 	assert.Contains(t, out, "  前端任务请转给 @ui-expert。")
-	// ui-expert: no persona → no indented block; offline state.
+	// ui-expert: no description → no indented block; offline state.
 	assert.Contains(t, out, "- [agent] ui-expert @ui-expert-agent-1 (offline)")
 	// archived: stopped state carries an explicit do-not-delegate hint.
 	assert.Contains(t, out, "- [agent] archived @archived-agent-1 (stopped)")

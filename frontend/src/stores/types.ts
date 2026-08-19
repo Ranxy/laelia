@@ -219,24 +219,27 @@ export interface AgentSlice {
   // agent profile; when omitted the agent is created with the server default.
   // allowAddToChannel controls whether other users may add this agent to a
   // channel; when false (default) only the agent's owner or a workspace admin
-  // may add it.
+  // may add it. description is the public agent intro shown to other
+  // users/agents (not injected into the agent's own prompt).
   createAgent: (
     title: string,
     machine: string,
     acpConfig?: AgentACPConfigInput,
     labels?: Record<string, string>,
-    allowAddToChannel?: boolean
+    allowAddToChannel?: boolean,
+    description?: string
   ) => Promise<CreateAgentResponse>;
-  // updateAgent patches the agent's mutable flag fields (allow_add_to_channel,
-  // follow_owner_permissions, can_manage_channel_members); only the keys present
-  // in `fields` are sent. Authorized server-side for the agent's owner or a
-  // workspace admin.
+  // updateAgent patches the agent's mutable fields (allow_add_to_channel,
+  // follow_owner_permissions, can_manage_channel_members, description); only the
+  // keys present in `fields` are sent. Authorized server-side for the agent's
+  // owner or a workspace admin.
   updateAgent: (
     name: string,
     fields: {
       allowAddToChannel?: boolean;
       followOwnerPermissions?: boolean;
       canManageChannelMembers?: boolean;
+      description?: string;
     }
   ) => Promise<Agent>;
   deleteAgent: (name: string) => Promise<void>;

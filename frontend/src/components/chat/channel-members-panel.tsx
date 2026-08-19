@@ -524,6 +524,11 @@ function ChannelMemberRow({
             </span>
           )}
         </div>
+        {isAgent && member.description && (
+          <p className="mt-1 truncate text-xs text-control-light">
+            {member.description}
+          </p>
+        )}
       </div>
       {/* DMs have fixed membership (user + agent); only channel owners can
           remove members. */}

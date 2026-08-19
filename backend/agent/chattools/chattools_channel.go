@@ -28,8 +28,8 @@ const (
 // ListMembersInput scopes the roster lookup: a conversation, and optionally a
 // thread root. With Root empty the roster is the conversation's members; with
 // Root set it is the distinct senders of that thread (root + replies). One tool,
-// one call — the agent perceives who is present and each co-agent's full persona
-// in a single lookup.
+// one call — the agent perceives who is present and each co-agent's public
+// description in a single lookup.
 type ListMembersInput struct {
 	Conversation string `json:"conversation"`
 	// Root is an optional thread-root message id; when set, the roster is the
@@ -79,10 +79,12 @@ func preferredLanguageString(l v1pb.PreferredLanguage) string {
 
 // formatMemberLine renders one roster entry: the header line (type, display
 // name, @<handle> mention token for every member, role when meaningful),
-// followed by the member's full description as an indented block when present —
-// for users this is their self-description, for agents it is the complete
-// persona_prompt. The full text is emitted untruncated so the agent gets every
-// co-agent's persona in the one call that produced this roster.
+// followed by the member's full public description as an indented block when
+// present — for users this is their self-description, for agents it is
+// Agent.description (the public intro). The agent's private persona_prompt is
+// never exposed in rosters. The full text is emitted untruncated so the agent
+// gets every co-agent's public description in the one call that produced this
+// roster.
 //
 // The @<handle> token is shown for ALL members (users and agents alike) and is
 // the exact text to copy into a reply to mention that member. Before the
@@ -124,10 +126,11 @@ func formatMemberLine(m *v1pb.ChannelMember) string {
 // --- Members operation ----------------------------------------------------
 
 // ListMembers returns the roster of a conversation's members (or, with Root, the
-// distinct senders of a thread), each with their full description inline — for
-// users their self-description, for agents their complete persona_prompt. Run
-// this before deciding whom to @mention so the addressing is grounded in who is
-// present, each person's role, and each co-agent's persona, all in one call.
+// distinct senders of a thread), each with their full public description inline
+// — for users their self-description, for agents Agent.description (the public
+// intro). Run this before deciding whom to @mention so the addressing is
+// grounded in who is present, each person's role, and each co-agent's public
+// description, all in one call.
 //
 // The agent only writes @<handle> in its reply content; the manager resolves
 // the token to the member.

@@ -1087,8 +1087,8 @@ func (s *Server) handleFileList(w http.ResponseWriter, r *http.Request) {
 
 // handleMembers serves the single roster tool: conversation members when Root is
 // empty, thread participants when Root is set. Each entry carries the member's
-// full description inline, so the agent perceives who is present and each
-// co-agent's persona in one call.
+// public description inline, so the agent perceives who is present and each
+// co-agent's public description in one call.
 func (s *Server) handleMembers(w http.ResponseWriter, r *http.Request) {
 	s.run(w, r, func(req Request) (string, *chattools.Error) {
 		text, err := chattools.ListMembers(r.Context(), s.deps(req), chattools.ListMembersInput{
@@ -1100,9 +1100,9 @@ func (s *Server) handleMembers(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleAgentList serves the global peer-agent roster: every other agent with
-// its display name, agents/<id> handle, connection state, and full persona. It
-// is the discovery tool the agent uses before delegating to a peer via
-// `message send dm:@<peer>`.
+// its display name, agents/<id> handle, connection state, and public
+// description. It is the discovery tool the agent uses before delegating to a
+// peer via `message send dm:@<peer>`.
 func (s *Server) handleAgentList(w http.ResponseWriter, r *http.Request) {
 	s.run(w, r, func(req Request) (string, *chattools.Error) {
 		text, err := chattools.ListPeerAgents(r.Context(), s.deps(req), chattools.ListPeerAgentsInput{})
