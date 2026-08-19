@@ -228,8 +228,8 @@ func TestBuildGlobalMentionIndex(t *testing.T) {
 func TestBuildMentionsWithDisplayNames(t *testing.T) {
 	// Unique display names are shown as-is.
 	got := buildMentionsWithDisplayNames([]mentionCandidate{
-		{Type: "agent", Id: "jet-agent-1", DisplayName: "jet"},
-		{Type: "user", Id: "ran-user-1", DisplayName: "Ran"},
+		{Type: "agent", ID: "jet-agent-1", DisplayName: "jet"},
+		{Type: "user", ID: "ran-user-1", DisplayName: "Ran"},
 	})
 	assert.Len(t, got, 2)
 	assert.Equal(t, "jet", got[0].Name)
@@ -237,8 +237,8 @@ func TestBuildMentionsWithDisplayNames(t *testing.T) {
 
 	// Two different ids sharing a display name fall back to handles.
 	ambiguous := buildMentionsWithDisplayNames([]mentionCandidate{
-		{Type: "agent", Id: "jane-agent-1", DisplayName: "jane"},
-		{Type: "agent", Id: "jane-agent-2", DisplayName: "jane"},
+		{Type: "agent", ID: "jane-agent-1", DisplayName: "jane"},
+		{Type: "agent", ID: "jane-agent-2", DisplayName: "jane"},
 	})
 	assert.Len(t, ambiguous, 2)
 	assert.Equal(t, "jane-agent-1", ambiguous[0].Name)
@@ -246,7 +246,7 @@ func TestBuildMentionsWithDisplayNames(t *testing.T) {
 
 	// Empty display name falls back to the handle.
 	empty := buildMentionsWithDisplayNames([]mentionCandidate{
-		{Type: "agent", Id: "x-agent-1", DisplayName: ""},
+		{Type: "agent", ID: "x-agent-1", DisplayName: ""},
 	})
 	assert.Len(t, empty, 1)
 	assert.Equal(t, "x-agent-1", empty[0].Name)

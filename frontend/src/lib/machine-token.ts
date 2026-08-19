@@ -11,7 +11,8 @@ export function machineInstallOSFromInfo(
   if (!os) return undefined;
   const normalized = os.toLowerCase();
   if (normalized.includes("win")) return "windows";
-  if (normalized.includes("darwin") || normalized.includes("mac")) return "macos";
+  if (normalized.includes("darwin") || normalized.includes("mac"))
+    return "macos";
   if (normalized.includes("linux")) return "linux";
   return undefined;
 }

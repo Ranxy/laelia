@@ -381,9 +381,7 @@ export function MachineProfilePage() {
   // install command depends on the machine's reported OS, while the setup
   // command is the same everywhere.
   const installOS = machineInstallOSFromInfo(info?.os);
-  const installCommand = installOS
-    ? buildMachineInstallCommand(installOS)
-    : "";
+  const installCommand = installOS ? buildMachineInstallCommand(installOS) : "";
   const setupCommand = buildMachineSetupCommand();
   const isOffline =
     machine.status?.state === MachineStatus_ConnectionState.OFFLINE;

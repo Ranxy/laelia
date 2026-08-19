@@ -235,9 +235,7 @@ describe("splitByMentions handle + display-name from one Mention", () => {
   });
 
   it("renders both forms through contentWithMentionTags", () => {
-    expect(
-      contentWithMentionTags("talk to @jet-agent-1 or @jet", [jet])
-    ).toBe(
+    expect(contentWithMentionTags("talk to @jet-agent-1 or @jet", [jet])).toBe(
       'talk to <mention type="agent" id="jet-agent-1" name="jet">@jet</mention> or <mention type="agent" id="jet-agent-1" name="jet">@jet</mention>'
     );
   });

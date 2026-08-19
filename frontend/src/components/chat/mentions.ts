@@ -189,8 +189,6 @@ export function contentWithMentionTags(
 ): string {
   if (mentions.length === 0) return content;
   return splitByMentions(content, mentions)
-    .map((seg) =>
-      seg.mention ? mentionTagMarkdown(seg.mention) : seg.text
-    )
+    .map((seg) => (seg.mention ? mentionTagMarkdown(seg.mention) : seg.text))
     .join("");
 }

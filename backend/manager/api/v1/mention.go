@@ -18,7 +18,7 @@ import (
 // display name.
 type mentionCandidate struct {
 	Type        string
-	Id          string
+	ID          string
 	DisplayName string
 }
 
@@ -105,7 +105,7 @@ func (s *CommandService) parseContentMentions(ctx context.Context, convID uuid.U
 		if displayName == "" {
 			displayName = mID
 		}
-		candidates = append(candidates, mentionCandidate{Type: mType, Id: mID, DisplayName: displayName})
+		candidates = append(candidates, mentionCandidate{Type: mType, ID: mID, DisplayName: displayName})
 	}
 
 	for _, token := range tokenizeMentions(content) {
@@ -165,7 +165,7 @@ func buildMentionsWithDisplayNames(candidates []mentionCandidate) []*v1pb.Mentio
 	for _, c := range candidates {
 		displayName := c.DisplayName
 		if displayName == "" {
-			displayName = c.Id
+			displayName = c.ID
 		}
 		nameCounts[normalizeMentionName(displayName)]++
 	}
@@ -173,15 +173,15 @@ func buildMentionsWithDisplayNames(candidates []mentionCandidate) []*v1pb.Mentio
 	for _, c := range candidates {
 		displayName := c.DisplayName
 		if displayName == "" {
-			displayName = c.Id
+			displayName = c.ID
 		}
 		name := displayName
 		if nameCounts[normalizeMentionName(displayName)] > 1 {
-			name = c.Id
+			name = c.ID
 		}
 		mentions = append(mentions, &v1pb.Mention{
 			Type: c.Type,
-			Id:   c.Id,
+			Id:   c.ID,
 			// Name is the display text shown in the badge. It is normally the
 			// member's display name; when two mentioned members share a display
 			// name it is the handle instead, so the UI can disambiguate. The
