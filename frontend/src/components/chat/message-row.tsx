@@ -1,4 +1,9 @@
-import { ArrowUp, ChevronRight, MessageCircleReply } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronRight,
+  Loader2,
+  MessageCircleReply,
+} from "lucide-react";
 import MarkdownRender from "markstream-react";
 import {
   memo,
@@ -506,6 +511,12 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
             <span className="text-xs text-control-placeholder">
               {formatTime(msg.timestamp, i18n.language)}
             </span>
+            {msg.sending && (
+              <span className="flex items-center gap-1 text-[10px] text-control-placeholder">
+                <Loader2 className="size-3 animate-spin" />
+                {t("chat.sending")}
+              </span>
+            )}
             {!isUser && msg.status !== undefined && !isStreaming && (
               <CommandStatusBadge
                 status={msg.status}
@@ -657,6 +668,23 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
           {msg.attachments && msg.attachments.length > 0 && (
             <div className="flex flex-col gap-1">
               {msg.attachments.map((att) => {
+                // While a file is still uploading, show its progress inline in
+                // the message instead of the final file/image card.
+                const uploadProgress = msg.uploadProgress?.[att.id];
+                if (uploadProgress !== undefined) {
+                  return (
+                    <div
+                      key={att.id}
+                      className="flex items-center gap-2 rounded-lg border border-control-border bg-control-bg/40 px-3 py-2 text-xs text-main"
+                    >
+                      <Loader2 className="size-3.5 animate-spin text-control-light" />
+                      <span className="max-w-[160px] truncate">{att.name}</span>
+                      <span className="text-control-placeholder">
+                        {uploadProgress}%
+                      </span>
+                    </div>
+                  );
+                }
                 // An attachment carrying a section anchor is a comment on a
                 // span of a file, not a whole-file upload — render the anchor
                 // + quote inline instead of a FileCard.

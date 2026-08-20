@@ -134,7 +134,8 @@ export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
     rootMessageId,
     content,
     mentions,
-    attachments
+    attachments,
+    optimisticId?
   ) {
     const conversationName = `conversations/${conversationId}`;
     const res = await commandServiceClient.sendMessage(
@@ -147,22 +148,25 @@ export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
       })
     );
     const chatMsg: ChatMessageUI = toUiMessage(res);
-    set((state) => ({
-      threadByRoot: {
-        ...state.threadByRoot,
-        [rootMessageId]: {
-          ...(state.threadByRoot[rootMessageId] ?? {
-            messages: [],
-            currentVersion: 0n,
-            loading: false,
-          }),
-          messages: appendNewMessages(
-            state.threadByRoot[rootMessageId]?.messages ?? [],
-            [chatMsg]
-          ),
+    set((state) => {
+      const current = state.threadByRoot[rootMessageId]?.messages ?? [];
+      const withoutOptimistic = optimisticId
+        ? current.filter((m) => m.id !== optimisticId)
+        : current;
+      return {
+        threadByRoot: {
+          ...state.threadByRoot,
+          [rootMessageId]: {
+            ...(state.threadByRoot[rootMessageId] ?? {
+              messages: [],
+              currentVersion: 0n,
+              loading: false,
+            }),
+            messages: appendNewMessages(withoutOptimistic, [chatMsg]),
+          },
         },
-      },
-    }));
+      };
+    });
     // Optimistically bump the root's reply count in the main channel list so the
     // "N replies" badge updates instantly. The thread watcher's next poll
     // replaces it with the authoritative count from the backend.

@@ -259,7 +259,8 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
     content,
     mentions,
     attachments,
-    asTask
+    asTask,
+    optimisticId?
   ) {
     const conversationName = `conversations/${conversationId}`;
     const res = await commandServiceClient.sendMessage(
@@ -277,29 +278,34 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
     // before the send response; both carry the same server id, and an
     // unconditional append would show the message twice. appendNewMessages
     // keeps the first copy and skips the duplicate.
-    set((state) => ({
-      chatMessages: {
-        ...state.chatMessages,
-        [conversationName]: appendNewMessages(
-          state.chatMessages[conversationName] ?? [],
-          [chatMsg]
+    set((state) => {
+      const current = state.chatMessages[conversationName] ?? [];
+      // Drop the optimistic placeholder (if any) so the committed server
+      // message replaces it instead of showing a duplicate.
+      const withoutOptimistic = optimisticId
+        ? current.filter((m) => m.id !== optimisticId)
+        : current;
+      return {
+        chatMessages: {
+          ...state.chatMessages,
+          [conversationName]: appendNewMessages(withoutOptimistic, [chatMsg]),
+        },
+        // Refresh the left-rail last-message preview optimistically so the
+        // just-sent message shows up immediately; the 5s fetchChannels poll
+        // reconciles the server-side truncation.
+        channels: state.channels.map((c) =>
+          c.name === conversationName
+            ? {
+                ...c,
+                lastMessage: listPreview(content),
+                lastMessageSender: chatMsg.senderName ?? "",
+                lastMessagePrincipalId: chatMsg.principalId ?? "",
+                lastMessageAt: timestampFromDate(chatMsg.timestamp),
+              }
+            : c
         ),
-      },
-      // Refresh the left-rail last-message preview optimistically so the
-      // just-sent message shows up immediately; the 5s fetchChannels poll
-      // reconciles the server-side truncation.
-      channels: state.channels.map((c) =>
-        c.name === conversationName
-          ? {
-              ...c,
-              lastMessage: listPreview(content),
-              lastMessageSender: chatMsg.senderName ?? "",
-              lastMessagePrincipalId: chatMsg.principalId ?? "",
-              lastMessageAt: timestampFromDate(chatMsg.timestamp),
-            }
-          : c
-      ),
-    }));
+      };
+    });
 
     // Agent replies arrive asynchronously on the agent's bidi stream; the
     // frontend has no push channel, so the persistent watcher started by the

@@ -1,3 +1,4 @@
+import { create } from "@bufbuild/protobuf";
 import {
   ArrowDown,
   Bot,
@@ -46,7 +47,7 @@ import {
 } from "@/composables/useMentionTargets";
 import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
-import { uploadFileToConversation } from "@/lib/file-upload";
+import { MAX_UPLOAD_BYTES, uploadFileToConversation } from "@/lib/file-upload";
 import { isImageAttachment } from "@/lib/image-file";
 import "@/lib/markdown";
 import { toastManager } from "@/lib/toast";
@@ -61,6 +62,7 @@ import type {
   ChannelMember,
   Conversation,
 } from "@/types/proto-es/v1/command_pb";
+import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
 
 // Stable empty fallbacks so per-key selectors returning undefined for an
 // unloaded conversation don't mint a new array each run (which would defeat
@@ -75,6 +77,8 @@ interface UploadItem {
   id: string;
   name: string;
   progress: number;
+  file: File;
+  error?: string;
 }
 
 // DOM id of the mention popup listbox, used to wire the textarea's
@@ -255,6 +259,16 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // Uploads still in flight, stored as promises resolving to their Attachment
   // so handleSend can wait for them before composing the message.
   const inFlightUploadsRef = useRef<Promise<Attachment | null>[]>([]);
+  // Upload ids that have been adopted by an optimistic send; their completion
+  // must not re-add to the composer's pendingAttachments (already cleared).
+  const adoptedUploadIdsRef = useRef<Set<string>>(new Set());
+  // The optimistic message id currently being sent (if any), so in-flight
+  // upload progress can update the message bubble inline.
+  const activeOptimisticIdRef = useRef<string | null>(null);
+  // Re-entrancy guard for handleSend: the `sending` state updates asynchronously,
+  // so a fast double-click could otherwise start two sends (the second one with
+  // no in-flight uploads -> the file would be dropped).
+  const sendingRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastChannelRef = useRef<string | null>(null);
   const stickToBottomRef = useRef(true);
@@ -592,18 +606,13 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
       onProgress?: (progress: number) => void
     ): Promise<Attachment | null> => {
       if (!channelId) return null;
-      try {
-        return await uploadFileToConversation({
-          conversation: `conversations/${channelId}`,
-          originalName: file.name,
-          mimeType: file.type || "",
-          file,
-          onProgress: (p) => onProgress?.(p.percent),
-        });
-      } catch (err) {
-        console.error("file upload failed", err);
-        return null;
-      }
+      return uploadFileToConversation({
+        conversation: `conversations/${channelId}`,
+        originalName: file.name,
+        mimeType: file.type || "",
+        file,
+        onProgress: (p) => onProgress?.(p.percent),
+      });
     },
     [channelId]
   );
@@ -617,18 +626,68 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
       // blocks the main thread or requires reading the whole file into memory.
       const tasks = list.map((file) => {
         const id = `${file.name}-${Date.now()}-${Math.random()}`;
-        setUploads((prev) => [...prev, { id, name: file.name, progress: 0 }]);
+        // Reject oversized files immediately, before starting the upload, so
+        // the user sees a clear error instead of a mid-upload failure. The
+        // file is not added to the composer at all.
+        if (file.size > MAX_UPLOAD_BYTES) {
+          toastManager.add({ type: "error", title: t("chat.file-too-large") });
+          return Promise.resolve(null);
+        }
+        setUploads((prev) => [
+          ...prev,
+          { id, name: file.name, progress: 0, file },
+        ]);
         const task = uploadFile(file, (progress) => {
           setUploads((prev) =>
             prev.map((u) => (u.id === id ? { ...u, progress } : u))
           );
+          // If this upload was adopted by an optimistic send, mirror the
+          // progress into the message bubble in the chat list.
+          const optimisticId = activeOptimisticIdRef.current;
+          if (optimisticId && adoptedUploadIdsRef.current.has(id)) {
+            useAppStore.setState((state) => ({
+              chatMessages: {
+                ...state.chatMessages,
+                [conversationName]: (
+                  state.chatMessages[conversationName] ?? []
+                ).map((m) =>
+                  m.id === optimisticId
+                    ? {
+                        ...m,
+                        uploadProgress: {
+                          ...(m.uploadProgress ?? {}),
+                          [`pending-${id}`]: progress,
+                        },
+                      }
+                    : m
+                ),
+              },
+            }));
+          }
         })
           .then((att) => {
-            if (att) setPendingAttachments((prev) => [...prev, att]);
+            if (att && !adoptedUploadIdsRef.current.has(id)) {
+              setPendingAttachments((prev) => [...prev, att]);
+            }
             return att;
           })
+          .catch((err) => {
+            // Keep the failed upload visible with an error so it doesn't
+            // silently vanish; the user can dismiss it manually.
+            console.error("file upload failed", err);
+            const message =
+              err instanceof Error
+                ? err.message
+                : String(err ?? "upload failed");
+            setUploads((prev) =>
+              prev.map((u) => (u.id === id ? { ...u, error: message } : u))
+            );
+            return null;
+          })
           .finally(() => {
-            setUploads((prev) => prev.filter((u) => u.id !== id));
+            // Remove only successful uploads; failed ones stay visible so the
+            // user can see what went wrong.
+            setUploads((prev) => prev.filter((u) => u.id !== id || u.error));
           });
         inFlightUploadsRef.current.push(task);
         return task;
@@ -640,53 +699,145 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
-    if (sending || !channelId) return;
+    if (sendingRef.current || !channelId) return;
+    sendingRef.current = true;
 
-    let attachments = pendingAttachments;
-    // If files are still uploading, wait for them first so the message carries
-    // the attachments exactly as if they had finished before clicking send.
-    if (inFlightUploadsRef.current.length > 0) {
-      setSending(true);
-      const inflight = inFlightUploadsRef.current;
-      inFlightUploadsRef.current = [];
-      const results = await Promise.all(inflight);
-      const snapshot = pendingAttachments;
-      attachments = [
-        ...snapshot,
-        ...results.filter(
-          (a): a is Attachment =>
-            a !== null && !snapshot.some((p) => p.id === a.id)
-        ),
-      ];
-      setPendingAttachments(attachments);
+    const completedAttachments = pendingAttachments;
+    const inFlight = inFlightUploadsRef.current;
+    const hasInFlight = inFlight.length > 0;
+    const tempId = crypto.randomUUID();
+
+    // Build the optimistic message: completed attachments plus temp
+    // placeholders for files still uploading, so the whole message (text +
+    // files) appears in the chat immediately with a "sending" state.
+    const tempAttachments: Attachment[] = [
+      ...completedAttachments,
+      ...uploads.map((u) =>
+        create(AttachmentSchema, {
+          id: `pending-${u.id}`,
+          name: u.name,
+          mimeType: u.file.type || "",
+          sizeBytes: BigInt(u.file.size),
+        })
+      ),
+    ];
+    const uploadProgress: Record<string, number> = {};
+    for (const u of uploads) {
+      uploadProgress[`pending-${u.id}`] = u.progress;
     }
 
-    if (!text && attachments.length === 0) {
-      setSending(false);
-      return;
-    }
-    const sendAsTask = asTask;
+    const optimisticMsg: ChatMessageUI = {
+      id: tempId,
+      role: "user",
+      content: text,
+      timestamp: new Date(),
+      attachments: tempAttachments,
+      sending: true,
+      uploadProgress: hasInFlight ? uploadProgress : undefined,
+    };
+
+    // Append the optimistic message immediately so the user sees it sending.
+    useAppStore.setState((state) => ({
+      chatMessages: {
+        ...state.chatMessages,
+        [conversationName]: [
+          ...(state.chatMessages[conversationName] ?? []),
+          optimisticMsg,
+        ],
+      },
+    }));
+
+    // Clear the composer right away so the user can start typing the next
+    // message while uploads continue in the background.
     setInput("");
     setMentionState(null);
     setPendingAttachments([]);
     setAsTask(false);
     setSending(true);
+    activeOptimisticIdRef.current = tempId;
+
+    // Adopt in-flight uploads: their completion updates the optimistic
+    // message, not the (now cleared) composer pending list.
+    for (const u of uploads) adoptedUploadIdsRef.current.add(u.id);
+    inFlightUploadsRef.current = [];
+    // The uploads are now represented inside the optimistic message; clear the
+    // composer's progress chips so they don't show twice.
+    setUploads([]);
+
+    let finalAttachments = completedAttachments;
+    if (hasInFlight) {
+      const results = await Promise.all(inFlight);
+      const uploaded = results.filter((a): a is Attachment => a !== null);
+      // Dedupe by id: an upload that finished just before send may already be
+      // in completedAttachments AND in the resolved in-flight results.
+      finalAttachments = [
+        ...new Map(
+          [...completedAttachments, ...uploaded].map((a) => [a.id, a])
+        ).values(),
+      ];
+
+      // Replace temp placeholders with the real attachments in the message.
+      useAppStore.setState((state) => ({
+        chatMessages: {
+          ...state.chatMessages,
+          [conversationName]: (state.chatMessages[conversationName] ?? []).map(
+            (m) =>
+              m.id === tempId
+                ? {
+                    ...m,
+                    attachments: finalAttachments,
+                    uploadProgress: undefined,
+                  }
+                : m
+          ),
+        },
+      }));
+    }
+
+    if (!text && finalAttachments.length === 0) {
+      // Nothing to send (e.g. all uploads failed) — remove the optimistic row.
+      useAppStore.setState((state) => ({
+        chatMessages: {
+          ...state.chatMessages,
+          [conversationName]: (
+            state.chatMessages[conversationName] ?? []
+          ).filter((m) => m.id !== tempId),
+        },
+      }));
+      setSending(false);
+      sendingRef.current = false;
+      activeOptimisticIdRef.current = null;
+      return;
+    }
+
+    const sendAsTask = asTask;
     const mentions = mentionMap.map(targetToMention);
     try {
       await sendChannelMessage(
         channelId,
         text,
         mentions,
-        attachments,
-        sendAsTask
+        finalAttachments,
+        sendAsTask,
+        tempId
       );
     } catch {
-      // send failed — restore the attachments (and the asTask toggle) so the
-      // user can retry.
-      setPendingAttachments(attachments);
+      // send failed — remove the optimistic row and restore the composer so
+      // the user can retry.
+      useAppStore.setState((state) => ({
+        chatMessages: {
+          ...state.chatMessages,
+          [conversationName]: (
+            state.chatMessages[conversationName] ?? []
+          ).filter((m) => m.id !== tempId),
+        },
+      }));
+      setPendingAttachments(finalAttachments);
       setAsTask(sendAsTask);
     } finally {
       setSending(false);
+      sendingRef.current = false;
+      activeOptimisticIdRef.current = null;
       // The textarea is disabled while sending, which drops focus; restore it
       // after the send settles so the user can keep typing.
       setTimeout(() => textareaRef.current?.focus(), 0);
@@ -695,9 +846,11 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     input,
     sending,
     channelId,
+    conversationName,
     mentionMap,
     sendChannelMessage,
     pendingAttachments,
+    uploads,
     asTask,
   ]);
 
@@ -1018,20 +1171,44 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                   >
                     {(pendingAttachments.length > 0 || uploads.length > 0) && (
                       <div className="flex flex-wrap gap-1.5 px-3 pt-2">
-                        {uploads.map((u) => (
-                          <span
-                            key={u.id}
-                            className="flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
-                          >
-                            <Loader2 className="size-3 animate-spin" />
-                            <span className="max-w-[120px] truncate">
-                              {u.name}
+                        {uploads.map((u) =>
+                          u.error ? (
+                            <span
+                              key={u.id}
+                              className="flex items-center gap-1.5 rounded-md border border-error/40 bg-error/5 px-2 py-1 text-xs text-error"
+                            >
+                              <span className="max-w-[120px] truncate">
+                                {u.name}
+                              </span>
+                              <span className="text-error/80">{u.error}</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setUploads((prev) =>
+                                    prev.filter((p) => p.id !== u.id)
+                                  )
+                                }
+                                className="text-error/60 hover:text-error transition-colors"
+                                aria-label={t("common.delete")}
+                              >
+                                <X className="size-3" />
+                              </button>
                             </span>
-                            <span className="text-control-placeholder">
-                              {u.progress}%
+                          ) : (
+                            <span
+                              key={u.id}
+                              className="flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
+                            >
+                              <Loader2 className="size-3 animate-spin" />
+                              <span className="max-w-[120px] truncate">
+                                {u.name}
+                              </span>
+                              <span className="text-control-placeholder">
+                                {u.progress}%
+                              </span>
                             </span>
-                          </span>
-                        ))}
+                          )
+                        )}
                         {pendingAttachments.map((att) =>
                           isImageAttachment(att) ? (
                             <div
@@ -1177,7 +1354,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                         setMentionState(state);
                         setMentionSelectedIndex(0);
                       }}
-                      disabled={sending}
                     />
                     <div className="flex items-center justify-between px-3 pb-2">
                       <div className="flex items-center gap-2">

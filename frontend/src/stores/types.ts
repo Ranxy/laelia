@@ -86,6 +86,13 @@ export interface ChatMessageUI {
   // caller-relative `reacted` flag (whether the current user reacted). Drives
   // the reaction bar under the message; empty/absent when there are none.
   reactions?: Reaction[];
+  // sending marks a locally-created optimistic message that is still being
+  // uploaded/sent. The UI shows a "sending" indicator and, while files are
+  // still uploading, per-attachment progress from uploadProgress.
+  sending?: boolean;
+  // uploadProgress maps a pending attachment's id to its upload percentage
+  // (0-100). Only present on optimistic messages with in-flight files.
+  uploadProgress?: Record<string, number>;
 }
 
 // TaskInfoUI is the UI mirror of laelia.v1.TaskInfo attached to a task root
@@ -463,7 +470,8 @@ export interface ChannelSlice {
     content: string,
     mentions?: Mention[],
     attachments?: Attachment[],
-    asTask?: boolean
+    asTask?: boolean,
+    optimisticId?: string
   ) => Promise<ChatMessage>;
   fetchConversationActivity: (conversationId: string) => Promise<void>;
   startWatchingChannel: (conversationName: string) => void;
@@ -514,7 +522,8 @@ export interface ThreadSlice {
     rootMessageId: string,
     content: string,
     mentions?: Mention[],
-    attachments?: Attachment[]
+    attachments?: Attachment[],
+    optimisticId?: string
   ) => Promise<ChatMessage>;
 }
 

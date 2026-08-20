@@ -367,7 +367,9 @@
     "undo": "Undo",
     "view-details": "View details",
     "warning": "Warning",
-    "you": "You"
+    "you": "You",
+    "sending": "Sending",
+    "file-too-large": "File too large (max 512MB)"
   },
   "command": {
     "back": "Back",

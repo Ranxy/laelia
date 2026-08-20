@@ -21,10 +21,15 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
-// MaxUploadBytes caps a single uploaded/downloaded file. It bounds the in-memory
-// buffering the bytes-based file RPCs do and matches the connect.WithReadMaxBytes
-// limit applied to the handler.
+// MaxUploadBytes caps a single uploaded/downloaded file over the Connect RPC.
+// It bounds the in-memory buffering the bytes-based file RPCs do and matches
+// the connect.WithReadMaxBytes limit applied to the handler.
 const MaxUploadBytes = 100 * 1024 * 1024
+
+// MaxStreamUploadBytes caps a single file uploaded through the browser-facing
+// multipart route. That route streams the file to S3 without buffering it in
+// memory, so it can safely accept much larger files than the Connect RPC.
+const MaxStreamUploadBytes = 512 * 1024 * 1024
 
 // resolveFileCaller returns the user or agent making the call. The auth
 // interceptor injects exactly one of them (user token vs agent token); both nil
@@ -73,9 +78,6 @@ type UploadFileStreamInput struct {
 func (s *CommandService) UploadFileStream(ctx context.Context, in *UploadFileStreamInput) (*v1pb.File, error) {
 	if in.OriginalName == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("original_name is required"))
-	}
-	if in.SizeBytes > MaxUploadBytes {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("file too large"))
 	}
 
 	s3Cli, cfg, err := s.s3clientManager.Get(ctx)
@@ -178,6 +180,9 @@ func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1
 	user, agent, err := resolveFileCaller(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if int64(len(req.Msg.Data)) > MaxUploadBytes {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("file too large"))
 	}
 	mimeType := sniffMimeType(req.Msg.MimeType, req.Msg.Data)
 	file, err := s.UploadFileStream(ctx, &UploadFileStreamInput{

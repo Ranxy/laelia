@@ -2,6 +2,9 @@ import { create } from "@bufbuild/protobuf";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
 import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
 
+// Matches the backend's MaxStreamUploadBytes for the browser multipart route.
+export const MAX_UPLOAD_BYTES = 512 * 1024 * 1024;
+
 export interface UploadProgress {
   loaded: number;
   total: number;

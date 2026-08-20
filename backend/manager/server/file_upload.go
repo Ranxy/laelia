@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 
 	"connectrpc.com/connect"
@@ -22,7 +23,7 @@ func registerFileUploadRoute(
 	e.POST("/v1/files/upload", func(c *echo.Context) error {
 		// Cap the multipart body so a malicious client cannot stream an
 		// unbounded request; the per-file size is validated again below.
-		c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, apiv1.MaxUploadBytes+1024*1024)
+		c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, apiv1.MaxStreamUploadBytes+1024*1024)
 
 		ctx, err := authInterceptor.AuthenticateHTTP(c.Request().Context(), c.Request().Header, c.Request().RemoteAddr)
 		if err != nil {
@@ -31,7 +32,14 @@ func registerFileUploadRoute(
 
 		fileHeader, err := c.FormFile("file")
 		if err != nil {
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				return c.JSON(http.StatusRequestEntityTooLarge, map[string]string{"error": "file too large"})
+			}
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "missing file"})
+		}
+		if fileHeader.Size > apiv1.MaxStreamUploadBytes {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "file too large"})
 		}
 		file, err := fileHeader.Open()
 		if err != nil {

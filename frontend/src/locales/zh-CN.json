@@ -367,7 +367,9 @@
     "undo": "撤销",
     "view-details": "查看详情",
     "warning": "警告",
-    "you": "你"
+    "you": "你",
+    "sending": "发送中",
+    "file-too-large": "文件过大（最大 512MB）"
   },
   "command": {
     "back": "返回",
