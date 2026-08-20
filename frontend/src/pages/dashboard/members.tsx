@@ -1,5 +1,5 @@
 import { ChevronDown, Hash, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useMatch, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
@@ -31,8 +31,6 @@ export function MembersPage() {
   const loading = useAppStore((s) => s.membersLoading);
   const error = useAppStore((s) => s.membersError);
   const fetchMembers = useAppStore((s) => s.fetchMembers);
-  const machines = useAppStore((s) => s.machines);
-  const fetchMachines = useAppStore((s) => s.fetchMachines);
   const myChannels = useAppStore((s) => s.myChannels);
   const myChannelsLoading = useAppStore((s) => s.myChannelsLoading);
   const fetchMyChannels = useAppStore((s) => s.fetchMyChannels);
@@ -65,18 +63,6 @@ export function MembersPage() {
     const hasCached = useAppStore.getState().myChannels.length > 0;
     void fetchMyChannels({ silent: hasCached });
   }, [fetchMyChannels]);
-
-  // Load the machine roster so agent rows can show the owning machine's title
-  // (member.subtitle is the machine resource name machines/{id}).
-  useEffect(() => {
-    void fetchMachines({ pageSize: 100 });
-  }, [fetchMachines]);
-
-  const machineTitleByName = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const machine of machines) m.set(machine.name, machine.title);
-    return m;
-  }, [machines]);
 
   // Section collapse state is persisted to localStorage so folding choices
   // survive navigation and reloads. Defaults match the original first-visit
@@ -197,12 +183,6 @@ export function MembersPage() {
                         <MemberRow
                           key={member.name}
                           member={member}
-                          machineLabel={
-                            member.subtitle
-                              ? (machineTitleByName.get(member.subtitle) ??
-                                member.subtitle.replace(/^machines\//, ""))
-                              : ""
-                          }
                           selected={
                             selectedAgentId ===
                             member.name.replace(/^agents\//, "")
@@ -356,11 +336,9 @@ function SectionHeader({
 function MemberRow({
   member,
   selected,
-  machineLabel,
 }: {
   member: MemberSummary;
   selected: boolean;
-  machineLabel?: string;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -398,9 +376,9 @@ function MemberRow({
         <span className="truncate text-sm font-medium text-main">
           {member.title}
         </span>
-        {isAgent && machineLabel ? (
+        {isAgent && member.subtitle ? (
           <span className="truncate text-xs text-control-light">
-            {t("members.agent-subtitle", { machine: machineLabel })}
+            {member.subtitle}
           </span>
         ) : null}
       </div>

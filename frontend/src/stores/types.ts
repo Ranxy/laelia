@@ -320,7 +320,7 @@ export interface MachineSlice {
 
 // MemberSummary is one row in the flat Members directory: a human user or an
 // agent. Agents carry their connection state for a status dot; the subtitle is
-// the agent's owning machine resource name (or a user's email).
+// the agent's owner display name (or a user's email).
 export interface MemberSummary {
   kind: "user" | "agent";
   name: string;

@@ -618,7 +618,6 @@
   "members": {
     "add-agent": "Add agent",
     "add-human": "Invite human",
-    "agent-subtitle": "Machine: {{machine}}",
     "channel-not-found": "Channel not found.",
     "channels-empty": "No channels yet.",
     "human": {

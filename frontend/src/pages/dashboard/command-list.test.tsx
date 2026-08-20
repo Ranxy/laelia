@@ -38,7 +38,7 @@ function seedStore() {
         kind: "agent",
         name: "agents/a",
         title: "Agent A",
-        subtitle: "machines/m1",
+        subtitle: "Owner Name",
         connectionState: 2,
       },
     ],

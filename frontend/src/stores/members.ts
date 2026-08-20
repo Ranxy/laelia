@@ -51,6 +51,9 @@ export const createMembersSlice: AppSliceCreator<MembersSlice> = (
         return undefined;
       }
 
+      const userTitleByName = new Map(
+        users.map((u) => [u.name, u.title || u.email || u.name])
+      );
       const members = [
         ...users.map((u) => ({
           kind: "user" as const,
@@ -62,7 +65,9 @@ export const createMembersSlice: AppSliceCreator<MembersSlice> = (
           kind: "agent" as const,
           name: a.name,
           title: a.title || a.name,
-          subtitle: a.machine || "",
+          subtitle: a.owner
+            ? userTitleByName.get(a.owner) || a.owner.replace(/^users\//, "")
+            : "",
           connectionState: a.status?.state,
           enabled: a.enabled,
         })),

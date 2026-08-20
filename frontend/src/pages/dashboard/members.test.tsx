@@ -29,14 +29,14 @@ function seedStore() {
         kind: "agent",
         name: "agents/alpha",
         title: "Alpha Agent",
-        subtitle: "machines/m1",
+        subtitle: "Carol",
         connectionState: 2,
       },
       {
         kind: "agent",
         name: "agents/beta",
         title: "Beta Agent",
-        subtitle: "machines/m1",
+        subtitle: "Dave",
         connectionState: 1,
       },
       { kind: "user", name: "users/1", title: "Alice", subtitle: "" },
@@ -99,6 +99,8 @@ describe("MembersPage search", () => {
     expect(screen.getByText("Beta Agent")).toBeTruthy();
     expect(screen.getByText("Alice")).toBeTruthy();
     expect(screen.getByText("Bob")).toBeTruthy();
+    expect(screen.getByText("Carol")).toBeTruthy();
+    expect(screen.getByText("Dave")).toBeTruthy();
   });
 
   it("filters agents and humans by title, case-insensitively", () => {
@@ -155,6 +157,8 @@ describe("MembersPage search", () => {
     expect(screen.getByText("Beta Agent")).toBeTruthy();
     expect(screen.getByText("Alice")).toBeTruthy();
     expect(screen.getByText("Bob")).toBeTruthy();
+    expect(screen.getByText("Carol")).toBeTruthy();
+    expect(screen.getByText("Dave")).toBeTruthy();
   });
 });
 

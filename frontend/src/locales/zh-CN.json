@@ -618,7 +618,6 @@
   "members": {
     "add-agent": "添加 Agent",
     "add-human": "邀请成员",
-    "agent-subtitle": "机器:{{machine}}",
     "channel-not-found": "频道不存在。",
     "channels-empty": "还没有频道。",
     "human": {
