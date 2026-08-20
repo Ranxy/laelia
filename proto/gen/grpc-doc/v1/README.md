@@ -188,6 +188,7 @@
     - [ContextCompactionPayload](#laelia-v1-ContextCompactionPayload)
     - [ContextUsagePayload](#laelia-v1-ContextUsagePayload)
     - [Conversation](#laelia-v1-Conversation)
+    - [ConversationFile](#laelia-v1-ConversationFile)
     - [ConvertMessageToReminderRequest](#laelia-v1-ConvertMessageToReminderRequest)
     - [ConvertMessageToReminderResponse](#laelia-v1-ConvertMessageToReminderResponse)
     - [ConvertMessageToTaskRequest](#laelia-v1-ConvertMessageToTaskRequest)
@@ -3481,6 +3482,31 @@ window. usage_ratio is used/size.
 
 
 
+<a name="laelia-v1-ConversationFile"></a>
+
+### ConversationFile
+ConversationFile is a file attached to a conversation together with the
+message context that carried it. Message fields are empty when the file was
+uploaded but never attached to a message (e.g. an abandoned upload).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| file | [File](#laelia-v1-File) |  |  |
+| sender_name | [string](#string) |  | sender_name is the display name of the message sender. |
+| sender_type | [int32](#int32) |  | sender_type mirrors ChatMessage.sender_type: 1=USER, 2=AGENT, 3=SYSTEM. |
+| principal_id | [string](#string) |  | principal_id is the sender&#39;s mention handle (for user messages). |
+| message_content | [string](#string) |  | message_content is the text of the message that carried this file. |
+| message_created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | message_created_at is when the message was sent. |
+| message_id | [string](#string) |  | message_id is the bare UUID of the message that carried this file. |
+| agent_id | [string](#string) |  | agent_id is the agent resource id (&#34;agents/{id}&#34;) when the sender is an agent, empty otherwise. |
+| thread_root | [string](#string) |  | thread_root is the bare UUID of the thread root message when the carrying message is a thread reply, empty for a main-channel message. Used to open the same preview/comment context as the in-chat file card. |
+
+
+
+
+
+
 <a name="laelia-v1-ConvertMessageToReminderRequest"></a>
 
 ### ConvertMessageToReminderRequest
@@ -4422,6 +4448,7 @@ drain loop. The agent identity is resolved from the auth context.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | files | [File](#laelia-v1-File) | repeated |  |
+| conversation_files | [ConversationFile](#laelia-v1-ConversationFile) | repeated | conversation_files is the file list enriched with the message that carried each file (sender, send time, message content). It is the primary payload for the channel files drawer; `files` is retained for backward compatibility with existing consumers (e.g. the agent file-list tool). |
 
 
 

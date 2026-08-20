@@ -20,10 +20,12 @@ export function RemoteImage({
   attachment,
   variant,
   onClick,
+  className,
 }: {
   attachment: Attachment;
   variant: "thumb" | "inline";
   onClick?: () => void;
+  className?: string;
 }) {
   const { t } = useTranslation();
   const [url, setUrl] = useState<string | null>(null);
@@ -61,7 +63,8 @@ export function RemoteImage({
       <div
         className={cn(
           "size-16 shrink-0 overflow-hidden rounded-md border border-control-border bg-control-bg/40 flex items-center justify-center",
-          interactive && "cursor-pointer hover:border-accent"
+          interactive && "cursor-pointer hover:border-accent",
+          className
         )}
         onClick={onClick}
         role={interactive ? "button" : undefined}

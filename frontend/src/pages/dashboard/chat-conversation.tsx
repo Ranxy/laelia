@@ -3,6 +3,7 @@ import {
   ArrowDown,
   Bot,
   ExternalLink,
+  FolderOpen,
   Hash,
   ListTodo,
   Loader2,
@@ -16,6 +17,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
+import { ChannelFilesPanel } from "@/components/chat/channel-files-panel";
 import { ChannelMembersPanel } from "@/components/chat/channel-members-panel";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
@@ -286,6 +288,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   >({});
 
   const [membersOpen, setMembersOpen] = useState(false);
+  const [filesOpen, setFilesOpen] = useState(false);
   // When true the thread panel fills the whole chat area and the channel's own
   // message pane is hidden (see the ThreadPanel expand toggle).
   const [threadExpanded, setThreadExpanded] = useState(false);
@@ -1064,6 +1067,16 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
         <Button
           variant="ghost"
           size="sm"
+          onClick={() => setFilesOpen(true)}
+          aria-pressed={filesOpen}
+          className="flex items-center gap-1.5 px-2.5 py-1.5"
+        >
+          <FolderOpen className="size-4" />
+          <span className="hidden sm:inline">{t("channelFiles.title")}</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setMembersOpen(true)}
           className="flex items-center gap-1.5 px-2.5 py-1.5"
         >
@@ -1467,6 +1480,26 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
           />
         )}
       </div>
+
+      {/* Files Sheet */}
+      <Sheet
+        open={filesOpen}
+        onOpenChange={(open) => !open && setFilesOpen(false)}
+      >
+        <SheetContent width="medium">
+          <SheetBody className="flex flex-col gap-0 overflow-hidden p-0">
+            {channelId && (
+              <ChannelFilesPanel
+                channelId={channelId}
+                channelTitle={channel?.title ?? channelId ?? ""}
+                onClose={() => setFilesOpen(false)}
+                onPreviewAttachment={handlePreviewAttachment}
+                onPreviewImage={handlePreviewImage}
+              />
+            )}
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
 
       {/* Members Sheet */}
       <Sheet

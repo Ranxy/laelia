@@ -290,6 +290,19 @@
     "selected-count": "{{count}} selected",
     "unpin": "Unpin"
   },
+  "channelFiles": {
+    "close": "Close files",
+    "count": "{{count}} files",
+    "download": "Download",
+    "empty": "No files in this channel yet",
+    "no-results": "No files match “{{query}}”",
+    "preview": "Preview",
+    "preview-unsupported": "This file type is not supported for online preview",
+    "search-placeholder": "Search file name…",
+    "title": "Files",
+    "unknown-sender": "Unknown sender",
+    "unknown-time": "Unknown time"
+  },
   "channelTask": {
     "as-task": "As Task",
     "as-task-hint": "Send this message as a task agents can claim",
@@ -334,6 +347,7 @@
     "copy-markdown-success": "Markdown copied",
     "diff": "Diff",
     "empty": "Start a conversation with the agent",
+    "file-too-large": "File too large (max 512MB)",
     "input-not-captured": "Input not captured",
     "mention-group-agents": "Agents",
     "mention-group-users": "Users",
@@ -348,6 +362,7 @@
     "send-hint": "Enter to send · Shift+Enter for newline",
     "send-hint-inverted": "Shift+Enter to send · Enter for newline",
     "send-message": "Send message",
+    "sending": "Sending",
     "thread-beginning": "Beginning of replies",
     "thread-close": "Close thread",
     "thread-collapse": "Collapse thread",
@@ -367,9 +382,7 @@
     "undo": "Undo",
     "view-details": "View details",
     "warning": "Warning",
-    "you": "You",
-    "sending": "Sending",
-    "file-too-large": "File too large (max 512MB)"
+    "you": "You"
   },
   "command": {
     "back": "Back",

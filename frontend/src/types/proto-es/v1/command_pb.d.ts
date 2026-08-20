@@ -962,6 +962,16 @@ export declare type ListFilesResponse = Message<"laelia.v1.ListFilesResponse"> &
    * @generated from field: repeated laelia.v1.File files = 1;
    */
   files: File[];
+
+  /**
+   * conversation_files is the file list enriched with the message that carried
+   * each file (sender, send time, message content). It is the primary payload
+   * for the channel files drawer; `files` is retained for backward
+   * compatibility with existing consumers (e.g. the agent file-list tool).
+   *
+   * @generated from field: repeated laelia.v1.ConversationFile conversation_files = 2;
+   */
+  conversationFiles: ConversationFile[];
 };
 
 /**
@@ -969,6 +979,85 @@ export declare type ListFilesResponse = Message<"laelia.v1.ListFilesResponse"> &
  * Use `create(ListFilesResponseSchema)` to create a new message.
  */
 export declare const ListFilesResponseSchema: GenMessage<ListFilesResponse>;
+
+/**
+ * ConversationFile is a file attached to a conversation together with the
+ * message context that carried it. Message fields are empty when the file was
+ * uploaded but never attached to a message (e.g. an abandoned upload).
+ *
+ * @generated from message laelia.v1.ConversationFile
+ */
+export declare type ConversationFile = Message<"laelia.v1.ConversationFile"> & {
+  /**
+   * @generated from field: laelia.v1.File file = 1;
+   */
+  file?: File | undefined;
+
+  /**
+   * sender_name is the display name of the message sender.
+   *
+   * @generated from field: string sender_name = 2;
+   */
+  senderName: string;
+
+  /**
+   * sender_type mirrors ChatMessage.sender_type: 1=USER, 2=AGENT, 3=SYSTEM.
+   *
+   * @generated from field: int32 sender_type = 3;
+   */
+  senderType: number;
+
+  /**
+   * principal_id is the sender's mention handle (for user messages).
+   *
+   * @generated from field: string principal_id = 4;
+   */
+  principalId: string;
+
+  /**
+   * message_content is the text of the message that carried this file.
+   *
+   * @generated from field: string message_content = 5;
+   */
+  messageContent: string;
+
+  /**
+   * message_created_at is when the message was sent.
+   *
+   * @generated from field: google.protobuf.Timestamp message_created_at = 6;
+   */
+  messageCreatedAt?: Timestamp | undefined;
+
+  /**
+   * message_id is the bare UUID of the message that carried this file.
+   *
+   * @generated from field: string message_id = 7;
+   */
+  messageId: string;
+
+  /**
+   * agent_id is the agent resource id ("agents/{id}") when the sender is an
+   * agent, empty otherwise.
+   *
+   * @generated from field: string agent_id = 8;
+   */
+  agentId: string;
+
+  /**
+   * thread_root is the bare UUID of the thread root message when the carrying
+   * message is a thread reply, empty for a main-channel message. Used to open
+   * the same preview/comment context as the in-chat file card.
+   *
+   * @generated from field: string thread_root = 9;
+   */
+  threadRoot: string;
+};
+
+/**
+ * Describes the message laelia.v1.ConversationFile.
+ * Use `create(ConversationFileSchema)` to create a new message.
+ */
+export declare const ConversationFileSchema: GenMessage<ConversationFile>;
 
 /**
  * Reaction is one emoji's aggregate on a message: the emoji, how many distinct

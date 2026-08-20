@@ -290,6 +290,19 @@
     "selected-count": "已选 {{count}} 个",
     "unpin": "取消置顶"
   },
+  "channelFiles": {
+    "close": "关闭文件",
+    "count": "{{count}} 个文件",
+    "download": "下载",
+    "empty": "此频道还没有文件",
+    "no-results": "没有匹配“{{query}}”的文件",
+    "preview": "预览",
+    "preview-unsupported": "该文件类型暂不支持在线预览",
+    "search-placeholder": "搜索文件名…",
+    "title": "文件",
+    "unknown-sender": "未知发送者",
+    "unknown-time": "未知时间"
+  },
   "channelTask": {
     "as-task": "作为任务",
     "as-task-hint": "将此消息作为任务发送，供 agent 认领",
@@ -334,6 +347,7 @@
     "copy-markdown-success": "已复制 Markdown",
     "diff": "差异",
     "empty": "开始与 Agent 对话",
+    "file-too-large": "文件过大（最大 512MB）",
     "input-not-captured": "未捕获输入",
     "mention-group-agents": "Agent",
     "mention-group-users": "用户",
@@ -348,6 +362,7 @@
     "send-hint": "Enter 发送 · Shift+Enter 换行",
     "send-hint-inverted": "Shift+Enter 发送 · Enter 换行",
     "send-message": "发送消息",
+    "sending": "发送中",
     "thread-beginning": "回复的开始",
     "thread-close": "关闭话题",
     "thread-collapse": "收起话题",
@@ -367,9 +382,7 @@
     "undo": "撤销",
     "view-details": "查看详情",
     "warning": "警告",
-    "you": "你",
-    "sending": "发送中",
-    "file-too-large": "文件过大（最大 512MB）"
+    "you": "你"
   },
   "command": {
     "back": "返回",

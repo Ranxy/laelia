@@ -246,7 +246,9 @@ func (s *CommandService) DownloadFile(ctx context.Context, req *connect.Request[
 }
 
 // ListFiles returns the files attached to a conversation. The caller must be a
-// member.
+// member. The response carries both the plain file list (for existing
+// consumers) and the enriched conversation_files payload used by the channel
+// files drawer.
 func (s *CommandService) ListFiles(ctx context.Context, req *connect.Request[v1pb.ListFilesRequest]) (*connect.Response[v1pb.ListFilesResponse], error) {
 	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
@@ -261,7 +263,42 @@ func (s *CommandService) ListFiles(ctx context.Context, req *connect.Request[v1p
 	for _, f := range files {
 		v1Files = append(v1Files, fileToV1(f))
 	}
-	return connect.NewResponse(&v1pb.ListFilesResponse{Files: v1Files}), nil
+
+	convFiles, err := s.store.ListConversationFiles(ctx, convID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	v1ConvFiles := make([]*v1pb.ConversationFile, 0, len(convFiles))
+	for _, cf := range convFiles {
+		v1ConvFiles = append(v1ConvFiles, conversationFileToV1(cf))
+	}
+	return connect.NewResponse(&v1pb.ListFilesResponse{Files: v1Files, ConversationFiles: v1ConvFiles}), nil
+}
+
+// conversationFileToV1 converts a store conversation file to the proto
+// ConversationFile message.
+func conversationFileToV1(cf *store.ConversationFile) *v1pb.ConversationFile {
+	if cf == nil {
+		return nil
+	}
+	out := &v1pb.ConversationFile{
+		File:           fileToV1(&cf.File),
+		SenderName:     cf.SenderName,
+		SenderType:     cf.SenderType,
+		PrincipalId:    cf.PrincipalID,
+		MessageContent: cf.MessageContent,
+		AgentId:        cf.AgentResourceID,
+	}
+	if cf.MessageID.Valid {
+		out.MessageId = cf.MessageID.UUID.String()
+	}
+	if cf.MessageCreatedAt.Valid {
+		out.MessageCreatedAt = timestamppb.New(cf.MessageCreatedAt.Time)
+	}
+	if cf.ThreadRootID.Valid {
+		out.ThreadRoot = cf.ThreadRootID.UUID.String()
+	}
+	return out
 }
 
 // readAll reads the object body, capping at maxUploadBytes+1 so a corrupted/

@@ -87,3 +87,67 @@ func (s *Store) ListFilesByConversation(ctx context.Context, convID uuid.UUID) (
 	}
 	return files, nil
 }
+
+// ConversationFile is a file plus the message context that carried it in a
+// conversation (sender, send time, message content). Message fields are zero
+// when the file was uploaded but never attached to a message.
+type ConversationFile struct {
+	File
+	MessageID        uuid.NullUUID
+	MessageContent   string
+	MessageCreatedAt sql.NullTime
+	SenderName       string
+	SenderType       int32
+	PrincipalID      string
+	AgentResourceID  string
+	ThreadRootID     uuid.NullUUID
+}
+
+// listConversationFilesSQL joins each file to the earliest message that
+// carried it (via the attachments JSONB id) and returns newest-first.
+const listConversationFilesSQL = `
+	SELECT f.id, f.conversation_id, f.uploader_principal_id, f.original_name, f.mime_type, f.size_bytes, f.s3_key, f.created_at,
+	       cm.id, COALESCE(cm.content, ''), cm.created_at, cm.thread_root_message_id,
+	       COALESCE(p.name, ''), COALESCE(cm.sender_type, 0), COALESCE(p.handle, ''), COALESCE(a.resource_id, '')
+	FROM file f
+	LEFT JOIN LATERAL (
+		SELECT cm.id, cm.content, cm.created_at, cm.sender_type, cm.principal_id, cm.sender_agent_id, cm.thread_root_message_id
+		FROM chat_message cm
+		WHERE cm.conversation_id = f.conversation_id
+		  AND cm.attachments @> jsonb_build_array(jsonb_build_object('id', f.id::text))
+		ORDER BY cm.created_at ASC
+		LIMIT 1
+	) cm ON true
+	LEFT JOIN principal p ON p.id = cm.principal_id
+	LEFT JOIN agent a ON a.id = cm.sender_agent_id
+	WHERE f.conversation_id = $1
+	ORDER BY f.created_at DESC
+`
+
+// ListConversationFiles returns all files attached to a conversation, newest
+// first, enriched with the message that carried each file. A file uploaded but
+// never attached to a message still appears with empty message context.
+func (s *Store) ListConversationFiles(ctx context.Context, convID uuid.UUID) ([]*ConversationFile, error) {
+	rows, err := s.GetDB().QueryContext(ctx, listConversationFilesSQL, convID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list conversation files")
+	}
+	defer rows.Close()
+
+	var files []*ConversationFile
+	for rows.Next() {
+		var cf ConversationFile
+		if err := rows.Scan(
+			&cf.ID, &cf.ConversationID, &cf.UploaderPrincipalID, &cf.OriginalName, &cf.MimeType, &cf.SizeBytes, &cf.S3Key, &cf.CreatedAt,
+			&cf.MessageID, &cf.MessageContent, &cf.MessageCreatedAt, &cf.ThreadRootID,
+			&cf.SenderName, &cf.SenderType, &cf.PrincipalID, &cf.AgentResourceID,
+		); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan conversation file")
+		}
+		files = append(files, &cf)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate conversation files")
+	}
+	return files, nil
+}

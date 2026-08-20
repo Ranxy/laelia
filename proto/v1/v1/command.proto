@@ -332,6 +332,37 @@ message ListFilesRequest {
 
 message ListFilesResponse {
   repeated File files = 1;
+  // conversation_files is the file list enriched with the message that carried
+  // each file (sender, send time, message content). It is the primary payload
+  // for the channel files drawer; `files` is retained for backward
+  // compatibility with existing consumers (e.g. the agent file-list tool).
+  repeated ConversationFile conversation_files = 2;
+}
+
+// ConversationFile is a file attached to a conversation together with the
+// message context that carried it. Message fields are empty when the file was
+// uploaded but never attached to a message (e.g. an abandoned upload).
+message ConversationFile {
+  File file = 1;
+  // sender_name is the display name of the message sender.
+  string sender_name = 2;
+  // sender_type mirrors ChatMessage.sender_type: 1=USER, 2=AGENT, 3=SYSTEM.
+  int32 sender_type = 3;
+  // principal_id is the sender's mention handle (for user messages).
+  string principal_id = 4;
+  // message_content is the text of the message that carried this file.
+  string message_content = 5;
+  // message_created_at is when the message was sent.
+  google.protobuf.Timestamp message_created_at = 6;
+  // message_id is the bare UUID of the message that carried this file.
+  string message_id = 7;
+  // agent_id is the agent resource id ("agents/{id}") when the sender is an
+  // agent, empty otherwise.
+  string agent_id = 8;
+  // thread_root is the bare UUID of the thread root message when the carrying
+  // message is a thread reply, empty for a main-channel message. Used to open
+  // the same preview/comment context as the in-chat file card.
+  string thread_root = 9;
 }
 
 // Reaction is one emoji's aggregate on a message: the emoji, how many distinct
