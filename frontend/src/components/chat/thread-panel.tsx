@@ -233,6 +233,9 @@ export function ThreadPanel({
   );
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Uploads still in flight, stored as promises resolving to their Attachment
+  // so handleSend can wait for them before composing the message.
+  const inFlightUploadsRef = useRef<Promise<Attachment | null>[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -340,31 +343,56 @@ export function ThreadPanel({
     async (files: FileList | File[]) => {
       const list = Array.from(files);
       if (list.length === 0) return;
-      await Promise.all(
-        list.map((file) => {
-          const id = `${file.name}-${Date.now()}-${Math.random()}`;
-          setUploads((prev) => [...prev, { id, name: file.name, progress: 0 }]);
-          return uploadFile(file, (progress) => {
-            setUploads((prev) =>
-              prev.map((u) => (u.id === id ? { ...u, progress } : u))
-            );
-          })
-            .then((att) => {
-              if (att) setPendingAttachments((prev) => [...prev, att]);
-            })
-            .finally(() => {
-              setUploads((prev) => prev.filter((u) => u.id !== id));
-            });
+      const tasks = list.map((file) => {
+        const id = `${file.name}-${Date.now()}-${Math.random()}`;
+        setUploads((prev) => [...prev, { id, name: file.name, progress: 0 }]);
+        const task = uploadFile(file, (progress) => {
+          setUploads((prev) =>
+            prev.map((u) => (u.id === id ? { ...u, progress } : u))
+          );
         })
-      );
+          .then((att) => {
+            if (att) setPendingAttachments((prev) => [...prev, att]);
+            return att;
+          })
+          .finally(() => {
+            setUploads((prev) => prev.filter((u) => u.id !== id));
+          });
+        inFlightUploadsRef.current.push(task);
+        return task;
+      });
+      await Promise.all(tasks);
     },
     [uploadFile]
   );
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
-    if ((!text && pendingAttachments.length === 0) || sending) return;
-    const attachments = pendingAttachments;
+    if (sending) return;
+
+    let attachments = pendingAttachments;
+    // If files are still uploading, wait for them first so the message carries
+    // the attachments exactly as if they had finished before clicking send.
+    if (inFlightUploadsRef.current.length > 0) {
+      setSending(true);
+      const inflight = inFlightUploadsRef.current;
+      inFlightUploadsRef.current = [];
+      const results = await Promise.all(inflight);
+      const snapshot = pendingAttachments;
+      attachments = [
+        ...snapshot,
+        ...results.filter(
+          (a): a is Attachment =>
+            a !== null && !snapshot.some((p) => p.id === a.id)
+        ),
+      ];
+      setPendingAttachments(attachments);
+    }
+
+    if (!text && attachments.length === 0) {
+      setSending(false);
+      return;
+    }
     setInput("");
     setMentionState(null);
     setPendingAttachments([]);
