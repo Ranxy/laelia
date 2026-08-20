@@ -3,12 +3,15 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/common"
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
 // ErrConversationNotFound is returned by GetConversation when no row exists.
@@ -524,9 +527,10 @@ type UserConversation struct {
 	// LastMessage/LastMessageSender/LastMessagePrincipalID/LastMessageAt are
 	// the newest main-channel message (thread_root_message_id IS NULL) joined
 	// by ListUserConversationsWithUnread for the left-rail preview:
-	// content, sender display name, the sender's decimal principal id (empty
-	// unless the sender is a USER), and the send time. All empty/unset when
-	// the conversation has no main-channel messages yet.
+	// content (falling back to attachment names for file-only messages),
+	// sender display name, the sender's decimal principal id (empty unless the
+	// sender is a USER), and the send time. All empty/unset when the
+	// conversation has no main-channel messages yet.
 	LastMessage            string
 	LastMessageSender      string
 	LastMessagePrincipalID string
@@ -548,12 +552,12 @@ const listUserConversationsWithUnreadSQL = `
 		           AND m.room_version > COALESCE(ucc.read_version, c.version)
 		       ), 0),
 		       cm.pinned, cm.pinned_at, cm.closed,
-		       lm.content, lm.created_at, lm.sender_name, lm.sender_principal_id
+		       lm.content, lm.attachments, lm.created_at, lm.sender_name, lm.sender_principal_id
 		FROM conversation c
 		JOIN conversation_member_meta cm ON cm.conversation_id = c.id
 		LEFT JOIN user_channel_cursor ucc ON ucc.principal_id = $3 AND ucc.conversation_id = c.id
 		LEFT JOIN LATERAL (
-		  SELECT m.content, m.created_at,
+		  SELECT m.content, m.attachments, m.created_at,
 		         CASE WHEN m.sender_type = 2 THEN COALESCE(ag.name, '')
 		              ELSE COALESCE(p.name, '') END AS sender_name,
 		         CASE WHEN m.sender_type = 1 THEN COALESCE(p.handle, '') ELSE '' END AS sender_principal_id
@@ -601,17 +605,27 @@ func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID
 		var uc UserConversation
 		conv := &uc.Conversation
 		var lmContent, lmSender, lmPrincipalID sql.NullString
+		var lmAttachments []byte
 		var lmCreatedAt sql.NullTime
 		if err := rows.Scan(
 			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
 			&uc.UnreadCount,
 			&uc.Pinned, &uc.PinnedAt, &uc.Closed,
-			&lmContent, &lmCreatedAt, &lmSender, &lmPrincipalID,
+			&lmContent, &lmAttachments, &lmCreatedAt, &lmSender, &lmPrincipalID,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan user conversation")
 		}
 		if lmContent.Valid {
 			uc.LastMessage = lmContent.String
+			// A file-only message has no text, so fall back to the attached
+			// file name(s) for the left-rail preview instead of showing a blank
+			// line.
+			if uc.LastMessage == "" && len(lmAttachments) > 0 {
+				var attachments []*v1pb.Attachment
+				if err := json.Unmarshal(lmAttachments, &attachments); err == nil {
+					uc.LastMessage = attachmentListPreview(attachments)
+				}
+			}
 			uc.LastMessageAt = lmCreatedAt
 			uc.LastMessageSender = lmSender.String
 			uc.LastMessagePrincipalID = lmPrincipalID.String
@@ -623,6 +637,23 @@ func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID
 	}
 
 	return convs, nil
+}
+
+// attachmentListPreview renders a file-only message's attachments as the
+// left-rail preview: the first file name, plus a count suffix when there are
+// more files.
+func attachmentListPreview(attachments []*v1pb.Attachment) string {
+	if len(attachments) == 0 {
+		return ""
+	}
+	name := attachments[0].Name
+	if name == "" {
+		name = attachments[0].Id
+	}
+	if len(attachments) == 1 {
+		return name
+	}
+	return fmt.Sprintf("%s +%d", name, len(attachments)-1)
 }
 
 // ListAgentConversations returns every conversation the given agent is a member

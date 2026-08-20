@@ -4860,7 +4860,7 @@ is never populated here.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | conversation | [string](#string) |  |  |
-| content | [string](#string) |  |  |
+| content | [string](#string) |  | content is the message text. It may be empty when at least one attachment is provided. |
 | base_version | [int64](#int64) |  |  |
 | command_id | [string](#string) |  |  |
 | attachments | [Attachment](#laelia-v1-Attachment) | repeated |  |
@@ -5108,7 +5108,7 @@ creates one. Powers the &#34;#&lt;title&gt;&#34; address resolver.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | conversation | [string](#string) |  |  |
-| content | [string](#string) |  |  |
+| content | [string](#string) |  | content is the message text. It may be empty when at least one attachment is provided, allowing users to send a file-only message. |
 | mentions | [Mention](#laelia-v1-Mention) | repeated |  |
 | attachments | [Attachment](#laelia-v1-Attachment) | repeated |  |
 | thread_root | [string](#string) |  | thread_root, when set, makes this message a reply in the thread rooted at the given message name (&#34;conversations/{c}/messages/{m}&#34;). Empty posts a normal channel message. |

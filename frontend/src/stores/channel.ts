@@ -3,6 +3,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { commandServiceClient } from "@/connect";
 import type {
   AgentActivity,
+  Attachment,
   Conversation,
 } from "@/types/proto-es/v1/command_pb";
 import {
@@ -71,6 +72,15 @@ function listPreview(content: string): string {
   const chars = Array.from(oneLine);
   if (chars.length <= MAX_LIST_PREVIEW_LEN) return oneLine;
   return chars.slice(0, MAX_LIST_PREVIEW_LEN).join("") + "…";
+}
+
+// attachmentListPreview mirrors the backend's fallback for file-only messages:
+// show the first file name, plus a count suffix when there are more files.
+function attachmentListPreview(attachments: Attachment[]): string {
+  if (attachments.length === 0) return "";
+  const name = attachments[0].name || attachments[0].id || "";
+  if (attachments.length === 1) return name;
+  return `${name} +${attachments.length - 1}`;
 }
 
 // reorderChannels sorts the list the way the backend does: pinned items first
@@ -297,7 +307,9 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
           c.name === conversationName
             ? {
                 ...c,
-                lastMessage: listPreview(content),
+                lastMessage: listPreview(
+                  content || attachmentListPreview(attachments ?? [])
+                ),
                 lastMessageSender: chatMsg.senderName ?? "",
                 lastMessagePrincipalId: chatMsg.principalId ?? "",
                 lastMessageAt: timestampFromDate(chatMsg.timestamp),

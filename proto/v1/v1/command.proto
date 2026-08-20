@@ -934,7 +934,9 @@ message SendMessageRequest {
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "laelia/Conversation"}
   ];
-  string content = 2 [(google.api.field_behavior) = REQUIRED];
+  // content is the message text. It may be empty when at least one attachment
+  // is provided, allowing users to send a file-only message.
+  string content = 2;
   repeated Mention mentions = 3;
   repeated Attachment attachments = 4;
   // thread_root, when set, makes this message a reply in the thread rooted at
@@ -965,7 +967,9 @@ message PostMessageRequest {
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "laelia/Conversation"}
   ];
-  string content = 2 [(google.api.field_behavior) = REQUIRED];
+  // content is the message text. It may be empty when at least one attachment
+  // is provided.
+  string content = 2;
   int64 base_version = 3 [(google.api.field_behavior) = REQUIRED];
   string command_id = 4;
   repeated Attachment attachments = 5;

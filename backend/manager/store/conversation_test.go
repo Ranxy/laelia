@@ -3,6 +3,8 @@ package store
 import (
 	"strings"
 	"testing"
+
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
 // TestGetOrCreateDirectConversationSQL locks in the race-free DM creation:
@@ -49,7 +51,50 @@ func TestListUserConversationsWithUnreadSQL(t *testing.T) {
 	if !strings.Contains(listUserConversationsWithUnreadSQL, "CASE WHEN m.sender_type = 1 THEN COALESCE(p.handle, '') ELSE '' END") {
 		t.Fatal("preview must expose the sender handle only for USER senders")
 	}
+	if !strings.Contains(listUserConversationsWithUnreadSQL, "lm.attachments") {
+		t.Fatal("preview must carry attachments so file-only messages can fall back to the file name")
+	}
 	if !strings.Contains(listUserConversationsWithUnreadSQL, "AND ($6 OR NOT cm.closed)") {
 		t.Fatal("list must exclude closed conversations by default but include them when include_closed is requested; a closed chat only reappears when a new main-channel message clears the flag")
+	}
+}
+
+func TestAttachmentListPreview(t *testing.T) {
+	cases := []struct {
+		name        string
+		attachments []*v1pb.Attachment
+		want        string
+	}{
+		{
+			name: "no attachments",
+			want: "",
+		},
+		{
+			name:        "single attachment",
+			attachments: []*v1pb.Attachment{{Name: "report.pdf"}},
+			want:        "report.pdf",
+		},
+		{
+			name: "multiple attachments",
+			attachments: []*v1pb.Attachment{
+				{Name: "a.pdf"},
+				{Name: "b.pdf"},
+				{Name: "c.pdf"},
+			},
+			want: "a.pdf +2",
+		},
+		{
+			name:        "missing name falls back to id",
+			attachments: []*v1pb.Attachment{{Id: "file-1"}},
+			want:        "file-1",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := attachmentListPreview(tc.attachments); got != tc.want {
+				t.Fatalf("attachmentListPreview() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }

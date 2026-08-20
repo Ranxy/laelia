@@ -945,9 +945,19 @@ func (s *CommandService) ListThreadParticipants(ctx context.Context, req *connec
 	return connect.NewResponse(&v1pb.ListThreadParticipantsResponse{Members: v1Members}), nil
 }
 
+// validateSendMessageContent enforces that a user message carries either text
+// or at least one attachment, so file-only sends are allowed while a fully
+// empty message is still rejected.
+func validateSendMessageContent(req *v1pb.SendMessageRequest) error {
+	if req.Content == "" && len(req.Attachments) == 0 {
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("content or attachments must not be empty"))
+	}
+	return nil
+}
+
 func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v1pb.SendMessageRequest]) (*connect.Response[v1pb.ChatMessage], error) {
-	if req.Msg.Content == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("content must not be empty"))
+	if err := validateSendMessageContent(req.Msg); err != nil {
+		return nil, err
 	}
 
 	convID, err := parseConversationID(req.Msg.Conversation)

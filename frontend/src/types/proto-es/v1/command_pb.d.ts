@@ -731,7 +731,8 @@ export declare type Mention = Message<"laelia.v1.Mention"> & {
 
   /**
    * id is the member's id: the agent resource id for agents, the user handle
-   * for users.
+   * for users. It is also the canonical @handle used to match mentions in
+   * message content.
    *
    * @generated from field: string id = 2;
    */
@@ -2583,6 +2584,9 @@ export declare type SendMessageRequest = Message<"laelia.v1.SendMessageRequest">
   conversation: string;
 
   /**
+   * content is the message text. It may be empty when at least one attachment
+   * is provided, allowing users to send a file-only message.
+   *
    * @generated from field: string content = 2;
    */
   content: string;
@@ -2674,6 +2678,9 @@ export declare type PostMessageRequest = Message<"laelia.v1.PostMessageRequest">
   conversation: string;
 
   /**
+   * content is the message text. It may be empty when at least one attachment
+   * is provided.
+   *
    * @generated from field: string content = 2;
    */
   content: string;

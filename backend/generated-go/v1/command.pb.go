@@ -1994,7 +1994,8 @@ type Mention struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Type  string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
 	// id is the member's id: the agent resource id for agents, the user handle
-	// for users.
+	// for users. It is also the canonical @handle used to match mentions in
+	// message content.
 	Id string `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
 	// name is the display text shown in the badge. It is normally the member's
 	// display name; when the same message mentions two different members who
@@ -5762,9 +5763,11 @@ func (x *ListThreadParticipantsResponse) GetMembers() []*ChannelMember {
 type SendMessageRequest struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	Conversation string                 `protobuf:"bytes,1,opt,name=conversation,proto3" json:"conversation,omitempty"`
-	Content      string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
-	Mentions     []*Mention             `protobuf:"bytes,3,rep,name=mentions,proto3" json:"mentions,omitempty"`
-	Attachments  []*Attachment          `protobuf:"bytes,4,rep,name=attachments,proto3" json:"attachments,omitempty"`
+	// content is the message text. It may be empty when at least one attachment
+	// is provided, allowing users to send a file-only message.
+	Content     string        `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	Mentions    []*Mention    `protobuf:"bytes,3,rep,name=mentions,proto3" json:"mentions,omitempty"`
+	Attachments []*Attachment `protobuf:"bytes,4,rep,name=attachments,proto3" json:"attachments,omitempty"`
 	// thread_root, when set, makes this message a reply in the thread rooted at
 	// the given message name ("conversations/{c}/messages/{m}"). Empty posts a
 	// normal channel message.
@@ -5956,10 +5959,12 @@ func (x *GetCommandContextResponse) GetEvents() []*CommandEvent {
 type PostMessageRequest struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	Conversation string                 `protobuf:"bytes,1,opt,name=conversation,proto3" json:"conversation,omitempty"`
-	Content      string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
-	BaseVersion  int64                  `protobuf:"varint,3,opt,name=base_version,json=baseVersion,proto3" json:"base_version,omitempty"`
-	CommandId    string                 `protobuf:"bytes,4,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
-	Attachments  []*Attachment          `protobuf:"bytes,5,rep,name=attachments,proto3" json:"attachments,omitempty"`
+	// content is the message text. It may be empty when at least one attachment
+	// is provided.
+	Content     string        `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	BaseVersion int64         `protobuf:"varint,3,opt,name=base_version,json=baseVersion,proto3" json:"base_version,omitempty"`
+	CommandId   string        `protobuf:"bytes,4,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	Attachments []*Attachment `protobuf:"bytes,5,rep,name=attachments,proto3" json:"attachments,omitempty"`
 	// thread_root, when set, makes this agent reply a message in the thread
 	// rooted at the given message name. Empty posts a normal channel message.
 	ThreadRoot    string `protobuf:"bytes,6,opt,name=thread_root,json=threadRoot,proto3" json:"thread_root,omitempty"`
@@ -11663,11 +11668,11 @@ const file_v1_command_proto_rawDesc = "" +
 	"\vthread_root\x18\x02 \x01(\tB\x03\xe0A\x02R\n" +
 	"threadRoot\"T\n" +
 	"\x1eListThreadParticipantsResponse\x122\n" +
-	"\amembers\x18\x01 \x03(\v2\x18.laelia.v1.ChannelMemberR\amembers\"\x97\x02\n" +
+	"\amembers\x18\x01 \x03(\v2\x18.laelia.v1.ChannelMemberR\amembers\"\x92\x02\n" +
 	"\x12SendMessageRequest\x12?\n" +
 	"\fconversation\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
-	"\x13laelia/ConversationR\fconversation\x12\x1d\n" +
-	"\acontent\x18\x02 \x01(\tB\x03\xe0A\x02R\acontent\x12.\n" +
+	"\x13laelia/ConversationR\fconversation\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\x12.\n" +
 	"\bmentions\x18\x03 \x03(\v2\x12.laelia.v1.MentionR\bmentions\x127\n" +
 	"\vattachments\x18\x04 \x03(\v2\x15.laelia.v1.AttachmentR\vattachments\x12\x1f\n" +
 	"\vthread_root\x18\x05 \x01(\tR\n" +
@@ -11679,11 +11684,11 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x19GetCommandContextResponse\x12,\n" +
 	"\acommand\x18\x01 \x01(\v2\x12.laelia.v1.CommandR\acommand\x122\n" +
 	"\aoutputs\x18\x02 \x03(\v2\x18.laelia.v1.CommandOutputR\aoutputs\x12/\n" +
-	"\x06events\x18\x03 \x03(\v2\x17.laelia.v1.CommandEventR\x06events\"\x95\x02\n" +
+	"\x06events\x18\x03 \x03(\v2\x17.laelia.v1.CommandEventR\x06events\"\x90\x02\n" +
 	"\x12PostMessageRequest\x12?\n" +
 	"\fconversation\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
-	"\x13laelia/ConversationR\fconversation\x12\x1d\n" +
-	"\acontent\x18\x02 \x01(\tB\x03\xe0A\x02R\acontent\x12&\n" +
+	"\x13laelia/ConversationR\fconversation\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\x12&\n" +
 	"\fbase_version\x18\x03 \x01(\x03B\x03\xe0A\x02R\vbaseVersion\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x04 \x01(\tR\tcommandId\x127\n" +
