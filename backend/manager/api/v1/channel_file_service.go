@@ -54,18 +54,27 @@ func sniffMimeType(declared string, data []byte) string {
 	return http.DetectContentType(data[:n])
 }
 
-// UploadFile stores a blob in S3 and persists a file row. Both browser users
-// and agents call this; the caller must be a member of the conversation when
-// one is supplied.
-func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1pb.UploadFileRequest]) (*connect.Response[v1pb.File], error) {
-	user, agent, err := resolveFileCaller(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if req.Msg.OriginalName == "" {
+// UploadFileStreamInput carries the metadata + streaming body for a file
+// upload. The browser multipart route uses this so large files stream straight
+// to S3 instead of being buffered in memory.
+type UploadFileStreamInput struct {
+	User         *store.UserMessage
+	Agent        *store.AgentMessage
+	Conversation string
+	OriginalName string
+	MimeType     string
+	SizeBytes    int64
+	Body         io.Reader
+}
+
+// UploadFileStream stores a blob in S3 and persists a file row, streaming the
+// body to S3 instead of buffering it in memory. It performs the same
+// auth/membership checks as UploadFile.
+func (s *CommandService) UploadFileStream(ctx context.Context, in *UploadFileStreamInput) (*v1pb.File, error) {
+	if in.OriginalName == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("original_name is required"))
 	}
-	if int64(len(req.Msg.Data)) > MaxUploadBytes {
+	if in.SizeBytes > MaxUploadBytes {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("file too large"))
 	}
 
@@ -81,26 +90,25 @@ func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1
 	// Agent uploads are always tied to a conversation, so access is governed by
 	// membership, not this field.
 	uploaderPrincipalID := 1
-	if user != nil {
-		uploaderPrincipalID = user.ID
+	if in.User != nil {
+		uploaderPrincipalID = in.User.ID
 	}
-	mimeType := sniffMimeType(req.Msg.MimeType, req.Msg.Data)
 
 	fileRow := &store.File{
 		UploaderPrincipalID: uploaderPrincipalID,
-		OriginalName:        req.Msg.OriginalName,
-		MimeType:            mimeType,
-		SizeBytes:           int64(len(req.Msg.Data)),
+		OriginalName:        in.OriginalName,
+		MimeType:            in.MimeType,
+		SizeBytes:           in.SizeBytes,
 	}
-	if req.Msg.Conversation != "" {
-		convID, err := parseConversationID(req.Msg.Conversation)
+	if in.Conversation != "" {
+		convID, err := parseConversationID(in.Conversation)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation id"))
 		}
 		// Agent-DM conversations (type 3) are agent-only. Agents exchange
 		// files in their own DMs; users — including workspace admins, who can
 		// view via the admin bypass — must not upload into one.
-		if user != nil {
+		if in.User != nil {
 			conv, convErr := s.store.GetConversation(ctx, convID)
 			if convErr != nil {
 				return nil, connect.NewError(connect.CodeNotFound, convErr)
@@ -116,7 +124,7 @@ func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1
 		// authenticated user could spray blobs into arbitrary conversation
 		// UUIDs. Untied uploads stay workspace-baseline (downloads remain
 		// uploader-only).
-		memberType, memberID, ok := callerMemberInfo(user, agent)
+		memberType, memberID, ok := callerMemberInfo(in.User, in.Agent)
 		if !ok {
 			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 		}
@@ -149,7 +157,7 @@ func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1
 	if _, err := s3Cli.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:        aws.String(cfg.Bucket),
 		Key:           aws.String(fileRow.S3Key),
-		Body:          bytes.NewReader(req.Msg.Data),
+		Body:          in.Body,
 		ContentType:   aws.String(fileRow.MimeType),
 		ContentLength: aws.Int64(fileRow.SizeBytes),
 	}); err != nil {
@@ -160,7 +168,31 @@ func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to commit pending scheduler transaction"))
 	}
 
-	return connect.NewResponse(fileToV1(fileRow)), nil
+	return fileToV1(fileRow), nil
+}
+
+// UploadFile stores a blob in S3 and persists a file row. Both browser users
+// and agents call this; the caller must be a member of the conversation when
+// one is supplied.
+func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1pb.UploadFileRequest]) (*connect.Response[v1pb.File], error) {
+	user, agent, err := resolveFileCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	mimeType := sniffMimeType(req.Msg.MimeType, req.Msg.Data)
+	file, err := s.UploadFileStream(ctx, &UploadFileStreamInput{
+		User:         user,
+		Agent:        agent,
+		Conversation: req.Msg.Conversation,
+		OriginalName: req.Msg.OriginalName,
+		MimeType:     mimeType,
+		SizeBytes:    int64(len(req.Msg.Data)),
+		Body:         bytes.NewReader(req.Msg.Data),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(file), nil
 }
 
 // DownloadFile fetches a file's bytes from S3. The caller must be a member of

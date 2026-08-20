@@ -106,6 +106,8 @@ func configureV1Routers(
 
 	auditInterceptor := apiv1.NewAuditInterceptor(stores)
 
+	apiAuth := auth.New(stores, secret, stateCfg, profile)
+
 	// CSRF note: the Connect protocol can serve unary RPCs over GET, which
 	// browsers send without CORS preflight. connect-go only enables GET for
 	// procedures marked idempotency_level=NO_SIDE_EFFECTS, and none of the v1
@@ -123,7 +125,7 @@ func configureV1Routers(
 		connect.WithInterceptors(
 			apiv1.NewDebugInterceptor(),
 			ipValidator,
-			auth.New(stores, secret, stateCfg, profile),
+			apiAuth,
 			apiv1.NewIAMInterceptor(iam.NewManager(stores)),
 			auditInterceptor,
 		),
@@ -208,6 +210,8 @@ func configureV1Routers(
 	for path, handler := range connectHandlers {
 		e.Any(path+"*", echo.WrapHandler(handler))
 	}
+
+	registerFileUploadRoute(e, apiAuth, commandService)
 
 	return auditInterceptor, nil
 }

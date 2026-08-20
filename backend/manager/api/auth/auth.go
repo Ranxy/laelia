@@ -192,6 +192,49 @@ func (in *APIAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandler
 	}
 }
 
+// AuthenticateHTTP authenticates a plain HTTP request (used by browser-facing
+// Echo routes that do not go through the Connect interceptor) using the same
+// token/cookie rules as Connect RPCs. It returns a context carrying the
+// caller's user/agent/machine identity so existing handlers can resolve it via
+// apiv1.GetUserFromContext / GetAgentFromContext.
+func (in *APIAuthInterceptor) AuthenticateHTTP(
+	ctx context.Context,
+	header http.Header,
+	remoteAddr string,
+) (context.Context, error) {
+	sourceIP := extractSourceIP(header, remoteAddr, in.profile.TrustProxy)
+	ctx = context.WithValue(ctx, common.SourceIPContextKey, sourceIP)
+
+	accessTokenStr, err := GetTokenFromHeaders(header)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := in.getUserOrAgentConnect(ctx, accessTokenStr)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.user != nil {
+		ctx = context.WithValue(ctx, common.UserContextKey, result.user)
+	}
+	if result.agent != nil {
+		ctx = context.WithValue(ctx, common.AgentContextKey, result.agent)
+	}
+	if result.machine != nil {
+		ctx = context.WithValue(ctx, common.MachineContextKey, result.machine)
+		if declared, derr := in.resolveDeclaredAgent(ctx, result.machine, header); derr != nil {
+			return nil, derr
+		} else if declared != nil {
+			ctx = context.WithValue(ctx, common.AgentContextKey, declared)
+		}
+	}
+	if result.accessTokenExpiresAt > 0 {
+		ctx = context.WithValue(ctx, common.AccessTokenExpiresAtContextKey, result.accessTokenExpiresAt)
+	}
+	return ctx, nil
+}
+
 // invalidTokenError reports an invalid bearer token. The token can be
 // invalid without a jwt.ParseWithClaims error (untrusted claims or audience
 // mismatch), so err may be nil; it is appended only when present.

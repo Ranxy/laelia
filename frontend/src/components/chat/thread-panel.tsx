@@ -1,4 +1,3 @@
-import { create } from "@bufbuild/protobuf";
 import {
   ArrowLeft,
   ExternalLink,
@@ -38,8 +37,8 @@ import {
   useMentionLabelResolver,
   useMentionTargets,
 } from "@/composables/useMentionTargets";
-import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
+import { uploadFileToConversation } from "@/lib/file-upload";
 import { isImageAttachment } from "@/lib/image-file";
 import { taskStatusLabel } from "@/lib/task-status";
 import { toastManager } from "@/lib/toast";
@@ -49,9 +48,17 @@ import { useAppStore } from "@/stores";
 import { senderKeyForMessage } from "@/stores/chat-helpers";
 import type { ChatMessageUI } from "@/stores/types";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
-import { AttachmentSchema, TaskStatus } from "@/types/proto-es/v1/command_pb";
+import { TaskStatus } from "@/types/proto-es/v1/command_pb";
 
 const MENTION_POPUP_ID = "thread-mention-popup";
+
+// UploadItem tracks a file currently being uploaded so the composer can render
+// a real progress bar instead of a generic spinner.
+interface UploadItem {
+  id: string;
+  name: string;
+  progress: number;
+}
 
 // ThreadReplies renders the beginning-of-replies divider + the reply list. It
 // is memoized so typing a reply (which re-renders the panel's header/composer
@@ -224,7 +231,7 @@ export function ThreadPanel({
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>(
     []
   );
-  const [uploading, setUploading] = useState(false);
+  const [uploads, setUploads] = useState<UploadItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -309,19 +316,17 @@ export function ThreadPanel({
   }, [input, autoResize]);
 
   const uploadFile = useCallback(
-    async (file: File): Promise<Attachment | null> => {
+    async (
+      file: File,
+      onProgress?: (progress: number) => void
+    ): Promise<Attachment | null> => {
       try {
-        const res = await commandServiceClient.uploadFile({
+        return await uploadFileToConversation({
           conversation: conversationName,
           originalName: file.name,
           mimeType: file.type || "",
-          data: new Uint8Array(await file.arrayBuffer()),
-        });
-        return create(AttachmentSchema, {
-          id: res.id,
-          name: res.originalName,
-          mimeType: res.mimeType,
-          sizeBytes: res.sizeBytes,
+          file,
+          onProgress: (p) => onProgress?.(p.percent),
         });
       } catch (err) {
         console.error("thread file upload failed", err);
@@ -335,15 +340,23 @@ export function ThreadPanel({
     async (files: FileList | File[]) => {
       const list = Array.from(files);
       if (list.length === 0) return;
-      setUploading(true);
-      try {
-        for (const file of list) {
-          const att = await uploadFile(file);
-          if (att) setPendingAttachments((prev) => [...prev, att]);
-        }
-      } finally {
-        setUploading(false);
-      }
+      await Promise.all(
+        list.map((file) => {
+          const id = `${file.name}-${Date.now()}-${Math.random()}`;
+          setUploads((prev) => [...prev, { id, name: file.name, progress: 0 }]);
+          return uploadFile(file, (progress) => {
+            setUploads((prev) =>
+              prev.map((u) => (u.id === id ? { ...u, progress } : u))
+            );
+          })
+            .then((att) => {
+              if (att) setPendingAttachments((prev) => [...prev, att]);
+            })
+            .finally(() => {
+              setUploads((prev) => prev.filter((u) => u.id !== id));
+            });
+        })
+      );
     },
     [uploadFile]
   );
@@ -551,8 +564,20 @@ export function ThreadPanel({
                   handleFiles(e.dataTransfer.files);
               }}
             >
-              {pendingAttachments.length > 0 && (
+              {(pendingAttachments.length > 0 || uploads.length > 0) && (
                 <div className="flex flex-wrap gap-1.5 px-3 pt-2">
+                  {uploads.map((u) => (
+                    <span
+                      key={u.id}
+                      className="flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
+                    >
+                      <Loader2 className="size-3 animate-spin" />
+                      <span className="max-w-[120px] truncate">{u.name}</span>
+                      <span className="text-control-placeholder">
+                        {u.progress}%
+                      </span>
+                    </span>
+                  ))}
                   {pendingAttachments.map((att) =>
                     isImageAttachment(att) ? (
                       <div key={att.id} className="group relative shrink-0">
@@ -573,6 +598,9 @@ export function ThreadPanel({
                         >
                           <X className="size-3" />
                         </button>
+                        <div className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 max-w-[240px] -translate-y-1/2 truncate rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                          {att.name}
+                        </div>
                       </div>
                     ) : (
                       <span
@@ -708,11 +736,11 @@ export function ThreadPanel({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading || sending}
+                    disabled={uploads.length > 0 || sending}
                     className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors disabled:opacity-50"
                     aria-label={t("channel.attach-file")}
                   >
-                    {uploading ? (
+                    {uploads.length > 0 ? (
                       <Loader2 className="size-4 animate-spin" />
                     ) : (
                       <Paperclip className="size-4" />
