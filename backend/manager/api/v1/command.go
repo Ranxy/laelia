@@ -583,7 +583,7 @@ const maxLongPollWaitMs = 30000
 // long poll (client aborts the in-flight request, e.g. on unmount) is a normal
 // exit, not an error, and must not surface as a CodeCanceled. A nil hub (unit
 // tests) skips the wait and returns the re-read immediately.
-func (s *CommandService) longPollDelta(ctx context.Context, convID uuid.UUID, waitMs int32, readDelta func() ([]*store.ChatMessage, int64, error)) ([]*store.ChatMessage, int64, error) {
+func (s *CommandService) longPollDelta(ctx context.Context, convID uuid.UUID, waitMs int32, readDelta func() ([]*store.ChatMessage, int64, error), hasNew func([]*store.ChatMessage) bool) ([]*store.ChatMessage, int64, error) {
 	if s.roomhub == nil {
 		return readDelta()
 	}
@@ -594,7 +594,7 @@ func (s *CommandService) longPollDelta(ctx context.Context, convID uuid.UUID, wa
 	if err != nil {
 		return nil, 0, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list messages"))
 	}
-	if len(msgs) > 0 {
+	if hasNew(msgs) {
 		return msgs, currentVersion, nil
 	}
 
@@ -607,7 +607,7 @@ func (s *CommandService) longPollDelta(ctx context.Context, convID uuid.UUID, wa
 			if err != nil {
 				return nil, 0, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list messages"))
 			}
-			if len(msgs) > 0 {
+			if hasNew(msgs) {
 				return msgs, currentVersion, nil
 			}
 			// Spurious wake (a bump this read cannot see): keep waiting on the
@@ -673,7 +673,7 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list conversation messages"))
 		}
 		if len(msgs) == 0 && waitMs > 0 {
-			msgs, currentVersion, err = s.longPollDelta(ctx, convID, waitMs, readDelta)
+			msgs, currentVersion, err = s.longPollDelta(ctx, convID, waitMs, readDelta, func(msgs []*store.ChatMessage) bool { return len(msgs) > 0 })
 			if err != nil {
 				return nil, err
 			}
@@ -785,8 +785,14 @@ func (s *CommandService) ListThreadMessages(ctx context.Context, req *connect.Re
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list thread messages"))
 		}
-		if len(msgs) == 0 && waitMs > 0 {
-			msgs, currentVersion, err = s.longPollDelta(ctx, convID, waitMs, readDelta)
+		// ListThreadMessages always includes the thread root as the first
+		// element, even on a delta read, so the thread's delta is "empty" when
+		// it holds only the root (no new replies). A `len(msgs) == 0` gate here
+		// would never be true and the long poll would never engage, turning the
+		// watcher into a tight request loop. Only long-poll when no replies
+		// arrived after afterVersion.
+		if len(msgs) <= 1 && waitMs > 0 {
+			msgs, currentVersion, err = s.longPollDelta(ctx, convID, waitMs, readDelta, func(msgs []*store.ChatMessage) bool { return len(msgs) > 1 })
 			if err != nil {
 				return nil, err
 			}
