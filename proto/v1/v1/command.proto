@@ -2207,7 +2207,10 @@ message BeginSessionResponse {
 // in a conversation. It is polled by the frontend to show real-time agent
 // status in the channel header.
 message FetchConversationActivityRequest {
-  string conversation = 1;
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
 }
 
 message FetchConversationActivityResponse {

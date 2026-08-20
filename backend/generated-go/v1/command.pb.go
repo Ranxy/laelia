@@ -12063,9 +12063,10 @@ const file_v1_command_proto_rawDesc = "" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x12\n" +
 	"\x04idle\x18\x02 \x01(\bR\x04idle\x12,\n" +
 	"\x12agent_display_name\x18\x03 \x01(\tR\x10agentDisplayName\x12,\n" +
-	"\x12owner_display_name\x18\x04 \x01(\tR\x10ownerDisplayName\"F\n" +
-	" FetchConversationActivityRequest\x12\"\n" +
-	"\fconversation\x18\x01 \x01(\tR\fconversation\"]\n" +
+	"\x12owner_display_name\x18\x04 \x01(\tR\x10ownerDisplayName\"c\n" +
+	" FetchConversationActivityRequest\x12?\n" +
+	"\fconversation\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
+	"\x13laelia/ConversationR\fconversation\"]\n" +
 	"!FetchConversationActivityResponse\x128\n" +
 	"\n" +
 	"activities\x18\x01 \x03(\v2\x18.laelia.v1.AgentActivityR\n" +
