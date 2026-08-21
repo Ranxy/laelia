@@ -34,14 +34,14 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Build frontend and embedded machine binaries
-        run: VERSION="${GITHUB_REF_NAME}" scripts/build_laelia.sh build
+        run: VERSION="${GITHUB_REF_NAME}" RELEASE=true scripts/build_laelia.sh build
 
       - name: Cross-compile manager binaries
         run: |
           set -euo pipefail
           mv build/laelia build/laelia-linux-amd64
-          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags "embed_frontend embed_machine" -ldflags "-w -s" -p=16 -o build/laelia-windows-amd64.exe ./backend/manager/bin/server/main.go
-          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -tags "embed_frontend embed_machine" -ldflags "-w -s" -p=16 -o build/laelia-darwin-arm64 ./backend/manager/bin/server/main.go
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags "embed_frontend embed_machine release" -ldflags "-w -s" -p=16 -o build/laelia-windows-amd64.exe ./backend/manager/bin/server/main.go
+          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -tags "embed_frontend embed_machine release" -ldflags "-w -s" -p=16 -o build/laelia-darwin-arm64 ./backend/manager/bin/server/main.go
 
       - name: Generate checksums
         run: |

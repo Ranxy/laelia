@@ -105,11 +105,13 @@ cd proto && buf generate
 
 ```bash
 # Local monolithic build: frontend + per-platform machine binaries -> embedded into manager
-scripts/build_laelia.sh                             # outputs build/laelia + build/laelia-machine
+scripts/build_laelia.sh                             # outputs build/laelia + build/laelia-machine (dev mode)
+RELEASE=true scripts/build_laelia.sh                # release-mode manager (adds the release build tag)
 LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia.sh  # route the pi GitHub download through a proxy
 
 # Docker images (manager image embeds frontend + machine binaries; machine image embeds pi)
-LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_manager_docker.sh  # -> laelia/manager:local
+LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_manager_docker.sh  # -> laelia/manager:local (dev mode)
+RELEASE=true LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_manager_docker.sh  # -> release mode
 LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_machine_docker.sh  # -> laelia/machine:local
 ```
 

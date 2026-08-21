@@ -33,6 +33,7 @@ ARG VERSION=local
 ARG GIT_COMMIT=unknown
 ARG BUILD_TIME=unknown
 ARG LAELIA_BUILD_PROXY
+ARG RELEASE=false
 ENV BUILD_TIME=${BUILD_TIME}
 ENV http_proxy=${LAELIA_BUILD_PROXY} https_proxy=${LAELIA_BUILD_PROXY} no_proxy=localhost,127.0.0.1
 ENV HTTP_PROXY=${LAELIA_BUILD_PROXY} HTTPS_PROXY=${LAELIA_BUILD_PROXY} NO_PROXY=localhost,127.0.0.1
@@ -45,7 +46,9 @@ COPY . .
 RUN rm -rf ./backend/manager/server/dist ./backend/manager/server/embedded_machine
 COPY --from=frontend /frontend-build/dist ./backend/manager/server/dist
 COPY --from=machine-build /out/embedded_machine ./backend/manager/server/embedded_machine
-RUN CGO_ENABLED=0 go build -tags "embed_frontend embed_machine" -ldflags "-w -s -X github.com/Ranxy/laelia/backend/manager/version.Version=${VERSION} -X github.com/Ranxy/laelia/backend/manager/version.GitCommit=${GIT_COMMIT} -X github.com/Ranxy/laelia/backend/manager/version.BuildTime=${BUILD_TIME}" -p=16 \
+RUN BUILD_TAGS="embed_frontend embed_machine" \
+	&& if [ "${RELEASE}" = "true" ]; then BUILD_TAGS="${BUILD_TAGS} release"; fi \
+	&& CGO_ENABLED=0 go build -tags "${BUILD_TAGS}" -ldflags "-w -s -X github.com/Ranxy/laelia/backend/manager/version.Version=${VERSION} -X github.com/Ranxy/laelia/backend/manager/version.GitCommit=${GIT_COMMIT} -X github.com/Ranxy/laelia/backend/manager/version.BuildTime=${BUILD_TIME}" -p=16 \
 	-o /out/laelia ./backend/manager/bin/server/main.go
 
 FROM alpine:3.23 AS manager

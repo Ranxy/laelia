@@ -4,6 +4,11 @@
 # Usage:
 #   scripts/build_laelia_manager_docker.sh
 #   LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_manager_docker.sh
+#   RELEASE=true scripts/build_laelia_manager_docker.sh
+#   scripts/build_laelia_manager_docker.sh --release
+#
+# RELEASE=false (default) builds the manager in dev mode; RELEASE=true (or
+# --release) adds the `release` build tag so the manager runs in release mode.
 #
 # LAELIA_BUILD_PROXY is the single build proxy: it routes the Go module
 # download and the pi GitHub download through the proxy. It is passed as a
@@ -21,7 +26,39 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 . ./scripts/build_docker_common.sh
 collect_common_build_args
 
-echo "Building laelia manager docker image ${VERSION}..."
+RELEASE="${RELEASE:-false}"
+if [[ $# -gt 0 ]]; then
+  case "$1" in
+    --release)
+      RELEASE=true
+      shift
+      ;;
+    --dev)
+      RELEASE=false
+      shift
+      ;;
+    --help|-h)
+      echo "Usage: $0 [--release|--dev]"
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+fi
+case "${RELEASE}" in
+  true|1|yes) RELEASE=true ;;
+  false|0|no) RELEASE=false ;;
+  *)
+    echo "RELEASE must be true or false (got: ${RELEASE})" >&2
+    exit 1
+    ;;
+esac
+
+BUILD_ARGS+=(--build-arg "RELEASE=${RELEASE}")
+
+echo "Building laelia manager docker image ${VERSION} (${RELEASE} mode)..."
 docker build -f ./scripts/docker/Dockerfile.manager \
 	"${BUILD_ARGS[@]}" \
 	-t "laelia/manager:${VERSION}" \
