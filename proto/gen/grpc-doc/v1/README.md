@@ -282,6 +282,7 @@
     - [RemoveReactionResponse](#laelia-v1-RemoveReactionResponse)
     - [ResolveChannelByTitleRequest](#laelia-v1-ResolveChannelByTitleRequest)
     - [ResolveChannelByTitleResponse](#laelia-v1-ResolveChannelByTitleResponse)
+    - [SearchChatHistoryEntry](#laelia-v1-SearchChatHistoryEntry)
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
@@ -321,6 +322,7 @@
     - [CommandOutput.StreamType](#laelia-v1-CommandOutput-StreamType)
     - [CommandStatus](#laelia-v1-CommandStatus)
     - [ReminderStatus](#laelia-v1-ReminderStatus)
+    - [SearchScope](#laelia-v1-SearchScope)
     - [SenderType](#laelia-v1-SenderType)
     - [TaskStatus](#laelia-v1-TaskStatus)
   
@@ -5090,6 +5092,26 @@ creates one. Powers the &#34;#&lt;title&gt;&#34; address resolver.
 
 
 
+<a name="laelia-v1-SearchChatHistoryEntry"></a>
+
+### SearchChatHistoryEntry
+SearchChatHistoryEntry is one search hit: the matched message plus the
+conversation context needed to render the result and jump to it.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [ChatMessage](#laelia-v1-ChatMessage) |  |  |
+| conversation | [Conversation](#laelia-v1-Conversation) |  |  |
+| snippet | [string](#string) |  | snippet is a short excerpt of the message content around the first match. |
+| match_field | [int32](#int32) |  | match_field: 1=message content, 2=attachment file name. |
+| matched_attachment_name | [string](#string) |  | matched_attachment_name is set when match_field is 2. |
+
+
+
+
+
+
 <a name="laelia-v1-SearchChatHistoryRequest"></a>
 
 ### SearchChatHistoryRequest
@@ -5098,13 +5120,15 @@ creates one. Powers the &#34;#&lt;title&gt;&#34; address resolver.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| agent | [string](#string) |  |  |
+| agent | [string](#string) |  | **Deprecated.** agent is deprecated and ignored: the caller identity comes from the auth context. Kept for wire compatibility with older agent clients. |
 | query | [string](#string) |  |  |
 | since | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | until | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | limit | [int32](#int32) |  |  |
-| conversation | [string](#string) |  |  |
+| conversation | [string](#string) |  | conversation, when set, restricts the search to one conversation the caller can read. Empty searches every conversation the caller can read. |
 | page_token | [string](#string) |  |  |
+| from | [string](#string) |  | from filters by sender: a substring matched against the sender&#39;s display name or handle (users) / resource id or name (agents). |
+| scope | [SearchScope](#laelia-v1-SearchScope) |  | scope narrows the search to message content, attachment file names, or both. SEARCH_SCOPE_UNSPECIFIED searches both. |
 
 
 
@@ -5119,7 +5143,7 @@ creates one. Powers the &#34;#&lt;title&gt;&#34; address resolver.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| entries | [ChatMessage](#laelia-v1-ChatMessage) | repeated |  |
+| entries | [SearchChatHistoryEntry](#laelia-v1-SearchChatHistoryEntry) | repeated |  |
 | next_page_token | [string](#string) |  |  |
 
 
@@ -5758,6 +5782,20 @@ names), matching TaskStatus/SenderType.
 
 
 
+<a name="laelia-v1-SearchScope"></a>
+
+### SearchScope
+SearchScope narrows SearchChatHistory to message content, attachment file
+names, or both.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| SEARCH_SCOPE_UNSPECIFIED | 0 |  |
+| SEARCH_SCOPE_MESSAGES | 1 |  |
+| SEARCH_SCOPE_FILES | 2 |  |
+
+
+
 <a name="laelia-v1-SenderType"></a>
 
 ### SenderType
@@ -5822,7 +5860,7 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | SteerCommand | [SteerCommandRequest](#laelia-v1-SteerCommandRequest) | [Command](#laelia-v1-Command) | SteerCommand injects a follow-up message into a running command&#39;s in-flight turn. Only executors that support mid-turn steering (the ACP v2 thread protocol&#39;s turn/steer) honor it; others ignore it. |
 | WatchCommand | [WatchCommandRequest](#laelia-v1-WatchCommandRequest) | [CommandOutput](#laelia-v1-CommandOutput) stream |  |
 | WatchCommandEvents | [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest) | [CommandEvent](#laelia-v1-CommandEvent) stream |  |
-| SearchChatHistory | [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest) | [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse) |  |
+| SearchChatHistory | [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest) | [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse) | SearchChatHistory searches chat messages (and attachment file names) the caller can read. With `conversation` set it searches one conversation; without it, every conversation the caller can read. CUSTOM auth: the handler enforces conversations.read per conversation (or workspace scope for admins) because a global search has no single resource to gate on. |
 | GetCommandContext | [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest) | [GetCommandContextResponse](#laelia-v1-GetCommandContextResponse) |  |
 | GetOrCreateConversation | [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest) | [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse) |  |
 | GetOrCreateUserUserDM | [GetOrCreateUserUserDMRequest](#laelia-v1-GetOrCreateUserUserDMRequest) | [GetOrCreateUserUserDMResponse](#laelia-v1-GetOrCreateUserUserDMResponse) | GetOrCreateUserUserDM opens (or reuses) the type-4 user-to-user DM between the calling user and a peer user. User-only. The peer is resolved by user resource name (&#34;users/&lt;id&gt;&#34;); self-address is rejected; the pair is canonicalized by the store. User-user twin of GetOrCreateConversation. |

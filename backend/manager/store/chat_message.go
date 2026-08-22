@@ -121,11 +121,12 @@ func (s *Store) CreateChatMessage(ctx context.Context, msg *ChatMessage) (*ChatM
 	if err != nil {
 		return nil, err
 	}
+	searchText := markdownToPlainText(msg.Content)
 	err = s.GetDB().QueryRowContext(ctx, `
-		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions, attachments, thread_root_message_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions, attachments, thread_root_message_id, search_text)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id, created_at, room_version
-	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, msg.RoomVersion, msg.SenderType, mentionsBytes, attachmentsBytes, msg.ThreadRootMessageID).Scan(&id, &createdAt, &roomVersion)
+	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, msg.RoomVersion, msg.SenderType, mentionsBytes, attachmentsBytes, msg.ThreadRootMessageID, searchText).Scan(&id, &createdAt, &roomVersion)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create chat message")
 	}
@@ -238,13 +239,14 @@ func createChatMessageInTx(ctx context.Context, tx *sql.Tx, msg *ChatMessage, ro
 	if err != nil {
 		return uuid.Nil, time.Time{}, err
 	}
+	searchText := markdownToPlainText(msg.Content)
 	var id uuid.UUID
 	var createdAt time.Time
 	if err := tx.QueryRowContext(ctx, `
-		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions, attachments, thread_root_message_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions, attachments, thread_root_message_id, search_text)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id, created_at
-	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, roomVersion, msg.SenderType, mentionsBytes, attachmentsBytes, msg.ThreadRootMessageID).Scan(&id, &createdAt); err != nil {
+	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, roomVersion, msg.SenderType, mentionsBytes, attachmentsBytes, msg.ThreadRootMessageID, searchText).Scan(&id, &createdAt); err != nil {
 		return uuid.Nil, time.Time{}, errors.Wrapf(err, "failed to create chat message")
 	}
 	// A main-channel message un-closes the conversation for every member (a

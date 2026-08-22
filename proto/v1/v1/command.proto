@@ -231,21 +231,28 @@ message TokenUsagePayload {
 }
 
 message SearchChatHistoryRequest {
-  string agent = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference).type = "laelia/Agent"
-  ];
+  // agent is deprecated and ignored: the caller identity comes from the auth
+  // context. Kept for wire compatibility with older agent clients.
+  string agent = 1 [deprecated = true];
   string query = 2;
   google.protobuf.Timestamp since = 3;
   google.protobuf.Timestamp until = 4;
   reserved 5; // removed: principal_id
   int32 limit = 6;
-  string conversation = 7;
+  // conversation, when set, restricts the search to one conversation the
+  // caller can read. Empty searches every conversation the caller can read.
+  string conversation = 7 [(google.api.resource_reference).type = "laelia/Conversation"];
   string page_token = 8;
+  // from filters by sender: a substring matched against the sender's display
+  // name or handle (users) / resource id or name (agents).
+  string from = 9;
+  // scope narrows the search to message content, attachment file names, or
+  // both. SEARCH_SCOPE_UNSPECIFIED searches both.
+  SearchScope scope = 10;
 }
 
 message SearchChatHistoryResponse {
-  repeated ChatMessage entries = 1;
+  repeated SearchChatHistoryEntry entries = 1;
   string next_page_token = 2;
 }
 
@@ -1611,9 +1618,13 @@ service CommandService {
     option (laelia.v1.permission) = "laelia.commands.watch";
   }
 
+  // SearchChatHistory searches chat messages (and attachment file names) the
+  // caller can read. With `conversation` set it searches one conversation;
+  // without it, every conversation the caller can read. CUSTOM auth: the
+  // handler enforces conversations.read per conversation (or workspace scope
+  // for admins) because a global search has no single resource to gate on.
   rpc SearchChatHistory(SearchChatHistoryRequest) returns (SearchChatHistoryResponse) {
-    option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.conversations.read";
+    option (laelia.v1.auth_method) = CUSTOM;
   }
 
   rpc GetCommandContext(GetCommandContextRequest) returns (GetCommandContextResponse) {
@@ -2261,4 +2272,25 @@ message AgentActivity {
   string display_name = 2;
   string status = 3;
   string tool_name = 4;
+}
+
+// SearchScope narrows SearchChatHistory to message content, attachment file
+// names, or both.
+enum SearchScope {
+  SEARCH_SCOPE_UNSPECIFIED = 0;
+  SEARCH_SCOPE_MESSAGES = 1;
+  SEARCH_SCOPE_FILES = 2;
+}
+
+// SearchChatHistoryEntry is one search hit: the matched message plus the
+// conversation context needed to render the result and jump to it.
+message SearchChatHistoryEntry {
+  ChatMessage message = 1;
+  Conversation conversation = 2;
+  // snippet is a short excerpt of the message content around the first match.
+  string snippet = 3;
+  // match_field: 1=message content, 2=attachment file name.
+  int32 match_field = 4;
+  // matched_attachment_name is set when match_field is 2.
+  string matched_attachment_name = 5;
 }

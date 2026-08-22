@@ -8,6 +8,7 @@ import {
   ListTodo,
   Loader2,
   Paperclip,
+  Search,
   Send,
   User,
   Users,
@@ -26,6 +27,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
 import { ChannelFilesPanel } from "@/components/chat/channel-files-panel";
 import { ChannelMembersPanel } from "@/components/chat/channel-members-panel";
+import { ChannelSearchPanel } from "@/components/chat/channel-search-panel";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
 import { MentionPopup } from "@/components/chat/mention-popup";
@@ -69,6 +71,7 @@ import type {
   AgentActivity,
   Attachment,
   ChannelMember,
+  ChatMessage,
   Conversation,
   ConversationFile,
 } from "@/types/proto-es/v1/command_pb";
@@ -346,6 +349,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
 
   const [membersOpen, setMembersOpen] = useState(false);
   const [filesOpen, setFilesOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   // When a file drawer entry is clicked, this holds the target message id so
   // the list scrolls to it once the focused jump window has loaded.
   const [jumpMessageId, setJumpMessageId] = useState<string | null>(null);
@@ -502,41 +506,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     };
   }, [init, stopWatchingChannel, closeThread]);
 
-  // Deep-link from outside the channel (e.g. a reminder's "View in channel"):
-  // ?thread=<rootId> opens that thread and scrolls the main list to its root
-  // message once the channel's messages are mounted. Runs at most once per
-  // root id so it doesn't fight the user's own navigation.
-  const [searchParams, setSearchParams] = useSearchParams();
-  const threadDeepLinkId = searchParams.get("thread") ?? "";
-  const threadDeepLinkRef = useRef<string>("");
-  useEffect(() => {
-    if (!channelId || !threadDeepLinkId) return;
-    if (threadDeepLinkRef.current === threadDeepLinkId) return;
-    if (messages.length === 0) return; // wait for the channel to load
-    threadDeepLinkRef.current = threadDeepLinkId;
-    openThread(`conversations/${channelId}`, threadDeepLinkId);
-    // Defer so the root message is in the DOM.
-    requestAnimationFrame(() => {
-      scrollRef.current
-        ?.querySelector(`[data-msg-id="${threadDeepLinkId}"]`)
-        ?.scrollIntoView({ block: "center", behavior: "smooth" });
-    });
-    // Clean the param so a later in-page open of a different thread doesn't
-    // re-trigger this.
-    setSearchParams((prev) => {
-      if (!prev.has("thread")) return prev;
-      const next = new URLSearchParams(prev);
-      next.delete("thread");
-      return next;
-    });
-  }, [
-    channelId,
-    threadDeepLinkId,
-    messages.length,
-    openThread,
-    setSearchParams,
-  ]);
-
   // When embedded with a scrollToMessageId (the Activity detail pane pointing
   // at the message an activity references), scroll the main list to that
   // message once the channel's messages are mounted. Runs at most once per id
@@ -665,6 +634,80 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     nativeScrollAnchorSuppressedRef.current = true;
     scroller.style.overflowAnchor = "none";
   }, []);
+
+  // Deep-links from outside the channel (search results, reminders, activity):
+  //   ?thread=<rootId>              open the thread and scroll to its root
+  //   ?message=<id>&version=<v>     jump to a main-channel message
+  //   ?thread=<rootId>&message=<id> open the thread and scroll to the reply
+  // Runs at most once per target so it doesn't fight the user's own navigation.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const threadDeepLinkId = searchParams.get("thread") ?? "";
+  const messageDeepLinkId = searchParams.get("message") ?? "";
+  const messageDeepLinkVersion = searchParams.get("version") ?? "";
+  const deepLinkRef = useRef<string>("");
+  useEffect(() => {
+    if (!channelId) return;
+    const target = messageDeepLinkId || threadDeepLinkId;
+    if (!target) return;
+    if (deepLinkRef.current === target) return;
+    if (messages.length === 0) return; // wait for the channel to load
+    deepLinkRef.current = target;
+
+    if (messageDeepLinkId && threadDeepLinkId) {
+      // A thread reply: open the thread and let ThreadPanel scroll to the
+      // exact reply, while the main list centers the root message.
+      setThreadScrollToMessageId(messageDeepLinkId);
+      openThread(`conversations/${channelId}`, threadDeepLinkId);
+      requestAnimationFrame(() => {
+        scrollRef.current
+          ?.querySelector(`[data-msg-id="${threadDeepLinkId}"]`)
+          ?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+    } else if (messageDeepLinkId) {
+      const version = BigInt(messageDeepLinkVersion || "0");
+      if (version > 0n) {
+        stickToBottomRef.current = false;
+        jumpMessageIdRef.current = null;
+        suppressHistoryLoadRef.current = true;
+        suppressNativeScrollAnchor();
+        setJumpMessageId(messageDeepLinkId);
+        void jumpToMessage(
+          `conversations/${channelId}`,
+          messageDeepLinkId,
+          version
+        ).catch(() => {
+          suppressHistoryLoadRef.current = false;
+        });
+      }
+    } else {
+      openThread(`conversations/${channelId}`, threadDeepLinkId);
+      requestAnimationFrame(() => {
+        scrollRef.current
+          ?.querySelector(`[data-msg-id="${threadDeepLinkId}"]`)
+          ?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+    }
+
+    // Clean the params so a later in-page open of a different target doesn't
+    // re-trigger this.
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("thread");
+      next.delete("message");
+      next.delete("version");
+      return next;
+    });
+  }, [
+    channelId,
+    threadDeepLinkId,
+    messageDeepLinkId,
+    messageDeepLinkVersion,
+    messages.length,
+    openThread,
+    jumpToMessage,
+    setSearchParams,
+    suppressNativeScrollAnchor,
+  ]);
 
   const reenableNativeScrollAnchor = useCallback(() => {
     if (!scrollRef.current) return;
@@ -868,8 +911,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
       scrollTop > prevScrollTop &&
       (state.chatHasNewerByConv[conversationName] ?? false)
     ) {
-      const anchorId =
-        messagesRef.current[messagesRef.current.length - 1]?.id;
+      const anchorId = messagesRef.current[messagesRef.current.length - 1]?.id;
       if (!anchorId) return;
       captureScrollAnchor(anchorId);
       suppressNativeScrollAnchor();
@@ -1343,6 +1385,39 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     ]
   );
 
+  // Jump from the channel search panel to a matched message. Thread replies
+  // open the thread and scroll to the reply; main-channel messages load a
+  // focused window around the target, mirroring the files-drawer jump.
+  const handleSearchJump = useCallback(
+    (msg: ChatMessage) => {
+      if (!channelId) return;
+      setSearchOpen(false);
+      if (msg.threadRoot) {
+        setThreadScrollToMessageId(msg.name);
+        void openThread(conversationName, msg.threadRoot);
+        return;
+      }
+      if (!msg.roomVersion) return;
+      stickToBottomRef.current = false;
+      jumpMessageIdRef.current = null;
+      suppressHistoryLoadRef.current = true;
+      suppressNativeScrollAnchor();
+      setJumpMessageId(msg.name);
+      void jumpToMessage(conversationName, msg.name, msg.roomVersion).catch(
+        () => {
+          suppressHistoryLoadRef.current = false;
+        }
+      );
+    },
+    [
+      channelId,
+      conversationName,
+      jumpToMessage,
+      openThread,
+      suppressNativeScrollAnchor,
+    ]
+  );
+
   const handleToggleTasksPanel = useCallback(() => {
     if (!channelId) return;
     // Opening the tasks panel closes the thread panel — two 420px side panels
@@ -1388,6 +1463,16 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
           </h2>
           <AgentStatusBar activities={activities} />
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setSearchOpen(true)}
+          aria-pressed={searchOpen}
+          className="flex items-center gap-1.5 px-2.5 py-1.5"
+        >
+          <Search className="size-4" />
+          <span className="hidden sm:inline">{t("channelSearch.title")}</span>
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -1847,6 +1932,25 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
           />
         )}
       </div>
+
+      {/* Channel Search Sheet */}
+      <Sheet
+        open={searchOpen}
+        onOpenChange={(open) => !open && setSearchOpen(false)}
+      >
+        <SheetContent width="medium">
+          <SheetBody className="flex flex-col gap-0 overflow-hidden p-0">
+            {channelId && (
+              <ChannelSearchPanel
+                channelId={channelId}
+                channelTitle={channel?.title ?? channelId ?? ""}
+                onClose={() => setSearchOpen(false)}
+                onJumpToMessage={handleSearchJump}
+              />
+            )}
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
 
       {/* Files Sheet */}
       <Sheet

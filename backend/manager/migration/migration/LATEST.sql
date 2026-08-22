@@ -647,6 +647,26 @@ CREATE INDEX IF NOT EXISTS idx_file_uploader ON file(uploader_principal_id);
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX IF NOT EXISTS idx_chat_message_content_trgm
     ON chat_message USING GIN (content gin_trgm_ops);
+-- SearchChatHistory also matches attachment file names via file.original_name
+-- ILIKE '%q%'; the same leading-wildcard pattern needs a trgm index to avoid a
+-- full scan of the file table on every search.
+CREATE INDEX IF NOT EXISTS idx_file_original_name_trgm
+    ON file USING GIN (original_name gin_trgm_ops);
+-- SearchChatHistory searches a markdown-stripped plain-text copy of each
+-- message (search_text) so queries match the rendered text rather than the raw
+-- markdown. Populated on write; existing rows keep '' (no backfill).
+ALTER TABLE chat_message ADD COLUMN IF NOT EXISTS search_text TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_chat_message_search_text_trgm
+    ON chat_message USING GIN (search_text gin_trgm_ops);
+-- chat_occurrences counts case-insensitive occurrences of needle in haystack,
+-- used by SearchChatMessages' relevance ranking (term frequency).
+CREATE OR REPLACE FUNCTION chat_occurrences(haystack text, needle text)
+RETURNS integer
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT (length(lower(haystack)) - length(replace(lower(haystack), lower(needle), ''))) / greatest(length(needle), 1)
+$$;
 
 -- === Unique constraints (DM conversation / principal.email / token_hash) ===
 -- Three race/correctness gaps closed by unique indexes:

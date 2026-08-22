@@ -306,6 +306,14 @@
     "unknown-time": "Unknown time",
     "view-in-chat": "View in chat"
   },
+  "channelSearch": {
+    "empty": "Search messages and files in {{channel}}",
+    "in-thread": "In thread",
+    "no-results": "No messages match “{{query}}”",
+    "placeholder": "Search messages and files…",
+    "title": "Search",
+    "untitled": "Untitled message"
+  },
   "channelTask": {
     "as-task": "As Task",
     "as-task-hint": "Send this message as a task agents can claim",
@@ -516,6 +524,24 @@
     "toggle-secret-visibility": "Toggle visibility",
     "type-to-search": "Type to search...",
     "version": "Version"
+  },
+  "globalSearch": {
+    "all-channels": "All conversations",
+    "channel": "Channel",
+    "empty": "Search channels, DMs, messages and files",
+    "from": "From",
+    "in-thread": "In thread",
+    "no-results": "No results match “{{query}}”",
+    "placeholder": "Search channels, DMs, messages…",
+    "scope-all": "All content",
+    "scope-files": "Files",
+    "scope-messages": "Messages",
+    "time-24h": "Past 24 hours",
+    "time-30d": "Past 30 days",
+    "time-7d": "Past 7 days",
+    "time-any": "Any time",
+    "title": "Search",
+    "untitled": "Untitled message"
   },
   "landing": {},
   "machine": {

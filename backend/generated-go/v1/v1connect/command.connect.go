@@ -247,6 +247,11 @@ type CommandServiceClient interface {
 	SteerCommand(context.Context, *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.Command], error)
 	WatchCommand(context.Context, *connect.Request[v1.WatchCommandRequest]) (*connect.ServerStreamForClient[v1.CommandOutput], error)
 	WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest]) (*connect.ServerStreamForClient[v1.CommandEvent], error)
+	// SearchChatHistory searches chat messages (and attachment file names) the
+	// caller can read. With `conversation` set it searches one conversation;
+	// without it, every conversation the caller can read. CUSTOM auth: the
+	// handler enforces conversations.read per conversation (or workspace scope
+	// for admins) because a global search has no single resource to gate on.
 	SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error)
 	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
 	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)
@@ -1236,6 +1241,11 @@ type CommandServiceHandler interface {
 	SteerCommand(context.Context, *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.Command], error)
 	WatchCommand(context.Context, *connect.Request[v1.WatchCommandRequest], *connect.ServerStream[v1.CommandOutput]) error
 	WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest], *connect.ServerStream[v1.CommandEvent]) error
+	// SearchChatHistory searches chat messages (and attachment file names) the
+	// caller can read. With `conversation` set it searches one conversation;
+	// without it, every conversation the caller can read. CUSTOM auth: the
+	// handler enforces conversations.read per conversation (or workspace scope
+	// for admins) because a global search has no single resource to gate on.
 	SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error)
 	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
 	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)

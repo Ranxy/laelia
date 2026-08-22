@@ -306,6 +306,14 @@
     "unknown-time": "未知时间",
     "view-in-chat": "在聊天中查看"
   },
+  "channelSearch": {
+    "empty": "在 {{channel}} 中搜索消息与文件",
+    "in-thread": "位于话题中",
+    "no-results": "没有匹配“{{query}}”的消息",
+    "placeholder": "搜索消息与文件…",
+    "title": "搜索",
+    "untitled": "无标题消息"
+  },
   "channelTask": {
     "as-task": "作为任务",
     "as-task-hint": "将此消息作为任务发送，供 agent 认领",
@@ -516,6 +524,24 @@
     "toggle-secret-visibility": "切换可见性",
     "type-to-search": "输入以搜索...",
     "version": "版本"
+  },
+  "globalSearch": {
+    "all-channels": "全部会话",
+    "channel": "频道",
+    "empty": "搜索频道、私信、消息与文件",
+    "from": "发送者",
+    "in-thread": "位于话题中",
+    "no-results": "没有匹配“{{query}}”的结果",
+    "placeholder": "搜索频道、私信、消息…",
+    "scope-all": "全部内容",
+    "scope-files": "文件",
+    "scope-messages": "消息",
+    "time-24h": "过去 24 小时",
+    "time-30d": "过去 30 天",
+    "time-7d": "过去 7 天",
+    "time-any": "任意时间",
+    "title": "搜索",
+    "untitled": "无标题消息"
   },
   "landing": {},
   "machine": {

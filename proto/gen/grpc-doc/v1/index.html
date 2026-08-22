@@ -1276,6 +1276,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.SearchChatHistoryEntry"><span class="badge">M</span>SearchChatHistoryEntry</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.SearchChatHistoryRequest"><span class="badge">M</span>SearchChatHistoryRequest</a>
                 </li>
               
@@ -1426,6 +1430,10 @@
               
                 <li>
                   <a href="#laelia.v1.ReminderStatus"><span class="badge">E</span>ReminderStatus</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SearchScope"><span class="badge">E</span>SearchScope</a>
                 </li>
               
                 <li>
@@ -12684,6 +12692,58 @@ conversation (see AddReactionRequest). </p></td>
 
         
       
+        <h3 id="laelia.v1.SearchChatHistoryEntry">SearchChatHistoryEntry</h3>
+        <p>SearchChatHistoryEntry is one search hit: the matched message plus the</p><p>conversation context needed to render the result and jump to it.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#laelia.v1.Conversation">Conversation</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>snippet</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>snippet is a short excerpt of the message content around the first match. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>match_field</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>match_field: 1=message content, 2=attachment file name. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>matched_attachment_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>matched_attachment_name is set when match_field is 2. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.SearchChatHistoryRequest">SearchChatHistoryRequest</h3>
         <p></p>
 
@@ -12698,7 +12758,8 @@ conversation (see AddReactionRequest). </p></td>
                   <td>agent</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p><strong>Deprecated.</strong> agent is deprecated and ignored: the caller identity comes from the auth
+context. Kept for wire compatibility with older agent clients. </p></td>
                 </tr>
               
                 <tr>
@@ -12733,7 +12794,8 @@ conversation (see AddReactionRequest). </p></td>
                   <td>conversation</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>conversation, when set, restricts the search to one conversation the
+caller can read. Empty searches every conversation the caller can read. </p></td>
                 </tr>
               
                 <tr>
@@ -12743,9 +12805,46 @@ conversation (see AddReactionRequest). </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>from</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>from filters by sender: a substring matched against the sender&#39;s display
+name or handle (users) / resource id or name (agents). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>scope</td>
+                  <td><a href="#laelia.v1.SearchScope">SearchScope</a></td>
+                  <td></td>
+                  <td><p>scope narrows the search to message content, attachment file names, or
+both. SEARCH_SCOPE_UNSPECIFIED searches both. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
+          
+            
+            
+            <h4>Fields with deprecated option</h4>
+            <table>
+              <thead>
+                <tr>
+                  <td>Name</td>
+                  <td>Option</td>
+                </tr>
+              </thead>
+              <tbody>
+              
+                <tr>
+                  <td>agent</td>
+                  <td><p>true</p></td>
+                </tr>
+              
+              </tbody>
+            </table>
+            
           
 
         
@@ -12762,7 +12861,7 @@ conversation (see AddReactionRequest). </p></td>
               
                 <tr>
                   <td>entries</td>
-                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td><a href="#laelia.v1.SearchChatHistoryEntry">SearchChatHistoryEntry</a></td>
                   <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
@@ -14123,6 +14222,35 @@ is not a raw stdout/stderr/system message).</p></td>
           </tbody>
         </table>
       
+        <h3 id="laelia.v1.SearchScope">SearchScope</h3>
+        <p>SearchScope narrows SearchChatHistory to message content, attachment file</p><p>names, or both.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>SEARCH_SCOPE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>SEARCH_SCOPE_MESSAGES</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>SEARCH_SCOPE_FILES</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
         <h3 id="laelia.v1.SenderType">SenderType</h3>
         <p>SenderType distinguishes who authored a chat message. It replaces the</p><p>deprecated CommandSource enum and covers programmatic (SYSTEM) senders that</p><p>CommandSource could not express inside chat conversations. Values are</p><p>prefixed because UserType already occupies the unprefixed USER/SYSTEM_BOT</p><p>names (protobuf C++ scoping rules forbid sibling enums from sharing value</p><p>names).</p>
         <table class="enum-table">
@@ -14278,7 +14406,11 @@ thread protocol&#39;s turn/steer) honor it; others ignore it.</p></td>
                 <td>SearchChatHistory</td>
                 <td><a href="#laelia.v1.SearchChatHistoryRequest">SearchChatHistoryRequest</a></td>
                 <td><a href="#laelia.v1.SearchChatHistoryResponse">SearchChatHistoryResponse</a></td>
-                <td><p></p></td>
+                <td><p>SearchChatHistory searches chat messages (and attachment file names) the
+caller can read. With `conversation` set it searches one conversation;
+without it, every conversation the caller can read. CUSTOM auth: the
+handler enforces conversations.read per conversation (or workspace scope
+for admins) because a global search has no single resource to gate on.</p></td>
               </tr>
             
               <tr>

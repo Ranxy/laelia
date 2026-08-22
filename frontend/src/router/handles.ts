@@ -10,6 +10,7 @@ export const REMINDER_ROUTE_LIST = "reminder.list";
 export const REMINDER_ROUTE_DETAIL = "reminder.detail";
 export const CHAT_ROUTE = "chat";
 export const CHAT_ROUTE_DETAIL = "chat.detail";
+export const SEARCH_ROUTE = "search";
 export const ACTIVITY_ROUTE = "activity";
 export const ACTIVITY_ROUTE_DETAIL = "activity.detail";
 export const MACHINE_ROUTE_LIST = "machine.list";

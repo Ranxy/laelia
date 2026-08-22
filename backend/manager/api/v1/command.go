@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/common/permission"
+	models "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
@@ -414,9 +416,47 @@ func (s *CommandService) validateRawEventAccess(ctx context.Context, user *store
 }
 
 func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Request[v1pb.SearchChatHistoryRequest]) (*connect.Response[v1pb.SearchChatHistoryResponse], error) {
-	convID, err := parseConversationID(req.Msg.Conversation)
+	user, hasUser := GetUserFromContext(ctx)
+	agent, hasAgent := GetAgentFromContext(ctx)
+	if !hasUser && !hasAgent {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+
+	var convID uuid.NullUUID
+	if req.Msg.Conversation != "" {
+		id, err := parseConversationID(req.Msg.Conversation)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
+		}
+		convID = uuid.NullUUID{UUID: id, Valid: true}
+		ok, err := s.iam.CheckPermission(ctx, permission.ConversationsRead, user, agent, &iam.ResourceRef{
+			ResourceType: models.Policy_CONVERSATION,
+			Name:         common.FormatConversationName(id.String()),
+		})
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check conversation access"))
+		}
+		if !ok {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("permission \"laelia.conversations.read\" denied"))
+		}
+	}
+
+	// A workspace-scope conversations.read grant (workspace admin or a custom
+	// role) lets the caller search every conversation; otherwise the store
+	// filters to the caller's memberships (and owner-follow for agents).
+	workspaceRead, err := s.iam.CheckPermission(ctx, permission.ConversationsRead, user, agent, nil)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check workspace read permission"))
+	}
+
+	caller := store.ChatSearchCaller{WorkspaceRead: workspaceRead}
+	if user != nil {
+		caller.UserHandle = user.Handle
+	}
+	if agent != nil {
+		caller.AgentResourceID = agent.ResourceID
+		caller.AgentOwnerID = agent.OwnerID
+		caller.AgentFollowOwner = agent.FollowOwnerPermissions
 	}
 
 	var since, until *time.Time
@@ -439,29 +479,144 @@ func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Req
 	}
 	limitPlusOne := offset.limit + 1
 
-	msgs, err := s.store.SearchChatHistory(ctx, convID, req.Msg.Query, since, until, limitPlusOne, offset.offset)
+	results, err := s.store.SearchChatMessages(ctx, caller, store.ChatSearchOptions{
+		ConversationID: convID,
+		Query:          req.Msg.Query,
+		From:           req.Msg.From,
+		Scope:          int32(req.Msg.Scope),
+		Since:          since,
+		Until:          until,
+		Limit:          limitPlusOne,
+		Offset:         offset.offset,
+	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to search chat history"))
 	}
 
 	nextPageToken := ""
-	if len(msgs) == limitPlusOne {
-		msgs = msgs[:offset.limit]
+	if len(results) == limitPlusOne {
+		results = results[:offset.limit]
 		nextPageToken, _ = offset.getNextPageToken()
 	}
 
-	var v1Entries []*v1pb.ChatMessage
 	callerAgent, _ := GetAgentFromContext(ctx)
-	for _, msg := range msgs {
-		v1m := storeToV1ChatMessage(msg)
-		v1m.IsOwn = callerAgent != nil && msg.SenderAgentID.Valid && int(msg.SenderAgentID.Int32) == callerAgent.ID
-		v1Entries = append(v1Entries, v1m)
+	convCache := make(map[uuid.UUID]*v1pb.Conversation, len(results))
+	entries := make([]*v1pb.SearchChatHistoryEntry, 0, len(results))
+	for _, res := range results {
+		conv, ok := convCache[res.Conversation.ID]
+		if !ok {
+			conv = s.searchConversationV1(ctx, &res.Conversation, user, agent)
+			convCache[res.Conversation.ID] = conv
+		}
+		v1m := storeToV1ChatMessage(res.Message)
+		v1m.IsOwn = callerAgent != nil && res.Message.SenderAgentID.Valid && int(res.Message.SenderAgentID.Int32) == callerAgent.ID
+		entries = append(entries, &v1pb.SearchChatHistoryEntry{
+			Message:               v1m,
+			Conversation:          conv,
+			Snippet:               searchSnippet(res.SearchText, req.Msg.Query),
+			MatchField:            res.MatchField,
+			MatchedAttachmentName: res.MatchedAttachmentName,
+		})
 	}
 
 	return connect.NewResponse(&v1pb.SearchChatHistoryResponse{
-		Entries:       v1Entries,
+		Entries:       entries,
 		NextPageToken: nextPageToken,
 	}), nil
+}
+
+// searchConversationV1 builds the conversation context for a search hit,
+// reusing the same title/peer resolution as the channel list and detail
+// endpoints. Member count and read cursor are omitted (search results do not
+// render them).
+func (s *CommandService) searchConversationV1(ctx context.Context, conv *store.ConversationMessage, user *store.UserMessage, agent *store.AgentMessage) *v1pb.Conversation {
+	ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
+	ownerHandle := resolveUserHandle(ctx, s.store, conv.OwnerID)
+	title := conv.Title
+	peerName := ""
+	peerResource := ""
+	viewerAgentResourceID := ""
+	viewerUserID := 0
+	if agent != nil {
+		viewerAgentResourceID = agent.ResourceID
+	}
+	if user != nil {
+		viewerUserID = user.ID
+	}
+
+	switch conv.Type {
+	case store.ConversationTypeDM:
+		if agent != nil {
+			peerName = resolveUserHandle(ctx, s.store, conv.OwnerID)
+			peerResource = common.FormatUserHandle(peerName)
+			title = resolveUserName(ctx, s.store, conv.OwnerID)
+		} else if conv.AgentID.Valid {
+			if a, err := s.store.GetAgent(ctx, int(conv.AgentID.Int32)); err == nil && a != nil {
+				peerName = a.ResourceID
+				peerResource = common.FormatAgentUID(a.ResourceID)
+				title = a.Name
+			}
+		}
+	case store.ConversationTypeAgentDM:
+		if peer := s.resolveAgentDMPeer(ctx, conv.ID, viewerAgentResourceID); peer != nil {
+			peerName = peer.ResourceID
+			peerResource = common.FormatAgentUID(peer.ResourceID)
+			title = peer.Name
+		}
+	case store.ConversationTypeUserDM:
+		if peer := s.resolveUserDMPeer(ctx, conv.ID, viewerUserID); peer != nil {
+			peerName = peer.Handle
+			peerResource = common.FormatUserHandle(peer.Handle)
+			title = peer.Name
+		}
+	}
+	return convertToV1Conversation(conv, ownerName, ownerHandle, peerName, peerResource, 0, 0, title, 0)
+}
+
+// searchSnippet returns a short excerpt of content around the earliest
+// case-insensitive match of any query token. When the query is empty or no
+// token occurs in content (e.g. an attachment-name match) it returns the
+// beginning of the message.
+func searchSnippet(content, query string) string {
+	const maxRunes = 200
+	runes := []rune(content)
+	if len(runes) <= maxRunes {
+		return content
+	}
+	lower := strings.ToLower(content)
+	byteIdx := -1
+	matchRunes := 0
+	for _, field := range strings.Fields(query) {
+		token := strings.ToLower(field)
+		if token == "" {
+			continue
+		}
+		if idx := strings.Index(lower, token); idx >= 0 && (byteIdx < 0 || idx < byteIdx) {
+			byteIdx = idx
+			matchRunes = utf8.RuneCountInString(token)
+		}
+	}
+	if byteIdx < 0 {
+		return string(runes[:maxRunes]) + "…"
+	}
+	idx := utf8.RuneCountInString(content[:byteIdx])
+	start := idx - 60
+	if start < 0 {
+		start = 0
+	}
+	end := idx + matchRunes + 120
+	if end > len(runes) {
+		end = len(runes)
+	}
+	prefix := ""
+	if start > 0 {
+		prefix = "…"
+	}
+	suffix := ""
+	if end < len(runes) {
+		suffix = "…"
+	}
+	return prefix + string(runes[start:end]) + suffix
 }
 
 func (s *CommandService) GetCommandContext(ctx context.Context, req *connect.Request[v1pb.GetCommandContextRequest]) (*connect.Response[v1pb.GetCommandContextResponse], error) {

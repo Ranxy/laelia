@@ -47,6 +47,8 @@ const DYNAMIC_PREFIXES = [
   "command.phase-",
   // command-event-kind.ts output stream kinds translated via t(kind.labelKey).
   "command.stream-",
+  // global-search.tsx time-range filter translated via t(timeLabelKey(value)).
+  "globalSearch.time-",
   // token-usage-card.tsx rows: { key: "command.token-*" } translated via
   // t(row.key); the literal keys live in a data array, not a t("…") call.
   "command.token-input",

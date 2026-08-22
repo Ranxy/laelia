@@ -230,15 +230,19 @@ func SearchChatHistory(ctx context.Context, d Deps, in SearchChatHistoryInput) (
 	// (cached by conversation name to bound the GetChannel calls).
 	addrs := make(map[string]string)
 	for _, e := range resp.Msg.Entries {
-		addr, ok := addrs[e.GetConversation()]
+		m := e.GetMessage()
+		if m == nil {
+			continue
+		}
+		addr, ok := addrs[m.GetConversation()]
 		if !ok {
-			addr = conversationAddress(ctx, d, e.GetConversation())
-			addrs[e.GetConversation()] = addr
+			addr = conversationAddress(ctx, d, m.GetConversation())
+			addrs[m.GetConversation()] = addr
 		}
 		text += formatMessageLine(
-			e.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
-			e.SenderName, senderTypeString(e.SenderType), e.IsOwn,
-			addr, e.Name, e.RoomVersion, e.Content, e.Attachments,
+			m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
+			m.SenderName, senderTypeString(m.SenderType), m.IsOwn,
+			addr, m.Name, m.RoomVersion, m.Content, m.Attachments,
 		)
 	}
 	return text, nil

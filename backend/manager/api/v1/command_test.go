@@ -109,3 +109,24 @@ func TestBuildLightChatContextLimit(t *testing.T) {
 		t.Errorf("expected at most 7 lines, got %d", len(lines))
 	}
 }
+
+func TestSearchSnippet(t *testing.T) {
+	long := strings.Repeat("a", 300)
+	if got := searchSnippet(long, "b"); got != strings.Repeat("a", 200)+"…" {
+		t.Errorf("expected leading excerpt for missing query, got %q", got)
+	}
+	content := strings.Repeat("前", 100) + "needle" + strings.Repeat("后", 100)
+	got := searchSnippet(content, "needle")
+	if !strings.Contains(got, "needle") {
+		t.Errorf("expected snippet to contain the match, got %q", got)
+	}
+	if got == content {
+		t.Errorf("expected a truncated snippet, got the full content")
+	}
+
+	multi := strings.Repeat("a", 100) + "rust" + strings.Repeat("b", 100) + "jdk"
+	got = searchSnippet(multi, "jdk rust")
+	if !strings.Contains(got, "rust") {
+		t.Errorf("expected snippet to center on the earliest token match, got %q", got)
+	}
+}

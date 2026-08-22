@@ -21,6 +21,7 @@ import {
   MEMBERS_ROUTE,
   REMINDER_ROUTE_DETAIL,
   REMINDER_ROUTE_LIST,
+  SEARCH_ROUTE,
   SETTINGS_ROUTE,
   SETTINGS_ROUTE_AGENTS,
   SETTINGS_ROUTE_API_PROVIDERS,
@@ -75,6 +76,14 @@ export const dashboardChildrenRoutes: RouteObject[] = [
           })),
       },
     ],
+  },
+  {
+    path: "search",
+    handle: { name: SEARCH_ROUTE },
+    lazy: () =>
+      import("@/pages/dashboard/global-search").then((m) => ({
+        Component: m.GlobalSearchPage,
+      })),
   },
   {
     path: "activity",

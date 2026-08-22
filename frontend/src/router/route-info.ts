@@ -16,6 +16,7 @@ import {
   MEMBERS_ROUTE,
   REMINDER_ROUTE_DETAIL,
   REMINDER_ROUTE_LIST,
+  SEARCH_ROUTE,
   SETTINGS_ROUTE,
   SETTINGS_ROUTE_AGENTS,
   SETTINGS_ROUTE_API_PROVIDERS,
@@ -44,6 +45,7 @@ export interface RouteInfo {
 export const ROUTE_INFO: Record<string, RouteInfo> = {
   [CHAT_ROUTE]: { titleKey: "sidebar.home" },
   [CHAT_ROUTE_DETAIL]: { titleKey: "sidebar.home", backTo: "/" },
+  [SEARCH_ROUTE]: { titleKey: "globalSearch.title", backTo: "/" },
   [ACTIVITY_ROUTE]: { titleKey: "sidebar.activity" },
   [ACTIVITY_ROUTE_DETAIL]: {
     titleKey: "activity.title",

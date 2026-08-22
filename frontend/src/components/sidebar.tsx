@@ -6,6 +6,7 @@ import {
   type LucideIcon,
   Menu,
   Monitor,
+  Search,
   Settings,
   Users,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import {
   COMMAND_ROUTE_LIST,
   MACHINE_ROUTE_LIST,
   MEMBERS_ROUTE,
+  SEARCH_ROUTE,
   SETTINGS_ROUTE,
   SETTINGS_ROUTE_AGENTS,
   SETTINGS_ROUTE_API_PROVIDERS,
@@ -128,6 +130,12 @@ function useSidebarItems(): SidebarItem[] {
         title: t("sidebar.home"),
         icon: Home,
         name: CHAT_ROUTE,
+        type: "route",
+      },
+      {
+        title: t("globalSearch.title"),
+        icon: Search,
+        name: SEARCH_ROUTE,
         type: "route",
       },
       {

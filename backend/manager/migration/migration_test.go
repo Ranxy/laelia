@@ -54,6 +54,15 @@ func TestSearchChatHistoryTrgmIndexPresent(t *testing.T) {
 	if !strings.Contains(sql, "CREATE INDEX IF NOT EXISTS idx_chat_message_content_trgm") {
 		t.Fatal("trgm index must be created with IF NOT EXISTS so re-applying the schema is safe")
 	}
+	if !strings.Contains(sql, "CREATE INDEX IF NOT EXISTS idx_file_original_name_trgm") {
+		t.Fatal("GIN trgm index on file.original_name is missing; attachment-name search would full-scan")
+	}
+	if !strings.Contains(sql, "CREATE INDEX IF NOT EXISTS idx_chat_message_search_text_trgm") {
+		t.Fatal("GIN trgm index on chat_message.search_text is missing; markdown-stripped search would full-scan")
+	}
+	if !strings.Contains(sql, "chat_occurrences") {
+		t.Fatal("chat_occurrences function is missing; term-frequency ranking would fail")
+	}
 }
 
 // TestUniqueConstraintsPresent locks in the three unique indexes that close

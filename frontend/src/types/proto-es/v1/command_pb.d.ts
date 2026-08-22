@@ -622,7 +622,11 @@ export declare const TokenUsagePayloadSchema: GenMessage<TokenUsagePayload>;
  */
 export declare type SearchChatHistoryRequest = Message<"laelia.v1.SearchChatHistoryRequest"> & {
   /**
-   * @generated from field: string agent = 1;
+   * agent is deprecated and ignored: the caller identity comes from the auth
+   * context. Kept for wire compatibility with older agent clients.
+   *
+   * @generated from field: string agent = 1 [deprecated = true];
+   * @deprecated
    */
   agent: string;
 
@@ -647,6 +651,9 @@ export declare type SearchChatHistoryRequest = Message<"laelia.v1.SearchChatHist
   limit: number;
 
   /**
+   * conversation, when set, restricts the search to one conversation the
+   * caller can read. Empty searches every conversation the caller can read.
+   *
    * @generated from field: string conversation = 7;
    */
   conversation: string;
@@ -655,6 +662,22 @@ export declare type SearchChatHistoryRequest = Message<"laelia.v1.SearchChatHist
    * @generated from field: string page_token = 8;
    */
   pageToken: string;
+
+  /**
+   * from filters by sender: a substring matched against the sender's display
+   * name or handle (users) / resource id or name (agents).
+   *
+   * @generated from field: string from = 9;
+   */
+  from: string;
+
+  /**
+   * scope narrows the search to message content, attachment file names, or
+   * both. SEARCH_SCOPE_UNSPECIFIED searches both.
+   *
+   * @generated from field: laelia.v1.SearchScope scope = 10;
+   */
+  scope: SearchScope;
 };
 
 /**
@@ -668,9 +691,9 @@ export declare const SearchChatHistoryRequestSchema: GenMessage<SearchChatHistor
  */
 export declare type SearchChatHistoryResponse = Message<"laelia.v1.SearchChatHistoryResponse"> & {
   /**
-   * @generated from field: repeated laelia.v1.ChatMessage entries = 1;
+   * @generated from field: repeated laelia.v1.SearchChatHistoryEntry entries = 1;
    */
-  entries: ChatMessage[];
+  entries: SearchChatHistoryEntry[];
 
   /**
    * @generated from field: string next_page_token = 2;
@@ -5197,6 +5220,51 @@ export declare type AgentActivity = Message<"laelia.v1.AgentActivity"> & {
 export declare const AgentActivitySchema: GenMessage<AgentActivity>;
 
 /**
+ * SearchChatHistoryEntry is one search hit: the matched message plus the
+ * conversation context needed to render the result and jump to it.
+ *
+ * @generated from message laelia.v1.SearchChatHistoryEntry
+ */
+export declare type SearchChatHistoryEntry = Message<"laelia.v1.SearchChatHistoryEntry"> & {
+  /**
+   * @generated from field: laelia.v1.ChatMessage message = 1;
+   */
+  message?: ChatMessage | undefined;
+
+  /**
+   * @generated from field: laelia.v1.Conversation conversation = 2;
+   */
+  conversation?: Conversation | undefined;
+
+  /**
+   * snippet is a short excerpt of the message content around the first match.
+   *
+   * @generated from field: string snippet = 3;
+   */
+  snippet: string;
+
+  /**
+   * match_field: 1=message content, 2=attachment file name.
+   *
+   * @generated from field: int32 match_field = 4;
+   */
+  matchField: number;
+
+  /**
+   * matched_attachment_name is set when match_field is 2.
+   *
+   * @generated from field: string matched_attachment_name = 5;
+   */
+  matchedAttachmentName: string;
+};
+
+/**
+ * Describes the message laelia.v1.SearchChatHistoryEntry.
+ * Use `create(SearchChatHistoryEntrySchema)` to create a new message.
+ */
+export declare const SearchChatHistoryEntrySchema: GenMessage<SearchChatHistoryEntry>;
+
+/**
  * @generated from enum laelia.v1.CommandStatus
  */
 export enum CommandStatus {
@@ -5547,6 +5615,34 @@ export enum ActivityState {
 export declare const ActivityStateSchema: GenEnum<ActivityState>;
 
 /**
+ * SearchScope narrows SearchChatHistory to message content, attachment file
+ * names, or both.
+ *
+ * @generated from enum laelia.v1.SearchScope
+ */
+export enum SearchScope {
+  /**
+   * @generated from enum value: SEARCH_SCOPE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: SEARCH_SCOPE_MESSAGES = 1;
+   */
+  MESSAGES = 1,
+
+  /**
+   * @generated from enum value: SEARCH_SCOPE_FILES = 2;
+   */
+  FILES = 2,
+}
+
+/**
+ * Describes the enum laelia.v1.SearchScope.
+ */
+export declare const SearchScopeSchema: GenEnum<SearchScope>;
+
+/**
  * @generated from service laelia.v1.CommandService
  */
 export declare const CommandService: GenService<{
@@ -5603,6 +5699,12 @@ export declare const CommandService: GenService<{
     output: typeof CommandEventSchema;
   },
   /**
+   * SearchChatHistory searches chat messages (and attachment file names) the
+   * caller can read. With `conversation` set it searches one conversation;
+   * without it, every conversation the caller can read. CUSTOM auth: the
+   * handler enforces conversations.read per conversation (or workspace scope
+   * for admins) because a global search has no single resource to gate on.
+   *
    * @generated from rpc laelia.v1.CommandService.SearchChatHistory
    */
   searchChatHistory: {

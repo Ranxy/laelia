@@ -629,63 +629,6 @@ func (s *Store) ListPendingCommandsByAgent(ctx context.Context, agentID int) ([]
 	return commands, nil
 }
 
-// SearchChatHistory searches chat messages in a conversation by keyword,
-// optional time range, with pagination support via offset.
-// Results include sender identity (principal name, agent name, sender type)
-// via JOINs to the principal and agent tables.
-func (s *Store) SearchChatHistory(ctx context.Context, conversationID uuid.UUID, query string, since, until *time.Time, limit, offset int) ([]*ChatMessage, error) {
-	args := []any{conversationID}
-	where := `cm.conversation_id = $1`
-
-	if query != "" {
-		args = append(args, "%"+query+"%")
-		where += fmt.Sprintf(` AND cm.content ILIKE $%d`, len(args))
-	}
-	if since != nil {
-		args = append(args, since)
-		where += fmt.Sprintf(` AND cm.created_at >= $%d`, len(args))
-	}
-	if until != nil {
-		args = append(args, until)
-		where += fmt.Sprintf(` AND cm.created_at <= $%d`, len(args))
-	}
-	if limit <= 0 || limit > 50 {
-		limit = 10
-	}
-	if offset < 0 {
-		offset = 0
-	}
-	args = append(args, limit, offset)
-
-	rows, err := s.GetDB().QueryContext(ctx, fmt.Sprintf(`
-		SELECT `+chatMessageColumns+`
-		FROM chat_message cm
-		JOIN principal p ON p.id = cm.principal_id
-		LEFT JOIN agent a ON a.id = cm.sender_agent_id
-		WHERE %s
-		ORDER BY cm.created_at DESC, cm.id DESC
-		LIMIT $%d OFFSET $%d
-	`, where, len(args)-1, len(args)), args...)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to search chat history")
-	}
-	defer rows.Close()
-
-	var msgs []*ChatMessage
-	for rows.Next() {
-		msg, scanErr := scanChatMessageRow(rows)
-		if scanErr != nil {
-			return nil, scanErr
-		}
-		msgs = append(msgs, msg)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errors.Wrapf(err, "failed to iterate chat history rows")
-	}
-
-	return msgs, nil
-}
-
 // RunningCommandInfo holds the minimal data needed to derive agent execution
 // status for a conversation activity feed. AgentID is the internal integer ID;
 // CommandID is the UUID of the running command; EventType and Summary come from
