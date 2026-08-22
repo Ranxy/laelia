@@ -2282,6 +2282,16 @@ enum SearchScope {
   SEARCH_SCOPE_FILES = 2;
 }
 
+// SearchThreadContext carries the thread context for a search hit that is a
+// thread reply. The UI renders the reply nested under its root message so the
+// reader can see what the reply is answering.
+message SearchThreadContext {
+  // root is the root message of the thread the matched reply belongs to. It is
+  // always present when thread_context is set, even when the root itself does
+  // not match the query.
+  ChatMessage root = 1;
+}
+
 // SearchChatHistoryEntry is one search hit: the matched message plus the
 // conversation context needed to render the result and jump to it.
 message SearchChatHistoryEntry {
@@ -2293,4 +2303,7 @@ message SearchChatHistoryEntry {
   int32 match_field = 4;
   // matched_attachment_name is set when match_field is 2.
   string matched_attachment_name = 5;
+  // thread_context is set when message is a thread reply. It carries the thread
+  // root so the UI can render the reply nested under its root message.
+  SearchThreadContext thread_context = 6;
 }

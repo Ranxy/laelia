@@ -501,6 +501,20 @@ func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Req
 
 	callerAgent, _ := GetAgentFromContext(ctx)
 	convCache := make(map[uuid.UUID]*v1pb.Conversation, len(results))
+
+	// Load the thread roots for reply hits once so the UI can render each
+	// reply nested under its root message without an extra round trip per hit.
+	rootIDs := make([]uuid.UUID, 0)
+	for _, res := range results {
+		if res.Message.ThreadRootMessageID.Valid {
+			rootIDs = append(rootIDs, res.Message.ThreadRootMessageID.UUID)
+		}
+	}
+	roots, err := s.store.GetThreadRootMessages(ctx, rootIDs)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to load thread context"))
+	}
+
 	entries := make([]*v1pb.SearchChatHistoryEntry, 0, len(results))
 	for _, res := range results {
 		conv, ok := convCache[res.Conversation.ID]
@@ -510,13 +524,19 @@ func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Req
 		}
 		v1m := storeToV1ChatMessage(res.Message)
 		v1m.IsOwn = callerAgent != nil && res.Message.SenderAgentID.Valid && int(res.Message.SenderAgentID.Int32) == callerAgent.ID
-		entries = append(entries, &v1pb.SearchChatHistoryEntry{
+		entry := &v1pb.SearchChatHistoryEntry{
 			Message:               v1m,
 			Conversation:          conv,
 			Snippet:               searchSnippet(res.SearchText, req.Msg.Query),
 			MatchField:            res.MatchField,
 			MatchedAttachmentName: res.MatchedAttachmentName,
-		})
+		}
+		if res.Message.ThreadRootMessageID.Valid {
+			if root, ok := roots[res.Message.ThreadRootMessageID.UUID]; ok {
+				entry.ThreadContext = &v1pb.SearchThreadContext{Root: storeToV1ChatMessage(root)}
+			}
+		}
+		entries = append(entries, entry)
 	}
 
 	return connect.NewResponse(&v1pb.SearchChatHistoryResponse{

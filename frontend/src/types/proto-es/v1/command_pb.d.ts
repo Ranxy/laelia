@@ -5220,6 +5220,30 @@ export declare type AgentActivity = Message<"laelia.v1.AgentActivity"> & {
 export declare const AgentActivitySchema: GenMessage<AgentActivity>;
 
 /**
+ * SearchThreadContext carries the thread context for a search hit that is a
+ * thread reply. The UI renders the reply nested under its root message so the
+ * reader can see what the reply is answering.
+ *
+ * @generated from message laelia.v1.SearchThreadContext
+ */
+export declare type SearchThreadContext = Message<"laelia.v1.SearchThreadContext"> & {
+  /**
+   * root is the root message of the thread the matched reply belongs to. It is
+   * always present when thread_context is set, even when the root itself does
+   * not match the query.
+   *
+   * @generated from field: laelia.v1.ChatMessage root = 1;
+   */
+  root?: ChatMessage | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.SearchThreadContext.
+ * Use `create(SearchThreadContextSchema)` to create a new message.
+ */
+export declare const SearchThreadContextSchema: GenMessage<SearchThreadContext>;
+
+/**
  * SearchChatHistoryEntry is one search hit: the matched message plus the
  * conversation context needed to render the result and jump to it.
  *
@@ -5256,6 +5280,14 @@ export declare type SearchChatHistoryEntry = Message<"laelia.v1.SearchChatHistor
    * @generated from field: string matched_attachment_name = 5;
    */
   matchedAttachmentName: string;
+
+  /**
+   * thread_context is set when message is a thread reply. It carries the thread
+   * root so the UI can render the reply nested under its root message.
+   *
+   * @generated from field: laelia.v1.SearchThreadContext thread_context = 6;
+   */
+  threadContext?: SearchThreadContext | undefined;
 };
 
 /**

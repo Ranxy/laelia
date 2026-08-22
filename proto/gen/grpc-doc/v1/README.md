@@ -285,6 +285,7 @@
     - [SearchChatHistoryEntry](#laelia-v1-SearchChatHistoryEntry)
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
+    - [SearchThreadContext](#laelia-v1-SearchThreadContext)
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
     - [SetConversationClosedRequest](#laelia-v1-SetConversationClosedRequest)
     - [SetConversationClosedResponse](#laelia-v1-SetConversationClosedResponse)
@@ -5106,6 +5107,7 @@ conversation context needed to render the result and jump to it.
 | snippet | [string](#string) |  | snippet is a short excerpt of the message content around the first match. |
 | match_field | [int32](#int32) |  | match_field: 1=message content, 2=attachment file name. |
 | matched_attachment_name | [string](#string) |  | matched_attachment_name is set when match_field is 2. |
+| thread_context | [SearchThreadContext](#laelia-v1-SearchThreadContext) |  | thread_context is set when message is a thread reply. It carries the thread root so the UI can render the reply nested under its root message. |
 
 
 
@@ -5145,6 +5147,23 @@ conversation context needed to render the result and jump to it.
 | ----- | ---- | ----- | ----------- |
 | entries | [SearchChatHistoryEntry](#laelia-v1-SearchChatHistoryEntry) | repeated |  |
 | next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SearchThreadContext"></a>
+
+### SearchThreadContext
+SearchThreadContext carries the thread context for a search hit that is a
+thread reply. The UI renders the reply nested under its root message so the
+reader can see what the reply is answering.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| root | [ChatMessage](#laelia-v1-ChatMessage) |  | root is the root message of the thread the matched reply belongs to. It is always present when thread_context is set, even when the root itself does not match the query. |
 
 
 

@@ -1288,6 +1288,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.SearchThreadContext"><span class="badge">M</span>SearchThreadContext</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.SendMessageRequest"><span class="badge">M</span>SendMessageRequest</a>
                 </li>
               
@@ -12737,6 +12741,14 @@ conversation (see AddReactionRequest). </p></td>
                   <td><p>matched_attachment_name is set when match_field is 2. </p></td>
                 </tr>
               
+                <tr>
+                  <td>thread_context</td>
+                  <td><a href="#laelia.v1.SearchThreadContext">SearchThreadContext</a></td>
+                  <td></td>
+                  <td><p>thread_context is set when message is a thread reply. It carries the thread
+root so the UI can render the reply nested under its root message. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -12871,6 +12883,32 @@ both. SEARCH_SCOPE_UNSPECIFIED searches both. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SearchThreadContext">SearchThreadContext</h3>
+        <p>SearchThreadContext carries the thread context for a search hit that is a</p><p>thread reply. The UI renders the reply nested under its root message so the</p><p>reader can see what the reply is answering.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>root</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td></td>
+                  <td><p>root is the root message of the thread the matched reply belongs to. It is
+always present when thread_context is set, even when the root itself does
+not match the query. </p></td>
                 </tr>
               
             </tbody>

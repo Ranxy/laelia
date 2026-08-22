@@ -569,6 +569,38 @@ func (s *Store) IsThreadRoot(ctx context.Context, conversationID, rootID uuid.UU
 	return exists, nil
 }
 
+// GetThreadRootMessages returns the root messages for the given root IDs,
+// keyed by message ID. Only rows with thread_root_message_id IS NULL are
+// returned, so a reply ID passed by mistake is simply absent from the map.
+// Used by SearchChatHistory to attach thread context to reply hits.
+func (s *Store) GetThreadRootMessages(ctx context.Context, rootIDs []uuid.UUID) (map[uuid.UUID]*ChatMessage, error) {
+	if len(rootIDs) == 0 {
+		return map[uuid.UUID]*ChatMessage{}, nil
+	}
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT `+chatMessageColumns+`
+		FROM chat_message cm
+		JOIN principal p ON p.id = cm.principal_id
+		LEFT JOIN agent a ON a.id = cm.sender_agent_id
+		WHERE cm.id = ANY($1) AND cm.thread_root_message_id IS NULL`, rootIDs)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get thread root messages")
+	}
+	defer rows.Close()
+	roots := make(map[uuid.UUID]*ChatMessage, len(rootIDs))
+	for rows.Next() {
+		msg, scanErr := scanChatMessageRow(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		roots[msg.ID] = msg
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate thread root messages")
+	}
+	return roots, nil
+}
+
 // threadRootSenderSQL is the thread-root sender lookup used by
 // GetThreadRootSender. It must return sender_type and sender_agent_id of the
 // root message by id so subscribeAndNotifyThread can subscribe the agent that

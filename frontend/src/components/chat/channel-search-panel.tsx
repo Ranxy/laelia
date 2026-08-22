@@ -1,13 +1,12 @@
 import { create } from "@bufbuild/protobuf";
-import { timestampDate } from "@bufbuild/protobuf/wkt";
-import { CornerDownRight, FileText, SearchX } from "lucide-react";
+import { SearchX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { formatTime } from "@/components/chat/avatar";
+import { SearchResultList } from "@/components/chat/search-result-list";
 import { EmptyState, LoadingState } from "@/components/chat/states";
+import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { commandServiceClient } from "@/connect";
-import { cn } from "@/lib/utils";
 import type {
   ChatMessage,
   SearchChatHistoryEntry,
@@ -32,17 +31,20 @@ export function ChannelSearchPanel({
   onClose,
   onJumpToMessage,
 }: ChannelSearchPanelProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [results, setResults] =
     useState<SearchChatHistoryEntry[]>(EMPTY_RESULTS);
+  const [nextPageToken, setNextPageToken] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searched, setSearched] = useState(false);
 
   useEffect(() => {
     const q = query.trim();
     if (!q) {
       setResults(EMPTY_RESULTS);
+      setNextPageToken("");
       setSearched(false);
       setLoading(false);
       return;
@@ -61,11 +63,13 @@ export function ChannelSearchPanel({
         .then((res) => {
           if (cancelled) return;
           setResults(res.entries ?? EMPTY_RESULTS);
+          setNextPageToken(res.nextPageToken ?? "");
           setSearched(true);
         })
         .catch(() => {
           if (cancelled) return;
           setResults(EMPTY_RESULTS);
+          setNextPageToken("");
           setSearched(true);
         })
         .finally(() => {
@@ -77,6 +81,33 @@ export function ChannelSearchPanel({
       clearTimeout(timer);
     };
   }, [channelId, query]);
+
+  const handleOpen = (entry: SearchChatHistoryEntry) => {
+    if (entry.message) onJumpToMessage(entry.message);
+  };
+
+  const loadMore = () => {
+    const q = query.trim();
+    if (!q || !nextPageToken || loadingMore) return;
+    setLoadingMore(true);
+    commandServiceClient
+      .searchChatHistory(
+        create(SearchChatHistoryRequestSchema, {
+          conversation: `conversations/${channelId}`,
+          query: q,
+          limit: 50,
+          pageToken: nextPageToken,
+        })
+      )
+      .then((res) => {
+        setResults((prev) => [...prev, ...(res.entries ?? EMPTY_RESULTS)]);
+        setNextPageToken(res.nextPageToken ?? "");
+      })
+      .catch(() => {
+        // Keep the current page; the user can retry the load-more button.
+      })
+      .finally(() => setLoadingMore(false));
+  };
 
   const body = useMemo(() => {
     if (loading) return <LoadingState />;
@@ -97,53 +128,34 @@ export function ChannelSearchPanel({
       );
     }
     return (
-      <div className="flex flex-col gap-1 overflow-y-auto p-2">
-        {results.map((entry) => {
-          const msg = entry.message;
-          if (!msg) return null;
-          const isReply = !!msg.threadRoot;
-          const title =
-            entry.matchedAttachmentName ||
-            entry.snippet ||
-            msg.content ||
-            t("channelSearch.untitled");
-          return (
-            <button
-              key={msg.name}
+      <div className="flex flex-col gap-2 p-2">
+        <SearchResultList
+          entries={results}
+          query={query}
+          onOpen={handleOpen}
+          compact
+          threadLabel={t("channelSearch.thread")}
+        />
+        {nextPageToken && (
+          <div className="flex justify-center pb-1">
+            <Button
               type="button"
-              onClick={() => onJumpToMessage(msg)}
-              className="flex flex-col gap-1 rounded-md px-3 py-2 text-left transition-colors hover:bg-control-bg"
+              variant="outline"
+              size="sm"
+              onClick={loadMore}
+              disabled={loadingMore}
             >
-              <span className="flex items-center gap-1.5 text-xs text-control-light">
-                {isReply ? (
-                  <CornerDownRight className="size-3.5" />
-                ) : (
-                  <FileText className="size-3.5" />
-                )}
-                <span className="truncate">{msg.senderName}</span>
-                <span aria-hidden>·</span>
-                <span className="shrink-0">
-                  {msg.createdAt
-                    ? formatTime(timestampDate(msg.createdAt), i18n.language)
-                    : ""}
-                </span>
-              </span>
-              <span className="line-clamp-2 text-sm text-main">{title}</span>
-              {isReply && (
-                <span className="text-xs text-control-light">
-                  {t("channelSearch.in-thread")}
-                </span>
-              )}
-            </button>
-          );
-        })}
+              {t("channelSearch.load-more")}
+            </Button>
+          </div>
+        )}
       </div>
     );
   }, [
     channelTitle,
-    i18n.language,
     loading,
-    onJumpToMessage,
+    loadingMore,
+    nextPageToken,
     query,
     results,
     searched,
@@ -168,14 +180,7 @@ export function ChannelSearchPanel({
           {t("common.close")}
         </button>
       </div>
-      <div
-        className={cn(
-          "min-h-0 flex-1",
-          results.length > 0 && "overflow-hidden"
-        )}
-      >
-        {body}
-      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
     </div>
   );
 }

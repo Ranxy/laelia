@@ -564,45 +564,99 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // does not fight the user's own scrolling.
   const jumpMessageIdRef = useRef<string | null>(null);
   useLayoutEffect(() => {
-    if (!jumpMessageId) return;
+    // jumpMessageId is the intended target set by the caller (deep-link, file
+    // jump, channel search). It can be reset to null by init() when the
+    // channel mounts (and again by React StrictMode's double-invoke), so fall
+    // back to the committed jump anchor when the intent was cleared but the
+    // jump window is already active.
+    const targetId = jumpMessageId || jumpTarget?.messageId || null;
+    if (!targetId) return;
     // setJumpMessageId renders before jumpToMessage finishes, while the old
     // window is still on screen. Scrolling then would center the target in the
     // old window; after the focused window replaces it, that scrollTop no
     // longer points at the target. Wait until the jump anchor for this exact
     // message is active, then scroll once.
-    if (jumpTarget?.messageId !== jumpMessageId) return;
-    if (jumpMessageIdRef.current === jumpMessageId) return;
-    jumpMessageIdRef.current = jumpMessageId;
+    if (jumpTarget?.messageId !== targetId) return;
+    if (jumpMessageIdRef.current === targetId) return;
+    jumpMessageIdRef.current = targetId;
     stickToBottomRef.current = false;
-    if (messages.length > 0) {
-      const scroller = scrollRef.current;
-      const target = scroller?.querySelector(
-        `[data-msg-id="${jumpMessageId}"]`
-      );
-      if (scroller && target) {
-        // Center the target inside the message scroller only. scrollIntoView
-        // would also scroll every scrollable ancestor, which can leave the
-        // message list offset when the page itself is scrollable. Apply the
-        // position before paint so no sentinel-triggered load can interleave
-        // with a smooth-scroll animation and move the target again.
-        restoringHistoryScrollTokenRef.current += 1;
-        restoringHistoryScrollRef.current = true;
-        const targetTop =
-          target.getBoundingClientRect().top -
-          scroller.getBoundingClientRect().top;
-        const targetCenter =
-          targetTop + target.getBoundingClientRect().height / 2;
-        const scrollerCenter = scroller.clientHeight / 2;
-        scroller.scrollTop = scroller.scrollTop + targetCenter - scrollerCenter;
-        const token = restoringHistoryScrollTokenRef.current;
-        requestAnimationFrame(() => {
-          if (restoringHistoryScrollTokenRef.current === token) {
-            restoringHistoryScrollRef.current = false;
-          }
-        });
-      }
+
+    const scroller = scrollRef.current;
+    if (!scroller || messages.length === 0) {
+      suppressHistoryLoadRef.current = false;
+      return;
     }
+
+    let programmaticScrollTop = scroller.scrollTop;
+    const centerTarget = () => {
+      const target = scroller.querySelector(`[data-msg-id="${targetId}"]`);
+      if (!target) return;
+      // Center the target inside the message scroller only. scrollIntoView
+      // would also scroll every scrollable ancestor, which can leave the
+      // message list offset when the page itself is scrollable. Apply the
+      // position before paint so no sentinel-triggered load can interleave
+      // with a smooth-scroll animation and move the target again.
+      const targetTop =
+        target.getBoundingClientRect().top -
+        scroller.getBoundingClientRect().top;
+      const targetCenter =
+        targetTop + target.getBoundingClientRect().height / 2;
+      const scrollerCenter = scroller.clientHeight / 2;
+      scroller.scrollTop = scroller.scrollTop + targetCenter - scrollerCenter;
+      programmaticScrollTop = scroller.scrollTop;
+    };
+
+    restoringHistoryScrollTokenRef.current += 1;
+    restoringHistoryScrollRef.current = true;
+    centerTarget();
+    const token = restoringHistoryScrollTokenRef.current;
+    requestAnimationFrame(() => {
+      if (restoringHistoryScrollTokenRef.current === token) {
+        restoringHistoryScrollRef.current = false;
+      }
+    });
+
+    // Async content (images, lazy markdown) can change row heights after the
+    // jump and push the target off-center. Re-assert the centered position
+    // whenever the message list resizes, until the user scrolls. Keep native
+    // scroll anchoring off for the same window so the browser does not fight
+    // the re-centering; the anchor-restore effect below would otherwise
+    // re-enable it two frames after the jump.
+    nativeScrollAnchorSuppressedRef.current = false;
+    scroller.style.overflowAnchor = "none";
+
+    const content = scroller.querySelector("[data-msg-id]")?.parentElement;
+    const resizeObserver = content
+      ? new ResizeObserver(() => centerTarget())
+      : null;
+    if (resizeObserver && content) resizeObserver.observe(content);
+
+    let settled = false;
+    const stopSettling = () => {
+      if (settled) return;
+      settled = true;
+      resizeObserver?.disconnect();
+      scroller.removeEventListener("wheel", stopSettling);
+      scroller.removeEventListener("touchstart", stopSettling);
+      scroller.removeEventListener("scroll", onUserScroll);
+      scroller.style.overflowAnchor = "";
+    };
+    const onUserScroll = () => {
+      // Ignore the scroll events emitted by our own re-centering; any other
+      // scroll (wheel, keyboard, scrollbar) means the user took over.
+      if (Math.abs(scroller.scrollTop - programmaticScrollTop) > 1) {
+        stopSettling();
+      }
+    };
+    scroller.addEventListener("wheel", stopSettling, { passive: true });
+    scroller.addEventListener("touchstart", stopSettling, { passive: true });
+    scroller.addEventListener("scroll", onUserScroll, { passive: true });
+
     suppressHistoryLoadRef.current = false;
+
+    return () => {
+      stopSettling();
+    };
   }, [jumpMessageId, jumpTarget, messages.length]);
 
   // captureScrollAnchor records the viewport offset of a message before an

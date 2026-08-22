@@ -1,18 +1,12 @@
 import { create } from "@bufbuild/protobuf";
-import { TimestampSchema, timestampDate } from "@bufbuild/protobuf/wkt";
-import {
-  CalendarClock,
-  CornerDownRight,
-  Hash,
-  Search,
-  SearchX,
-  User,
-} from "lucide-react";
+import { TimestampSchema } from "@bufbuild/protobuf/wkt";
+import { CalendarClock, Search, SearchX, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { formatTime } from "@/components/chat/avatar";
+import { SearchResultList } from "@/components/chat/search-result-list";
 import { EmptyState, LoadingState } from "@/components/chat/states";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -44,11 +38,44 @@ function timeLabelKey(value: string): string {
   return `globalSearch.time-${value || "any"}`;
 }
 
+function buildSearchRequest({
+  query,
+  from,
+  scope,
+  channel,
+  timeRange,
+  pageToken,
+}: {
+  query: string;
+  from: string;
+  scope: SearchScope;
+  channel: string;
+  timeRange: TimeRange;
+  pageToken?: string;
+}) {
+  const range = TIME_RANGES.find((r) => r.value === timeRange);
+  const since =
+    range && range.hours > 0
+      ? create(TimestampSchema, {
+          seconds: BigInt(Math.floor(Date.now() / 1000) - range.hours * 3600),
+        })
+      : undefined;
+  return create(SearchChatHistoryRequestSchema, {
+    query,
+    from: from.trim() || "",
+    scope,
+    conversation: channel || "",
+    since,
+    limit: 50,
+    pageToken: pageToken || "",
+  });
+}
+
 // GlobalSearchPage searches every conversation the current user can read:
 // message content (main channel and thread replies) plus attachment file
 // names. Results link back into the channel chat at the exact message.
 export function GlobalSearchPage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const myChannels = useAppStore((s) => s.myChannels);
   const fetchChannels = useAppStore((s) => s.fetchChannels);
@@ -65,13 +92,16 @@ export function GlobalSearchPage() {
 
   const [results, setResults] =
     useState<SearchChatHistoryEntry[]>(EMPTY_RESULTS);
+  const [nextPageToken, setNextPageToken] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searched, setSearched] = useState(false);
 
   useEffect(() => {
     const q = query.trim();
     if (!q) {
       setResults(EMPTY_RESULTS);
+      setNextPageToken("");
       setSearched(false);
       setLoading(false);
       return;
@@ -79,34 +109,20 @@ export function GlobalSearchPage() {
     let cancelled = false;
     const timer = setTimeout(() => {
       setLoading(true);
-      const range = TIME_RANGES.find((r) => r.value === timeRange);
-      const since =
-        range && range.hours > 0
-          ? create(TimestampSchema, {
-              seconds: BigInt(
-                Math.floor(Date.now() / 1000) - range.hours * 3600
-              ),
-            })
-          : undefined;
       commandServiceClient
         .searchChatHistory(
-          create(SearchChatHistoryRequestSchema, {
-            query: q,
-            from: from.trim() || "",
-            scope,
-            conversation: channel || "",
-            since,
-            limit: 50,
-          })
+          buildSearchRequest({ query: q, from, scope, channel, timeRange })
         )
         .then((res) => {
           if (cancelled) return;
           setResults(res.entries ?? EMPTY_RESULTS);
+          setNextPageToken(res.nextPageToken ?? "");
           setSearched(true);
         })
         .catch(() => {
           if (cancelled) return;
           setResults(EMPTY_RESULTS);
+          setNextPageToken("");
           setSearched(true);
         })
         .finally(() => {
@@ -133,6 +149,31 @@ export function GlobalSearchPage() {
     navigate(`/${msg.conversation}?${params.toString()}`);
   };
 
+  const loadMore = () => {
+    const q = query.trim();
+    if (!q || !nextPageToken || loadingMore) return;
+    setLoadingMore(true);
+    commandServiceClient
+      .searchChatHistory(
+        buildSearchRequest({
+          query: q,
+          from,
+          scope,
+          channel,
+          timeRange,
+          pageToken: nextPageToken,
+        })
+      )
+      .then((res) => {
+        setResults((prev) => [...prev, ...(res.entries ?? EMPTY_RESULTS)]);
+        setNextPageToken(res.nextPageToken ?? "");
+      })
+      .catch(() => {
+        // Keep the current page; the user can retry the load-more button.
+      })
+      .finally(() => setLoadingMore(false));
+  };
+
   const body = useMemo(() => {
     if (loading) return <LoadingState />;
     if (!query.trim()) {
@@ -154,53 +195,29 @@ export function GlobalSearchPage() {
       );
     }
     return (
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-1 px-4 py-3">
-        {results.map((entry) => {
-          const msg = entry.message;
-          if (!msg) return null;
-          const conv = entry.conversation;
-          const convLabel =
-            conv?.title || conv?.address || msg.conversation || "";
-          const isReply = !!msg.threadRoot;
-          const title =
-            entry.matchedAttachmentName ||
-            entry.snippet ||
-            msg.content ||
-            t("globalSearch.untitled");
-          return (
-            <button
-              key={`${msg.conversation}:${msg.name}`}
+      <div className="flex w-full flex-col gap-3 px-4 py-3">
+        <SearchResultList
+          entries={results}
+          query={query}
+          onOpen={handleOpen}
+          threadLabel={t("globalSearch.thread")}
+        />
+        {nextPageToken && (
+          <div className="flex justify-center pb-2">
+            <Button
               type="button"
-              onClick={() => handleOpen(entry)}
-              className="flex flex-col gap-1 rounded-md border border-transparent px-3 py-2 text-left transition-colors hover:border-control-border hover:bg-control-bg"
+              variant="outline"
+              size="sm"
+              onClick={loadMore}
+              disabled={loadingMore}
             >
-              <span className="flex items-center gap-1.5 text-xs text-control-light">
-                <Hash className="size-3.5" />
-                <span className="truncate font-medium text-control">
-                  {convLabel}
-                </span>
-                <span aria-hidden>·</span>
-                <span className="truncate">{msg.senderName}</span>
-                <span aria-hidden>·</span>
-                <span className="shrink-0">
-                  {msg.createdAt
-                    ? formatTime(timestampDate(msg.createdAt), i18n.language)
-                    : ""}
-                </span>
-              </span>
-              <span className="line-clamp-2 text-sm text-main">{title}</span>
-              {isReply && (
-                <span className="flex items-center gap-1 text-xs text-control-light">
-                  <CornerDownRight className="size-3.5" />
-                  {t("globalSearch.in-thread")}
-                </span>
-              )}
-            </button>
-          );
-        })}
+              {t("globalSearch.load-more")}
+            </Button>
+          </div>
+        )}
       </div>
     );
-  }, [i18n.language, loading, query, results, searched, t]);
+  }, [loading, loadingMore, nextPageToken, query, results, searched, t]);
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
