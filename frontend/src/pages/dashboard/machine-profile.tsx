@@ -194,6 +194,7 @@ export function MachineProfilePage() {
   } | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
   const [accessMembers, setAccessMembers] = useState<Set<string>>(new Set());
+  const accessInitializedRef = useRef(false);
   const [accessSaving, setAccessSaving] = useState(false);
   const [accessError, setAccessError] = useState("");
   const [groups, setGroups] = useState<Group[]>([]);
@@ -323,6 +324,20 @@ export function MachineProfilePage() {
     );
     return binding?.members ?? [];
   }, [policyState]);
+
+  // If the manage sheet is opened before the IAM policy finishes loading,
+  // populate its member list as soon as the policy arrives. This avoids
+  // showing an empty "current members" list for fast clicks while the policy
+  // request is still in flight.
+  useEffect(() => {
+    if (!accessOpen) {
+      accessInitializedRef.current = false;
+      return;
+    }
+    if (!policyState || accessInitializedRef.current) return;
+    accessInitializedRef.current = true;
+    setAccessMembers(new Set(agentCreatorMembers));
+  }, [accessOpen, policyState, agentCreatorMembers]);
 
   // The active upgrade stage reported by the machine, polled from
   // machine.upgradeStatus while a triggered upgrade is in flight.
@@ -677,6 +692,7 @@ export function MachineProfilePage() {
   }
 
   function openAccess() {
+    accessInitializedRef.current = false;
     setAccessMembers(new Set(agentCreatorMembers));
     setAccessError("");
     setAccessOpen(true);
