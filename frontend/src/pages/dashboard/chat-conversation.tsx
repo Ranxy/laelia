@@ -627,11 +627,9 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
         scroller.scrollTop = scroller.scrollTop + targetCenter - scrollerCenter;
         const token = restoringHistoryScrollTokenRef.current;
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (restoringHistoryScrollTokenRef.current === token) {
-              restoringHistoryScrollRef.current = false;
-            }
-          });
+          if (restoringHistoryScrollTokenRef.current === token) {
+            restoringHistoryScrollRef.current = false;
+          }
         });
       }
     }
@@ -671,14 +669,14 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const reenableNativeScrollAnchor = useCallback(() => {
     if (!scrollRef.current) return;
     const token = nativeScrollAnchorSuppressTokenRef.current;
-    // Two frames: the first rAF can run before the browser lays out the
-    // restored scroll position, so wait for the following frame as well.
+    // The restore above runs in a layout effect, before the browser lays out
+    // and paints the prepended rows. By the next animation frame that layout
+    // has already happened, so native anchoring can be turned back on without
+    // fighting the manual scrollTop adjustment.
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (nativeScrollAnchorSuppressTokenRef.current !== token) return;
-        if (scrollRef.current) scrollRef.current.style.overflowAnchor = "";
-        nativeScrollAnchorSuppressedRef.current = false;
-      });
+      if (nativeScrollAnchorSuppressTokenRef.current !== token) return;
+      if (scrollRef.current) scrollRef.current.style.overflowAnchor = "";
+      nativeScrollAnchorSuppressedRef.current = false;
     });
   }, []);
 
@@ -722,12 +720,13 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     // immediately trigger another history page.
     if (didRestore) {
       const token = restoringHistoryScrollTokenRef.current;
+      // The programmatic scroll event emitted by the scrollTop change above is
+      // delivered before the next animation frame, so one frame is enough to
+      // keep the guard up through that event.
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (restoringHistoryScrollTokenRef.current === token) {
-            restoringHistoryScrollRef.current = false;
-          }
-        });
+        if (restoringHistoryScrollTokenRef.current === token) {
+          restoringHistoryScrollRef.current = false;
+        }
       });
     }
   }, [messages, jumpLoading, reenableNativeScrollAnchor]);
@@ -1466,7 +1465,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             )}
             {hasOlder && (
               <div
-                className="flex justify-center py-2 text-control-placeholder"
+                className="flex h-6 items-center justify-center overflow-hidden whitespace-nowrap text-control-placeholder"
                 style={{ overflowAnchor: "none" }}
               >
                 {jumpLoading ? (
@@ -1494,7 +1493,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             />
             {hasNewer && (
               <div
-                className="flex justify-center py-2 text-control-placeholder"
+                className="flex h-6 items-center justify-center overflow-hidden whitespace-nowrap text-control-placeholder"
                 style={{ overflowAnchor: "none" }}
               >
                 {jumpLoading ? (
