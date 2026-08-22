@@ -85,8 +85,9 @@ export interface LazyMarkdownProps {
 // browser then anchors to an already-rendered row below it, so the
 // fallback→markdown height change is absorbed without moving the rows the user
 // is reading. The scroll container must keep native `overflow-anchor` enabled
-// for this to work; chat-conversation.tsx intentionally no longer sets
-// `overflow-anchor: none` on the message scroller.
+// outside of history-page transactions for this to work; chat-conversation.tsx
+// only disables it for the brief prepend/append commit and restores it right
+// after that commit has been laid out.
 //
 // Observer setup is deferred one animation frame so it runs AFTER the page's
 // stick-to-bottom effect has scrolled the list to the latest message. React
