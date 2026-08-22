@@ -309,6 +309,11 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // Latest messages for the IntersectionObserver callback without re-creating
   // the observer (and re-firing it) every time the watcher appends a message.
   const messagesRef = useRef(messages);
+  // While a file jump is in flight (and until its scroll has been applied),
+  // sentinel-triggered history loads must stay quiet. Otherwise the new window
+  // can land with a sentinel visible, immediately load another page, and its
+  // scroll-anchor restore yanks the view away from the jump target.
+  const suppressHistoryLoadRef = useRef(false);
   const lastChannelRef = useRef<string | null>(null);
   const stickToBottomRef = useRef(true);
   const [showScrollDown, setShowScrollDown] = useState(false);
@@ -432,6 +437,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     setThreadExpanded(false);
     setJumpMessageId(null);
     jumpMessageIdRef.current = null;
+    suppressHistoryLoadRef.current = false;
     lastChannelRef.current = channelId;
     stickToBottomRef.current = true;
     pendingScrollAnchorRef.current = null;
@@ -569,17 +575,39 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // target message once it has loaded. Runs at most once per target id so it
   // does not fight the user's own scrolling.
   const jumpMessageIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!jumpMessageId || messages.length === 0) return;
+  useLayoutEffect(() => {
+    if (!jumpMessageId) return;
+    // setJumpMessageId renders before jumpToMessage finishes, while the old
+    // window is still on screen. Scrolling then would center the target in the
+    // old window; after the focused window replaces it, that scrollTop no
+    // longer points at the target. Wait until the jump anchor for this exact
+    // message is active, then scroll once.
+    if (jumpTarget?.messageId !== jumpMessageId) return;
     if (jumpMessageIdRef.current === jumpMessageId) return;
     jumpMessageIdRef.current = jumpMessageId;
-    requestAnimationFrame(() => {
-      stickToBottomRef.current = false;
-      scrollRef.current
-        ?.querySelector(`[data-msg-id="${jumpMessageId}"]`)
-        ?.scrollIntoView({ block: "center", behavior: "smooth" });
-    });
-  }, [jumpMessageId, messages.length]);
+    stickToBottomRef.current = false;
+    if (messages.length > 0) {
+      const scroller = scrollRef.current;
+      const target = scroller?.querySelector(
+        `[data-msg-id="${jumpMessageId}"]`
+      );
+      if (scroller && target) {
+        // Center the target inside the message scroller only. scrollIntoView
+        // would also scroll every scrollable ancestor, which can leave the
+        // message list offset when the page itself is scrollable. Apply the
+        // position before paint so no sentinel-triggered load can interleave
+        // with a smooth-scroll animation and move the target again.
+        const targetTop =
+          target.getBoundingClientRect().top -
+          scroller.getBoundingClientRect().top;
+        const targetCenter =
+          targetTop + target.getBoundingClientRect().height / 2;
+        const scrollerCenter = scroller.clientHeight / 2;
+        scroller.scrollTop = scroller.scrollTop + targetCenter - scrollerCenter;
+      }
+    }
+    suppressHistoryLoadRef.current = false;
+  }, [jumpMessageId, jumpTarget, messages.length]);
 
   // captureScrollAnchor records the viewport offset of a message before an
   // incremental page load. The layout effect below restores that offset after
@@ -641,6 +669,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     const newerEl = newerSentinelRef.current;
     const observer = new IntersectionObserver(
       (entries) => {
+        if (suppressHistoryLoadRef.current) return;
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
           // Read the store directly rather than the render closure: the first
@@ -731,6 +760,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
       // scrolls to it instead of being treated as an already-handled jump.
       setJumpMessageId(null);
       jumpMessageIdRef.current = null;
+      suppressHistoryLoadRef.current = false;
     }
     stickToBottomRef.current = true;
     if (scrollRef.current) {
@@ -1193,7 +1223,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // Only a focused window around the target is loaded; older/newer pages are
   // fetched incrementally as the user scrolls.
   const handleJumpToMessage = useCallback(
-    (cf: ConversationFile) => {
+    async (cf: ConversationFile) => {
       if (!channelId || !cf.messageId) return;
       setFilesOpen(false);
       // Files attached inside a thread reply live in the thread panel, not the
@@ -1207,11 +1237,19 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
       if (!cf.roomVersion) return;
       // Entering a focused history view: release stick-to-bottom before the
       // window loads so the auto-stick effect never yanks the list to the
-      // bottom of the jump window, and drop any stale scroll anchor.
+      // bottom of the jump window, and drop any stale scroll anchor/latch.
       stickToBottomRef.current = false;
       pendingScrollAnchorRef.current = null;
+      jumpMessageIdRef.current = null;
+      suppressHistoryLoadRef.current = true;
       setJumpMessageId(cf.messageId);
-      void jumpToMessage(conversationName, cf.messageId, cf.roomVersion);
+      try {
+        await jumpToMessage(conversationName, cf.messageId, cf.roomVersion);
+      } catch {
+        // The jump failed, so the scroll effect will never run to release the
+        // suppression; release it here so normal history paging still works.
+        suppressHistoryLoadRef.current = false;
+      }
     },
     [channelId, conversationName, jumpToMessage, openThread]
   );

@@ -298,10 +298,11 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         },
         chatJumpLoading: { ...state.chatJumpLoading, [conversation]: false },
       }));
-    } catch {
+    } catch (err) {
       set((state) => ({
         chatJumpLoading: { ...state.chatJumpLoading, [conversation]: false },
       }));
+      throw err;
     }
   },
 
