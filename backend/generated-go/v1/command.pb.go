@@ -2550,7 +2550,11 @@ type ConversationFile struct {
 	// thread_root is the bare UUID of the thread root message when the carrying
 	// message is a thread reply, empty for a main-channel message. Used to open
 	// the same preview/comment context as the in-chat file card.
-	ThreadRoot    string `protobuf:"bytes,9,opt,name=thread_root,json=threadRoot,proto3" json:"thread_root,omitempty"`
+	ThreadRoot string `protobuf:"bytes,9,opt,name=thread_root,json=threadRoot,proto3" json:"thread_root,omitempty"`
+	// room_version is the carrying message's room_version, used by the client to
+	// jump to the exact position in the conversation without loading the whole
+	// history.
+	RoomVersion   int64 `protobuf:"varint,10,opt,name=room_version,json=roomVersion,proto3" json:"room_version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2646,6 +2650,13 @@ func (x *ConversationFile) GetThreadRoot() string {
 		return x.ThreadRoot
 	}
 	return ""
+}
+
+func (x *ConversationFile) GetRoomVersion() int64 {
+	if x != nil {
+		return x.RoomVersion
+	}
+	return 0
 }
 
 // Reaction is one emoji's aggregate on a message: the emoji, how many distinct
@@ -11558,7 +11569,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x13laelia/ConversationR\fconversation\"\x86\x01\n" +
 	"\x11ListFilesResponse\x12%\n" +
 	"\x05files\x18\x01 \x03(\v2\x0f.laelia.v1.FileR\x05files\x12J\n" +
-	"\x12conversation_files\x18\x02 \x03(\v2\x1b.laelia.v1.ConversationFileR\x11conversationFiles\"\xea\x02\n" +
+	"\x12conversation_files\x18\x02 \x03(\v2\x1b.laelia.v1.ConversationFileR\x11conversationFiles\"\x8d\x03\n" +
 	"\x10ConversationFile\x12#\n" +
 	"\x04file\x18\x01 \x01(\v2\x0f.laelia.v1.FileR\x04file\x12\x1f\n" +
 	"\vsender_name\x18\x02 \x01(\tR\n" +
@@ -11572,7 +11583,9 @@ const file_v1_command_proto_rawDesc = "" +
 	"message_id\x18\a \x01(\tR\tmessageId\x12\x19\n" +
 	"\bagent_id\x18\b \x01(\tR\aagentId\x12\x1f\n" +
 	"\vthread_root\x18\t \x01(\tR\n" +
-	"threadRoot\"l\n" +
+	"threadRoot\x12!\n" +
+	"\froom_version\x18\n" +
+	" \x01(\x03R\vroomVersion\"l\n" +
 	"\bReaction\x12\x14\n" +
 	"\x05emoji\x18\x01 \x01(\tR\x05emoji\x12\x14\n" +
 	"\x05count\x18\x02 \x01(\x05R\x05count\x12\x1a\n" +

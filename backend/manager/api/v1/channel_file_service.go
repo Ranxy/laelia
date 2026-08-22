@@ -288,6 +288,7 @@ func conversationFileToV1(cf *store.ConversationFile) *v1pb.ConversationFile {
 		PrincipalId:    cf.PrincipalID,
 		MessageContent: cf.MessageContent,
 		AgentId:        cf.AgentResourceID,
+		RoomVersion:    cf.RoomVersion,
 	}
 	if cf.MessageID.Valid {
 		out.MessageId = cf.MessageID.UUID.String()

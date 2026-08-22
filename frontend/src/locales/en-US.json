@@ -295,13 +295,16 @@
     "count": "{{count}} files",
     "download": "Download",
     "empty": "No files in this channel yet",
+    "load-newer": "Load newer messages",
+    "load-older": "Load earlier messages",
     "no-results": "No files match “{{query}}”",
     "preview": "Preview",
     "preview-unsupported": "This file type is not supported for online preview",
     "search-placeholder": "Search file name…",
     "title": "Files",
     "unknown-sender": "Unknown sender",
-    "unknown-time": "Unknown time"
+    "unknown-time": "Unknown time",
+    "view-in-chat": "View in chat"
   },
   "channelTask": {
     "as-task": "As Task",

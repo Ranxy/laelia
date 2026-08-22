@@ -381,6 +381,18 @@ export interface ChatSlice {
   // messages newer than what it has already seen instead of re-fetching the
   // whole list every tick.
   chatCurrentVersion: Record<string, bigint>;
+  // Jump-to-message state: when a file drawer entry is clicked, the client
+  // loads a focused window around the carrying message instead of the whole
+  // history. chatJumpByConv holds the active jump anchor per conversation
+  // (null when not in jump mode); chatHasOlder/Newer tell the UI whether more
+  // history is available in each direction for incremental loading.
+  chatJumpByConv: Record<
+    string,
+    { messageId: string; roomVersion: bigint } | null
+  >;
+  chatJumpLoading: Record<string, boolean>;
+  chatHasOlderByConv: Record<string, boolean>;
+  chatHasNewerByConv: Record<string, boolean>;
 
   getOrCreateConversation: (agent: string) => Promise<string>;
   // getOrCreateUserUserDM opens (or reuses) the 1:1 DM between the calling
@@ -402,6 +414,20 @@ export interface ChatSlice {
     messageId: string,
     emoji: string
   ) => Promise<void>;
+  // jumpToMessage replaces the conversation's message list with a focused
+  // window around the given message (the file's carrying position) so the user
+  // can jump to an old message without loading the whole history. Older/newer
+  // pages are loaded incrementally via loadOlderMessages / loadNewerMessages.
+  jumpToMessage: (
+    conversation: string,
+    messageId: string,
+    roomVersion: bigint
+  ) => Promise<void>;
+  loadOlderMessages: (conversation: string) => Promise<void>;
+  loadNewerMessages: (conversation: string) => Promise<void>;
+  // clearJump exits jump mode and reloads the latest messages for the
+  // conversation.
+  clearJump: (conversation: string) => Promise<void>;
 }
 
 // ChannelSlice owns channel conversations: the channel roster, per-conversation

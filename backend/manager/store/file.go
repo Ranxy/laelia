@@ -101,21 +101,22 @@ type ConversationFile struct {
 	PrincipalID      string
 	AgentResourceID  string
 	ThreadRootID     uuid.NullUUID
+	RoomVersion      int64
 }
 
 // listConversationFilesSQL joins each file to the earliest message that
 // carried it (via the attachments JSONB id) and returns newest-first.
 const listConversationFilesSQL = `
 	SELECT f.id, f.conversation_id, f.uploader_principal_id, f.original_name, f.mime_type, f.size_bytes, f.s3_key, f.created_at,
-	       cm.id, COALESCE(cm.content, ''), cm.created_at, cm.thread_root_message_id,
+	       cm.id, COALESCE(cm.content, ''), cm.created_at, cm.thread_root_message_id, COALESCE(cm.room_version, 0),
 	       COALESCE(p.name, ''), COALESCE(cm.sender_type, 0), COALESCE(p.handle, ''), COALESCE(a.resource_id, '')
 	FROM file f
 	LEFT JOIN LATERAL (
-		SELECT cm.id, cm.content, cm.created_at, cm.sender_type, cm.principal_id, cm.sender_agent_id, cm.thread_root_message_id
+		SELECT cm.id, cm.content, cm.created_at, cm.sender_type, cm.principal_id, cm.sender_agent_id, cm.thread_root_message_id, cm.room_version
 		FROM chat_message cm
 		WHERE cm.conversation_id = f.conversation_id
 		  AND cm.attachments @> jsonb_build_array(jsonb_build_object('id', f.id::text))
-		ORDER BY cm.created_at ASC
+		ORDER BY cm.created_at DESC
 		LIMIT 1
 	) cm ON true
 	LEFT JOIN principal p ON p.id = cm.principal_id
@@ -139,7 +140,7 @@ func (s *Store) ListConversationFiles(ctx context.Context, convID uuid.UUID) ([]
 		var cf ConversationFile
 		if err := rows.Scan(
 			&cf.ID, &cf.ConversationID, &cf.UploaderPrincipalID, &cf.OriginalName, &cf.MimeType, &cf.SizeBytes, &cf.S3Key, &cf.CreatedAt,
-			&cf.MessageID, &cf.MessageContent, &cf.MessageCreatedAt, &cf.ThreadRootID,
+			&cf.MessageID, &cf.MessageContent, &cf.MessageCreatedAt, &cf.ThreadRootID, &cf.RoomVersion,
 			&cf.SenderName, &cf.SenderType, &cf.PrincipalID, &cf.AgentResourceID,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan conversation file")

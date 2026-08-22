@@ -1,5 +1,13 @@
 import { create } from "@bufbuild/protobuf";
-import { Download, Eye, FileIcon, FolderOpen, Loader2, X } from "lucide-react";
+import {
+  CornerDownRight,
+  Download,
+  Eye,
+  FileIcon,
+  FolderOpen,
+  Loader2,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatTime } from "@/components/chat/avatar";
@@ -36,6 +44,10 @@ export interface ChannelFilesPanelProps {
   onClose: () => void;
   onPreviewAttachment: (attachment: Attachment, rootMessageId: string) => void;
   onPreviewImage: (attachment: Attachment) => void;
+  // onJumpToMessage navigates the channel chat to the message where the file
+  // was attached (the last carrying position), loading only a focused window
+  // around it instead of the whole history.
+  onJumpToMessage: (cf: ConversationFile) => void;
 }
 
 const EMPTY_FILES: ConversationFile[] = [];
@@ -62,6 +74,7 @@ export function ChannelFilesPanel({
   onClose,
   onPreviewAttachment,
   onPreviewImage,
+  onJumpToMessage,
 }: ChannelFilesPanelProps) {
   const { t } = useTranslation();
   const [files, setFiles] = useState<ConversationFile[]>(EMPTY_FILES);
@@ -153,6 +166,7 @@ export function ChannelFilesPanel({
               cf={cf}
               onPreviewAttachment={onPreviewAttachment}
               onPreviewImage={onPreviewImage}
+              onJumpToMessage={onJumpToMessage}
             />
           ))}
         </div>
@@ -165,10 +179,12 @@ function FileRow({
   cf,
   onPreviewAttachment,
   onPreviewImage,
+  onJumpToMessage,
 }: {
   cf: ConversationFile;
   onPreviewAttachment: (attachment: Attachment, rootMessageId: string) => void;
   onPreviewImage: (attachment: Attachment) => void;
+  onJumpToMessage: (cf: ConversationFile) => void;
 }) {
   const { t, i18n } = useTranslation();
   const isDesktop = useIsDesktop();
@@ -193,6 +209,7 @@ function FileRow({
         ? MAX_HTML_PREVIEW_BYTES
         : MAX_MARKDOWN_PREVIEW_BYTES);
   const rootMessageId = cf.threadRoot || cf.messageId || file.id;
+  const canJump = !!cf.messageId;
   const canPreview = isImage || (previewable && !tooLarge);
   // Reason shown when preview is unavailable, so the button is always visible
   // but clearly disabled with an explanation instead of disappearing.
@@ -238,26 +255,42 @@ function FileRow({
       )}
     >
       {isImage ? (
-        <RemoteImage
-          attachment={attachment}
-          variant="thumb"
-          onClick={canPreview ? handlePreview : undefined}
-          className="size-10"
-        />
+        <button
+          type="button"
+          onClick={() => canJump && onJumpToMessage(cf)}
+          disabled={!canJump}
+          className="shrink-0 rounded-md focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-default"
+          title={canJump ? t("channelFiles.view-in-chat") : undefined}
+        >
+          <RemoteImage
+            attachment={attachment}
+            variant="thumb"
+            className="size-10"
+          />
+        </button>
       ) : (
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-control-bg text-control">
+        <button
+          type="button"
+          onClick={() => canJump && onJumpToMessage(cf)}
+          disabled={!canJump}
+          className="flex size-10 shrink-0 items-center justify-center rounded-md bg-control-bg text-control transition-colors hover:bg-control-bg/70 focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-default"
+          title={canJump ? t("channelFiles.view-in-chat") : undefined}
+        >
           <FileIcon className="size-4.5" />
-        </span>
+        </button>
       )}
 
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-2">
-          <p
-            className="truncate font-medium text-main"
-            title={file.originalName}
+          <button
+            type="button"
+            onClick={() => canJump && onJumpToMessage(cf)}
+            disabled={!canJump}
+            className="truncate font-medium text-main text-left hover:text-accent transition-colors disabled:cursor-default disabled:hover:text-main"
+            title={canJump ? t("channelFiles.view-in-chat") : undefined}
           >
             {truncateFileName(file.originalName)}
-          </p>
+          </button>
           <span className="shrink-0 text-[11px] text-control-placeholder">
             {file.mimeType || "file"} · {formatBytes(file.sizeBytes)}
           </span>
@@ -316,6 +349,15 @@ function FileRow({
     <ContextMenu>
       <ContextMenuTrigger className="block">{row}</ContextMenuTrigger>
       <ContextMenuContent>
+        {canJump && (
+          <>
+            <ContextMenuItem onClick={() => onJumpToMessage(cf)}>
+              <CornerDownRight className="size-4" />
+              {t("channelFiles.view-in-chat")}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        )}
         <ContextMenuItem onClick={handlePreview} disabled={!canPreview}>
           <Eye className="size-4" />
           {canPreview

@@ -1051,6 +1051,15 @@ export declare type ConversationFile = Message<"laelia.v1.ConversationFile"> & {
    * @generated from field: string thread_root = 9;
    */
   threadRoot: string;
+
+  /**
+   * room_version is the carrying message's room_version, used by the client to
+   * jump to the exact position in the conversation without loading the whole
+   * history.
+   *
+   * @generated from field: int64 room_version = 10;
+   */
+  roomVersion: bigint;
 };
 
 /**

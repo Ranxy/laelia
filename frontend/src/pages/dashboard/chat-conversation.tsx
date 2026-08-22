@@ -63,6 +63,7 @@ import type {
   Attachment,
   ChannelMember,
   Conversation,
+  ConversationFile,
 } from "@/types/proto-es/v1/command_pb";
 import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
 
@@ -250,6 +251,22 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     EMPTY_MEMBERS;
   const activities =
     useAppStore((s) => s.agentActivities[conversationName]) ?? EMPTY_ACTIVITIES;
+  const jumpTarget = useAppStore(
+    (s) => s.chatJumpByConv[conversationName] ?? null
+  );
+  const jumpLoading = useAppStore(
+    (s) => s.chatJumpLoading[conversationName] ?? false
+  );
+  const hasOlder = useAppStore(
+    (s) => s.chatHasOlderByConv[conversationName] ?? false
+  );
+  const hasNewer = useAppStore(
+    (s) => s.chatHasNewerByConv[conversationName] ?? false
+  );
+  const jumpToMessage = useAppStore((s) => s.jumpToMessage);
+  const loadOlderMessages = useAppStore((s) => s.loadOlderMessages);
+  const loadNewerMessages = useAppStore((s) => s.loadNewerMessages);
+  const clearJump = useAppStore((s) => s.clearJump);
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -272,6 +289,8 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // no in-flight uploads -> the file would be dropped).
   const sendingRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const olderSentinelRef = useRef<HTMLDivElement | null>(null);
+  const newerSentinelRef = useRef<HTMLDivElement | null>(null);
   const lastChannelRef = useRef<string | null>(null);
   const stickToBottomRef = useRef(true);
   const [showScrollDown, setShowScrollDown] = useState(false);
@@ -289,6 +308,14 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
 
   const [membersOpen, setMembersOpen] = useState(false);
   const [filesOpen, setFilesOpen] = useState(false);
+  // When a file drawer entry is clicked, this holds the target message id so
+  // the list scrolls to it once the focused jump window has loaded.
+  const [jumpMessageId, setJumpMessageId] = useState<string | null>(null);
+  // When a file lives in a thread reply, we open the thread and scroll to the
+  // exact reply via ThreadPanel's scrollToMessageId.
+  const [threadScrollToMessageId, setThreadScrollToMessageId] = useState<
+    string | null
+  >(null);
   // When true the thread panel fills the whole chat area and the channel's own
   // message pane is hidden (see the ThreadPanel expand toggle).
   const [threadExpanded, setThreadExpanded] = useState(false);
@@ -517,6 +544,56 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     });
   }, [scrollToReadVersion, messages.length]);
 
+  // When a file drawer jump is requested, scroll the focused window to the
+  // target message once it has loaded. Runs at most once per target id so it
+  // does not fight the user's own scrolling.
+  const jumpMessageIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!jumpMessageId || messages.length === 0) return;
+    if (jumpMessageIdRef.current === jumpMessageId) return;
+    jumpMessageIdRef.current = jumpMessageId;
+    requestAnimationFrame(() => {
+      stickToBottomRef.current = false;
+      scrollRef.current
+        ?.querySelector(`[data-msg-id="${jumpMessageId}"]`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  }, [jumpMessageId, messages.length]);
+
+  // While in jump mode, auto-load older/newer pages when the user scrolls to
+  // the top/bottom sentinels, so history is fetched incrementally instead of
+  // loading the whole conversation.
+  useEffect(() => {
+    if (!jumpTarget) return;
+    const olderEl = olderSentinelRef.current;
+    const newerEl = newerSentinelRef.current;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          if (entry.target === olderEl && hasOlder && !jumpLoading) {
+            void loadOlderMessages(conversationName);
+          }
+          if (entry.target === newerEl && hasNewer && !jumpLoading) {
+            void loadNewerMessages(conversationName);
+          }
+        }
+      },
+      { root: scrollRef.current, rootMargin: "80px" }
+    );
+    if (olderEl) observer.observe(olderEl);
+    if (newerEl) observer.observe(newerEl);
+    return () => observer.disconnect();
+  }, [
+    jumpTarget,
+    hasOlder,
+    hasNewer,
+    jumpLoading,
+    conversationName,
+    loadOlderMessages,
+    loadNewerMessages,
+  ]);
+
   // Restore the entering conversation's draft. Declared before the persist
   // effect so it reads the saved draft before any stale write lands.
   useEffect(() => {
@@ -563,6 +640,11 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   }, [messages, channelId, markConversationRead]);
 
   const scrollToBottom = useCallback(() => {
+    // When viewing a focused jump window, the scroll-to-latest button exits
+    // jump mode and reloads the real latest messages first.
+    if (jumpTarget) {
+      void clearJump(conversationName);
+    }
     stickToBottomRef.current = true;
     if (scrollRef.current) {
       scrollRef.current.scrollTo({
@@ -570,7 +652,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
         behavior: "smooth",
       });
     }
-  }, []);
+  }, [jumpTarget, conversationName, clearJump]);
 
   // Auto-stick to the bottom only when the user is already viewing the latest
   // messages. When they have scrolled up to read history, new polling updates
@@ -1007,6 +1089,28 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     [openImagePreview]
   );
 
+  // Jump from the files drawer to the message where the file was attached.
+  // Only a focused window around the target is loaded; older/newer pages are
+  // fetched incrementally as the user scrolls.
+  const handleJumpToMessage = useCallback(
+    (cf: ConversationFile) => {
+      if (!channelId || !cf.messageId) return;
+      setFilesOpen(false);
+      // Files attached inside a thread reply live in the thread panel, not the
+      // main channel list (which excludes replies). Open the thread and let
+      // ThreadPanel scroll to the exact reply.
+      if (cf.threadRoot) {
+        setThreadScrollToMessageId(cf.messageId);
+        void openThread(conversationName, cf.threadRoot);
+        return;
+      }
+      if (!cf.roomVersion) return;
+      setJumpMessageId(cf.messageId);
+      void jumpToMessage(conversationName, cf.messageId, cf.roomVersion);
+    },
+    [channelId, conversationName, jumpToMessage, openThread]
+  );
+
   const handleToggleTasksPanel = useCallback(() => {
     if (!channelId) return;
     // Opening the tasks panel closes the thread panel — two 420px side panels
@@ -1121,6 +1225,18 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             {!loading && messages.length === 0 && (
               <EmptyState icon={Send} message={t("chat.empty")} />
             )}
+            {jumpTarget && hasOlder && (
+              <div
+                ref={olderSentinelRef}
+                className="flex justify-center py-2 text-control-placeholder"
+              >
+                {jumpLoading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  t("channelFiles.load-older")
+                )}
+              </div>
+            )}
             <MessageList
               messages={messages}
               mentionLabel={mentionLabel}
@@ -1137,6 +1253,18 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
               scrollRoot={scrollRef}
               onToggleReaction={handleToggleReaction}
             />
+            {jumpTarget && hasNewer && (
+              <div
+                ref={newerSentinelRef}
+                className="flex justify-center py-2 text-control-placeholder"
+              >
+                {jumpLoading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  t("channelFiles.load-newer")
+                )}
+              </div>
+            )}
           </div>
 
           {/* Scroll to bottom button — hidden while the tasks panel is open so
@@ -1469,6 +1597,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             expanded={threadExpanded}
             onToggleExpand={() => setThreadExpanded((v) => !v)}
             fluid={threadExpanded}
+            scrollToMessageId={threadScrollToMessageId ?? undefined}
           />
         )}
         {tasksPanelOpen && channelId && (
@@ -1495,6 +1624,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                 onClose={() => setFilesOpen(false)}
                 onPreviewAttachment={handlePreviewAttachment}
                 onPreviewImage={handlePreviewImage}
+                onJumpToMessage={handleJumpToMessage}
               />
             )}
           </SheetBody>

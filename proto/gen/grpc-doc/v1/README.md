@@ -3501,6 +3501,7 @@ uploaded but never attached to a message (e.g. an abandoned upload).
 | message_id | [string](#string) |  | message_id is the bare UUID of the message that carried this file. |
 | agent_id | [string](#string) |  | agent_id is the agent resource id (&#34;agents/{id}&#34;) when the sender is an agent, empty otherwise. |
 | thread_root | [string](#string) |  | thread_root is the bare UUID of the thread root message when the carrying message is a thread reply, empty for a main-channel message. Used to open the same preview/comment context as the in-chat file card. |
+| room_version | [int64](#int64) |  | room_version is the carrying message&#39;s room_version, used by the client to jump to the exact position in the conversation without loading the whole history. |
 
 
 

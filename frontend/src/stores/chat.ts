@@ -63,11 +63,26 @@ export async function fetchConversationDelta(
   return { uiMsgs, currentVersion: last?.roomVersion ?? currentVersion };
 }
 
+// mergeMessages dedupes by id and sorts by room_version ascending. Used to
+// assemble a focused jump window (older + target + newer) and to prepend/append
+// incremental pages while the user scrolls.
+function mergeMessages(msgs: ChatMessageUI[]): ChatMessageUI[] {
+  const byId = new Map<string, ChatMessageUI>();
+  for (const m of msgs) byId.set(m.id, m);
+  return [...byId.values()].sort((a, b) =>
+    Number((a.roomVersion ?? 0n) - (b.roomVersion ?? 0n))
+  );
+}
+
 export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
   conversations: {},
   chatMessages: {},
   chatLoading: {},
   chatCurrentVersion: {},
+  chatJumpByConv: {},
+  chatJumpLoading: {},
+  chatHasOlderByConv: {},
+  chatHasNewerByConv: {},
   async getOrCreateConversation(agent) {
     const existing = get().conversations[agent];
     if (existing) return existing;
@@ -195,5 +210,164 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         ),
       },
     }));
+  },
+
+  async jumpToMessage(conversation, messageId, roomVersion) {
+    set((state) => ({
+      chatJumpLoading: { ...state.chatJumpLoading, [conversation]: true },
+    }));
+    try {
+      const pageSize = 30;
+      // Fetch older, newer, and the target itself in parallel for a snappy jump.
+      const [beforeRes, afterRes, targetRes] = await Promise.all([
+        commandServiceClient.listConversationMessages(
+          create(ListConversationMessagesRequestSchema, {
+            conversation,
+            pageSize,
+            beforeVersion: roomVersion,
+          })
+        ),
+        commandServiceClient.listConversationMessages(
+          create(ListConversationMessagesRequestSchema, {
+            conversation,
+            pageSize,
+            afterVersion: roomVersion,
+          })
+        ),
+        // The target itself: the latest message strictly before roomVersion+1.
+        commandServiceClient.listConversationMessages(
+          create(ListConversationMessagesRequestSchema, {
+            conversation,
+            pageSize: 1,
+            beforeVersion: roomVersion + 1n,
+          })
+        ),
+      ]);
+      const before = (beforeRes.messages ?? []).map(toUiMessage);
+      const after = (afterRes.messages ?? []).map(toUiMessage);
+      const target = (targetRes.messages ?? [])
+        .map(toUiMessage)
+        .find((m) => m.id === messageId);
+      const merged = mergeMessages([
+        ...before,
+        ...(target ? [target] : []),
+        ...after,
+      ]);
+      // Advance the watcher cursor to the newest message in the window so the
+      // long-poll only fetches messages beyond what we already have.
+      const newestVersion =
+        merged[merged.length - 1]?.roomVersion ?? roomVersion;
+      set((state) => ({
+        chatMessages: { ...state.chatMessages, [conversation]: merged },
+        chatCurrentVersion: {
+          ...state.chatCurrentVersion,
+          [conversation]: newestVersion,
+        },
+        chatJumpByConv: {
+          ...state.chatJumpByConv,
+          [conversation]: { messageId, roomVersion },
+        },
+        chatHasOlderByConv: {
+          ...state.chatHasOlderByConv,
+          [conversation]: before.length >= pageSize,
+        },
+        chatHasNewerByConv: {
+          ...state.chatHasNewerByConv,
+          [conversation]: after.length >= pageSize,
+        },
+        chatJumpLoading: { ...state.chatJumpLoading, [conversation]: false },
+      }));
+    } catch {
+      set((state) => ({
+        chatJumpLoading: { ...state.chatJumpLoading, [conversation]: false },
+      }));
+    }
+  },
+
+  async loadOlderMessages(conversation) {
+    const msgs = get().chatMessages[conversation] ?? [];
+    if (msgs.length === 0) return;
+    const oldest = msgs[0];
+    const beforeVersion = oldest.roomVersion ?? 0n;
+    const pageSize = 30;
+    set((state) => ({
+      chatJumpLoading: { ...state.chatJumpLoading, [conversation]: true },
+    }));
+    try {
+      const res = await commandServiceClient.listConversationMessages(
+        create(ListConversationMessagesRequestSchema, {
+          conversation,
+          pageSize,
+          beforeVersion,
+        })
+      );
+      const older = (res.messages ?? []).map(toUiMessage);
+      const merged = mergeMessages([...older, ...msgs]);
+      set((state) => ({
+        chatMessages: { ...state.chatMessages, [conversation]: merged },
+        chatHasOlderByConv: {
+          ...state.chatHasOlderByConv,
+          [conversation]: older.length >= pageSize,
+        },
+        chatJumpLoading: { ...state.chatJumpLoading, [conversation]: false },
+      }));
+    } catch {
+      set((state) => ({
+        chatJumpLoading: { ...state.chatJumpLoading, [conversation]: false },
+      }));
+    }
+  },
+
+  async loadNewerMessages(conversation) {
+    const msgs = get().chatMessages[conversation] ?? [];
+    if (msgs.length === 0) return;
+    const newest = msgs[msgs.length - 1];
+    const afterVersion = newest.roomVersion ?? 0n;
+    const pageSize = 30;
+    set((state) => ({
+      chatJumpLoading: { ...state.chatJumpLoading, [conversation]: true },
+    }));
+    try {
+      const res = await commandServiceClient.listConversationMessages(
+        create(ListConversationMessagesRequestSchema, {
+          conversation,
+          pageSize,
+          afterVersion,
+        })
+      );
+      const newer = (res.messages ?? []).map(toUiMessage);
+      const merged = mergeMessages([...msgs, ...newer]);
+      set((state) => ({
+        chatMessages: { ...state.chatMessages, [conversation]: merged },
+        chatHasNewerByConv: {
+          ...state.chatHasNewerByConv,
+          [conversation]: newer.length >= pageSize,
+        },
+        chatJumpLoading: { ...state.chatJumpLoading, [conversation]: false },
+      }));
+    } catch {
+      set((state) => ({
+        chatJumpLoading: { ...state.chatJumpLoading, [conversation]: false },
+      }));
+    }
+  },
+
+  async clearJump(conversation) {
+    // Reset the message list and cursor so the next loadMessages fetches the
+    // latest page instead of merging onto the focused jump window.
+    set((state) => ({
+      chatMessages: { ...state.chatMessages, [conversation]: [] },
+      chatCurrentVersion: { ...state.chatCurrentVersion, [conversation]: 0n },
+      chatJumpByConv: { ...state.chatJumpByConv, [conversation]: null },
+      chatHasOlderByConv: {
+        ...state.chatHasOlderByConv,
+        [conversation]: false,
+      },
+      chatHasNewerByConv: {
+        ...state.chatHasNewerByConv,
+        [conversation]: false,
+      },
+    }));
+    await get().loadMessages(conversation);
   },
 });

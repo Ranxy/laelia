@@ -295,13 +295,16 @@
     "count": "{{count}} 个文件",
     "download": "下载",
     "empty": "此频道还没有文件",
+    "load-newer": "加载更新的消息",
+    "load-older": "加载更早的消息",
     "no-results": "没有匹配“{{query}}”的文件",
     "preview": "预览",
     "preview-unsupported": "该文件类型暂不支持在线预览",
     "search-placeholder": "搜索文件名…",
     "title": "文件",
     "unknown-sender": "未知发送者",
-    "unknown-time": "未知时间"
+    "unknown-time": "未知时间",
+    "view-in-chat": "在聊天中查看"
   },
   "channelTask": {
     "as-task": "作为任务",
