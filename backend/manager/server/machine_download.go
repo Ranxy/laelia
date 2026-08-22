@@ -24,9 +24,8 @@ const managerURLPlaceholder = "__LAELIA_MANAGER_URL__"
 func registerMachineDownloadRoutes(e *echo.Echo, stores *store.Store) {
 	// Publish the embedded build info (version + checksums) to the API layer
 	// for the self-upgrade feature. No-op when binaries are not embedded.
-	if manifest, err := machineManifest(); err == nil {
-		machinebuild.SetManifest(manifest)
-	}
+	manifest, _ := machineManifest()
+	machinebuild.SetManifest(manifest)
 
 	e.GET("/machine/install.sh", func(c *echo.Context) error {
 		managerURL, err := externalManagerURL(c, stores)
@@ -55,8 +54,8 @@ func registerMachineDownloadRoutes(e *echo.Echo, stores *store.Store) {
 	})
 
 	e.GET("/machine/manifest.json", func(c *echo.Context) error {
-		manifest, err := machineManifest()
-		if err != nil {
+		manifest, _ := machineManifest()
+		if len(manifest) == 0 {
 			return c.NoContent(http.StatusNotFound)
 		}
 		return c.Blob(http.StatusOK, "application/json", manifest)

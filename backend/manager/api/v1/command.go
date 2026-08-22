@@ -569,6 +569,7 @@ func (s *CommandService) searchConversationV1(ctx context.Context, conv *store.C
 			peerResource = common.FormatUserHandle(peer.Handle)
 			title = peer.Name
 		}
+	default:
 	}
 	return convertToV1Conversation(conv, ownerName, ownerHandle, peerName, peerResource, 0, 0, title, 0)
 }

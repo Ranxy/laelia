@@ -121,7 +121,7 @@ func TestSearchSnippet(t *testing.T) {
 		t.Errorf("expected snippet to contain the match, got %q", got)
 	}
 	if got == content {
-		t.Errorf("expected a truncated snippet, got the full content")
+		t.Error("expected a truncated snippet, got the full content")
 	}
 
 	multi := strings.Repeat("a", 100) + "rust" + strings.Repeat("b", 100) + "jdk"
