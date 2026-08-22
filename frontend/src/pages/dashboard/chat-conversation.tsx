@@ -298,21 +298,10 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const olderSentinelRef = useRef<HTMLDivElement | null>(null);
   const newerSentinelRef = useRef<HTMLDivElement | null>(null);
-  // Scroll anchor captured before an incremental history load. After the new
-  // page is committed we restore the anchor's viewport offset so prepending
-  // older messages (or appending newer ones) never yanks the rows the user is
-  // currently reading out of view.
-  const pendingScrollAnchorRef = useRef<{
-    anchorId: string;
-    anchorTop: number;
-  } | null>(null);
-  // Latest messages for the IntersectionObserver callback without re-creating
-  // the observer (and re-firing it) every time the watcher appends a message.
-  const messagesRef = useRef(messages);
   // While a file jump is in flight (and until its scroll has been applied),
   // sentinel-triggered history loads must stay quiet. Otherwise the new window
-  // can land with a sentinel visible, immediately load another page, and its
-  // scroll-anchor restore yanks the view away from the jump target.
+  // can land with a sentinel visible and immediately load another page, yanking
+  // the view away from the jump target.
   const suppressHistoryLoadRef = useRef(false);
   const lastChannelRef = useRef<string | null>(null);
   const stickToBottomRef = useRef(true);
@@ -440,7 +429,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     suppressHistoryLoadRef.current = false;
     lastChannelRef.current = channelId;
     stickToBottomRef.current = true;
-    pendingScrollAnchorRef.current = null;
     try {
       await loadMessages(conversationName);
     } catch {
@@ -609,56 +597,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     suppressHistoryLoadRef.current = false;
   }, [jumpMessageId, jumpTarget, messages.length]);
 
-  // captureScrollAnchor records the viewport offset of a message before an
-  // incremental page load. The layout effect below restores that offset after
-  // React commits the new rows, which is what keeps the currently-visible
-  // messages stationary while older/newer pages are inserted around them.
-  const captureScrollAnchor = useCallback((anchorId: string) => {
-    const scroller = scrollRef.current;
-    const anchor = scroller?.querySelector(`[data-msg-id="${anchorId}"]`);
-    if (!scroller || !anchor) return;
-    pendingScrollAnchorRef.current = {
-      anchorId,
-      anchorTop:
-        anchor.getBoundingClientRect().top -
-        scroller.getBoundingClientRect().top,
-    };
-  }, []);
-
-  // Restore the captured anchor after a history page is committed. This runs
-  // before paint (useLayoutEffect) so the user never sees the jump that would
-  // otherwise happen when older rows are prepended above the current viewport.
-  useLayoutEffect(() => {
-    const pending = pendingScrollAnchorRef.current;
-    if (!pending) return;
-    pendingScrollAnchorRef.current = null;
-    const scroller = scrollRef.current;
-    const anchor = scroller?.querySelector(
-      `[data-msg-id="${pending.anchorId}"]`
-    );
-    if (!scroller || !anchor) return;
-    const nextTop =
-      anchor.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-    scroller.scrollTop += nextTop - pending.anchorTop;
-  }, [messages]);
-
-  // Keep the observer callback's view of messages current without making the
-  // observer effect depend on the messages array identity.
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  // If a history load finishes without changing messages (e.g. the request
-  // failed), the layout effect above never runs, so drop the now-stale anchor.
-  const prevJumpLoadingRef = useRef(jumpLoading);
-  useEffect(() => {
-    const wasLoading = prevJumpLoadingRef.current;
-    prevJumpLoadingRef.current = jumpLoading;
-    if (wasLoading && !jumpLoading) {
-      pendingScrollAnchorRef.current = null;
-    }
-  }, [jumpLoading]);
-
   // Auto-load older/newer pages when the user scrolls to the top/bottom
   // sentinels, so history is fetched incrementally instead of loading the
   // whole conversation. This is the same path for the normal latest window
@@ -675,19 +613,13 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
           // Read the store directly rather than the render closure: the first
           // load in this callback flips chatJumpLoading synchronously, so a
           // second intersecting sentinel (or a duplicate observer callback
-          // before React re-renders) cannot start another page load or
-          // overwrite the scroll anchor captured for the first one.
+          // before React re-renders) cannot start another page load.
           const loadingNow =
             useAppStore.getState().chatJumpLoading[conversationName] ?? false;
           if (entry.target === olderEl && hasOlder && !loadingNow) {
-            const anchorId = messagesRef.current[0]?.id;
-            if (anchorId) captureScrollAnchor(anchorId);
             void loadOlderMessages(conversationName);
           }
           if (entry.target === newerEl && hasNewer && !loadingNow) {
-            const anchorId =
-              messagesRef.current[messagesRef.current.length - 1]?.id;
-            if (anchorId) captureScrollAnchor(anchorId);
             void loadNewerMessages(conversationName);
           }
         }
@@ -701,7 +633,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     hasOlder,
     hasNewer,
     conversationName,
-    captureScrollAnchor,
     loadOlderMessages,
     loadNewerMessages,
   ]);
@@ -1239,7 +1170,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
       // window loads so the auto-stick effect never yanks the list to the
       // bottom of the jump window, and drop any stale scroll anchor/latch.
       stickToBottomRef.current = false;
-      pendingScrollAnchorRef.current = null;
       jumpMessageIdRef.current = null;
       suppressHistoryLoadRef.current = true;
       setJumpMessageId(cf.messageId);
@@ -1354,18 +1284,17 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             threadRootOpen && threadExpanded && "hidden"
           )}
         >
-          {/* Messages scroll area. Browser scroll anchoring would fight the
-              manual anchor restore below when older pages are prepended, so it
-              is disabled whenever a history sentinel is active. */}
+          {/* Messages scroll area. Native CSS scroll anchoring is left
+              enabled: it keeps the currently-visible rows stationary when
+              older/newer pages are prepended/appended AND when a lazy markdown
+              row swaps its raw-text placeholder for the real (taller) markdown
+              render while scrolling through history. The sentinels below opt
+              out of anchoring so the browser always picks a real message row
+              as its anchor. */}
           <div
             ref={scrollRef}
             onScroll={handleScroll}
             className="flex-1 overflow-y-auto"
-            style={
-              jumpTarget || hasOlder || hasNewer
-                ? { overflowAnchor: "none" }
-                : undefined
-            }
           >
             {/* LoadingState only when there's genuinely nothing to show yet.
                 On a revisit cached messages are already in the store, so a
@@ -1379,6 +1308,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
               <div
                 ref={olderSentinelRef}
                 className="flex justify-center py-2 text-control-placeholder"
+                style={{ overflowAnchor: "none" }}
               >
                 {jumpLoading ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -1407,6 +1337,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
               <div
                 ref={newerSentinelRef}
                 className="flex justify-center py-2 text-control-placeholder"
+                style={{ overflowAnchor: "none" }}
               >
                 {jumpLoading ? (
                   <Loader2 className="size-4 animate-spin" />

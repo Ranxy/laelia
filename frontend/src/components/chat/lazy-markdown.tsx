@@ -2,6 +2,7 @@ import {
   type ReactNode,
   type RefObject,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -77,8 +78,15 @@ export interface LazyMarkdownProps {
 // scrolled into view and swapped its 160px intrinsic placeholder for the real
 // height (and again when the markdown replaced the raw-text fallback), scroll
 // anchoring could not compensate, so the viewport snapped back down while
-// scrolling up through history. With cv:auto gone, those height changes are
-// ordinary layout shifts that scroll anchoring absorbs cleanly.
+// scrolling up through history.
+//
+// Instead, the fallback row opts out of being a scroll-anchor candidate (see
+// the layout effect below) while the real markdown is still pending. The
+// browser then anchors to an already-rendered row below it, so the
+// fallback→markdown height change is absorbed without moving the rows the user
+// is reading. The scroll container must keep native `overflow-anchor` enabled
+// for this to work; chat-conversation.tsx intentionally no longer sets
+// `overflow-anchor: none` on the message scroller.
 //
 // Observer setup is deferred one animation frame so it runs AFTER the page's
 // stick-to-bottom effect has scrolled the list to the latest message. React
@@ -95,6 +103,46 @@ export function LazyMarkdown({
 }: LazyMarkdownProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(eager);
+  // The message-row wrapper that contains this markdown. While the row is still
+  // showing the raw-text fallback its height is not final, so it must not be
+  // chosen as the browser's scroll-anchor node: if it were, the fallback→markdown
+  // swap would keep the row's top edge fixed while the content below it is
+  // pushed down (the exact "history squeezes the viewport down" jump). Excluding
+  // the row forces the browser to anchor to an already-rendered row below it.
+  const rowRef = useRef<HTMLElement | null>(null);
+  const previousOverflowAnchorRef = useRef<string>("");
+
+  useLayoutEffect(() => {
+    if (visible) {
+      // The fallback has just been replaced by the real markdown. The browser
+      // must still see overflow-anchor:none on this row while it lays out the
+      // height change and compensates the scroll position. A single rAF can run
+      // before that layout, so restoration is deferred by two frames.
+      const row = rowRef.current;
+      if (!row) return;
+      let raf2 = 0;
+      const raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => {
+          row.style.overflowAnchor = previousOverflowAnchorRef.current;
+        });
+      });
+      return () => {
+        cancelAnimationFrame(raf1);
+        if (raf2) cancelAnimationFrame(raf2);
+      };
+    }
+
+    const el = ref.current;
+    if (!el) return;
+    const row = el.closest<HTMLElement>("[data-msg-id]");
+    if (!row) return;
+    rowRef.current = row;
+    previousOverflowAnchorRef.current = row.style.overflowAnchor;
+    row.style.overflowAnchor = "none";
+    // Intentionally no cleanup restore here: React runs effect cleanups before
+    // the browser lays out the fallback→markdown swap, so restoring in cleanup
+    // would make the growing row a valid anchor again and defeat the exclusion.
+  }, [visible]);
 
   useEffect(() => {
     if (visible) return;

@@ -9,7 +9,15 @@ import {
   Send,
   X,
 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { MentionBadge } from "@/components/chat/mention-badge";
@@ -79,6 +87,7 @@ const ThreadReplies = memo(function ThreadReplies({
   debugMode,
   currentPrincipalId,
   onSenderClick,
+  scrollRoot,
 }: {
   replies: ChatMessageUI[];
   loading: boolean;
@@ -95,6 +104,7 @@ const ThreadReplies = memo(function ThreadReplies({
   currentPrincipalId?: string;
   mentionLabel?: (handle: string) => string | undefined;
   onSenderClick?: (type: "user" | "agent", id: string, name: string) => void;
+  scrollRoot?: RefObject<HTMLDivElement | null>;
 }) {
   const { t } = useTranslation();
   return (
@@ -134,6 +144,7 @@ const ThreadReplies = memo(function ThreadReplies({
               onPreviewImage={onPreviewImage}
               debugMode={debugMode}
               currentPrincipalId={currentPrincipalId}
+              scrollRoot={scrollRoot}
               // Small threads render markdown synchronously to avoid the
               // per-row fallback→swap flash on open; large threads keep the
               // lazy gate so off-screen replies stay cheap.
@@ -738,6 +749,7 @@ export function ThreadPanel({
                 onPreviewImage={onPreviewImage}
                 debugMode={currentUser?.debugMode ?? false}
                 currentPrincipalId={currentUser?.handle}
+                scrollRoot={scrollRef}
                 // The root is a single message — render its markdown synchronously
                 // so opening the thread doesn't flash as it swaps the raw-text
                 // placeholder for the real markdown a frame later.
@@ -758,6 +770,7 @@ export function ThreadPanel({
             currentPrincipalId={currentUser?.handle}
             mentionLabel={mentionLabel}
             onSenderClick={handleSenderClick}
+            scrollRoot={scrollRef}
           />
         </div>
       </div>
