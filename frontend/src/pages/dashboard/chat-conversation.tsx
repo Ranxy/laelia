@@ -13,7 +13,14 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
@@ -291,6 +298,17 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const olderSentinelRef = useRef<HTMLDivElement | null>(null);
   const newerSentinelRef = useRef<HTMLDivElement | null>(null);
+  // Scroll anchor captured before an incremental history load. After the new
+  // page is committed we restore the anchor's viewport offset so prepending
+  // older messages (or appending newer ones) never yanks the rows the user is
+  // currently reading out of view.
+  const pendingScrollAnchorRef = useRef<{
+    anchorId: string;
+    anchorTop: number;
+  } | null>(null);
+  // Latest messages for the IntersectionObserver callback without re-creating
+  // the observer (and re-firing it) every time the watcher appends a message.
+  const messagesRef = useRef(messages);
   const lastChannelRef = useRef<string | null>(null);
   const stickToBottomRef = useRef(true);
   const [showScrollDown, setShowScrollDown] = useState(false);
@@ -412,8 +430,11 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     // Close any open thread panel — it belongs to the previous channel.
     closeThread();
     setThreadExpanded(false);
+    setJumpMessageId(null);
+    jumpMessageIdRef.current = null;
     lastChannelRef.current = channelId;
     stickToBottomRef.current = true;
+    pendingScrollAnchorRef.current = null;
     try {
       await loadMessages(conversationName);
     } catch {
@@ -560,21 +581,84 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     });
   }, [jumpMessageId, messages.length]);
 
-  // While in jump mode, auto-load older/newer pages when the user scrolls to
-  // the top/bottom sentinels, so history is fetched incrementally instead of
-  // loading the whole conversation.
+  // captureScrollAnchor records the viewport offset of a message before an
+  // incremental page load. The layout effect below restores that offset after
+  // React commits the new rows, which is what keeps the currently-visible
+  // messages stationary while older/newer pages are inserted around them.
+  const captureScrollAnchor = useCallback((anchorId: string) => {
+    const scroller = scrollRef.current;
+    const anchor = scroller?.querySelector(`[data-msg-id="${anchorId}"]`);
+    if (!scroller || !anchor) return;
+    pendingScrollAnchorRef.current = {
+      anchorId,
+      anchorTop:
+        anchor.getBoundingClientRect().top -
+        scroller.getBoundingClientRect().top,
+    };
+  }, []);
+
+  // Restore the captured anchor after a history page is committed. This runs
+  // before paint (useLayoutEffect) so the user never sees the jump that would
+  // otherwise happen when older rows are prepended above the current viewport.
+  useLayoutEffect(() => {
+    const pending = pendingScrollAnchorRef.current;
+    if (!pending) return;
+    pendingScrollAnchorRef.current = null;
+    const scroller = scrollRef.current;
+    const anchor = scroller?.querySelector(
+      `[data-msg-id="${pending.anchorId}"]`
+    );
+    if (!scroller || !anchor) return;
+    const nextTop =
+      anchor.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+    scroller.scrollTop += nextTop - pending.anchorTop;
+  }, [messages]);
+
+  // Keep the observer callback's view of messages current without making the
+  // observer effect depend on the messages array identity.
   useEffect(() => {
-    if (!jumpTarget) return;
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // If a history load finishes without changing messages (e.g. the request
+  // failed), the layout effect above never runs, so drop the now-stale anchor.
+  const prevJumpLoadingRef = useRef(jumpLoading);
+  useEffect(() => {
+    const wasLoading = prevJumpLoadingRef.current;
+    prevJumpLoadingRef.current = jumpLoading;
+    if (wasLoading && !jumpLoading) {
+      pendingScrollAnchorRef.current = null;
+    }
+  }, [jumpLoading]);
+
+  // Auto-load older/newer pages when the user scrolls to the top/bottom
+  // sentinels, so history is fetched incrementally instead of loading the
+  // whole conversation. This is the same path for the normal latest window
+  // (hasOlder) and a focused jump window (hasOlder/hasNewer).
+  useEffect(() => {
+    if (!hasOlder && !hasNewer) return;
     const olderEl = olderSentinelRef.current;
     const newerEl = newerSentinelRef.current;
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
-          if (entry.target === olderEl && hasOlder && !jumpLoading) {
+          // Read the store directly rather than the render closure: the first
+          // load in this callback flips chatJumpLoading synchronously, so a
+          // second intersecting sentinel (or a duplicate observer callback
+          // before React re-renders) cannot start another page load or
+          // overwrite the scroll anchor captured for the first one.
+          const loadingNow =
+            useAppStore.getState().chatJumpLoading[conversationName] ?? false;
+          if (entry.target === olderEl && hasOlder && !loadingNow) {
+            const anchorId = messagesRef.current[0]?.id;
+            if (anchorId) captureScrollAnchor(anchorId);
             void loadOlderMessages(conversationName);
           }
-          if (entry.target === newerEl && hasNewer && !jumpLoading) {
+          if (entry.target === newerEl && hasNewer && !loadingNow) {
+            const anchorId =
+              messagesRef.current[messagesRef.current.length - 1]?.id;
+            if (anchorId) captureScrollAnchor(anchorId);
             void loadNewerMessages(conversationName);
           }
         }
@@ -585,11 +669,10 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     if (newerEl) observer.observe(newerEl);
     return () => observer.disconnect();
   }, [
-    jumpTarget,
     hasOlder,
     hasNewer,
-    jumpLoading,
     conversationName,
+    captureScrollAnchor,
     loadOlderMessages,
     loadNewerMessages,
   ]);
@@ -639,11 +722,15 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     prevMsgCountRef.current = messages.length;
   }, [messages, channelId, markConversationRead]);
 
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = useCallback(async () => {
     // When viewing a focused jump window, the scroll-to-latest button exits
     // jump mode and reloads the real latest messages first.
     if (jumpTarget) {
-      void clearJump(conversationName);
+      await clearJump(conversationName);
+      // Reset the jump-scroll latch so clicking the same file again later
+      // scrolls to it instead of being treated as an already-handled jump.
+      setJumpMessageId(null);
+      jumpMessageIdRef.current = null;
     }
     stickToBottomRef.current = true;
     if (scrollRef.current) {
@@ -654,22 +741,35 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     }
   }, [jumpTarget, conversationName, clearJump]);
 
+  // A focused jump window is a history view, not the live tail: never
+  // auto-stick to the bottom while it is open, even if the user happens to be
+  // near the bottom sentinel loading newer pages.
+  useEffect(() => {
+    if (jumpTarget) {
+      stickToBottomRef.current = false;
+    }
+  }, [jumpTarget]);
+
   // Auto-stick to the bottom only when the user is already viewing the latest
   // messages. When they have scrolled up to read history, new polling updates
   // must not yank them back down.
   useEffect(() => {
-    if (scrollRef.current && stickToBottomRef.current) {
+    if (scrollRef.current && stickToBottomRef.current && !jumpTarget) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, jumpTarget]);
 
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
     const nearBottom = scrollHeight - scrollTop - clientHeight < 100;
-    stickToBottomRef.current = nearBottom;
+    // In jump mode the bottom sentinel is a "load more history" affordance,
+    // not the live tail, so reaching it must not re-enable auto-stick.
+    if (!jumpTarget) {
+      stickToBottomRef.current = nearBottom;
+    }
     setShowScrollDown(!nearBottom);
-  }, []);
+  }, [jumpTarget]);
 
   const autoResize = useCallback(() => {
     const el = textareaRef.current;
@@ -1105,6 +1205,11 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
         return;
       }
       if (!cf.roomVersion) return;
+      // Entering a focused history view: release stick-to-bottom before the
+      // window loads so the auto-stick effect never yanks the list to the
+      // bottom of the jump window, and drop any stale scroll anchor.
+      stickToBottomRef.current = false;
+      pendingScrollAnchorRef.current = null;
       setJumpMessageId(cf.messageId);
       void jumpToMessage(conversationName, cf.messageId, cf.roomVersion);
     },
@@ -1211,11 +1316,18 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             threadRootOpen && threadExpanded && "hidden"
           )}
         >
-          {/* Messages scroll area */}
+          {/* Messages scroll area. Browser scroll anchoring would fight the
+              manual anchor restore below when older pages are prepended, so it
+              is disabled whenever a history sentinel is active. */}
           <div
             ref={scrollRef}
             onScroll={handleScroll}
             className="flex-1 overflow-y-auto"
+            style={
+              jumpTarget || hasOlder || hasNewer
+                ? { overflowAnchor: "none" }
+                : undefined
+            }
           >
             {/* LoadingState only when there's genuinely nothing to show yet.
                 On a revisit cached messages are already in the store, so a
@@ -1225,7 +1337,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             {!loading && messages.length === 0 && (
               <EmptyState icon={Send} message={t("chat.empty")} />
             )}
-            {jumpTarget && hasOlder && (
+            {hasOlder && (
               <div
                 ref={olderSentinelRef}
                 className="flex justify-center py-2 text-control-placeholder"
@@ -1253,7 +1365,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
               scrollRoot={scrollRef}
               onToggleReaction={handleToggleReaction}
             />
-            {jumpTarget && hasNewer && (
+            {hasNewer && (
               <div
                 ref={newerSentinelRef}
                 className="flex justify-center py-2 text-control-placeholder"

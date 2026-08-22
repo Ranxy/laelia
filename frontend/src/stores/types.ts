@@ -381,11 +381,12 @@ export interface ChatSlice {
   // messages newer than what it has already seen instead of re-fetching the
   // whole list every tick.
   chatCurrentVersion: Record<string, bigint>;
-  // Jump-to-message state: when a file drawer entry is clicked, the client
-  // loads a focused window around the carrying message instead of the whole
-  // history. chatJumpByConv holds the active jump anchor per conversation
-  // (null when not in jump mode); chatHasOlder/Newer tell the UI whether more
+  // Bidirectional history-window state, shared by the normal latest window
+  // and a file-drawer jump window. chatJumpByConv holds the active jump anchor
+  // (null in the normal window); chatHasOlder/Newer tell the UI whether more
   // history is available in each direction for incremental loading.
+  // chatJumpLoading guards the in-flight page load for either direction (the
+  // name is historical).
   chatJumpByConv: Record<
     string,
     { messageId: string; roomVersion: bigint } | null

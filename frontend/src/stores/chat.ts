@@ -19,6 +19,10 @@ export { appendNewMessages, toUiMessage } from "./chat-helpers";
 // messages needs pagination to avoid dropping the newest ones.
 const MAX_DELTA_PAGES = 10;
 
+// The backend clamps ListConversationMessages page_size to 100. A latest-N
+// load that returns a full page may therefore still have older history.
+const LATEST_PAGE_SIZE = 100;
+
 // fetchConversationDelta pulls the full incremental delta for a conversation
 // (all messages with room_version > afterVersion), following nextPageToken so a
 // >pageSize burst is not truncated. Returns the cursor to advance to: the
@@ -113,6 +117,10 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       // switching A→B→A does not re-download the whole 200-message history.
       // A first load (version 0) still returns the latest N messages.
       const afterVersion = get().chatCurrentVersion[conversation] ?? 0n;
+      // A first load (version 0) returns the latest N messages and establishes
+      // the bidirectional window: hasOlder is inferred from a full latest page,
+      // and hasNewer is false because the window ends at the live tail.
+      const isLatestLoad = afterVersion === 0n;
       // Follows nextPageToken so a >100-message burst while away is not
       // truncated (the newest messages were previously dropped permanently).
       const { uiMsgs, currentVersion } = await fetchConversationDelta(
@@ -132,6 +140,18 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
             [conversation]: currentVersion,
           },
           chatLoading: { ...state.chatLoading, [conversation]: false },
+          ...(isLatestLoad
+            ? {
+                chatHasOlderByConv: {
+                  ...state.chatHasOlderByConv,
+                  [conversation]: uiMsgs.length >= LATEST_PAGE_SIZE,
+                },
+                chatHasNewerByConv: {
+                  ...state.chatHasNewerByConv,
+                  [conversation]: false,
+                },
+              }
+            : {}),
         };
       });
     } catch {
@@ -253,15 +273,16 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         ...(target ? [target] : []),
         ...after,
       ]);
-      // Advance the watcher cursor to the newest message in the window so the
-      // long-poll only fetches messages beyond what we already have.
-      const newestVersion =
-        merged[merged.length - 1]?.roomVersion ?? roomVersion;
+      // Keep the watcher cursor at the conversation's real latest version, not
+      // the newest message in this focused window. The window may have unloaded
+      // newer pages; pointing the cursor at the window edge would make the
+      // watcher drain all of them in one burst and defeat incremental loading.
+      const currentVersion = afterRes.currentVersion;
       set((state) => ({
         chatMessages: { ...state.chatMessages, [conversation]: merged },
         chatCurrentVersion: {
           ...state.chatCurrentVersion,
-          [conversation]: newestVersion,
+          [conversation]: currentVersion,
         },
         chatJumpByConv: {
           ...state.chatJumpByConv,
@@ -285,10 +306,14 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
   },
 
   async loadOlderMessages(conversation) {
+    if (get().chatJumpLoading[conversation]) return;
     const msgs = get().chatMessages[conversation] ?? [];
     if (msgs.length === 0) return;
-    const oldest = msgs[0];
-    const beforeVersion = oldest.roomVersion ?? 0n;
+    const beforeVersion = msgs[0].roomVersion ?? 0n;
+    // The jump anchor doubles as a window generation: jumpToMessage replaces
+    // this object and clearJump nulls it, so an in-flight page can detect that
+    // the window it was loading for no longer exists.
+    const jumpAnchor = get().chatJumpByConv[conversation];
     const pageSize = 30;
     set((state) => ({
       chatJumpLoading: { ...state.chatJumpLoading, [conversation]: true },
@@ -302,7 +327,17 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         })
       );
       const older = (res.messages ?? []).map(toUiMessage);
-      const merged = mergeMessages([...older, ...msgs]);
+      if (get().chatJumpByConv[conversation] !== jumpAnchor) {
+        set((state) => ({
+          chatJumpLoading: { ...state.chatJumpLoading, [conversation]: false },
+        }));
+        return;
+      }
+      // Re-read after the await: the watcher or an optimistic send may have
+      // appended messages while the page was in flight, and merging onto the
+      // stale snapshot would drop them.
+      const current = get().chatMessages[conversation] ?? [];
+      const merged = mergeMessages([...older, ...current]);
       set((state) => ({
         chatMessages: { ...state.chatMessages, [conversation]: merged },
         chatHasOlderByConv: {
@@ -319,10 +354,11 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
   },
 
   async loadNewerMessages(conversation) {
+    if (get().chatJumpLoading[conversation]) return;
     const msgs = get().chatMessages[conversation] ?? [];
     if (msgs.length === 0) return;
-    const newest = msgs[msgs.length - 1];
-    const afterVersion = newest.roomVersion ?? 0n;
+    const afterVersion = msgs[msgs.length - 1].roomVersion ?? 0n;
+    const jumpAnchor = get().chatJumpByConv[conversation];
     const pageSize = 30;
     set((state) => ({
       chatJumpLoading: { ...state.chatJumpLoading, [conversation]: true },
@@ -336,7 +372,15 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         })
       );
       const newer = (res.messages ?? []).map(toUiMessage);
-      const merged = mergeMessages([...msgs, ...newer]);
+      if (get().chatJumpByConv[conversation] !== jumpAnchor) {
+        set((state) => ({
+          chatJumpLoading: { ...state.chatJumpLoading, [conversation]: false },
+        }));
+        return;
+      }
+      // Re-read after the await for the same reason as loadOlderMessages.
+      const current = get().chatMessages[conversation] ?? [];
+      const merged = mergeMessages([...current, ...newer]);
       set((state) => ({
         chatMessages: { ...state.chatMessages, [conversation]: merged },
         chatHasNewerByConv: {
@@ -359,6 +403,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       chatMessages: { ...state.chatMessages, [conversation]: [] },
       chatCurrentVersion: { ...state.chatCurrentVersion, [conversation]: 0n },
       chatJumpByConv: { ...state.chatJumpByConv, [conversation]: null },
+      chatJumpLoading: { ...state.chatJumpLoading, [conversation]: false },
       chatHasOlderByConv: {
         ...state.chatHasOlderByConv,
         [conversation]: false,
