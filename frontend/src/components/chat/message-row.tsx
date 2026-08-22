@@ -362,16 +362,17 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     [MentionBadge, displayContent, msg.mentions]
   );
 
-  // Agent markdown with @mentions rewritten to inline <mention> nodes, so a
-  // mention flows inline with the surrounding prose instead of landing on its
-  // own line (which happened when each text segment was rendered through its
-  // own block-emitting MarkdownRender). Only computed for the mention-aware path.
-  const agentMentionContent = useMemo(
+  // Markdown with @mentions rewritten to inline <mention> nodes, so a mention
+  // flows inline with the surrounding prose instead of landing on its own line
+  // (which happened when each text segment was rendered through its own
+  // block-emitting MarkdownRender). Used for both user and agent messages in
+  // the mention-aware path (channel chat / threads).
+  const mentionContent = useMemo(
     () =>
-      MentionBadge && !isUser
+      MentionBadge
         ? contentWithMentionTags(displayContent ?? "", msg.mentions ?? [])
         : null,
-    [MentionBadge, isUser, displayContent, msg.mentions]
+    [MentionBadge, displayContent, msg.mentions]
   );
 
   const MentionBadgeCmp = MentionBadge;
@@ -597,53 +598,23 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
           onClick={handleBubbleClick}
         >
           {segments && MentionBadgeCmp ? (
-            // Mention-aware rendering (channel chat / threads).
-            isUser ? (
-              // User text is plain (no markdown): interleave pre-wrapped text
-              // spans with real MentionBadge chips. Both are inline-level, so
-              // they already flow inline correctly.
-              segments.length > 0 &&
-              segments.map((seg, i) => {
-                const mention = seg.mention;
-                if (mention) {
-                  return (
-                    <MentionBadgeCmp
-                      key={`${i}-${mention.name}`}
-                      name={mention.name}
-                      onClick={() =>
-                        onMentionClick?.(mention.type, mention.id, mention.name)
-                      }
-                    />
-                  );
-                }
-                if (!seg.text) return null;
-                return (
-                  <span key={i} className="whitespace-pre-wrap break-words">
-                    {seg.text}
-                  </span>
-                );
-              })
-            ) : (
-              // Agent: render the whole body in a single markdown pass with
-              // @mentions rewritten to inline links (agentMentionContent). A
-              // single MarkdownRender keeps the mention inside the same <p> as
-              // the surrounding prose, so it flows inline instead of being
-              // forced onto its own line by per-segment block <p> wrappers.
-              <div className="markstream-chat break-words">
-                <MemoMarkdown
-                  content={agentMentionContent ?? ""}
-                  isStreaming={isStreaming ?? false}
-                  eager={eager}
-                  scrollRoot={scrollRoot}
-                  markdownCustomId={markdownCustomId}
-                  fade={fade ?? false}
-                  customHtmlTags={MENTION_HTML_TAGS}
-                />
-              </div>
-            )
-          ) : isUser ? (
-            <div className="whitespace-pre-wrap break-words">
-              {displayContent || ""}
+            // Mention-aware rendering (channel chat / threads): render the
+            // whole body in a single markdown pass with @mentions rewritten
+            // to inline <mention> nodes (mentionContent) for both user and
+            // agent messages. A single MarkdownRender keeps each mention
+            // inside the same <p> as the surrounding prose, so it flows
+            // inline instead of being forced onto its own line by per-segment
+            // block <p> wrappers.
+            <div className="markstream-chat break-words">
+              <MemoMarkdown
+                content={mentionContent ?? ""}
+                isStreaming={isStreaming ?? false}
+                eager={eager}
+                scrollRoot={scrollRoot}
+                markdownCustomId={markdownCustomId}
+                fade={fade ?? false}
+                customHtmlTags={MENTION_HTML_TAGS}
+              />
             </div>
           ) : displayContent ? (
             <div className="markstream-chat break-words">

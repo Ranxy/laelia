@@ -26,9 +26,10 @@ import { create } from "@bufbuild/protobuf";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { Avatar, formatTime } from "@/components/chat/avatar";
+import { MentionBadge } from "@/components/chat/mention-badge";
 import { MessageRow } from "@/components/chat/message-row";
 import type { ChatMessageUI } from "@/stores/types";
-import { ReactionSchema } from "@/types/proto-es/v1/command_pb";
+import { MentionSchema, ReactionSchema } from "@/types/proto-es/v1/command_pb";
 
 // buildReaction constructs a Reaction message (which requires $typeName).
 function reaction(
@@ -38,6 +39,10 @@ function reaction(
   reacted: boolean
 ) {
   return create(ReactionSchema, { emoji, count, reactors, reacted });
+}
+
+function mention(type: string, id: string, name: string) {
+  return create(MentionSchema, { type, id, name });
 }
 
 let container: HTMLDivElement | null = null;
@@ -100,12 +105,12 @@ describe("formatTime", () => {
 });
 
 describe("MessageRow shared render", () => {
-  it("renders user content as pre-wrapped text", () => {
+  it("renders user content through markdown", () => {
     const onViewDetails = (_id: string, _agentId: string) => {};
     act(() => {
       root!.render(
         <MessageRow
-          msg={baseMsg({ role: "user", content: "hi there" })}
+          msg={baseMsg({ role: "user", content: "**hi** there" })}
           showAvatar
           agentTitle="Agent"
           streamingContent=""
@@ -117,7 +122,38 @@ describe("MessageRow shared render", () => {
       );
     });
     expect(translationHookCalls).toBeGreaterThan(0);
-    expect(container?.textContent).toContain("hi there");
+    expect(container?.textContent).toContain("**hi** there");
+  });
+
+  it("renders user markdown with mentions through the mention-aware path", () => {
+    const onViewDetails = (_id: string, _agentId: string) => {};
+    act(() => {
+      root!.render(
+        <MessageRow
+          msg={baseMsg({
+            role: "user",
+            content: "Hello @alice-user-1, see **this**",
+            mentions: [mention("user", "alice-user-1", "Alice Lee")],
+          })}
+          showAvatar
+          agentTitle="Agent"
+          streamingContent=""
+          streamingEvents={[]}
+          onViewDetails={onViewDetails}
+          MentionBadge={MentionBadge}
+          onMentionClick={() => {}}
+          markdownCustomId="channel-chat"
+          debugMode={false}
+        />
+      );
+    });
+    // The mock MarkdownRender emits its content as-is, so the rewritten
+    // mention node should be visible (user markdown now goes through the same
+    // single-pass mention-aware renderer as agent markdown).
+    expect(container?.textContent).toContain(
+      '<mention type="user" id="alice-user-1" name="Alice Lee">@Alice Lee</mention>'
+    );
+    expect(container?.textContent).toContain("**this**");
   });
 });
 
