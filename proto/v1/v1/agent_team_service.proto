@@ -1,0 +1,155 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "v1/annotation.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+// AgentTeam is a named collection of agents that work together on tasks. A
+// team has exactly one leader and a team-level prompt that is injected into
+// each member's context when the team is assigned to a task.
+message AgentTeam {
+  option (google.api.resource) = {
+    type: "laelia/AgentTeam"
+    pattern: "agentTeams/{agentTeam}"
+  };
+
+  // The resource name of the team, in the form `agentTeams/{id}`.
+  string name = 1 [
+    (google.api.field_behavior) = IDENTIFIER,
+    (google.api.field_behavior) = REQUIRED
+  ];
+
+  // Human-readable title.
+  string title = 2;
+
+  // Longer description of the team.
+  string description = 3;
+
+  // Team-level prompt injected into every member's context when the team is
+  // assigned to a task.
+  string team_prompt = 4;
+
+  // The leader agent resource name ("agents/{id}").
+  string leader_agent = 5;
+
+  // The team's members, including the leader.
+  repeated AgentTeamMember members = 6;
+
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+
+  // Output only. True when the caller may manage this team (the team owner or
+  // a workspace admin).
+  bool can_manage = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // The team owner's user resource name ("users/{id}").
+  string owner = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message AgentTeamMember {
+  // The member agent resource name ("agents/{id}").
+  string agent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+
+  // The member's role in the team.
+  AgentTeamRole role = 2;
+
+  // The member's responsibility in the team (free text).
+  string responsibility = 3;
+}
+
+enum AgentTeamRole {
+  AGENT_TEAM_ROLE_UNSPECIFIED = 0;
+  AGENT_TEAM_ROLE_LEADER = 1;
+  AGENT_TEAM_ROLE_MEMBER = 2;
+}
+
+message GetAgentTeamRequest {
+  // The team resource name, in the form `agentTeams/{id}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/AgentTeam"
+  ];
+}
+
+message ListAgentTeamsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListAgentTeamsResponse {
+  repeated AgentTeam agent_teams = 1;
+  string next_page_token = 2;
+}
+
+message CreateAgentTeamRequest {
+  // The team to create. The name field is ignored; title, leader_agent and
+  // members are required.
+  AgentTeam agent_team = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateAgentTeamRequest {
+  // The team to update. The `name` field identifies the team.
+  AgentTeam agent_team = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The list of fields to update: "title", "description", "team_prompt",
+  // "leader_agent", "members".
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteAgentTeamRequest {
+  // The team resource name, in the form `agentTeams/{id}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/AgentTeam"
+  ];
+}
+
+// AgentTeamService manages agent teams. A team belongs to its creator (owner)
+// and is visible to other users; only the owner or a workspace admin may
+// manage it.
+service AgentTeamService {
+  rpc GetAgentTeam(GetAgentTeamRequest) returns (AgentTeam) {
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agentTeams.get";
+  }
+
+  rpc ListAgentTeams(ListAgentTeamsRequest) returns (ListAgentTeamsResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agentTeams.list";
+  }
+
+  rpc CreateAgentTeam(CreateAgentTeamRequest) returns (AgentTeam) {
+    option (google.api.method_signature) = "agent_team";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agentTeams.create";
+    option (laelia.v1.audit) = true;
+  }
+
+  // UpdateAgentTeam is handler-gated (no permission annotation): the team
+  // owner or a workspace admin may update it.
+  rpc UpdateAgentTeam(UpdateAgentTeamRequest) returns (AgentTeam) {
+    option (google.api.method_signature) = "agent_team,update_mask";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
+  // DeleteAgentTeam is handler-gated (no permission annotation): the team
+  // owner or a workspace admin may delete it.
+  rpc DeleteAgentTeam(DeleteAgentTeamRequest) returns (google.protobuf.Empty) {
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -526,7 +527,38 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 			slog.Warn("failed to resolve agent owner", "agent", agent.ResourceID, "ownerID", agent.OwnerID, "error", err)
 		}
 	}
-	return &v1pb.BeginSessionResponse{CommandId: cmd.ID.String(), AgentDisplayName: agent.Name, OwnerDisplayName: ownerDisplayName}, nil
+
+	// Resolve the agent's current team (an agent can belong to at most one
+	// team) so the agent client can inject a "Your Team" section into its
+	// cold-start prompt.
+	var teamCtx *v1pb.TeamContext
+	if team, err := d.store.GetAgentTeamByAgentID(ctx, agentID); err != nil {
+		slog.Warn("failed to resolve agent team", "agent", agent.ResourceID, "error", err)
+	} else if team != nil {
+		teamCtx = &v1pb.TeamContext{
+			TeamId:     common.FormatAgentTeamName(team.ResourceID),
+			TeamName:   team.Title,
+			TeamPrompt: team.TeamPrompt,
+		}
+		for _, m := range team.Members {
+			if m.AgentID == agentID {
+				if m.Role == store.AgentTeamRoleLeader {
+					teamCtx.Role = "leader"
+				} else {
+					teamCtx.Role = "member"
+				}
+				teamCtx.Responsibility = m.Responsibility
+				break
+			}
+		}
+	}
+
+	return &v1pb.BeginSessionResponse{
+		CommandId:        cmd.ID.String(),
+		AgentDisplayName: agent.Name,
+		OwnerDisplayName: ownerDisplayName,
+		Team:             teamCtx,
+	}, nil
 }
 
 // agentStopped reports whether the agent has been stopped (StopAgent). A

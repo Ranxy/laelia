@@ -22,6 +22,10 @@ type Request struct {
 	// to DM for approval of high-risk requests from non-owners. Empty for legacy
 	// agents with no recorded owner.
 	OwnerDisplayName string
+	// TeamPrompt is the agent's current team prompt (from
+	// BeginSessionResponse.team), injected into the cold-start init prompt as a
+	// "Your Team" section. Empty when the agent is not in a team.
+	TeamPrompt string
 	// AgentID is the agent's stable server-assigned UUID (parsed from the
 	// agents/{id} tail). It keys the per-agent working dir and the persistent
 	// ACP session-state file (acp-session.json) that lets drain turns resume

@@ -14,23 +14,23 @@ import (
 
 func TestReanchorPromptDecision(t *testing.T) {
 	state := &executor.ContextState{NeedsReanchor: true}
-	got := reanchorPrompt(state, "alice", "")
+	got := reanchorPrompt(state, "alice", "", "")
 	assert.Contains(t, got, "Re-anchor (context compaction recovery)")
 	assert.False(t, state.NeedsReanchor, "decision is consumed")
 	assert.Zero(t, state.Session.Turns)
 
 	state = &executor.ContextState{Session: executor.SessionHealth{Turns: reanchorEveryTurns}}
-	assert.NotEmpty(t, reanchorPrompt(state, "alice", ""), "periodic re-anchor fires at the warm-turn threshold")
+	assert.NotEmpty(t, reanchorPrompt(state, "alice", "", ""), "periodic re-anchor fires at the warm-turn threshold")
 	assert.Zero(t, state.Session.Turns)
 
 	state = &executor.ContextState{Session: executor.SessionHealth{Turns: reanchorEveryTurns - 1}}
-	assert.Empty(t, reanchorPrompt(state, "alice", ""))
+	assert.Empty(t, reanchorPrompt(state, "alice", "", ""))
 	assert.Equal(t, reanchorEveryTurns-1, state.Session.Turns, "below threshold leaves the counter alone")
 
-	assert.Empty(t, reanchorPrompt(nil, "alice", ""))
+	assert.Empty(t, reanchorPrompt(nil, "alice", "", ""))
 
 	// The owner is carried into the re-anchor prompt when present.
-	withOwner := reanchorPrompt(&executor.ContextState{NeedsReanchor: true}, "alice", "Alice Owner")
+	withOwner := reanchorPrompt(&executor.ContextState{NeedsReanchor: true}, "alice", "Alice Owner", "")
 	assert.Contains(t, withOwner, "dm:@Alice Owner", "re-anchor must carry the owner line")
 }
 
@@ -235,7 +235,7 @@ func TestRunSessionReanchorInjectionAndPersistence(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "TestAgent", "")
+		cs.runSession(ctx, stream, "drain-1", "TestAgent", "", nil)
 		close(done)
 	}()
 	select {
@@ -283,7 +283,7 @@ func TestRunSessionOwnerChangeForcesReanchor(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "TestAgent", "New Owner")
+		cs.runSession(ctx, stream, "drain-1", "TestAgent", "New Owner", nil)
 		close(done)
 	}()
 	select {
@@ -324,7 +324,7 @@ func TestRunSessionInitializesContextStateForFreshAgent(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "FreshAgent", "")
+		cs.runSession(ctx, stream, "drain-1", "FreshAgent", "", nil)
 		close(done)
 	}()
 	select {

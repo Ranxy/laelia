@@ -345,7 +345,8 @@
     "status-todo": "Todo",
     "status-unknown": "Unknown",
     "unassigned": "unassigned",
-    "untitled": "Untitled task"
+    "untitled": "Untitled task",
+    "assignee-teams": "Teams"
   },
   "chat": {
     "agent": "Agent",
@@ -687,7 +688,8 @@
       "role-source-direct": "Direct",
       "role-source-group": "via {{group}}",
       "save": "Save",
-      "you": "(you)"
+      "you": "(you)",
+      "agent-teams": "Agent Teams"
     },
     "kind-user": "User",
     "load-failed": "Failed to load the member directory. Please retry.",
@@ -705,7 +707,8 @@
     "section-channels": "Channels",
     "section-humans": "Humans",
     "send-message": "Send Message",
-    "title": "Members"
+    "title": "Members",
+    "back": "Back"
   },
   "mobile": {
     "tab-bar": "Tab bar"
@@ -1223,7 +1226,34 @@
       "use-tls": "Use TLS (port 465 implicit TLS, other ports STARTTLS)",
       "username": "Username"
     },
-    "title": "Settings"
+    "title": "Settings",
+    "agentTeams": {
+      "title": "Agent Teams",
+      "create": "Create team",
+      "create-description": "Create a team of agents with one leader and a shared team prompt.",
+      "create-failed": "Failed to create team",
+      "created": "Team created",
+      "edit": "Edit team",
+      "save-failed": "Failed to save team",
+      "saved": "Team saved",
+      "delete": "Delete team",
+      "delete-description": "Delete this team? Its members are not affected.",
+      "delete-failed": "Failed to delete team",
+      "deleted": "Team deleted",
+      "load-failed": "Failed to load teams",
+      "empty": "No teams yet",
+      "title-required": "Team title is required",
+      "at-least-one-leader": "A team must have exactly one leader",
+      "leader": "Leader",
+      "member": "Member",
+      "members": "Members",
+      "description": "Description",
+      "teamPrompt": "Team prompt",
+      "add-member": "Add member",
+      "responsibility": "Responsibility",
+      "select-agent": "Select agent",
+      "no-agents": "No available agents"
+    }
   },
   "setup": {
     "action": {
@@ -1260,7 +1290,8 @@
     "settings-roles": "Roles",
     "settings-smtp": "SMTP",
     "settings-storage": "Storage",
-    "settings-users": "Users"
+    "settings-users": "Users",
+    "settings-agent-teams": "Agent Teams"
   },
   "tasks": {
     "empty": "No tasks yet",

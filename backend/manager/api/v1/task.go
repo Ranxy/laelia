@@ -212,11 +212,25 @@ func (s *CommandService) ClaimTask(ctx context.Context, req *connect.Request[v1p
 		return nil, err
 	}
 
-	msg, err := s.store.ClaimTask(ctx, msgID, convID, agent.ID)
+	// A team-assigned task can only be claimed by the team's leader. Inspect
+	// the current task to decide which claim path to use.
+	current, err := s.store.GetTaskMessage(ctx, msgID)
+	if err != nil {
+		if errors.Is(err, store.ErrTaskNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to read task before claim"))
+	}
+	var msg *store.ChatMessage
+	if current.TaskInfo != nil && current.TaskInfo.AssigneeType == 3 {
+		msg, err = s.store.ClaimTeamTask(ctx, msgID, convID, agent.ID)
+	} else {
+		msg, err = s.store.ClaimTask(ctx, msgID, convID, agent.ID)
+	}
 	if err != nil {
 		switch {
 		case errors.Is(err, store.ErrTaskNotClaimable):
-			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("task is already claimed or not in todo"))
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("task is already claimed, not in todo, or only the team leader may claim it"))
 		case errors.Is(err, store.ErrTaskNotFound):
 			return nil, connect.NewError(connect.CodeNotFound, err)
 		default:
@@ -321,12 +335,127 @@ func (s *CommandService) AssignTask(ctx context.Context, req *connect.Request[v1
 			return nil, connect.NewError(connect.CodeNotFound, err)
 		case errors.Is(err, store.ErrTaskAssigneeNotMember):
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("assignee is not a member of this conversation"))
+		case errors.Is(err, store.ErrTaskTeamAlreadyAssigned):
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("team is already assigned to an active task"))
 		default:
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to assign task"))
 		}
 	}
+
+	// Team assignment: auto-join all team agents to the conversation, write the
+	// team instruction system message into the task thread, and wake the team.
+	if req.Msg.MemberType == 3 {
+		if err := s.afterTeamAssign(ctx, convID, msgID, msg); err != nil {
+			return nil, err
+		}
+	}
 	s.postTaskSystemNotification(ctx, convID, fmt.Sprintf("👤 %s assigned task #%d to %s", resolveActorName(ctx), msg.TaskInfo.TaskNumber, msg.TaskInfo.AssigneeName))
 	return connect.NewResponse(&v1pb.AssignTaskResponse{Message: storeToV1ChatMessage(msg)}), nil
+}
+
+// afterTeamAssign performs the team-specific side effects after a task is
+// assigned to a team: auto-join all team agents to the conversation, write the
+// team instruction system message into the task thread, and wake the team.
+func (s *CommandService) afterTeamAssign(ctx context.Context, convID, msgID uuid.UUID, msg *store.ChatMessage) error {
+	if msg.TaskInfo == nil || msg.TaskInfo.AssigneeTeamID == "" {
+		return nil
+	}
+	team, err := s.store.GetAgentTeamByResourceID(ctx, msg.TaskInfo.AssigneeTeamID)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to load assigned team"))
+	}
+	if team == nil {
+		return connect.NewError(connect.CodeInternal, errors.New("assigned team not found"))
+	}
+
+	// Auto-join all team agents to the conversation and seed their cursors.
+	var inputs []store.ConversationMemberInput
+	for _, m := range team.Members {
+		existingRole, _, err := s.store.GetConversationMembership(ctx, convID, store.MemberTypeAgent, m.AgentResourceID)
+		if err != nil {
+			return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check team member membership"))
+		}
+		if existingRole != 0 {
+			continue
+		}
+		inputs = append(inputs, store.ConversationMemberInput{MemberType: store.MemberTypeAgent, MemberID: m.AgentResourceID})
+	}
+	if len(inputs) > 0 {
+		if err := s.store.AddConversationMembers(ctx, convID, inputs); err != nil {
+			return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to add team members to conversation"))
+		}
+		for _, m := range inputs {
+			if agent, agentErr := s.store.GetAgentByResourceID(ctx, m.MemberID); agentErr == nil && agent != nil {
+				if seedErr := s.store.SeedCursorOnJoin(ctx, agent.ID, convID); seedErr != nil {
+					slog.Warn("failed to seed team member cursor on join", "agent", agent.ResourceID, "conversationID", convID, "error", seedErr)
+				}
+			}
+		}
+	}
+
+	// Build the team instruction system message in the task thread.
+	content := buildTeamAssignmentMessage(team, msg)
+	if content != "" {
+		if _, _, err := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
+			ConversationID:      convID,
+			PrincipalID:         1,
+			PrincipalHandle:     common.SystemBotHandle,
+			Role:                1,
+			Content:             content,
+			SenderType:          store.SenderTypeSystem,
+			ThreadRootMessageID: uuid.NullUUID{UUID: msgID, Valid: true},
+		}); err != nil {
+			slog.Warn("failed to post team assignment system message", "conversationID", convID, "rootID", msgID, "error", err)
+		}
+	}
+
+	// Wake all team agents so they discover the assignment.
+	s.notifyConversationAgents(ctx, convID, 0, nil)
+	return nil
+}
+
+// buildTeamAssignmentMessage renders the system message posted into a task
+// thread when a team is assigned.
+func buildTeamAssignmentMessage(team *store.AgentTeamMessage, msg *store.ChatMessage) string {
+	var b strings.Builder
+	b.WriteString("[TEAM ASSIGNMENT]\n")
+	b.WriteString("Team: " + team.Title + "\n")
+	for _, m := range team.Members {
+		if m.Role == store.AgentTeamRoleLeader {
+			b.WriteString("Leader: " + agentNameForTeam(m) + "\n")
+		}
+	}
+	if team.TeamPrompt != "" {
+		b.WriteString("Team Prompt: " + team.TeamPrompt + "\n")
+	}
+	b.WriteString("\nTask Instruction: " + msg.Content + "\n\n")
+	b.WriteString("Roles:\n")
+	for _, m := range team.Members {
+		role := "member"
+		if m.Role == store.AgentTeamRoleLeader {
+			role = "leader"
+		}
+		line := "- " + agentNameForTeam(m) + " (" + role + ")"
+		if m.Responsibility != "" {
+			line += ": " + m.Responsibility
+		}
+		if m.Role == store.AgentTeamRoleLeader {
+			line += ". You are the leader. You own the task outcome. You must break the work into subtasks, coordinate other members, track progress, and ensure the task moves from IN_PROGRESS to IN_REVIEW/DONE."
+		} else {
+			line += ". Follow the leader's coordination and complete the assigned subtasks."
+		}
+		b.WriteString(line + "\n")
+	}
+	return b.String()
+}
+
+// agentNameForTeam returns a display name for a team member. The store member
+// row carries the agent resource id; we use it as a stable handle.
+func agentNameForTeam(m *store.AgentTeamMemberMessage) string {
+	if m.AgentResourceID != "" {
+		return m.AgentResourceID
+	}
+	return fmt.Sprintf("agent-%d", m.AgentID)
 }
 
 // CloseTask lets a channel member close a task directly from the UI: any

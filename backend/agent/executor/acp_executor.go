@@ -572,7 +572,7 @@ func turnPromptText(req Request, persona string, resumed bool) string {
 	if identityName == "" {
 		identityName = req.AgentResourceID
 	}
-	initPrompt := BuildPrompt(identityName, req.OwnerDisplayName, persona)
+	initPrompt := BuildPrompt(identityName, req.OwnerDisplayName, persona, req.TeamPrompt)
 	if batch == "" {
 		return initPrompt
 	}

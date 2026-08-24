@@ -39,6 +39,9 @@ var (
 	// ErrTaskAssigneeNotMember is returned by AssignTask when the target member
 	// is not a member of the task's conversation.
 	ErrTaskAssigneeNotMember = errors.New("assignee is not a conversation member")
+	// ErrTaskTeamAlreadyAssigned is returned by AssignTask when the target team
+	// is already assigned to another active task.
+	ErrTaskTeamAlreadyAssigned = errors.New("team is already assigned to an active task")
 )
 
 // TaskInfo is the join shape attached to a ChatMessage that is a task. It is
@@ -51,6 +54,9 @@ type TaskInfo struct {
 	AssigneeType       int16
 	AssigneeName       string
 	AssigneeResourceID string
+	AssigneeTeamID     string
+	AssigneeTeamName   string
+	AssigneeTeamLeader string
 }
 
 // RootMessageKinds reports whether a message is the root of a task and/or a
@@ -233,6 +239,46 @@ func (s *Store) ClaimTask(ctx context.Context, msgID, convID uuid.UUID, agentID 
 	return s.GetTaskMessage(ctx, msgID)
 }
 
+// ClaimTeamTask lets the leader of a team-assigned task claim it. The task
+// must be TODO and assigned to a team whose leader is the calling agent. On
+// success the task becomes IN_PROGRESS and the leader is recorded as the
+// working owner (assignee_agent_id) while keeping assignee_type=3 (team).
+func (s *Store) ClaimTeamTask(ctx context.Context, msgID, convID uuid.UUID, agentID int) (*ChatMessage, error) {
+	var teamID string
+	var leaderID int
+	err := s.GetDB().QueryRowContext(ctx, `
+SELECT t.assignee_team_id, at.leader_agent_id
+FROM task t
+LEFT JOIN agent_team at ON at.id = t.assignee_team_id
+WHERE t.message_id = $1 AND t.conversation_id = $2 AND t.status = $3
+`, msgID, convID, TaskStatusTodo).Scan(&teamID, &leaderID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotClaimable
+		}
+		return nil, errors.Wrapf(err, "failed to read team task for claim")
+	}
+	if teamID == "" || leaderID != agentID {
+		return nil, ErrTaskNotClaimable
+	}
+	res, err := s.GetDB().ExecContext(ctx, `
+UPDATE task
+   SET status = $1, assignee_agent_id = $2, assignee_type = 3, updated_at = now()
+ WHERE message_id = $3 AND conversation_id = $4 AND status = $5
+`, TaskStatusInProgress, agentID, msgID, convID, TaskStatusTodo)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to claim team task")
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read team claim result")
+	}
+	if rows == 0 {
+		return nil, ErrTaskNotClaimable
+	}
+	return s.GetTaskMessage(ctx, msgID)
+}
+
 // UnclaimTask releases the calling agent's claim on a task it owns, setting it
 // back to TODO so another agent may claim it. DONE is terminal and cannot be
 // unclaimed. Returns ErrTaskNotOwner when the caller is not the assignee or the
@@ -302,7 +348,25 @@ func (s *Store) AssignTask(ctx context.Context, msgID, convID uuid.UUID, memberT
 	// resource id).
 	var assigneeType int16
 	var agentID, userID sql.NullInt32
+	var teamID string
 	switch memberType {
+	case 3: // team
+		team, err := s.GetAgentTeamByResourceID(ctx, memberID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to resolve team assignee")
+		}
+		if team == nil {
+			return nil, ErrTaskAssigneeNotMember
+		}
+		active, err := s.TeamHasActiveTask(ctx, team.ID)
+		if err != nil {
+			return nil, err
+		}
+		if active {
+			return nil, ErrTaskTeamAlreadyAssigned
+		}
+		assigneeType = 3
+		teamID = team.ID
 	case MemberTypeAgent:
 		var id int
 		if err := s.GetDB().QueryRowContext(ctx, `
@@ -337,9 +401,10 @@ func (s *Store) AssignTask(ctx context.Context, msgID, convID uuid.UUID, memberT
 
 	res, err := s.GetDB().ExecContext(ctx, `
 		UPDATE task
-		   SET assignee_type = $1, assignee_agent_id = $2, assignee_user_id = $3, updated_at = now()
-		 WHERE message_id = $4 AND conversation_id = $5
-	`, assigneeType, agentID, userID, msgID, convID)
+		   SET assignee_type = $1, assignee_agent_id = $2, assignee_user_id = $3,
+		       assignee_team_id = $4, updated_at = now()
+		 WHERE message_id = $5 AND conversation_id = $6
+	`, assigneeType, agentID, userID, nullIfEmpty(teamID), msgID, convID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to assign task")
 	}
@@ -524,15 +589,19 @@ func (s *Store) fillTaskInfo(ctx context.Context, msgs []*ChatMessage) error {
 		return nil
 	}
 	rows, err := s.GetDB().QueryContext(ctx, `
-		SELECT t.message_id, t.task_number, t.status, t.assignee_agent_id,
-		       t.assignee_user_id, t.assignee_type,
-		       COALESCE(a.name, ''), COALESCE(a.resource_id, ''),
-		       COALESCE(u.name, ''), COALESCE(u.handle, '')
-		FROM task t
-		LEFT JOIN agent a ON a.id = t.assignee_agent_id
-		LEFT JOIN principal u ON u.id = t.assignee_user_id
-		WHERE t.message_id = ANY($1)
-	`, roots)
+SELECT t.message_id, t.task_number, t.status, t.assignee_agent_id,
+       t.assignee_user_id, t.assignee_type, t.assignee_team_id,
+       COALESCE(a.name, ''), COALESCE(a.resource_id, ''),
+       COALESCE(u.name, ''), COALESCE(u.handle, ''),
+       COALESCE(at.name, ''), COALESCE(at.resource_id, ''),
+       COALESCE(la.name, '')
+FROM task t
+LEFT JOIN agent a ON a.id = t.assignee_agent_id
+LEFT JOIN principal u ON u.id = t.assignee_user_id
+LEFT JOIN agent_team at ON at.id = t.assignee_team_id
+LEFT JOIN agent la ON la.id = at.leader_agent_id
+WHERE t.message_id = ANY($1)
+`, roots)
 	if err != nil {
 		return errors.Wrapf(err, "failed to query task info")
 	}
@@ -545,20 +614,31 @@ func (s *Store) fillTaskInfo(ctx context.Context, msgs []*ChatMessage) error {
 			agentID      sql.NullInt32
 			userID       sql.NullInt32
 			assigneeType sql.NullInt16
+			teamID       sql.NullString
 			agentName    string
 			agentResID   string
 			userName     string
 			userHandle   string
+			teamName     string
+			teamResID    string
+			teamLeader   string
 		)
-		if err := rows.Scan(&msgID, &ti.TaskNumber, &ti.Status, &agentID, &userID, &assigneeType, &agentName, &agentResID, &userName, &userHandle); err != nil {
+		if err := rows.Scan(&msgID, &ti.TaskNumber, &ti.Status, &agentID, &userID, &assigneeType, &teamID, &agentName, &agentResID, &userName, &userHandle, &teamName, &teamResID, &teamLeader); err != nil {
 			return errors.Wrapf(err, "failed to scan task info")
 		}
 		ti.AssigneeAgentID = agentID
 		ti.AssigneeUserID = userID
 		ti.AssigneeType = assigneeType.Int16
 		// Surface the assignee name/resource id according to the current
-		// assignee kind: agent for agent assignees, user for user assignees.
+		// assignee kind: agent for agent assignees, user for user assignees,
+		// team for team assignees.
 		switch ti.AssigneeType {
+		case 3:
+			ti.AssigneeTeamID = teamResID
+			ti.AssigneeTeamName = teamName
+			ti.AssigneeTeamLeader = teamLeader
+			ti.AssigneeName = teamName
+			ti.AssigneeResourceID = teamResID
 		case 2:
 			ti.AssigneeName = agentName
 			ti.AssigneeResourceID = agentResID
@@ -594,4 +674,12 @@ func (s *Store) fillTaskInfo(ctx context.Context, msgs []*ChatMessage) error {
 		}
 	}
 	return nil
+}
+
+// nullIfEmpty returns a sql.NullString that is NULL when s is empty.
+func nullIfEmpty(s string) sql.NullString {
+	if s == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: s, Valid: true}
 }

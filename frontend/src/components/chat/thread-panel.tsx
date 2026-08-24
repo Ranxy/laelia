@@ -19,6 +19,8 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { agentTeamServiceClient } from "@/connect";
+import type { AgentTeam } from "@/types/proto-es/v1/agent_team_service_pb";
 import { useNavigate } from "react-router-dom";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
@@ -1078,6 +1080,7 @@ function ThreadHeader({
     useAppStore((s) => s.channelMembersByConv[conversationName]) ?? [];
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [teams, setTeams] = useState<AgentTeam[]>([]);
   const isTask = !!rootMsg?.task;
   // Task controls (status + assignee dropdowns) are hidden in readOnly
   // (admin agent-to-agent DMs) and when the thread has no task root.
@@ -1088,6 +1091,12 @@ function ThreadHeader({
   useEffect(() => {
     if (canManageTask && members.length === 0) {
       void listChannelMembers(channelId);
+    }
+    if (canManageTask) {
+      void agentTeamServiceClient
+        .listAgentTeams({ pageSize: 1000 })
+        .then((res) => setTeams(res.agentTeams ?? []))
+        .catch(() => setTeams([]));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManageTask, channelId]);
@@ -1246,6 +1255,23 @@ function ThreadHeader({
                   {m.displayName}
                 </SelectItem>
               ))}
+              {teams.length > 0 && (
+                <SelectItem
+                  key="team-separator"
+                  value="team-separator"
+                  disabled
+                >
+                  {t("channelTask.assignee-teams")}
+                </SelectItem>
+              )}
+              {teams.map((team) => {
+                const teamId = team.name.split("/").pop() ?? "";
+                return (
+                  <SelectItem key={team.name} value={`3:${teamId}`}>
+                    {team.title}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </>

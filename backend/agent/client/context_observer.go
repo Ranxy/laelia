@@ -181,7 +181,7 @@ func (o *contextObserver) onWatchdog() error {
 // periodic warm-turn threshold. The anchor is only actually prepended on warm
 // turns by the executor; a cold turn re-sends the full init prompt, so
 // consuming the decision either way is correct.
-func reanchorPrompt(ctxState *executor.ContextState, name, ownerDisplayName string) string {
+func reanchorPrompt(ctxState *executor.ContextState, name, ownerDisplayName, teamPrompt string) string {
 	if ctxState == nil {
 		return ""
 	}
@@ -190,7 +190,7 @@ func reanchorPrompt(ctxState *executor.ContextState, name, ownerDisplayName stri
 	}
 	ctxState.NeedsReanchor = false
 	ctxState.Session.Turns = 0
-	return executor.BuildReanchorPrompt(name, ownerDisplayName)
+	return executor.BuildReanchorPrompt(name, ownerDisplayName, teamPrompt)
 }
 
 // appendContextWarning appends the context-window warning to the turn batch

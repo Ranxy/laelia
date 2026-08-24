@@ -71,6 +71,7 @@ func configureV1Routers(
 	roleService := apiv1.NewRoleService(stores)
 	iamService := apiv1.NewIamService(stores, iamManager)
 	groupService := apiv1.NewGroupService(stores, iamManager)
+	agentTeamService := apiv1.NewAgentTeamService(stores, iamManager)
 	apiProviderService := apiv1.NewAPIProviderService(stores, iamManager)
 	mcpServerService := apiv1.NewMcpServerService(stores, iamManager)
 	mcpGatewayService := apiv1.NewMcpGatewayService(stores, iamManager)
@@ -161,6 +162,8 @@ func configureV1Routers(
 	connectHandlers[iamPath] = iamHandler
 	groupPath, groupHandler := v1connect.NewGroupServiceHandler(groupService, handlerOpts)
 	connectHandlers[groupPath] = groupHandler
+	agentTeamPath, agentTeamHandler := v1connect.NewAgentTeamServiceHandler(agentTeamService, handlerOpts)
+	connectHandlers[agentTeamPath] = agentTeamHandler
 	apiProviderPath, apiProviderHandler := v1connect.NewApiProviderServiceHandler(apiProviderService, handlerOpts)
 	connectHandlers[apiProviderPath] = apiProviderHandler
 	mcpServerPath, mcpServerHandler := v1connect.NewMcpServerServiceHandler(mcpServerService, handlerOpts)
@@ -193,6 +196,7 @@ func configureV1Routers(
 			v1connect.RoleServiceName,
 			v1connect.IamServiceName,
 			v1connect.GroupServiceName,
+			v1connect.AgentTeamServiceName,
 			v1connect.ApiProviderServiceName,
 			v1connect.McpServerServiceName,
 			v1connect.McpGatewayServiceName,

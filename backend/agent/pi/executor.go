@@ -670,7 +670,7 @@ func (e *PiExecutor) turnPromptText(resumed bool) string {
 		}
 		return strings.Join(parts, "\n\n")
 	}
-	initPrompt := executor.BuildPrompt(e.identity, e.req.OwnerDisplayName, e.cfg.PersonaPrompt)
+	initPrompt := executor.BuildPrompt(e.identity, e.req.OwnerDisplayName, e.cfg.PersonaPrompt, e.req.TeamPrompt)
 	parts := []string{initPrompt}
 	if windowsNote != "" {
 		parts = append(parts, windowsNote)

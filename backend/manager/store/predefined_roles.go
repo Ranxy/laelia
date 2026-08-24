@@ -73,6 +73,9 @@ var memberBaselinePermissions = permissionSet(
 	permission.FilesUpload,
 	permission.GroupsGet,
 	permission.GroupsList,
+	permission.AgentTeamsCreate,
+	permission.AgentTeamsGet,
+	permission.AgentTeamsList,
 )
 
 // PredefinedRoles are the read-only, Go-defined roles shown on the management

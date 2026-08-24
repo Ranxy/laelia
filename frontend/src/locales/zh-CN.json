@@ -345,7 +345,8 @@
     "status-todo": "待办",
     "status-unknown": "未知",
     "unassigned": "未认领",
-    "untitled": "未命名任务"
+    "untitled": "未命名任务",
+    "assignee-teams": "团队"
   },
   "chat": {
     "agent": "Agent",
@@ -687,7 +688,8 @@
       "role-source-direct": "直接",
       "role-source-group": "通过 {{group}}",
       "save": "保存",
-      "you": "(你)"
+      "you": "(你)",
+      "agent-teams": "Agent 团队"
     },
     "kind-user": "用户",
     "load-failed": "加载成员目录失败,请重试。",
@@ -705,7 +707,8 @@
     "section-channels": "频道",
     "section-humans": "Humans",
     "send-message": "发送消息",
-    "title": "成员"
+    "title": "成员",
+    "back": "返回"
   },
   "mobile": {
     "tab-bar": "标签栏"
@@ -1223,7 +1226,34 @@
       "use-tls": "使用 TLS（465 端口隐式 TLS，其他端口 STARTTLS）",
       "username": "用户名"
     },
-    "title": "设置"
+    "title": "设置",
+    "agentTeams": {
+      "title": "Agent 团队",
+      "create": "创建团队",
+      "create-description": "创建一个 agent 团队，包含一个 leader 和共享团队提示词。",
+      "create-failed": "创建团队失败",
+      "created": "团队已创建",
+      "edit": "编辑团队",
+      "save-failed": "保存团队失败",
+      "saved": "团队已保存",
+      "delete": "删除团队",
+      "delete-description": "删除该团队？团队成员不受影响。",
+      "delete-failed": "删除团队失败",
+      "deleted": "团队已删除",
+      "load-failed": "加载团队失败",
+      "empty": "还没有团队",
+      "title-required": "团队名称必填",
+      "at-least-one-leader": "团队必须有且只有一个 leader",
+      "leader": "Leader",
+      "member": "成员",
+      "members": "成员",
+      "description": "描述",
+      "teamPrompt": "团队提示词",
+      "add-member": "添加成员",
+      "responsibility": "职责",
+      "select-agent": "选择 agent",
+      "no-agents": "没有可选 agent"
+    }
   },
   "setup": {
     "action": {
@@ -1260,7 +1290,8 @@
     "settings-roles": "角色",
     "settings-smtp": "SMTP",
     "settings-storage": "存储配置",
-    "settings-users": "用户管理"
+    "settings-users": "用户管理",
+    "settings-agent-teams": "Agent 团队"
   },
   "tasks": {
     "empty": "暂无任务",

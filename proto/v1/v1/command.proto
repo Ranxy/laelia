@@ -63,9 +63,17 @@ message TaskInfo {
   // assignee_resource_id is the assigned member's resource id (the agent's
   // handle for agents, the user's handle for users), empty when unassigned.
   string assignee_resource_id = 4;
-  // assignee_type distinguishes the assignee kind: 1=user, 2=agent (reuses the
-  // MemberType semantics). 0 when unassigned.
+  // assignee_type distinguishes the assignee kind: 1=user, 2=agent, 3=team
+  // (reuses the MemberType semantics plus team). 0 when unassigned.
   int32 assignee_type = 5;
+  // assignee_team_id is the team resource id ("agentTeams/{id}") when the
+  // assignee is a team. Empty otherwise.
+  string assignee_team_id = 6;
+  // assignee_team_name is the team's display title when the assignee is a team.
+  string assignee_team_name = 7;
+  // assignee_team_leader_name is the team leader's display name when the
+  // assignee is a team.
+  string assignee_team_leader_name = 8;
 }
 
 enum CommandEventType {
@@ -1132,13 +1140,14 @@ message AssignTaskRequest {
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference).type = "laelia/Conversation"
   ];
-  // member_type is the target assignee kind: 1=user, 2=agent (reuses the
-  // MemberType semantics). A user assignee is a display-only "owner" and does
-  // not participate in claim/process flows; an agent assignee is the working
-  // owner.
+  // member_type is the target assignee kind: 1=user, 2=agent, 3=team (reuses
+  // the MemberType semantics plus team). A user assignee is a display-only
+  // "owner" and does not participate in claim/process flows; an agent assignee
+  // is the working owner; a team assignee is owned by the team's leader.
   int32 member_type = 2 [(google.api.field_behavior) = REQUIRED];
   // member_id is the target member's stable id within the conversation: the
-  // agent's resource id (handle) for agents, the user's handle for users.
+  // agent's resource id (handle) for agents, the user's handle for users, or
+  // the team resource id ("agentTeams/{id}") for teams.
   string member_id = 3 [(google.api.field_behavior) = REQUIRED];
 }
 message AssignTaskResponse {
@@ -2251,6 +2260,26 @@ message BeginSessionResponse {
   // DM for approval of high-risk requests from non-owners. Empty for legacy
   // agents with no recorded owner.
   string owner_display_name = 4;
+  // team is the agent's current team (an agent can belong to at most one team).
+  // Populated when the agent is a member of a team; empty otherwise. The agent
+  // client may inject it into the cold-start init prompt as a "Your Team"
+  // section.
+  TeamContext team = 5;
+}
+
+// TeamContext describes the agent's current team membership for injection into
+// the agent's cold-start prompt.
+message TeamContext {
+  // team_id is the team resource id ("agentTeams/{id}").
+  string team_id = 1;
+  // team_name is the team's display title.
+  string team_name = 2;
+  // team_prompt is the team-level prompt.
+  string team_prompt = 3;
+  // role is "leader" or "member".
+  string role = 4;
+  // responsibility is the agent's responsibility in the team.
+  string responsibility = 5;
 }
 
 // FetchConversationActivity returns the execution status of each agent member

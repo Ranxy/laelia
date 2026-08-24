@@ -453,7 +453,7 @@ func TestRunSessionExecutesRuntime(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "TestAgent", "")
+		cs.runSession(ctx, stream, "drain-1", "TestAgent", "", nil)
 		close(done)
 	}()
 
@@ -514,7 +514,7 @@ func TestRunnerCoordinatesInFlightTurnOnReload(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	go cs.runSession(ctx, stream, "drain-reload", "TestAgent", "")
+	go cs.runSession(ctx, stream, "drain-reload", "TestAgent", "", nil)
 
 	// Wait until the turn is in flight before reloading.
 	require.Eventually(t, cs.InFlight, 2*time.Second, 5*time.Millisecond, "turn must become in flight")

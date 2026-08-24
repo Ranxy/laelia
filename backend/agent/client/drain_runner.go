@@ -136,7 +136,7 @@ func (c *commandStream) drainLoop(ctx context.Context, stream streamSender, done
 			}
 
 			lastSessionStart = time.Now()
-			c.runSession(ctx, stream, resp.CommandId, resp.AgentDisplayName, resp.OwnerDisplayName)
+			c.runSession(ctx, stream, resp.CommandId, resp.AgentDisplayName, resp.OwnerDisplayName, resp.Team)
 		}
 	}
 }
@@ -168,7 +168,7 @@ func (c *commandStream) beginSession(ctx context.Context, stream streamSender, d
 // runCommand. The agent itself decides which channel to process and how, by
 // shelling out to the `laelia-machine` CLI over the local daemon. Blocking:
 // returns when the session finishes.
-func (c *commandStream) runSession(ctx context.Context, stream streamSender, commandID string, agentDisplayName, ownerDisplayName string) {
+func (c *commandStream) runSession(ctx context.Context, stream streamSender, commandID string, agentDisplayName, ownerDisplayName string, team *v1pb.TeamContext) {
 	// Per-agent context state drives re-anchor / usage-warning decisions for
 	// this turn and is updated from the events below. A load failure disables
 	// context tracking for the turn (never blocks work).
@@ -211,12 +211,17 @@ func (c *commandStream) runSession(ctx context.Context, stream streamSender, com
 	if name == "" {
 		name = c.agentID
 	}
+	teamPrompt := ""
+	if team != nil {
+		teamPrompt = team.TeamPrompt
+	}
 	req := executor.Request{
 		CommandID:        commandID,
 		TurnPrompt:       turnPrompt,
 		AgentDisplayName: agentDisplayName,
 		OwnerDisplayName: ownerDisplayName,
-		ReanchorPrompt:   reanchorPrompt(ctxState, name, ownerDisplayName),
+		TeamPrompt:       teamPrompt,
+		ReanchorPrompt:   reanchorPrompt(ctxState, name, ownerDisplayName, teamPrompt),
 	}
 
 	runtime, err := c.newSessionRuntime(req)

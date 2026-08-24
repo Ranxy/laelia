@@ -84,6 +84,20 @@
   
     - [AgentService](#laelia-v1-AgentService)
   
+- [v1/agent_team_service.proto](#v1_agent_team_service-proto)
+    - [AgentTeam](#laelia-v1-AgentTeam)
+    - [AgentTeamMember](#laelia-v1-AgentTeamMember)
+    - [CreateAgentTeamRequest](#laelia-v1-CreateAgentTeamRequest)
+    - [DeleteAgentTeamRequest](#laelia-v1-DeleteAgentTeamRequest)
+    - [GetAgentTeamRequest](#laelia-v1-GetAgentTeamRequest)
+    - [ListAgentTeamsRequest](#laelia-v1-ListAgentTeamsRequest)
+    - [ListAgentTeamsResponse](#laelia-v1-ListAgentTeamsResponse)
+    - [UpdateAgentTeamRequest](#laelia-v1-UpdateAgentTeamRequest)
+  
+    - [AgentTeamRole](#laelia-v1-AgentTeamRole)
+  
+    - [AgentTeamService](#laelia-v1-AgentTeamService)
+  
 - [v1/api_provider_service.proto](#v1_api_provider_service-proto)
     - [ApiProvider](#laelia-v1-ApiProvider)
     - [ApiProviderChange](#laelia-v1-ApiProviderChange)
@@ -294,6 +308,7 @@
     - [SteerCommandRequest](#laelia-v1-SteerCommandRequest)
     - [SteerMessage](#laelia-v1-SteerMessage)
     - [TaskInfo](#laelia-v1-TaskInfo)
+    - [TeamContext](#laelia-v1-TeamContext)
     - [TextDeltaPayload](#laelia-v1-TextDeltaPayload)
     - [ThreadUpdate](#laelia-v1-ThreadUpdate)
     - [TokenUsagePayload](#laelia-v1-TokenUsagePayload)
@@ -1783,6 +1798,187 @@ ReadAgentWorkspaceFile RPC.
 
 
 
+<a name="v1_agent_team_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/agent_team_service.proto
+
+
+
+<a name="laelia-v1-AgentTeam"></a>
+
+### AgentTeam
+AgentTeam is a named collection of agents that work together on tasks. A
+team has exactly one leader and a team-level prompt that is injected into
+each member&#39;s context when the team is assigned to a task.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The resource name of the team, in the form `agentTeams/{id}`. |
+| title | [string](#string) |  | Human-readable title. |
+| description | [string](#string) |  | Longer description of the team. |
+| team_prompt | [string](#string) |  | Team-level prompt injected into every member&#39;s context when the team is assigned to a task. |
+| leader_agent | [string](#string) |  | The leader agent resource name (&#34;agents/{id}&#34;). |
+| members | [AgentTeamMember](#laelia-v1-AgentTeamMember) | repeated | The team&#39;s members, including the leader. |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| updated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| can_manage | [bool](#bool) |  | Output only. True when the caller may manage this team (the team owner or a workspace admin). |
+| owner | [string](#string) |  | The team owner&#39;s user resource name (&#34;users/{id}&#34;). |
+
+
+
+
+
+
+<a name="laelia-v1-AgentTeamMember"></a>
+
+### AgentTeamMember
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent | [string](#string) |  | The member agent resource name (&#34;agents/{id}&#34;). |
+| role | [AgentTeamRole](#laelia-v1-AgentTeamRole) |  | The member&#39;s role in the team. |
+| responsibility | [string](#string) |  | The member&#39;s responsibility in the team (free text). |
+
+
+
+
+
+
+<a name="laelia-v1-CreateAgentTeamRequest"></a>
+
+### CreateAgentTeamRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_team | [AgentTeam](#laelia-v1-AgentTeam) |  | The team to create. The name field is ignored; title, leader_agent and members are required. |
+
+
+
+
+
+
+<a name="laelia-v1-DeleteAgentTeamRequest"></a>
+
+### DeleteAgentTeamRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The team resource name, in the form `agentTeams/{id}`. |
+
+
+
+
+
+
+<a name="laelia-v1-GetAgentTeamRequest"></a>
+
+### GetAgentTeamRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The team resource name, in the form `agentTeams/{id}`. |
+
+
+
+
+
+
+<a name="laelia-v1-ListAgentTeamsRequest"></a>
+
+### ListAgentTeamsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListAgentTeamsResponse"></a>
+
+### ListAgentTeamsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_teams | [AgentTeam](#laelia-v1-AgentTeam) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateAgentTeamRequest"></a>
+
+### UpdateAgentTeamRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_team | [AgentTeam](#laelia-v1-AgentTeam) |  | The team to update. The `name` field identifies the team. |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The list of fields to update: &#34;title&#34;, &#34;description&#34;, &#34;team_prompt&#34;, &#34;leader_agent&#34;, &#34;members&#34;. |
+
+
+
+
+
+ 
+
+
+<a name="laelia-v1-AgentTeamRole"></a>
+
+### AgentTeamRole
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| AGENT_TEAM_ROLE_UNSPECIFIED | 0 |  |
+| AGENT_TEAM_ROLE_LEADER | 1 |  |
+| AGENT_TEAM_ROLE_MEMBER | 2 |  |
+
+
+ 
+
+ 
+
+
+<a name="laelia-v1-AgentTeamService"></a>
+
+### AgentTeamService
+AgentTeamService manages agent teams. A team belongs to its creator (owner)
+and is visible to other users; only the owner or a workspace admin may
+manage it.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetAgentTeam | [GetAgentTeamRequest](#laelia-v1-GetAgentTeamRequest) | [AgentTeam](#laelia-v1-AgentTeam) |  |
+| ListAgentTeams | [ListAgentTeamsRequest](#laelia-v1-ListAgentTeamsRequest) | [ListAgentTeamsResponse](#laelia-v1-ListAgentTeamsResponse) |  |
+| CreateAgentTeam | [CreateAgentTeamRequest](#laelia-v1-CreateAgentTeamRequest) | [AgentTeam](#laelia-v1-AgentTeam) |  |
+| UpdateAgentTeam | [UpdateAgentTeamRequest](#laelia-v1-UpdateAgentTeamRequest) | [AgentTeam](#laelia-v1-AgentTeam) | UpdateAgentTeam is handler-gated (no permission annotation): the team owner or a workspace admin may update it. |
+| DeleteAgentTeam | [DeleteAgentTeamRequest](#laelia-v1-DeleteAgentTeamRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | DeleteAgentTeam is handler-gated (no permission annotation): the team owner or a workspace admin may delete it. |
+
+ 
+
+
+
 <a name="v1_api_provider_service-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -2887,8 +3083,8 @@ never generates conversation activity.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | message | [string](#string) |  | message is the resource name of the task&#39;s root message (&#34;conversations/{c}/messages/{m}&#34;). |
-| member_type | [int32](#int32) |  | member_type is the target assignee kind: 1=user, 2=agent (reuses the MemberType semantics). A user assignee is a display-only &#34;owner&#34; and does not participate in claim/process flows; an agent assignee is the working owner. |
-| member_id | [string](#string) |  | member_id is the target member&#39;s stable id within the conversation: the agent&#39;s resource id (handle) for agents, the user&#39;s handle for users. |
+| member_type | [int32](#int32) |  | member_type is the target assignee kind: 1=user, 2=agent, 3=team (reuses the MemberType semantics plus team). A user assignee is a display-only &#34;owner&#34; and does not participate in claim/process flows; an agent assignee is the working owner; a team assignee is owned by the team&#39;s leader. |
+| member_id | [string](#string) |  | member_id is the target member&#39;s stable id within the conversation: the agent&#39;s resource id (handle) for agents, the user&#39;s handle for users, or the team resource id (&#34;agentTeams/{id}&#34;) for teams. |
 
 
 
@@ -2964,6 +3160,7 @@ the agent uses to anchor its execution events and link any posted replies.
 | idle | [bool](#bool) |  |  |
 | agent_display_name | [string](#string) |  | agent_display_name is the posting agent&#39;s human-readable name, sourced from the manager (the source of truth for agent identity). The agent client injects it into its system prompt so it knows who it is and can recognize its own messages and @mentions of itself. |
 | owner_display_name | [string](#string) |  | owner_display_name is the agent&#39;s owner&#39;s display name, sourced from the manager (the source of truth for ownership). The agent client injects it into its system prompt (the Ownership &amp; Safety section) so the agent knows whom to DM for approval of high-risk requests from non-owners. Empty for legacy agents with no recorded owner. |
+| team | [TeamContext](#laelia-v1-TeamContext) |  | team is the agent&#39;s current team (an agent can belong to at most one team). Populated when the agent is a member of a team; empty otherwise. The agent client may inject it into the cold-start init prompt as a &#34;Your Team&#34; section. |
 
 
 
@@ -5302,7 +5499,30 @@ content/sender/room_version.
 | status | [TaskStatus](#laelia-v1-TaskStatus) |  |  |
 | assignee_name | [string](#string) |  | assignee_name is the assigned member&#39;s display name, empty when unassigned. |
 | assignee_resource_id | [string](#string) |  | assignee_resource_id is the assigned member&#39;s resource id (the agent&#39;s handle for agents, the user&#39;s handle for users), empty when unassigned. |
-| assignee_type | [int32](#int32) |  | assignee_type distinguishes the assignee kind: 1=user, 2=agent (reuses the MemberType semantics). 0 when unassigned. |
+| assignee_type | [int32](#int32) |  | assignee_type distinguishes the assignee kind: 1=user, 2=agent, 3=team (reuses the MemberType semantics plus team). 0 when unassigned. |
+| assignee_team_id | [string](#string) |  | assignee_team_id is the team resource id (&#34;agentTeams/{id}&#34;) when the assignee is a team. Empty otherwise. |
+| assignee_team_name | [string](#string) |  | assignee_team_name is the team&#39;s display title when the assignee is a team. |
+| assignee_team_leader_name | [string](#string) |  | assignee_team_leader_name is the team leader&#39;s display name when the assignee is a team. |
+
+
+
+
+
+
+<a name="laelia-v1-TeamContext"></a>
+
+### TeamContext
+TeamContext describes the agent&#39;s current team membership for injection into
+the agent&#39;s cold-start prompt.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| team_id | [string](#string) |  | team_id is the team resource id (&#34;agentTeams/{id}&#34;). |
+| team_name | [string](#string) |  | team_name is the team&#39;s display title. |
+| team_prompt | [string](#string) |  | team_prompt is the team-level prompt. |
+| role | [string](#string) |  | role is &#34;leader&#34; or &#34;member&#34;. |
+| responsibility | [string](#string) |  | responsibility is the agent&#39;s responsibility in the team. |
 
 
 

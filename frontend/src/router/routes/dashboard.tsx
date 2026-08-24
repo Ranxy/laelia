@@ -14,6 +14,7 @@ import {
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
   HUMAN_ROUTE_DETAIL,
+  HUMAN_TEAM_ROUTE,
   MACHINE_ROUTE_LIST,
   MACHINE_ROUTE_NEW,
   MACHINE_ROUTE_PROFILE,
@@ -207,6 +208,14 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         lazy: () =>
           import("@/pages/dashboard/human-detail").then((m) => ({
             Component: m.HumanDetailPage,
+          })),
+      },
+      {
+        path: "users/:userId/teams/:teamId",
+        handle: { name: HUMAN_TEAM_ROUTE },
+        lazy: () =>
+          import("@/pages/dashboard/team-detail").then((m) => ({
+            Component: m.TeamDetailPage,
           })),
       },
       {

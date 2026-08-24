@@ -492,6 +492,57 @@
         
           
           <li>
+            <a href="#v1%2fagent_team_service.proto">v1/agent_team_service.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.v1.AgentTeam"><span class="badge">M</span>AgentTeam</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AgentTeamMember"><span class="badge">M</span>AgentTeamMember</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CreateAgentTeamRequest"><span class="badge">M</span>CreateAgentTeamRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DeleteAgentTeamRequest"><span class="badge">M</span>DeleteAgentTeamRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetAgentTeamRequest"><span class="badge">M</span>GetAgentTeamRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListAgentTeamsRequest"><span class="badge">M</span>ListAgentTeamsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListAgentTeamsResponse"><span class="badge">M</span>ListAgentTeamsResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateAgentTeamRequest"><span class="badge">M</span>UpdateAgentTeamRequest</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#laelia.v1.AgentTeamRole"><span class="badge">E</span>AgentTeamRole</a>
+                </li>
+              
+              
+              
+                <li>
+                  <a href="#laelia.v1.AgentTeamService"><span class="badge">S</span>AgentTeamService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
             <a href="#v1%2fapi_provider_service.proto">v1/api_provider_service.proto</a>
             <ul>
               
@@ -1321,6 +1372,10 @@
               
                 <li>
                   <a href="#laelia.v1.TaskInfo"><span class="badge">M</span>TaskInfo</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.TeamContext"><span class="badge">M</span>TeamContext</a>
                 </li>
               
                 <li>
@@ -5350,6 +5405,392 @@ Requires laelia.agents.edit on the agent.</p></td>
     
       
       <div class="file-heading">
+        <h2 id="v1/agent_team_service.proto">v1/agent_team_service.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.v1.AgentTeam">AgentTeam</h3>
+        <p>AgentTeam is a named collection of agents that work together on tasks. A</p><p>team has exactly one leader and a team-level prompt that is injected into</p><p>each member's context when the team is assigned to a task.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The resource name of the team, in the form `agentTeams/{id}`. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Human-readable title. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Longer description of the team. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>team_prompt</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Team-level prompt injected into every member&#39;s context when the team is
+assigned to a task. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>leader_agent</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The leader agent resource name (&#34;agents/{id}&#34;). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>members</td>
+                  <td><a href="#laelia.v1.AgentTeamMember">AgentTeamMember</a></td>
+                  <td>repeated</td>
+                  <td><p>The team&#39;s members, including the leader. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>updated_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>can_manage</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Output only. True when the caller may manage this team (the team owner or
+a workspace admin). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>owner</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The team owner&#39;s user resource name (&#34;users/{id}&#34;). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.AgentTeamMember">AgentTeamMember</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The member agent resource name (&#34;agents/{id}&#34;). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>role</td>
+                  <td><a href="#laelia.v1.AgentTeamRole">AgentTeamRole</a></td>
+                  <td></td>
+                  <td><p>The member&#39;s role in the team. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>responsibility</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The member&#39;s responsibility in the team (free text). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.CreateAgentTeamRequest">CreateAgentTeamRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent_team</td>
+                  <td><a href="#laelia.v1.AgentTeam">AgentTeam</a></td>
+                  <td></td>
+                  <td><p>The team to create. The name field is ignored; title, leader_agent and
+members are required. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DeleteAgentTeamRequest">DeleteAgentTeamRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The team resource name, in the form `agentTeams/{id}`. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetAgentTeamRequest">GetAgentTeamRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The team resource name, in the form `agentTeams/{id}`. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListAgentTeamsRequest">ListAgentTeamsRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListAgentTeamsResponse">ListAgentTeamsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent_teams</td>
+                  <td><a href="#laelia.v1.AgentTeam">AgentTeam</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateAgentTeamRequest">UpdateAgentTeamRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent_team</td>
+                  <td><a href="#laelia.v1.AgentTeam">AgentTeam</a></td>
+                  <td></td>
+                  <td><p>The team to update. The `name` field identifies the team. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>update_mask</td>
+                  <td><a href="#google.protobuf.FieldMask">google.protobuf.FieldMask</a></td>
+                  <td></td>
+                  <td><p>The list of fields to update: &#34;title&#34;, &#34;description&#34;, &#34;team_prompt&#34;,
+&#34;leader_agent&#34;, &#34;members&#34;. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="laelia.v1.AgentTeamRole">AgentTeamRole</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>AGENT_TEAM_ROLE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>AGENT_TEAM_ROLE_LEADER</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>AGENT_TEAM_ROLE_MEMBER</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+        <h3 id="laelia.v1.AgentTeamService">AgentTeamService</h3>
+        <p>AgentTeamService manages agent teams. A team belongs to its creator (owner)</p><p>and is visible to other users; only the owner or a workspace admin may</p><p>manage it.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetAgentTeam</td>
+                <td><a href="#laelia.v1.GetAgentTeamRequest">GetAgentTeamRequest</a></td>
+                <td><a href="#laelia.v1.AgentTeam">AgentTeam</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ListAgentTeams</td>
+                <td><a href="#laelia.v1.ListAgentTeamsRequest">ListAgentTeamsRequest</a></td>
+                <td><a href="#laelia.v1.ListAgentTeamsResponse">ListAgentTeamsResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CreateAgentTeam</td>
+                <td><a href="#laelia.v1.CreateAgentTeamRequest">CreateAgentTeamRequest</a></td>
+                <td><a href="#laelia.v1.AgentTeam">AgentTeam</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateAgentTeam</td>
+                <td><a href="#laelia.v1.UpdateAgentTeamRequest">UpdateAgentTeamRequest</a></td>
+                <td><a href="#laelia.v1.AgentTeam">AgentTeam</a></td>
+                <td><p>UpdateAgentTeam is handler-gated (no permission annotation): the team
+owner or a workspace admin may update it.</p></td>
+              </tr>
+            
+              <tr>
+                <td>DeleteAgentTeam</td>
+                <td><a href="#laelia.v1.DeleteAgentTeamRequest">DeleteAgentTeamRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p>DeleteAgentTeam is handler-gated (no permission annotation): the team
+owner or a workspace admin may delete it.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
         <h2 id="v1/api_provider_service.proto">v1/api_provider_service.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
@@ -7808,10 +8249,10 @@ machine app&#39;s per-agent runner; required on the first message. </p></td>
                   <td>member_type</td>
                   <td><a href="#int32">int32</a></td>
                   <td></td>
-                  <td><p>member_type is the target assignee kind: 1=user, 2=agent (reuses the
-MemberType semantics). A user assignee is a display-only &#34;owner&#34; and does
-not participate in claim/process flows; an agent assignee is the working
-owner. </p></td>
+                  <td><p>member_type is the target assignee kind: 1=user, 2=agent, 3=team (reuses
+the MemberType semantics plus team). A user assignee is a display-only
+&#34;owner&#34; and does not participate in claim/process flows; an agent assignee
+is the working owner; a team assignee is owned by the team&#39;s leader. </p></td>
                 </tr>
               
                 <tr>
@@ -7819,7 +8260,8 @@ owner. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>member_id is the target member&#39;s stable id within the conversation: the
-agent&#39;s resource id (handle) for agents, the user&#39;s handle for users. </p></td>
+agent&#39;s resource id (handle) for agents, the user&#39;s handle for users, or
+the team resource id (&#34;agentTeams/{id}&#34;) for teams. </p></td>
                 </tr>
               
             </tbody>
@@ -7971,6 +8413,16 @@ manager (the source of truth for ownership). The agent client injects it into
 its system prompt (the Ownership &amp; Safety section) so the agent knows whom to
 DM for approval of high-risk requests from non-owners. Empty for legacy
 agents with no recorded owner. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>team</td>
+                  <td><a href="#laelia.v1.TeamContext">TeamContext</a></td>
+                  <td></td>
+                  <td><p>team is the agent&#39;s current team (an agent can belong to at most one team).
+Populated when the agent is a member of a team; empty otherwise. The agent
+client may inject it into the cold-start init prompt as a &#34;Your Team&#34;
+section. </p></td>
                 </tr>
               
             </tbody>
@@ -13163,8 +13615,83 @@ handle for agents, the user&#39;s handle for users), empty when unassigned. </p>
                   <td>assignee_type</td>
                   <td><a href="#int32">int32</a></td>
                   <td></td>
-                  <td><p>assignee_type distinguishes the assignee kind: 1=user, 2=agent (reuses the
-MemberType semantics). 0 when unassigned. </p></td>
+                  <td><p>assignee_type distinguishes the assignee kind: 1=user, 2=agent, 3=team
+(reuses the MemberType semantics plus team). 0 when unassigned. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>assignee_team_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>assignee_team_id is the team resource id (&#34;agentTeams/{id}&#34;) when the
+assignee is a team. Empty otherwise. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>assignee_team_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>assignee_team_name is the team&#39;s display title when the assignee is a team. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>assignee_team_leader_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>assignee_team_leader_name is the team leader&#39;s display name when the
+assignee is a team. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.TeamContext">TeamContext</h3>
+        <p>TeamContext describes the agent's current team membership for injection into</p><p>the agent's cold-start prompt.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>team_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>team_id is the team resource id (&#34;agentTeams/{id}&#34;). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>team_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>team_name is the team&#39;s display title. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>team_prompt</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>team_prompt is the team-level prompt. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>role</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>role is &#34;leader&#34; or &#34;member&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>responsibility</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>responsibility is the agent&#39;s responsibility in the team. </p></td>
                 </tr>
               
             </tbody>

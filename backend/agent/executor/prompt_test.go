@@ -6,7 +6,7 @@ import (
 )
 
 func TestBuildPromptOmitsPersonaWhenEmpty(t *testing.T) {
-	got := BuildPrompt("alice", "", "")
+	got := BuildPrompt("alice", "", "", "")
 	if strings.Contains(got, "Your persona") {
 		t.Fatalf("prompt should not contain persona section when empty, got:\n%s", got)
 	}
@@ -19,7 +19,7 @@ func TestBuildPromptOmitsPersonaWhenEmpty(t *testing.T) {
 }
 
 func TestBuildPromptInjectsPersonaAfterIdentity(t *testing.T) {
-	got := BuildPrompt("alice", "", "  Be concise and prefer Go.  ")
+	got := BuildPrompt("alice", "", "  Be concise and prefer Go.  ", "")
 	identityIdx := strings.Index(got, agentIdentityText("alice"))
 	personaIdx := strings.Index(got, "## Your persona")
 	commIdx := strings.Index(got, AgentCommunicationPrompt)
@@ -32,7 +32,7 @@ func TestBuildPromptInjectsPersonaAfterIdentity(t *testing.T) {
 }
 
 func TestBuildPromptInjectsOwnershipAfterPersona(t *testing.T) {
-	got := BuildPrompt("alice", "Alice Owner", "persona text")
+	got := BuildPrompt("alice", "Alice Owner", "persona text", "")
 	if !strings.Contains(got, "## Ownership & Safety") {
 		t.Fatalf("prompt must contain ownership section when owner is set, got:\n%s", got)
 	}
@@ -58,13 +58,13 @@ func TestBuildPromptInjectsOwnershipAfterPersona(t *testing.T) {
 }
 
 func TestBuildPromptOmitsOwnershipWhenOwnerEmpty(t *testing.T) {
-	if got := BuildPrompt("alice", "", "persona"); strings.Contains(got, "Ownership & Safety") {
+	if got := BuildPrompt("alice", "", "persona", ""); strings.Contains(got, "Ownership & Safety") {
 		t.Fatalf("prompt must omit ownership section for a legacy agent with no owner, got:\n%s", got)
 	}
 }
 
 func TestBuildReanchorPrompt(t *testing.T) {
-	got := BuildReanchorPrompt("bob", "")
+	got := BuildReanchorPrompt("bob", "", "")
 	if strings.Contains(got, "{{name}}") {
 		t.Fatalf("re-anchor template must not contain unrendered placeholders:\n%s", got)
 	}
@@ -77,11 +77,11 @@ func TestBuildReanchorPrompt(t *testing.T) {
 }
 
 func TestBuildReanchorPromptCarriesOwner(t *testing.T) {
-	withOwner := BuildReanchorPrompt("bob", "Bob Owner")
+	withOwner := BuildReanchorPrompt("bob", "Bob Owner", "")
 	if !strings.Contains(withOwner, "Bob Owner") || !strings.Contains(withOwner, "dm:@Bob Owner") {
 		t.Fatalf("re-anchor must carry the owner line when owner is set, got:\n%s", withOwner)
 	}
-	if got := BuildReanchorPrompt("bob", ""); strings.Contains(got, "Owner:") {
+	if got := BuildReanchorPrompt("bob", "", ""); strings.Contains(got, "Owner:") {
 		t.Fatalf("re-anchor must omit the owner line for a legacy agent, got:\n%s", got)
 	}
 }

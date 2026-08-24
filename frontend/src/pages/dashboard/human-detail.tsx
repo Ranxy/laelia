@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
+import { AgentTeamsManager } from "@/components/agent/agent-teams-manager";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -132,6 +133,9 @@ export function HumanDetailPage() {
       setStartingChat(false);
     }
   }
+
+  // Tab between the user's owned agents and their managed agent teams.
+  const [activeTab, setActiveTab] = useState<"agents" | "teams">("agents");
 
   // Role bindings from the workspace IAM policy with their source: held
   // directly or via a group the user belongs to. Fetched only when the caller
@@ -463,27 +467,38 @@ export function HumanDetailPage() {
         </div>
       </div>
 
-      {/* Owned agents. */}
+      {/* Owned agents / agent teams tabs (teams only shown for self). */}
       <div className="border-t border-control-border px-5 py-4">
-        <div className="mb-3 flex items-center gap-2">
-          <div className="text-xs font-bold uppercase text-control tracking-widest">
-            {t("members.human.owned-agents")}
-          </div>
-          <span className="font-mono text-xs text-control-light">
-            {ownedAgents.length}
-          </span>
+        <div className="mb-3 flex items-center gap-1 border-b border-control-border">
+          <TabButton
+            active={activeTab === "agents"}
+            onClick={() => setActiveTab("agents")}
+            label={t("members.human.owned-agents")}
+            count={ownedAgents.length}
+          />
+          {isSelf && (
+            <TabButton
+              active={activeTab === "teams"}
+              onClick={() => setActiveTab("teams")}
+              label={t("members.human.agent-teams")}
+            />
+          )}
         </div>
-        {ownedAgents.length === 0 ? (
-          <p className="text-sm text-control-light">
-            {t("members.human.no-owned-agents")}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {ownedAgents.map((agent) => (
-              <OwnedAgentRow key={agent.name} agent={agent} />
-            ))}
-          </div>
-        )}
+
+        {activeTab === "agents" &&
+          (ownedAgents.length === 0 ? (
+            <p className="text-sm text-control-light">
+              {t("members.human.no-owned-agents")}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {ownedAgents.map((agent) => (
+                <OwnedAgentRow key={agent.name} agent={agent} />
+              ))}
+            </div>
+          ))}
+
+        {isSelf && activeTab === "teams" && <AgentTeamsManager />}
       </div>
       {/* Mobile send-message FAB: replaces the header Message button on touch
           layouts, styled like the chat list's create-channel FAB. */}
@@ -529,6 +544,37 @@ function OwnedAgentRow({ agent }: { agent: AgentSummary }) {
         )}
       </div>
       <ConnectionBadge state={agent.status?.state} enabled={agent.enabled} />
+    </button>
+  );
+}
+
+
+function TabButton({
+  active,
+  onClick,
+  label,
+  count,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count?: number;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        "flex items-center gap-1 border-b-2 px-3 py-2 text-sm font-medium transition-colors " +
+        (active
+          ? "border-accent text-main"
+          : "border-transparent text-control hover:text-main")
+      }
+    >
+      {label}
+      {count !== undefined && (
+        <span className="font-mono text-xs text-control-light">{count}</span>
+      )}
     </button>
   );
 }

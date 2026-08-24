@@ -23,6 +23,7 @@ const (
 	APIProviderNamePrefix      = "apiProviders/"
 	APIProviderEntryPrefix     = "entries/"
 	McpServerNamePrefix        = "mcpServers/"
+	AgentTeamNamePrefix        = "agentTeams/"
 )
 
 // GetUserHandle returns the user handle (or email alias) token from a
@@ -183,6 +184,22 @@ func GetAgentResourceID(name string) (string, error) {
 
 func FormatAgentUID(uid string) string {
 	return fmt.Sprintf("%s%s", AgentNamePrefix, uid)
+}
+
+// FormatAgentTeamName formats an agent team resource id as an
+// "agentTeams/{id}" resource name.
+func FormatAgentTeamName(id string) string {
+	return fmt.Sprintf("%s%s", AgentTeamNamePrefix, id)
+}
+
+// GetAgentTeamResourceID returns the agent team resource id from an
+// "agentTeams/{id}" resource name.
+func GetAgentTeamResourceID(name string) (string, error) {
+	tokens, err := GetNameParentTokens(name, AgentTeamNamePrefix)
+	if err != nil {
+		return "", err
+	}
+	return tokens[0], nil
 }
 
 // GetMachineResourceID returns the machine resource id (uuid) from a

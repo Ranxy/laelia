@@ -62,6 +62,11 @@ const (
 	GroupsList                 Permission = "laelia.groups.list"
 	GroupsUpdate               Permission = "laelia.groups.update"
 	GroupsDelete               Permission = "laelia.groups.delete"
+	AgentTeamsCreate           Permission = "laelia.agentTeams.create"
+	AgentTeamsGet              Permission = "laelia.agentTeams.get"
+	AgentTeamsList             Permission = "laelia.agentTeams.list"
+	AgentTeamsUpdate           Permission = "laelia.agentTeams.update"
+	AgentTeamsDelete           Permission = "laelia.agentTeams.delete"
 	AuditLogsSearch            Permission = "laelia.auditLogs.search"
 	AuditLogsExport            Permission = "laelia.auditLogs.export"
 	ApiProvidersCreate         Permission = "laelia.apiProviders.create"
@@ -142,6 +147,11 @@ var allPermissions = []Permission{
 	GroupsList,
 	GroupsUpdate,
 	GroupsDelete,
+	AgentTeamsCreate,
+	AgentTeamsGet,
+	AgentTeamsList,
+	AgentTeamsUpdate,
+	AgentTeamsDelete,
 	AuditLogsSearch,
 	AuditLogsExport,
 	ApiProvidersCreate,

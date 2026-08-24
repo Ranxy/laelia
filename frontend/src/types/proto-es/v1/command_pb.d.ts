@@ -51,12 +51,35 @@ export declare type TaskInfo = Message<"laelia.v1.TaskInfo"> & {
   assigneeResourceId: string;
 
   /**
-   * assignee_type distinguishes the assignee kind: 1=user, 2=agent (reuses the
-   * MemberType semantics). 0 when unassigned.
+   * assignee_type distinguishes the assignee kind: 1=user, 2=agent, 3=team
+   * (reuses the MemberType semantics plus team). 0 when unassigned.
    *
    * @generated from field: int32 assignee_type = 5;
    */
   assigneeType: number;
+
+  /**
+   * assignee_team_id is the team resource id ("agentTeams/{id}") when the
+   * assignee is a team. Empty otherwise.
+   *
+   * @generated from field: string assignee_team_id = 6;
+   */
+  assigneeTeamId: string;
+
+  /**
+   * assignee_team_name is the team's display title when the assignee is a team.
+   *
+   * @generated from field: string assignee_team_name = 7;
+   */
+  assigneeTeamName: string;
+
+  /**
+   * assignee_team_leader_name is the team leader's display name when the
+   * assignee is a team.
+   *
+   * @generated from field: string assignee_team_leader_name = 8;
+   */
+  assigneeTeamLeaderName: string;
 };
 
 /**
@@ -3155,10 +3178,10 @@ export declare type AssignTaskRequest = Message<"laelia.v1.AssignTaskRequest"> &
   message: string;
 
   /**
-   * member_type is the target assignee kind: 1=user, 2=agent (reuses the
-   * MemberType semantics). A user assignee is a display-only "owner" and does
-   * not participate in claim/process flows; an agent assignee is the working
-   * owner.
+   * member_type is the target assignee kind: 1=user, 2=agent, 3=team (reuses
+   * the MemberType semantics plus team). A user assignee is a display-only
+   * "owner" and does not participate in claim/process flows; an agent assignee
+   * is the working owner; a team assignee is owned by the team's leader.
    *
    * @generated from field: int32 member_type = 2;
    */
@@ -3166,7 +3189,8 @@ export declare type AssignTaskRequest = Message<"laelia.v1.AssignTaskRequest"> &
 
   /**
    * member_id is the target member's stable id within the conversation: the
-   * agent's resource id (handle) for agents, the user's handle for users.
+   * agent's resource id (handle) for agents, the user's handle for users, or
+   * the team resource id ("agentTeams/{id}") for teams.
    *
    * @generated from field: string member_id = 3;
    */
@@ -5144,6 +5168,16 @@ export declare type BeginSessionResponse = Message<"laelia.v1.BeginSessionRespon
    * @generated from field: string owner_display_name = 4;
    */
   ownerDisplayName: string;
+
+  /**
+   * team is the agent's current team (an agent can belong to at most one team).
+   * Populated when the agent is a member of a team; empty otherwise. The agent
+   * client may inject it into the cold-start init prompt as a "Your Team"
+   * section.
+   *
+   * @generated from field: laelia.v1.TeamContext team = 5;
+   */
+  team?: TeamContext | undefined;
 };
 
 /**
@@ -5151,6 +5185,55 @@ export declare type BeginSessionResponse = Message<"laelia.v1.BeginSessionRespon
  * Use `create(BeginSessionResponseSchema)` to create a new message.
  */
 export declare const BeginSessionResponseSchema: GenMessage<BeginSessionResponse>;
+
+/**
+ * TeamContext describes the agent's current team membership for injection into
+ * the agent's cold-start prompt.
+ *
+ * @generated from message laelia.v1.TeamContext
+ */
+export declare type TeamContext = Message<"laelia.v1.TeamContext"> & {
+  /**
+   * team_id is the team resource id ("agentTeams/{id}").
+   *
+   * @generated from field: string team_id = 1;
+   */
+  teamId: string;
+
+  /**
+   * team_name is the team's display title.
+   *
+   * @generated from field: string team_name = 2;
+   */
+  teamName: string;
+
+  /**
+   * team_prompt is the team-level prompt.
+   *
+   * @generated from field: string team_prompt = 3;
+   */
+  teamPrompt: string;
+
+  /**
+   * role is "leader" or "member".
+   *
+   * @generated from field: string role = 4;
+   */
+  role: string;
+
+  /**
+   * responsibility is the agent's responsibility in the team.
+   *
+   * @generated from field: string responsibility = 5;
+   */
+  responsibility: string;
+};
+
+/**
+ * Describes the message laelia.v1.TeamContext.
+ * Use `create(TeamContextSchema)` to create a new message.
+ */
+export declare const TeamContextSchema: GenMessage<TeamContext>;
 
 /**
  * FetchConversationActivity returns the execution status of each agent member

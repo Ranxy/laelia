@@ -23,8 +23,13 @@ const mockClient = vi.hoisted(() => ({
   listTaskCounts: vi.fn(),
 }));
 
+const mockAgentTeamClient = vi.hoisted(() => ({
+  listAgentTeams: vi.fn(),
+}));
+
 vi.mock("@/connect", () => ({
   commandServiceClient: mockClient,
+  agentTeamServiceClient: mockAgentTeamClient,
 }));
 
 vi.mock("@/components/chat/message-row", () => ({
@@ -134,6 +139,7 @@ describe("ThreadPanel task controls", () => {
       inReviewCount: 0,
       doneCount: 1,
     });
+    mockAgentTeamClient.listAgentTeams.mockResolvedValue({ agentTeams: [] });
   });
 
   afterEach(() => {
