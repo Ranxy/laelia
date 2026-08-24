@@ -11,8 +11,8 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { Avatar } from "@/components/chat/avatar";
 import { AgentTeamsManager } from "@/components/agent/agent-teams-manager";
+import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -135,7 +135,26 @@ export function HumanDetailPage() {
   }
 
   // Tab between the user's owned agents and their managed agent teams.
-  const [activeTab, setActiveTab] = useState<"agents" | "teams">("agents");
+  // Persist the last chosen tab in sessionStorage so returning from a team
+  // detail page restores the Agent Teams tab instead of defaulting to agents.
+  const tabStorageKey = `human-detail-tab-${userId ?? ""}`;
+  const [activeTab, setActiveTabState] = useState<"agents" | "teams">(() => {
+    try {
+      const stored = sessionStorage.getItem(tabStorageKey);
+      if (stored === "teams") return "teams";
+    } catch {
+      // ignore storage errors
+    }
+    return "agents";
+  });
+  const setActiveTab = (tab: "agents" | "teams") => {
+    setActiveTabState(tab);
+    try {
+      sessionStorage.setItem(tabStorageKey, tab);
+    } catch {
+      // ignore storage errors
+    }
+  };
 
   // Role bindings from the workspace IAM policy with their source: held
   // directly or via a group the user belongs to. Fetched only when the caller
@@ -547,7 +566,6 @@ function OwnedAgentRow({ agent }: { agent: AgentSummary }) {
     </button>
   );
 }
-
 
 function TabButton({
   active,

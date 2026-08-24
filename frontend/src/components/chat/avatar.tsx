@@ -18,14 +18,17 @@ export function Avatar({
   seed,
   label,
   accent,
+  size = 8,
 }: {
   src?: string | null;
   seed: string;
   label?: string;
   accent?: boolean;
+  size?: 6 | 7 | 8 | 10 | 12 | 14 | 16;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = src && !imgFailed;
+  const sizeClass = `size-${size}`;
 
   if (showImage) {
     return (
@@ -35,7 +38,7 @@ export function Avatar({
       <img
         src={src}
         alt=""
-        className="size-8 shrink-0 rounded-full object-cover"
+        className={cn("shrink-0 rounded-full object-cover", sizeClass)}
         onError={() => setImgFailed(true)}
       />
     );
@@ -44,12 +47,13 @@ export function Avatar({
   return (
     <div
       className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold overflow-hidden",
+        "flex shrink-0 items-center justify-center rounded-full text-xs font-semibold overflow-hidden",
+        sizeClass,
         accent ? "bg-accent text-accent-foreground" : "bg-transparent"
       )}
     >
       {seed ? (
-        <PixelAvatar seed={seed} size={32} />
+        <PixelAvatar seed={seed} size={size * 4} />
       ) : (
         <span>{(label ?? "?").charAt(0).toUpperCase()}</span>
       )}

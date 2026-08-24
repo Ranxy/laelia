@@ -4,12 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  type TeamFormValues,
   TeamFormFields,
+  type TeamFormValues,
 } from "@/components/agent/agent-team-form";
-import { describeError } from "@/lib/connect-errors";
-import { toastManager } from "@/lib/toast";
-import { Button } from "@/components/ui/button";
+import { Card } from "@/components/profile-common";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -18,19 +16,20 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  agentServiceClient,
-  agentTeamServiceClient,
-} from "@/connect";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { agentServiceClient, agentTeamServiceClient } from "@/connect";
+import { describeError } from "@/lib/connect-errors";
+import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
-import { State } from "@/types/proto-es/v1/common_pb";
+import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
 import {
   type AgentTeam,
-  AgentTeamRole,
   AgentTeamMemberSchema,
+  AgentTeamRole,
   AgentTeamSchema,
 } from "@/types/proto-es/v1/agent_team_service_pb";
-import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
+import { State } from "@/types/proto-es/v1/common_pb";
 
 function teamToForm(team: AgentTeam): TeamFormValues {
   return {
@@ -135,12 +134,16 @@ export function TeamDetailPage() {
   }, [teams]);
 
   const availableAgents = useMemo(() => {
-    const selectedIds = new Set(form.members.map((m) => agentIdFromName(m.agent)));
+    const selectedIds = new Set(
+      form.members.map((m) => agentIdFromName(m.agent))
+    );
     const editingTeamName = team?.name;
     return myAgents.filter((a) => {
       if (selectedIds.has(a.handle)) return true;
       const teamsForAgent = teamByAgent.get(a.handle) ?? [];
-      const inOtherTeam = teamsForAgent.some((name) => name !== editingTeamName);
+      const inOtherTeam = teamsForAgent.some(
+        (name) => name !== editingTeamName
+      );
       return !inOtherTeam;
     });
   }, [myAgents, teamByAgent, form.members, team]);
@@ -280,6 +283,8 @@ export function TeamDetailPage() {
     }
   };
 
+  const goBack = () => navigate(`/members/users/${userId ?? ""}`);
+
   if (loading) {
     return (
       <div className="h-full overflow-y-auto p-6">
@@ -298,81 +303,131 @@ export function TeamDetailPage() {
     );
   }
 
+  const pageTitle = isCreate
+    ? t("settings.agentTeams.create")
+    : editing
+      ? t("settings.agentTeams.edit")
+      : (team?.title ?? "");
+
   return (
     <div className="h-full overflow-y-auto px-5 py-5">
-      <div className="mb-4 flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(`/members/users/${userId ?? ""}`)}
-        >
-          <ArrowLeft className="size-4" />
-          {t("members.back")}
-        </Button>
-        {isCreate ? (
-          <>
-            <Button size="sm" onClick={handleSave} disabled={saving}>
-              {saving ? t("common.saving") : t("common.create")}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => navigate(`/members/users/${userId ?? ""}`)}
-            >
-              <X className="size-4" />
-              {t("common.cancel")}
-            </Button>
-          </>
-        ) : editing ? (
-          <>
-            <Button size="sm" onClick={handleSave} disabled={saving}>
-              {saving ? t("common.saving") : t("common.save")}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setEditing(false);
-                if (team) setForm(teamToForm(team));
-              }}
-            >
-              <X className="size-4" />
-              {t("common.cancel")}
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-              <Pencil className="size-4" />
-              {t("settings.agentTeams.edit")}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-control-light hover:text-error"
-              onClick={() => setDeleteOpen(true)}
-            >
-              <Trash2 className="size-4" />
-            </Button>
-          </>
-        )}
-      </div>
+      <header className="mb-6 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={goBack}>
+            <ArrowLeft className="size-4" />
+            {t("members.back")}
+          </Button>
+          <h1 className="truncate text-lg font-semibold text-main">
+            {pageTitle}
+          </h1>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {isCreate ? (
+            <>
+              <Button size="sm" onClick={handleSave} disabled={saving}>
+                {saving ? t("common.saving") : t("common.create")}
+              </Button>
+              <Button size="sm" variant="outline" onClick={goBack}>
+                <X className="size-4" />
+                {t("common.cancel")}
+              </Button>
+            </>
+          ) : editing ? (
+            <>
+              <Button size="sm" onClick={handleSave} disabled={saving}>
+                {saving ? t("common.saving") : t("common.save")}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setEditing(false);
+                  if (team) setForm(teamToForm(team));
+                }}
+              >
+                <X className="size-4" />
+                {t("common.cancel")}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditing(true)}
+              >
+                <Pencil className="size-4" />
+                {t("settings.agentTeams.edit")}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-control-light hover:text-error"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </>
+          )}
+        </div>
+      </header>
 
-      <TeamFormFields
-        agents={availableAgents}
-        form={form}
-        disabled={!editing}
-        onChange={setForm}
-        onAdd={addMember}
-        onRemove={removeMember}
-        onUpdate={(i, patch) => updateMember(form, i, patch)}
-      />
+      <div className="flex flex-col gap-5">
+        <Card title={t("settings.agentTeams.basic-info")}>
+          <div className="flex flex-col gap-4">
+            {(editing || isCreate) && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-control">
+                  {t("settings.agentTeams.team-name")}
+                </label>
+                <Input
+                  value={form.title}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, title: e.target.value }))
+                  }
+                  placeholder={t("settings.agentTeams.team-name")}
+                />
+              </div>
+            )}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-control">
+                {t("settings.agentTeams.description")}
+              </label>
+              {editing || isCreate ? (
+                <Input
+                  value={form.description}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, description: e.target.value }))
+                  }
+                  placeholder={t("settings.agentTeams.description")}
+                />
+              ) : form.description ? (
+                <p className="whitespace-pre-wrap text-sm text-main">
+                  {form.description}
+                </p>
+              ) : (
+                <p className="text-sm italic text-control-light">
+                  {t("settings.agentTeams.no-description")}
+                </p>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        <TeamFormFields
+          agents={availableAgents}
+          form={form}
+          disabled={!editing && !isCreate}
+          onChange={setForm}
+          onAdd={addMember}
+          onRemove={removeMember}
+          onUpdate={(i, patch) => updateMember(form, i, patch)}
+        />
+      </div>
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
-          <AlertDialogTitle>
-            {t("settings.agentTeams.delete")}
-          </AlertDialogTitle>
+          <AlertDialogTitle>{t("settings.agentTeams.delete")}</AlertDialogTitle>
           <AlertDialogDescription>
             {t("settings.agentTeams.delete-description")}
           </AlertDialogDescription>

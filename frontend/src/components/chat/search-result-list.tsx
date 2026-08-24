@@ -1,6 +1,6 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { CornerDownRight, MessageSquare, Paperclip } from "lucide-react";
-import { memo, useMemo, type ReactNode } from "react";
+import { memo, type ReactNode, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { formatTime } from "@/components/chat/avatar";
 import { cn } from "@/lib/utils";

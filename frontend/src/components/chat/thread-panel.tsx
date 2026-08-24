@@ -19,8 +19,6 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { agentTeamServiceClient } from "@/connect";
-import type { AgentTeam } from "@/types/proto-es/v1/agent_team_service_pb";
 import { useNavigate } from "react-router-dom";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
@@ -48,6 +46,7 @@ import {
   useMentionLabelResolver,
   useMentionTargets,
 } from "@/composables/useMentionTargets";
+import { agentTeamServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
 import { MAX_UPLOAD_BYTES, uploadFileToConversation } from "@/lib/file-upload";
 import { isImageAttachment } from "@/lib/image-file";
@@ -58,6 +57,7 @@ import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { senderKeyForMessage } from "@/stores/chat-helpers";
 import type { ChatMessageUI } from "@/stores/types";
+import type { AgentTeam } from "@/types/proto-es/v1/agent_team_service_pb";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
 import { AttachmentSchema, TaskStatus } from "@/types/proto-es/v1/command_pb";
 

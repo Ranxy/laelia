@@ -1,25 +1,33 @@
-import { Plus } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { agentServiceClient, agentTeamServiceClient } from "@/connect";
 import { Avatar } from "@/components/chat/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { agentServiceClient, agentTeamServiceClient } from "@/connect";
 import { avatarNameForAgentId, useAvatar } from "@/lib/avatar-cache";
 import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
-import { State } from "@/types/proto-es/v1/common_pb";
-import { type AgentTeam, type AgentTeamMember } from "@/types/proto-es/v1/agent_team_service_pb";
 import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
-import { Button } from "@/components/ui/button";
+import {
+  type AgentTeam,
+  type AgentTeamMember,
+} from "@/types/proto-es/v1/agent_team_service_pb";
+import { State } from "@/types/proto-es/v1/common_pb";
+
+const AVATAR_STACK_LIMIT = 2;
 
 export function AgentTeamsManager() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const canList = useHasPermission("laelia.agentTeams.list");
   const canCreate = useHasPermission("laelia.agentTeams.create");
-  const currentUserId = useAppStore((s) => s.currentUser?.name?.split("/").pop());
+  const currentUserId = useAppStore((s) =>
+    s.currentUser?.name?.split("/").pop()
+  );
 
   const [teams, setTeams] = useState<AgentTeam[]>([]);
   const [agents, setAgents] = useState<AgentSummary[]>([]);
@@ -62,25 +70,24 @@ export function AgentTeamsManager() {
   };
 
   const manageable = teams.filter((team) => team.canManage);
+  const createTeam = () => {
+    const userId = currentUserId ?? "";
+    navigate(`/members/users/${userId}/teams/new`);
+  };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-control">
-          {t("settings.agentTeams.title")}
-          <span className="ml-2 font-mono text-xs text-control-light">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-main">
+            {t("settings.agentTeams.title")}
+          </span>
+          <span className="rounded-full bg-control-bg px-2 py-0.5 text-xs font-medium text-control">
             {manageable.length}
           </span>
-        </span>
+        </div>
         {canCreate && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const userId = currentUserId ?? "";
-              navigate(`/members/users/${userId}/teams/new`);
-            }}
-          >
+          <Button size="sm" onClick={createTeam}>
             <Plus className="size-4" />
             {t("settings.agentTeams.create")}
           </Button>
@@ -90,11 +97,25 @@ export function AgentTeamsManager() {
       {loading ? (
         <p className="text-sm text-control-light">{t("common.loading")}</p>
       ) : manageable.length === 0 ? (
-        <p className="text-sm text-control-light">
-          {t("settings.agentTeams.empty")}
-        </p>
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-control-border bg-background p-8 text-center">
+          <Users className="size-10 text-control-light" />
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-semibold text-main">
+              {t("settings.agentTeams.empty")}
+            </p>
+            <p className="max-w-[260px] text-xs leading-relaxed text-control-light">
+              {t("settings.agentTeams.empty-description")}
+            </p>
+          </div>
+          {canCreate && (
+            <Button size="sm" variant="outline" onClick={createTeam}>
+              <Plus className="size-4" />
+              {t("settings.agentTeams.create")}
+            </Button>
+          )}
+        </div>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           {manageable.map((team) => (
             <TeamCard
               key={team.name}
@@ -110,7 +131,6 @@ export function AgentTeamsManager() {
           ))}
         </div>
       )}
-
     </div>
   );
 }
@@ -127,32 +147,38 @@ function TeamCard({
   onClick: () => void;
 }) {
   const { t } = useTranslation();
+  const memberCount = team.members.length;
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-3 rounded-md border border-control-border bg-background px-3 py-2 text-left transition-colors hover:border-accent/40 hover:bg-control-bg/60"
+      className="flex items-center gap-4 rounded-lg border border-control-border bg-background p-3 text-left transition-colors hover:border-accent/40 hover:bg-control-bg/40"
     >
-      <TeamMemberStack members={team.members} agents={agents} />
-      <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-        <span className="truncate text-sm font-semibold text-main">
-          {team.title}
-        </span>
-        {team.description && (
-          <span className="truncate text-xs text-control-light">
-            {team.description}
+      <div className="flex w-20 shrink-0 items-center justify-start">
+        <TeamMemberStack members={team.members} agents={agents} />
+      </div>
+      <div className="min-w-0 flex-1 flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-semibold text-main">
+            {team.title}
           </span>
-        )}
-        <span className="truncate text-xs text-control-light">
-          {t("settings.agentTeams.leader")}: {agentLabel(team.leaderAgent)}
-        </span>
+          <Badge variant="secondary" className="shrink-0 text-xs">
+            {t("settings.agentTeams.leader")}: {agentLabel(team.leaderAgent)}
+          </Badge>
+          <span className="ml-auto shrink-0 text-xs text-control-light">
+            {t("settings.agentTeams.member-count", { count: memberCount })}
+          </span>
+        </div>
+        {team.description ? (
+          <p className="line-clamp-1 text-xs text-control-light">
+            {team.description}
+          </p>
+        ) : null}
       </div>
     </button>
   );
 }
 
-// Stacked member avatars using the agents' real avatars. Shows up to 3, then a
-// +N overflow indicator.
 function TeamMemberStack({
   members,
   agents,
@@ -160,7 +186,7 @@ function TeamMemberStack({
   members: AgentTeamMember[];
   agents: AgentSummary[];
 }) {
-  const visible = members.slice(0, 3);
+  const visible = members.slice(0, AVATAR_STACK_LIMIT);
   const extra = members.length - visible.length;
   return (
     <div className="flex shrink-0 items-center">
@@ -168,18 +194,24 @@ function TeamMemberStack({
         const id = m.agent.split("/").pop() ?? "";
         const agent = agents.find((a) => a.handle === id);
         return (
-          <div key={m.agent} className={i === 0 ? "" : "-ml-1.5"}>
+          <div
+            key={m.agent}
+            className={
+              i === 0 ? "" : "-ml-2 rounded-full border-2 border-background"
+            }
+          >
             <MemberAvatar
               agent={agent}
               seed={id || m.agent}
               label={agent?.title || agent?.handle || id}
+              size={7}
             />
           </div>
         );
       })}
       {extra > 0 && (
-        <div className="-ml-1.5 flex size-6 items-center justify-center rounded-full border border-background bg-control-bg text-[10px] font-medium text-control">
-          +{extra}
+        <div className="-ml-2 flex size-7 items-center justify-center rounded-full border-2 border-background bg-control-bg text-[10px] font-medium text-control">
+          +{Math.min(extra, 99)}
         </div>
       )}
     </div>
@@ -190,15 +222,17 @@ function MemberAvatar({
   agent,
   seed,
   label,
+  size,
 }: {
   agent?: AgentSummary;
   seed: string;
   label: string;
+  size?: 6 | 7 | 8 | 10 | 12 | 14 | 16;
 }) {
   const avatarSrc = useAvatar(avatarNameForAgentId(agent?.handle || seed));
   return (
-    <div title={label} className="size-6">
-      <Avatar seed={seed} src={avatarSrc} />
+    <div title={label}>
+      <Avatar seed={seed} src={avatarSrc} size={size} />
     </div>
   );
 }

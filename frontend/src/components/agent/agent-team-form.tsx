@@ -1,14 +1,11 @@
 import { ChevronDown, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
-import { AgentTeamRole } from "@/types/proto-es/v1/agent_team_service_pb";
 import { Avatar } from "@/components/chat/avatar";
-import { avatarNameForAgentId, useAvatar } from "@/lib/avatar-cache";
+import { Card } from "@/components/profile-common";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FieldRow } from "@/components/ui/field-row";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -16,6 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { avatarNameForAgentId, useAvatar } from "@/lib/avatar-cache";
+import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
+import { AgentTeamRole } from "@/types/proto-es/v1/agent_team_service_pb";
 
 export interface TeamFormValues {
   title: string;
@@ -49,43 +50,51 @@ export function TeamFormFields({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col gap-4">
-      <FieldRow label={t("settings.agentTeams.title")}>
-        <Input
-          value={form.title}
+    <div className="flex flex-col gap-5">
+      <Card title={t("settings.agentTeams.teamPrompt")}>
+        {disabled ? (
+          form.teamPrompt ? (
+            <p className="whitespace-pre-wrap text-sm text-main">
+              {form.teamPrompt}
+            </p>
+          ) : (
+            <p className="text-sm italic text-control-light">
+              {t("settings.agentTeams.no-prompt")}
+            </p>
+          )
+        ) : (
+          <Textarea
+            value={form.teamPrompt}
+            onChange={(e) =>
+              onChange?.({ ...form, teamPrompt: e.target.value })
+            }
+            placeholder={t("settings.agentTeams.teamPrompt")}
+            className="min-h-[120px]"
+          />
+        )}
+      </Card>
+
+      <Card
+        title={t("settings.agentTeams.members")}
+        actions={
+          !disabled && onAdd ? (
+            <Button type="button" variant="outline" size="sm" onClick={onAdd}>
+              <Plus className="size-4" />
+              {t("settings.agentTeams.add-member")}
+            </Button>
+          ) : undefined
+        }
+      >
+        <MemberEditor
+          agents={agents}
+          form={form}
           disabled={disabled}
-          onChange={(e) =>
-            onChange?.({ ...form, title: e.target.value })
-          }
+          onAdd={onAdd}
+          onRemove={onRemove}
+          onUpdate={onUpdate}
+          t={t}
         />
-      </FieldRow>
-      <FieldRow label={t("settings.agentTeams.description")}>
-        <Input
-          value={form.description}
-          disabled={disabled}
-          onChange={(e) =>
-            onChange?.({ ...form, description: e.target.value })
-          }
-        />
-      </FieldRow>
-      <FieldRow label={t("settings.agentTeams.teamPrompt")}>
-        <Textarea
-          value={form.teamPrompt}
-          disabled={disabled}
-          onChange={(e) =>
-            onChange?.({ ...form, teamPrompt: e.target.value })
-          }
-        />
-      </FieldRow>
-      <MemberEditor
-        agents={agents}
-        form={form}
-        disabled={disabled}
-        onAdd={onAdd}
-        onRemove={onRemove}
-        onUpdate={onUpdate}
-        t={t}
-      />
+      </Card>
     </div>
   );
 }
@@ -107,75 +116,158 @@ function MemberEditor({
   onUpdate?: (index: number, patch: Partial<TeamMemberForm>) => void;
   t: (key: string, options?: Record<string, unknown>) => string;
 }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">
-          {t("settings.agentTeams.members")}
-        </span>
-        {!disabled && onAdd && (
+  if (form.members.length === 0) {
+    const hasAvailableAgents = agents.length > 0;
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-control-border p-6 text-center">
+        <p className="text-sm text-control-light">
+          {hasAvailableAgents
+            ? t("settings.agentTeams.no-members")
+            : t("settings.agentTeams.no-agents")}
+        </p>
+        {!disabled && onAdd && hasAvailableAgents && (
           <Button type="button" variant="outline" size="sm" onClick={onAdd}>
             <Plus className="size-4" />
             {t("settings.agentTeams.add-member")}
           </Button>
         )}
       </div>
-      {form.members.map((m, i) => (
-        <div key={i} className="flex flex-col gap-2 rounded-md border p-2">
-          <div className="flex items-center gap-2">
-            <AgentSelect
-              agents={agents}
-              value={m.agent}
-              exclude={form.members.map((x) => x.agent)}
-              disabled={disabled}
-              onChange={(agent) => onUpdate?.(i, { agent })}
-            />
-            <Select
-              value={String(m.role)}
-              disabled={disabled}
-              onValueChange={(v) =>
-                onUpdate?.(i, { role: Number(v) as AgentTeamRole })
-              }
-            >
-              <SelectTrigger className="w-32">
-                <SelectValue>
-                  {(value) =>
-                    value === String(AgentTeamRole.LEADER)
-                      ? t("settings.agentTeams.leader")
-                      : t("settings.agentTeams.member")
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={String(AgentTeamRole.LEADER)}>
-                  {t("settings.agentTeams.leader")}
-                </SelectItem>
-                <SelectItem value={String(AgentTeamRole.MEMBER)}>
-                  {t("settings.agentTeams.member")}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            {!disabled && onRemove && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => onRemove(i)}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            )}
-          </div>
-          <Input
-            placeholder={t("settings.agentTeams.responsibility")}
-            value={m.responsibility}
-            disabled={disabled}
-            onChange={(e) =>
-              onUpdate?.(i, { responsibility: e.target.value })
-            }
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {form.members.map((m, i) =>
+        disabled ? (
+          <ReadMemberRow
+            key={`${m.agent}-${i}`}
+            agents={agents}
+            member={m}
+            t={t}
           />
+        ) : (
+          <EditMemberRow
+            key={`${m.agent}-${i}`}
+            agents={agents}
+            member={m}
+            index={i}
+            form={form}
+            onUpdate={onUpdate}
+            onRemove={onRemove}
+            t={t}
+          />
+        )
+      )}
+    </div>
+  );
+}
+
+function ReadMemberRow({
+  agents,
+  member,
+  t,
+}: {
+  agents: AgentSummary[];
+  member: TeamMemberForm;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}) {
+  const id = member.agent.split("/").pop() ?? "";
+  const agent = agents.find((a) => a.handle === id);
+  const avatarSrc = useAvatar(avatarNameForAgentId(agent?.handle || id));
+  const name = agent?.title || agent?.handle || id;
+  return (
+    <div className="flex items-start gap-3 py-2">
+      <div className="size-8 shrink-0">
+        <Avatar seed={id || member.agent} src={avatarSrc} />
+      </div>
+      <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-main">{name}</span>
+          {member.role === AgentTeamRole.LEADER && (
+            <Badge variant="secondary" className="text-xs">
+              {t("settings.agentTeams.leader")}
+            </Badge>
+          )}
         </div>
-      ))}
+        {member.responsibility ? (
+          <p className="text-xs text-control-light">{member.responsibility}</p>
+        ) : (
+          <p className="text-xs italic text-control-light">
+            {t("settings.agentTeams.no-responsibility")}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EditMemberRow({
+  agents,
+  member,
+  index,
+  form,
+  onUpdate,
+  onRemove,
+  t,
+}: {
+  agents: AgentSummary[];
+  member: TeamMemberForm;
+  index: number;
+  form: TeamFormValues;
+  onUpdate?: (index: number, patch: Partial<TeamMemberForm>) => void;
+  onRemove?: (index: number) => void;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-control-border p-3">
+      <div className="flex items-center gap-2">
+        <AgentSelect
+          agents={agents}
+          value={member.agent}
+          exclude={form.members.map((x) => x.agent)}
+          onChange={(agent) => onUpdate?.(index, { agent })}
+        />
+        <Select
+          value={String(member.role)}
+          onValueChange={(v) =>
+            onUpdate?.(index, { role: Number(v) as AgentTeamRole })
+          }
+        >
+          <SelectTrigger className="w-32 shrink-0">
+            <SelectValue>
+              {(value) =>
+                value === String(AgentTeamRole.LEADER)
+                  ? t("settings.agentTeams.leader")
+                  : t("settings.agentTeams.member")
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={String(AgentTeamRole.LEADER)}>
+              {t("settings.agentTeams.leader")}
+            </SelectItem>
+            <SelectItem value={String(AgentTeamRole.MEMBER)}>
+              {t("settings.agentTeams.member")}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        {onRemove && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="shrink-0 text-control-light hover:text-error"
+            onClick={() => onRemove(index)}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        )}
+      </div>
+      <Input
+        placeholder={t("settings.agentTeams.responsibility")}
+        value={member.responsibility}
+        onChange={(e) => onUpdate?.(index, { responsibility: e.target.value })}
+      />
     </div>
   );
 }
@@ -184,13 +276,11 @@ function AgentSelect({
   agents,
   value,
   exclude,
-  disabled,
   onChange,
 }: {
   agents: AgentSummary[];
   value: string;
   exclude: string[];
-  disabled?: boolean;
   onChange: (agentName: string) => void;
 }) {
   const { t } = useTranslation();
@@ -211,17 +301,15 @@ function AgentSelect({
   const selected = agents.find((a) => `agents/${a.handle}` === value);
   const available = agents.filter(
     (a) =>
-      !exclude.includes(`agents/${a.handle}`) ||
-      `agents/${a.handle}` === value
+      !exclude.includes(`agents/${a.handle}`) || `agents/${a.handle}` === value
   );
 
   return (
     <div ref={containerRef} className="relative min-w-0 flex-1">
       <button
         type="button"
-        disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-md border border-control-border bg-transparent px-2 py-1.5 text-left text-sm hover:bg-control-bg disabled:cursor-not-allowed disabled:opacity-70"
+        className="flex w-full items-center gap-2 rounded-md border border-control-border bg-transparent px-3 py-2 text-left text-sm hover:bg-control-bg"
       >
         {selected ? (
           <AgentOptionContent agent={selected} />
@@ -230,14 +318,12 @@ function AgentSelect({
             {t("settings.agentTeams.select-agent")}
           </span>
         )}
-        {!disabled && (
-          <ChevronDown className="ml-auto size-4 shrink-0 text-control-light" />
-        )}
+        <ChevronDown className="ml-auto size-4 shrink-0 text-control-light" />
       </button>
-      {open && !disabled && (
-        <div className="absolute left-0 right-0 z-30 mt-1 max-h-60 overflow-auto rounded border border-control-border bg-background py-1 shadow-md">
+      {open && (
+        <div className="absolute left-0 right-0 z-30 mt-1 max-h-60 overflow-auto rounded-lg border border-control-border bg-background py-1 shadow-md">
           {available.length === 0 ? (
-            <div className="px-2 py-1.5 text-xs text-control-placeholder">
+            <div className="px-3 py-2 text-xs text-control-placeholder">
               {t("settings.agentTeams.no-agents")}
             </div>
           ) : (
@@ -277,9 +363,11 @@ function AgentOption({
         e.preventDefault();
         onSelect();
       }}
-      className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-control-bg"
+      className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-control-bg"
     >
-      <Avatar seed={agent.handle || agent.name} src={avatarSrc} />
+      <div className="size-6 shrink-0">
+        <Avatar seed={agent.handle || agent.name} src={avatarSrc} />
+      </div>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-main">
           {agent.title || agent.handle}
@@ -301,8 +389,10 @@ function AgentOption({
 function AgentOptionContent({ agent }: { agent: AgentSummary }) {
   const avatarSrc = useAvatar(avatarNameForAgentId(agent.handle || ""));
   return (
-    <span className="flex min-w-0 items-center gap-2">
-      <Avatar seed={agent.handle || agent.name} src={avatarSrc} />
+    <span className="flex min-w-0 items-center gap-3">
+      <div className="size-6 shrink-0">
+        <Avatar seed={agent.handle || agent.name} src={avatarSrc} />
+      </div>
       <span className="truncate text-main">{agent.title || agent.handle}</span>
     </span>
   );

@@ -13,7 +13,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { useIsDesktop } from "@/lib/use-is-desktop";
 import { Avatar } from "@/components/chat/avatar";
 import { SearchResultList } from "@/components/chat/search-result-list";
 import { EmptyState, LoadingState } from "@/components/chat/states";
@@ -32,6 +31,7 @@ import {
   avatarNameForUserId,
   useAvatar,
 } from "@/lib/avatar-cache";
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import { buildUserFilter } from "@/lib/user-filter";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -328,10 +328,7 @@ function FromSenderPicker({
   const showDropdown = open && query.trim().length > 0;
 
   return (
-    <div
-      ref={containerRef}
-      className={cn("relative", fullWidth && "w-full")}
-    >
+    <div ref={containerRef} className={cn("relative", fullWidth && "w-full")}>
       <div className="flex items-center gap-1.5 rounded-md border border-control-border px-2 py-1">
         <UserIcon className="size-3.5 shrink-0 text-control-light" />
         <Input
@@ -733,7 +730,10 @@ export function GlobalSearchPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={channel} onValueChange={(v) => setChannel(v ?? "")}>
+              <Select
+                value={channel}
+                onValueChange={(v) => setChannel(v ?? "")}
+              >
                 <SelectTrigger size="md" className="w-full">
                   <SelectValue>
                     {(value) =>
@@ -745,7 +745,9 @@ export function GlobalSearchPage() {
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{t("globalSearch.all-channels")}</SelectItem>
+                  <SelectItem value="">
+                    {t("globalSearch.all-channels")}
+                  </SelectItem>
                   {myChannels.map((c) => (
                     <SelectItem key={c.name} value={c.name ?? ""}>
                       {c.title || c.address || c.name}
