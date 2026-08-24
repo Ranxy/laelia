@@ -152,14 +152,14 @@ function TeamCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-4 rounded-lg border border-control-border bg-background p-3 text-left transition-colors hover:border-accent/40 hover:bg-control-bg/40"
+      className="flex items-center gap-3 rounded-lg border border-control-border bg-background p-3 text-left transition-colors hover:border-accent/40 hover:bg-control-bg/40"
     >
-      <div className="flex w-20 shrink-0 items-center justify-start">
+      <div className="flex w-16 shrink-0 items-center justify-start sm:w-20">
         <TeamMemberStack members={team.members} agents={agents} />
       </div>
       <div className="min-w-0 flex-1 flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-semibold text-main">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="max-w-[120px] truncate text-sm font-semibold text-main sm:max-w-none">
             {team.title}
           </span>
           <Badge variant="secondary" className="shrink-0 text-xs">

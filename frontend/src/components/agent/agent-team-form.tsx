@@ -220,20 +220,22 @@ function EditMemberRow({
 }) {
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-control-border p-3">
-      <div className="flex items-center gap-2">
+      <div className="min-w-0">
         <AgentSelect
           agents={agents}
           value={member.agent}
           exclude={form.members.map((x) => x.agent)}
           onChange={(agent) => onUpdate?.(index, { agent })}
         />
+      </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Select
           value={String(member.role)}
           onValueChange={(v) =>
             onUpdate?.(index, { role: Number(v) as AgentTeamRole })
           }
         >
-          <SelectTrigger className="w-32 shrink-0">
+          <SelectTrigger className="w-full shrink-0 sm:w-32">
             <SelectValue>
               {(value) =>
                 value === String(AgentTeamRole.LEADER)
@@ -251,23 +253,38 @@ function EditMemberRow({
             </SelectItem>
           </SelectContent>
         </Select>
+        <Input
+          placeholder={t("settings.agentTeams.responsibility")}
+          value={member.responsibility}
+          onChange={(e) =>
+            onUpdate?.(index, { responsibility: e.target.value })
+          }
+          className="min-w-0 flex-1"
+        />
         {onRemove && (
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="shrink-0 text-control-light hover:text-error"
+            className="hidden shrink-0 text-control-light hover:text-error sm:inline-flex"
             onClick={() => onRemove(index)}
           >
             <Trash2 className="size-4" />
           </Button>
         )}
       </div>
-      <Input
-        placeholder={t("settings.agentTeams.responsibility")}
-        value={member.responsibility}
-        onChange={(e) => onUpdate?.(index, { responsibility: e.target.value })}
-      />
+      {onRemove && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full text-error hover:text-error sm:hidden"
+          onClick={() => onRemove(index)}
+        >
+          <Trash2 className="size-4" />
+          {t("common.remove")}
+        </Button>
+      )}
     </div>
   );
 }
@@ -309,7 +326,7 @@ function AgentSelect({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-md border border-control-border bg-transparent px-3 py-2 text-left text-sm hover:bg-control-bg"
+        className="flex w-full min-w-0 items-center gap-2 rounded-md border border-control-border bg-transparent px-3 py-2 text-left text-sm hover:bg-control-bg"
       >
         {selected ? (
           <AgentOptionContent agent={selected} />
@@ -366,7 +383,7 @@ function AgentOption({
       className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-control-bg"
     >
       <div className="size-6 shrink-0">
-        <Avatar seed={agent.handle || agent.name} src={avatarSrc} />
+        <Avatar seed={agent.handle || agent.name} src={avatarSrc} size={6} />
       </div>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-main">
@@ -391,7 +408,7 @@ function AgentOptionContent({ agent }: { agent: AgentSummary }) {
   return (
     <span className="flex min-w-0 items-center gap-3">
       <div className="size-6 shrink-0">
-        <Avatar seed={agent.handle || agent.name} src={avatarSrc} />
+        <Avatar seed={agent.handle || agent.name} src={avatarSrc} size={6} />
       </div>
       <span className="truncate text-main">{agent.title || agent.handle}</span>
     </span>

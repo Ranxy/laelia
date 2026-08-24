@@ -310,9 +310,9 @@ export function TeamDetailPage() {
       : (team?.title ?? "");
 
   return (
-    <div className="h-full overflow-y-auto px-5 py-5">
-      <header className="mb-6 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+    <div className="h-full overflow-y-auto px-3 py-3 sm:px-5 sm:py-5 pb-20 sm:pb-5">
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <Button variant="ghost" size="sm" onClick={goBack}>
             <ArrowLeft className="size-4" />
             {t("members.back")}
@@ -329,7 +329,7 @@ export function TeamDetailPage() {
               </Button>
               <Button size="sm" variant="outline" onClick={goBack}>
                 <X className="size-4" />
-                {t("common.cancel")}
+                <span className="hidden sm:inline">{t("common.cancel")}</span>
               </Button>
             </>
           ) : editing ? (
@@ -346,7 +346,7 @@ export function TeamDetailPage() {
                 }}
               >
                 <X className="size-4" />
-                {t("common.cancel")}
+                <span className="hidden sm:inline">{t("common.cancel")}</span>
               </Button>
             </>
           ) : (
@@ -357,7 +357,9 @@ export function TeamDetailPage() {
                 onClick={() => setEditing(true)}
               >
                 <Pencil className="size-4" />
-                {t("settings.agentTeams.edit")}
+                <span className="hidden sm:inline">
+                  {t("settings.agentTeams.edit")}
+                </span>
               </Button>
               <Button
                 variant="ghost"
