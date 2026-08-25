@@ -19,6 +19,7 @@ BIN="$WORKTREE_CACHE/laelia"
 STAMP="$WORKTREE_CACHE/build.stamp"
 RELEASE="${RELEASE:-false}"
 FORCE=0
+QUIET=0
 mkdir -p "$CACHE_DIR" "$WORKTREE_CACHE"
 
 while [[ $# -gt 0 ]]; do
@@ -35,8 +36,12 @@ while [[ $# -gt 0 ]]; do
       RELEASE=false
       shift
       ;;
+    --quiet)
+      QUIET=1
+      shift
+      ;;
     --help|-h)
-      echo "Usage: $0 [--force] [--release|--dev]"
+      echo "Usage: $0 [--force] [--release|--dev] [--quiet]"
       exit 0
       ;;
     *)
@@ -80,23 +85,43 @@ if [[ "${RELEASE}" == "true" ]]; then
 else
   MODE="dev"
 fi
-echo "Building laelia from current worktree source (git commit ${GIT_COMMIT}, ${MODE} mode, including any uncommitted changes)..."
-echo "Building frontend..."
-rm -rf backend/manager/server/dist
-pnpm --dir frontend i --frozen-lockfile
-pnpm --dir frontend build
-cp -r frontend/dist backend/manager/server/dist
+if [[ "${QUIET}" -eq 1 ]]; then
+  BUILD_LOG="$WORKTREE_CACHE/build.log"
+  echo "Building laelia from current worktree source (git commit ${GIT_COMMIT}, ${MODE} mode, including any uncommitted changes)..."
+  rm -rf backend/manager/server/dist
+  pnpm --dir frontend i --frozen-lockfile >"$BUILD_LOG" 2>&1
+  pnpm --dir frontend build >>"$BUILD_LOG" 2>&1
+  cp -r frontend/dist backend/manager/server/dist
+  echo "frontend build complete"
+  BUILD_TAGS="embed_frontend"
+  if [[ "${RELEASE}" == "true" ]]; then
+    BUILD_TAGS="${BUILD_TAGS} release"
+  fi
+  BUILD_MODE="dev"
+  if [[ "${RELEASE}" == "true" ]]; then
+    BUILD_MODE="release"
+  fi
+  CGO_ENABLED=0 go build -tags "${BUILD_TAGS}" -ldflags "-w -s -X github.com/Ranxy/laelia/backend/manager/version.Version=${VERSION} -X github.com/Ranxy/laelia/backend/manager/version.GitCommit=${GIT_COMMIT} -X github.com/Ranxy/laelia/backend/manager/version.BuildTime=${BUILD_TIME}" -p=16 -o "$BIN" ./backend/manager/bin/server/main.go >>"$BUILD_LOG" 2>&1
+  echo "backend build complete"
+else
+  echo "Building laelia from current worktree source (git commit ${GIT_COMMIT}, ${MODE} mode, including any uncommitted changes)..."
+  echo "Building frontend..."
+  rm -rf backend/manager/server/dist
+  pnpm --dir frontend i --frozen-lockfile
+  pnpm --dir frontend build
+  cp -r frontend/dist backend/manager/server/dist
 
-BUILD_TAGS="embed_frontend"
-if [[ "${RELEASE}" == "true" ]]; then
-  BUILD_TAGS="${BUILD_TAGS} release"
+  BUILD_TAGS="embed_frontend"
+  if [[ "${RELEASE}" == "true" ]]; then
+    BUILD_TAGS="${BUILD_TAGS} release"
+  fi
+  BUILD_MODE="dev"
+  if [[ "${RELEASE}" == "true" ]]; then
+    BUILD_MODE="release"
+  fi
+  echo "Building manager (embed_frontend, ${BUILD_MODE} mode)..."
+  CGO_ENABLED=0 go build -tags "${BUILD_TAGS}" -ldflags "-w -s -X github.com/Ranxy/laelia/backend/manager/version.Version=${VERSION} -X github.com/Ranxy/laelia/backend/manager/version.GitCommit=${GIT_COMMIT} -X github.com/Ranxy/laelia/backend/manager/version.BuildTime=${BUILD_TIME}" -p=16 -o "$BIN" ./backend/manager/bin/server/main.go
 fi
-BUILD_MODE="dev"
-if [[ "${RELEASE}" == "true" ]]; then
-  BUILD_MODE="release"
-fi
-echo "Building manager (embed_frontend, ${BUILD_MODE} mode)..."
-CGO_ENABLED=0 go build -tags "${BUILD_TAGS}" -ldflags "-w -s -X github.com/Ranxy/laelia/backend/manager/version.Version=${VERSION} -X github.com/Ranxy/laelia/backend/manager/version.GitCommit=${GIT_COMMIT} -X github.com/Ranxy/laelia/backend/manager/version.BuildTime=${BUILD_TIME}" -p=16 -o "$BIN" ./backend/manager/bin/server/main.go
 
 echo "$BUILD_STAMP" > "$STAMP"
 echo "Build complete: $BIN"

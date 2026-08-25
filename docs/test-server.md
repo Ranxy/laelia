@@ -20,6 +20,8 @@ scripts/test-server.sh run --workdir /tmp/laelia-test-1
 
 浏览器打开 `http://127.0.0.1:<port>`，用 `admin@laelia.test / admin1234` 登录（管理员），或用 alice/bob 登录（普通用户）。
 
+`run` 命令在启动完成后会**立即返回**，服务在后台持续运行，不会占据终端；构建过程只显示简略进度（如 `frontend build complete`、`backend build complete`），详细构建日志在 worktree 缓存的 `build.log` 中。
+
 ## 停止与清理
 
 ```bash
@@ -45,7 +47,7 @@ rm -rf /tmp/laelia-test-1
 | `--pg-port <n>` | PostgreSQL 端口，默认随机空闲端口 |
 | `--no-seed` | 跳过预设测试数据 |
 | `--build` | 强制重新构建 laelia 二进制 |
-| `--keep` | 退出时保留 PG 数据（调试用） |
+| `--keep` | 兼容保留；现在 `run` 总是让实例在后台持续运行 |
 | `--admin-email / --admin-password` | 覆盖预设管理员账号 |
 | `--cache <dir>` | 共享缓存目录（默认 `LAELIA_TEST_CACHE` 或 `~/.cache/laelia-test`） |
 

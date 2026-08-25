@@ -6,11 +6,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
-	"time"
 )
 
 type runOptions struct {
@@ -38,7 +35,7 @@ func runCmd(args []string) int {
 	fs.StringVar(&opts.host, "host", "127.0.0.1", "bind address for the HTTP server")
 	fs.BoolVar(&opts.noSeed, "no-seed", false, "skip seeding test data")
 	fs.BoolVar(&opts.build, "build", false, "force rebuild of the laelia binary")
-	fs.BoolVar(&opts.keep, "keep", false, "keep postgres data on exit (for debugging)")
+	fs.BoolVar(&opts.keep, "keep", false, "accepted for compatibility; run now always leaves the instance running in the background")
 	fs.StringVar(&opts.cache, "cache", "", "shared cache dir (default: LAELIA_TEST_CACHE or ~/.cache/laelia-test)")
 	fs.StringVar(&opts.binary, "binary", "", "path to the laelia binary (default: per-worktree cache entry)")
 	fs.StringVar(&opts.adminEmail, "admin-email", "admin@laelia.test", "admin email")
@@ -89,6 +86,7 @@ func runCmd(args []string) int {
 	// fast-skips when the source fingerprint is unchanged, and rebuilds when
 	// the current worktree code has changed (including uncommitted edits). An
 	// explicitly supplied --binary is only built when missing or --build.
+	fmt.Println("Checking/building laelia...")
 	if explicitBinary {
 		if opts.build || !fileExists(opts.binary) {
 			if err := buildBinary(opts); err != nil {
@@ -140,13 +138,16 @@ func runCmd(args []string) int {
 	pgCfg := pgConfig{workdir: opts.workdir, cacheDir: opts.cache, port: opts.pgPort, password: pgPassword}
 
 	// Start embedded postgres.
+	fmt.Println("Starting embedded postgres...")
 	pgURL, err := startPG(pgCfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
+	fmt.Println("Postgres ready.")
 
 	// Start the laelia server.
+	fmt.Println("Starting laelia server...")
 	logFile, err := os.OpenFile(filepath.Join(opts.workdir, "logs", "server.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -160,16 +161,19 @@ func runCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
+	fmt.Println("Server ready.")
 
 	// Seed test data.
 	users := defaultUsers(opts.adminEmail, opts.adminPassword)
 	if !opts.noSeed {
+		fmt.Println("Seeding test data...")
 		if err := seedUsers(ctx, pgURL, users); err != nil {
 			_ = stopServer(serverCmd)
 			_ = stopPG(pgCfg)
 			fmt.Fprintf(os.Stderr, "error: seeding failed: %v\n", err)
 			return 1
 		}
+		fmt.Println("Test data ready.")
 	}
 
 	// Persist metadata and write info.txt / stop.sh.
@@ -195,39 +199,11 @@ func runCmd(args []string) int {
 	writeStopScript(m)
 
 	printURLs(m)
+	fmt.Println("Instance is running in the background. Use the printed stop command to shut it down.")
 
-	// Wait for a signal or for the laelia server to exit (e.g. when the stop
-	// command terminates it), then shut down. Watching the child means an
-	// instance never leaves an orphaned run process behind after stop.
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	serverDone := make(chan struct{})
-	go func() {
-		_ = serverCmd.Wait()
-		close(serverDone)
-	}()
-
-	var reason string
-	select {
-	case <-sigCh:
-		reason = "signal received"
-		// Gracefully stop the laelia server; the Wait goroutine observes exit.
-		_ = serverCmd.Process.Signal(os.Interrupt)
-		select {
-		case <-serverDone:
-		case <-time.After(15 * time.Second):
-			_ = serverCmd.Process.Kill()
-			<-serverDone
-		}
-	case <-serverDone:
-		reason = "laelia server exited"
-	}
-	fmt.Printf("\n%s; stopping postgres...\n", reason)
-	if !opts.keep {
-		_ = stopPG(pgCfg)
-	}
-	m.Status = "stopped"
-	_ = m.save()
+	// run returns immediately after startup. The laelia server and embedded
+	// postgres keep running in the background; use `testserver stop` or the
+	// generated stop.sh to shut them down.
 	return 0
 }
 
@@ -240,7 +216,7 @@ func buildBinary(opts *runOptions) error {
 		return fmt.Errorf("cannot locate repo root; pass --repo or set LAELIA_TEST_REPO")
 	}
 	script := filepath.Join(repo, "scripts", "build_test_server.sh")
-	args := []string{script}
+	args := []string{script, "--quiet"}
 	if opts.build {
 		// --build means the user explicitly wants a fresh build; forward
 		// --force so the build script does not skip due to a matching stamp.
@@ -250,7 +226,13 @@ func buildBinary(opts *runOptions) error {
 	cmd.Env = append(os.Environ(), "LAELIA_TEST_CACHE="+opts.cache)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		// In quiet mode the detailed build output goes to the per-worktree
+		// build log; point the user at it on failure.
+		buildLog := filepath.Join(filepath.Dir(opts.binary), "build.log")
+		return fmt.Errorf("build failed: %w (see %s)", err, buildLog)
+	}
+	return nil
 }
 
 func fileExists(p string) bool {

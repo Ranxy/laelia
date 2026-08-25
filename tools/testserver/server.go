@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"syscall"
 	"time"
 )
 
@@ -19,6 +20,9 @@ func startServer(ctx context.Context, binary, pgURL string, port int, logFile io
 	cmd.Env = append(os.Environ(), "LAELIA_PG_URL="+pgURL)
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
+	// Detach the server into its own session so it keeps running after the
+	// launcher (testserver run) exits and the invoking shell returns.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start laelia server: %w", err)
 	}

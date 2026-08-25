@@ -21,7 +21,7 @@ Run options:
   --host <addr>       bind address (default 127.0.0.1; use 0.0.0.0 to share)
   --no-seed           skip seeding test data
   --build             force rebuild of the laelia binary
-  --keep              keep postgres data on exit (debugging)
+  --keep              accepted for compatibility (instance always runs in background)
   --cache <dir>       shared cache dir (default LAELIA_TEST_CACHE or ~/.cache/laelia-test)
   --binary <path>     path to the laelia binary (default: per-worktree cache entry)
   --admin-email <e>   admin email (default admin@laelia.test)
