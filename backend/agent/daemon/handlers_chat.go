@@ -113,6 +113,20 @@ func (s *Server) handleThreadSend(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleTeamGet(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.GetMyTeam(r.Context(), s.deps(req), chattools.GetMyTeamInput{})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleTeamShow(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.GetTeamByID(r.Context(), s.deps(req), chattools.GetTeamByIDInput{TeamID: req.TeamID})
+		return text, asChatError(err)
+	})
+}
+
 func (s *Server) handleCommandContext(w http.ResponseWriter, r *http.Request) {
 	s.run(w, r, func(req Request) (string, *chattools.Error) {
 		text, err := chattools.GetCommandContext(r.Context(), s.deps(req), chattools.GetCommandContextInput{

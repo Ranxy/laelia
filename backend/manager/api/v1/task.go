@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -368,14 +369,21 @@ func (s *CommandService) afterTeamAssign(ctx context.Context, convID, msgID uuid
 		return connect.NewError(connect.CodeInternal, errors.New("assigned team not found"))
 	}
 
-	// Auto-join all team agents to the conversation and seed their cursors.
+	// Auto-join all team agents to the conversation. Their cursors are seeded to
+	// the current version BEFORE the activation message is written, so they only
+	// see the new team-assignment message (and follow-ups), not the conversation
+	// history before it.
 	var inputs []store.ConversationMemberInput
+	var teamAgentIDs []int
 	for _, m := range team.Members {
 		existingRole, _, err := s.store.GetConversationMembership(ctx, convID, store.MemberTypeAgent, m.AgentResourceID)
 		if err != nil {
 			return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check team member membership"))
 		}
 		if existingRole != 0 {
+			if agent, agentErr := s.store.GetAgentByResourceID(ctx, m.AgentResourceID); agentErr == nil && agent != nil {
+				teamAgentIDs = append(teamAgentIDs, agent.ID)
+			}
 			continue
 		}
 		inputs = append(inputs, store.ConversationMemberInput{MemberType: store.MemberTypeAgent, MemberID: m.AgentResourceID})
@@ -386,29 +394,50 @@ func (s *CommandService) afterTeamAssign(ctx context.Context, convID, msgID uuid
 		}
 		for _, m := range inputs {
 			if agent, agentErr := s.store.GetAgentByResourceID(ctx, m.MemberID); agentErr == nil && agent != nil {
-				if seedErr := s.store.SeedCursorOnJoin(ctx, agent.ID, convID); seedErr != nil {
-					slog.Warn("failed to seed team member cursor on join", "agent", agent.ResourceID, "conversationID", convID, "error", seedErr)
-				}
+				teamAgentIDs = append(teamAgentIDs, agent.ID)
 			}
 		}
 	}
 
-	// Build the team instruction system message in the task thread.
-	content := buildTeamAssignmentMessage(team, msg)
-	if content != "" {
-		if _, _, err := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
-			ConversationID:      convID,
-			PrincipalID:         1,
-			PrincipalHandle:     common.SystemBotHandle,
-			Role:                1,
-			Content:             content,
-			SenderType:          store.SenderTypeSystem,
-			ThreadRootMessageID: uuid.NullUUID{UUID: msgID, Valid: true},
-		}); err != nil {
-			slog.Warn("failed to post team assignment system message", "conversationID", convID, "rootID", msgID, "error", err)
+	// Subscribe every team agent to the task thread BEFORE the activation
+	// message so the new thread reply counts as relevant work for them.
+	if len(teamAgentIDs) > 0 {
+		if err := s.store.AddThreadParticipants(ctx, msgID, teamAgentIDs); err != nil {
+			slog.Warn("failed to subscribe team agents to task thread", "rootID", msgID, "error", err)
+		}
+		// Seed cursors to the current version so only the activation message
+		// below (which bumps the version) is seen as new.
+		for _, agentID := range teamAgentIDs {
+			if err := s.store.SeedCursorOnJoin(ctx, agentID, convID); err != nil {
+				slog.Warn("failed to seed team member cursor", "agentID", agentID, "conversationID", convID, "error", err)
+			}
 		}
 	}
 
+	// Write the team instruction as an AGENT message (not SYSTEM) so it is a
+	// real wake signal: agent wake routing deliberately excludes SYSTEM rows.
+	// Using the leader as the sender keeps the message attributable to the
+	// team lead, which is the natural actor for a team assignment.
+	content := buildTeamAssignmentMessage(team, msg)
+	if content != "" {
+		leader := teamLeaderMember(team)
+		if leader != nil {
+			if _, _, err := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
+				ConversationID:      convID,
+				PrincipalID:         1,
+				PrincipalHandle:     common.SystemBotHandle,
+				Role:                2,
+				Content:             content,
+				SenderType:          store.SenderTypeAgent,
+				SenderAgentID:       sql.NullInt32{Int32: int32(leader.AgentID), Valid: true},
+				AgentResourceID:     leader.AgentResourceID,
+				AgentName:           leader.AgentResourceID,
+				ThreadRootMessageID: uuid.NullUUID{UUID: msgID, Valid: true},
+			}); err != nil {
+				slog.Warn("failed to post team assignment message", "conversationID", convID, "rootID", msgID, "error", err)
+			}
+		}
+	}
 	// Wake all team agents so they discover the assignment.
 	s.notifyConversationAgents(ctx, convID, 0, nil)
 	return nil
@@ -420,6 +449,7 @@ func buildTeamAssignmentMessage(team *store.AgentTeamMessage, msg *store.ChatMes
 	var b strings.Builder
 	b.WriteString("[TEAM ASSIGNMENT]\n")
 	b.WriteString("Team: " + team.Title + "\n")
+	b.WriteString("Team ID: " + common.FormatAgentTeamName(team.ResourceID) + "\n")
 	for _, m := range team.Members {
 		if m.Role == store.AgentTeamRoleLeader {
 			b.WriteString("Leader: " + agentNameForTeam(m) + "\n")
@@ -451,6 +481,16 @@ func buildTeamAssignmentMessage(team *store.AgentTeamMessage, msg *store.ChatMes
 
 // agentNameForTeam returns a display name for a team member. The store member
 // row carries the agent resource id; we use it as a stable handle.
+// teamLeaderMember returns the LEADER member of a team, or nil.
+func teamLeaderMember(team *store.AgentTeamMessage) *store.AgentTeamMemberMessage {
+	for _, m := range team.Members {
+		if m.Role == store.AgentTeamRoleLeader {
+			return m
+		}
+	}
+	return nil
+}
+
 func agentNameForTeam(m *store.AgentTeamMemberMessage) string {
 	if m.AgentResourceID != "" {
 		return m.AgentResourceID

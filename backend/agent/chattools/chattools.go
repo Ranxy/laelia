@@ -29,10 +29,11 @@ import (
 // names to principal ids for channel add-member; it may be nil for callers that
 // never resolve users (the user-name path then fails with PERMISSION_FAILED).
 type Deps struct {
-	Client     v1connect.CommandServiceClient
-	UserClient v1connect.UserServiceClient
-	Agent      string
-	Command    string
+	Client          v1connect.CommandServiceClient
+	UserClient      v1connect.UserServiceClient
+	AgentTeamClient v1connect.AgentTeamServiceClient
+	Agent           string
+	Command         string
 }
 
 // Error is the canonical failure envelope. Code is a stable machine-oriented

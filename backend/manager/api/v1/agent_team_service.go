@@ -46,6 +46,23 @@ func (s *AgentTeamService) GetAgentTeam(ctx context.Context, req *connect.Reques
 	return connect.NewResponse(s.convertToV1AgentTeam(ctx, team, canManage)), nil
 }
 
+// GetMyAgentTeam returns the calling agent's current team, or NotFound when
+// the agent is not a member of any team.
+func (s *AgentTeamService) GetMyAgentTeam(ctx context.Context, _ *connect.Request[emptypb.Empty]) (*connect.Response[v1pb.AgentTeam], error) {
+	agent, ok := GetAgentFromContext(ctx)
+	if !ok || agent == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent authentication required"))
+	}
+	team, err := s.store.GetAgentTeamByAgentID(ctx, agent.ID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get agent team"))
+	}
+	if team == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("agent is not a member of any team"))
+	}
+	return connect.NewResponse(s.convertToV1AgentTeam(ctx, team, false)), nil
+}
+
 // ListAgentTeams lists all teams (visible to all authenticated users).
 func (s *AgentTeamService) ListAgentTeams(ctx context.Context, req *connect.Request[v1pb.ListAgentTeamsRequest]) (*connect.Response[v1pb.ListAgentTeamsResponse], error) {
 	offset, err := parseLimitAndOffset(&pageSize{

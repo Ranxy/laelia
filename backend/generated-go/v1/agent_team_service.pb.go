@@ -613,10 +613,11 @@ const file_v1_agent_team_service_proto_rawDesc = "" +
 	"\rAgentTeamRole\x12\x1f\n" +
 	"\x1bAGENT_TEAM_ROLE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16AGENT_TEAM_ROLE_LEADER\x10\x01\x12\x1a\n" +
-	"\x16AGENT_TEAM_ROLE_MEMBER\x10\x022\xc2\x04\n" +
+	"\x16AGENT_TEAM_ROLE_MEMBER\x10\x022\x84\x05\n" +
 	"\x10AgentTeamService\x12j\n" +
 	"\fGetAgentTeam\x12\x1e.laelia.v1.GetAgentTeamRequest\x1a\x14.laelia.v1.AgentTeam\"$\xdaA\x04name\x8a\xea0\x15laelia.agentTeams.get\x90\xea0\x01\x12u\n" +
-	"\x0eListAgentTeams\x12 .laelia.v1.ListAgentTeamsRequest\x1a!.laelia.v1.ListAgentTeamsResponse\"\x1e\x8a\xea0\x16laelia.agentTeams.list\x90\xea0\x01\x12}\n" +
+	"\x0eListAgentTeams\x12 .laelia.v1.ListAgentTeamsRequest\x1a!.laelia.v1.ListAgentTeamsResponse\"\x1e\x8a\xea0\x16laelia.agentTeams.list\x90\xea0\x01\x12@\n" +
+	"\x0eGetMyAgentTeam\x12\x16.google.protobuf.Empty\x1a\x14.laelia.v1.AgentTeam\"\x00\x12}\n" +
 	"\x0fCreateAgentTeam\x12!.laelia.v1.CreateAgentTeamRequest\x1a\x14.laelia.v1.AgentTeam\"1\xdaA\n" +
 	"agent_team\x8a\xea0\x18laelia.agentTeams.create\x90\xea0\x01\x98\xea0\x01\x12m\n" +
 	"\x0fUpdateAgentTeam\x12!.laelia.v1.UpdateAgentTeamRequest\x1a\x14.laelia.v1.AgentTeam\"!\xdaA\x16agent_team,update_mask\x90\xea0\x01\x98\xea0\x01\x12]\n" +
@@ -661,16 +662,18 @@ var file_v1_agent_team_service_proto_depIdxs = []int32{
 	10, // 7: laelia.v1.UpdateAgentTeamRequest.update_mask:type_name -> google.protobuf.FieldMask
 	3,  // 8: laelia.v1.AgentTeamService.GetAgentTeam:input_type -> laelia.v1.GetAgentTeamRequest
 	4,  // 9: laelia.v1.AgentTeamService.ListAgentTeams:input_type -> laelia.v1.ListAgentTeamsRequest
-	6,  // 10: laelia.v1.AgentTeamService.CreateAgentTeam:input_type -> laelia.v1.CreateAgentTeamRequest
-	7,  // 11: laelia.v1.AgentTeamService.UpdateAgentTeam:input_type -> laelia.v1.UpdateAgentTeamRequest
-	8,  // 12: laelia.v1.AgentTeamService.DeleteAgentTeam:input_type -> laelia.v1.DeleteAgentTeamRequest
-	1,  // 13: laelia.v1.AgentTeamService.GetAgentTeam:output_type -> laelia.v1.AgentTeam
-	5,  // 14: laelia.v1.AgentTeamService.ListAgentTeams:output_type -> laelia.v1.ListAgentTeamsResponse
-	1,  // 15: laelia.v1.AgentTeamService.CreateAgentTeam:output_type -> laelia.v1.AgentTeam
-	1,  // 16: laelia.v1.AgentTeamService.UpdateAgentTeam:output_type -> laelia.v1.AgentTeam
-	11, // 17: laelia.v1.AgentTeamService.DeleteAgentTeam:output_type -> google.protobuf.Empty
-	13, // [13:18] is the sub-list for method output_type
-	8,  // [8:13] is the sub-list for method input_type
+	11, // 10: laelia.v1.AgentTeamService.GetMyAgentTeam:input_type -> google.protobuf.Empty
+	6,  // 11: laelia.v1.AgentTeamService.CreateAgentTeam:input_type -> laelia.v1.CreateAgentTeamRequest
+	7,  // 12: laelia.v1.AgentTeamService.UpdateAgentTeam:input_type -> laelia.v1.UpdateAgentTeamRequest
+	8,  // 13: laelia.v1.AgentTeamService.DeleteAgentTeam:input_type -> laelia.v1.DeleteAgentTeamRequest
+	1,  // 14: laelia.v1.AgentTeamService.GetAgentTeam:output_type -> laelia.v1.AgentTeam
+	5,  // 15: laelia.v1.AgentTeamService.ListAgentTeams:output_type -> laelia.v1.ListAgentTeamsResponse
+	1,  // 16: laelia.v1.AgentTeamService.GetMyAgentTeam:output_type -> laelia.v1.AgentTeam
+	1,  // 17: laelia.v1.AgentTeamService.CreateAgentTeam:output_type -> laelia.v1.AgentTeam
+	1,  // 18: laelia.v1.AgentTeamService.UpdateAgentTeam:output_type -> laelia.v1.AgentTeam
+	11, // 19: laelia.v1.AgentTeamService.DeleteAgentTeam:output_type -> google.protobuf.Empty
+	14, // [14:20] is the sub-list for method output_type
+	8,  // [8:14] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
 	8,  // [8:8] is the sub-list for extension extendee
 	0,  // [0:8] is the sub-list for field type_name

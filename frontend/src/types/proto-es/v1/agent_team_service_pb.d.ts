@@ -299,6 +299,18 @@ export declare const AgentTeamService: GenService<{
     output: typeof ListAgentTeamsResponseSchema;
   },
   /**
+   * GetMyAgentTeam returns the calling agent's current team (an agent can
+   * belong to at most one team). Agent-callable (no auth_method annotation,
+   * identity from GetAgentFromContext).
+   *
+   * @generated from rpc laelia.v1.AgentTeamService.GetMyAgentTeam
+   */
+  getMyAgentTeam: {
+    methodKind: "unary";
+    input: typeof EmptySchema;
+    output: typeof AgentTeamSchema;
+  },
+  /**
    * @generated from rpc laelia.v1.AgentTeamService.CreateAgentTeam
    */
   createAgentTeam: {

@@ -1971,6 +1971,7 @@ manage it.
 | ----------- | ------------ | ------------- | ------------|
 | GetAgentTeam | [GetAgentTeamRequest](#laelia-v1-GetAgentTeamRequest) | [AgentTeam](#laelia-v1-AgentTeam) |  |
 | ListAgentTeams | [ListAgentTeamsRequest](#laelia-v1-ListAgentTeamsRequest) | [ListAgentTeamsResponse](#laelia-v1-ListAgentTeamsResponse) |  |
+| GetMyAgentTeam | [.google.protobuf.Empty](#google-protobuf-Empty) | [AgentTeam](#laelia-v1-AgentTeam) | GetMyAgentTeam returns the calling agent&#39;s current team (an agent can belong to at most one team). Agent-callable (no auth_method annotation, identity from GetAgentFromContext). |
 | CreateAgentTeam | [CreateAgentTeamRequest](#laelia-v1-CreateAgentTeamRequest) | [AgentTeam](#laelia-v1-AgentTeam) |  |
 | UpdateAgentTeam | [UpdateAgentTeamRequest](#laelia-v1-UpdateAgentTeamRequest) | [AgentTeam](#laelia-v1-AgentTeam) | UpdateAgentTeam is handler-gated (no permission annotation): the team owner or a workspace admin may update it. |
 | DeleteAgentTeam | [DeleteAgentTeamRequest](#laelia-v1-DeleteAgentTeamRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | DeleteAgentTeam is handler-gated (no permission annotation): the team owner or a workspace admin may delete it. |

@@ -18,7 +18,12 @@ import (
 // agents/<id>/commands/<id> resource names. Each agent runner passes its own
 // agent id.
 func (s *Server) BatchDeps(agentBareID string) chattools.Deps {
-	return chattools.Deps{Client: s.agentClient(agentBareID), UserClient: s.userClient(agentBareID), Agent: agentBareID}
+	return chattools.Deps{
+		Client:          s.agentClient(agentBareID),
+		UserClient:      s.userClient(agentBareID),
+		AgentTeamClient: s.agentTeamClient(agentBareID),
+		Agent:           agentBareID,
+	}
 }
 
 // agentClient returns a cached CommandServiceClient for the agent identified by
@@ -64,6 +69,26 @@ func (s *Server) userClient(agentBareID string) v1connect.UserServiceClient {
 		connect.WithInterceptors(s.authInterceptor(agentBareID)),
 	)
 	s.userClients[agentBareID] = c
+	return c
+}
+
+// agentTeamClient returns a cached AgentTeamServiceClient for the agent,
+// stamped with the same token + X-Laelia-Agent header as agentClient.
+func (s *Server) agentTeamClient(agentBareID string) v1connect.AgentTeamServiceClient {
+	s.agentTeamClientsMu.Lock()
+	defer s.agentTeamClientsMu.Unlock()
+	if s.agentTeamClients == nil {
+		s.agentTeamClients = make(map[string]v1connect.AgentTeamServiceClient)
+	}
+	if c, ok := s.agentTeamClients[agentBareID]; ok {
+		return c
+	}
+	c := v1connect.NewAgentTeamServiceClient(
+		s.httpClient,
+		s.managerURL,
+		connect.WithInterceptors(s.authInterceptor(agentBareID)),
+	)
+	s.agentTeamClients[agentBareID] = c
 	return c
 }
 

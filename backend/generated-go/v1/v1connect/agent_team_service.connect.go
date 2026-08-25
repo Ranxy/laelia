@@ -40,6 +40,9 @@ const (
 	// AgentTeamServiceListAgentTeamsProcedure is the fully-qualified name of the AgentTeamService's
 	// ListAgentTeams RPC.
 	AgentTeamServiceListAgentTeamsProcedure = "/laelia.v1.AgentTeamService/ListAgentTeams"
+	// AgentTeamServiceGetMyAgentTeamProcedure is the fully-qualified name of the AgentTeamService's
+	// GetMyAgentTeam RPC.
+	AgentTeamServiceGetMyAgentTeamProcedure = "/laelia.v1.AgentTeamService/GetMyAgentTeam"
 	// AgentTeamServiceCreateAgentTeamProcedure is the fully-qualified name of the AgentTeamService's
 	// CreateAgentTeam RPC.
 	AgentTeamServiceCreateAgentTeamProcedure = "/laelia.v1.AgentTeamService/CreateAgentTeam"
@@ -55,6 +58,10 @@ const (
 type AgentTeamServiceClient interface {
 	GetAgentTeam(context.Context, *connect.Request[v1.GetAgentTeamRequest]) (*connect.Response[v1.AgentTeam], error)
 	ListAgentTeams(context.Context, *connect.Request[v1.ListAgentTeamsRequest]) (*connect.Response[v1.ListAgentTeamsResponse], error)
+	// GetMyAgentTeam returns the calling agent's current team (an agent can
+	// belong to at most one team). Agent-callable (no auth_method annotation,
+	// identity from GetAgentFromContext).
+	GetMyAgentTeam(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.AgentTeam], error)
 	CreateAgentTeam(context.Context, *connect.Request[v1.CreateAgentTeamRequest]) (*connect.Response[v1.AgentTeam], error)
 	// UpdateAgentTeam is handler-gated (no permission annotation): the team
 	// owner or a workspace admin may update it.
@@ -87,6 +94,12 @@ func NewAgentTeamServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(agentTeamServiceMethods.ByName("ListAgentTeams")),
 			connect.WithClientOptions(opts...),
 		),
+		getMyAgentTeam: connect.NewClient[emptypb.Empty, v1.AgentTeam](
+			httpClient,
+			baseURL+AgentTeamServiceGetMyAgentTeamProcedure,
+			connect.WithSchema(agentTeamServiceMethods.ByName("GetMyAgentTeam")),
+			connect.WithClientOptions(opts...),
+		),
 		createAgentTeam: connect.NewClient[v1.CreateAgentTeamRequest, v1.AgentTeam](
 			httpClient,
 			baseURL+AgentTeamServiceCreateAgentTeamProcedure,
@@ -112,6 +125,7 @@ func NewAgentTeamServiceClient(httpClient connect.HTTPClient, baseURL string, op
 type agentTeamServiceClient struct {
 	getAgentTeam    *connect.Client[v1.GetAgentTeamRequest, v1.AgentTeam]
 	listAgentTeams  *connect.Client[v1.ListAgentTeamsRequest, v1.ListAgentTeamsResponse]
+	getMyAgentTeam  *connect.Client[emptypb.Empty, v1.AgentTeam]
 	createAgentTeam *connect.Client[v1.CreateAgentTeamRequest, v1.AgentTeam]
 	updateAgentTeam *connect.Client[v1.UpdateAgentTeamRequest, v1.AgentTeam]
 	deleteAgentTeam *connect.Client[v1.DeleteAgentTeamRequest, emptypb.Empty]
@@ -125,6 +139,11 @@ func (c *agentTeamServiceClient) GetAgentTeam(ctx context.Context, req *connect.
 // ListAgentTeams calls laelia.v1.AgentTeamService.ListAgentTeams.
 func (c *agentTeamServiceClient) ListAgentTeams(ctx context.Context, req *connect.Request[v1.ListAgentTeamsRequest]) (*connect.Response[v1.ListAgentTeamsResponse], error) {
 	return c.listAgentTeams.CallUnary(ctx, req)
+}
+
+// GetMyAgentTeam calls laelia.v1.AgentTeamService.GetMyAgentTeam.
+func (c *agentTeamServiceClient) GetMyAgentTeam(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[v1.AgentTeam], error) {
+	return c.getMyAgentTeam.CallUnary(ctx, req)
 }
 
 // CreateAgentTeam calls laelia.v1.AgentTeamService.CreateAgentTeam.
@@ -146,6 +165,10 @@ func (c *agentTeamServiceClient) DeleteAgentTeam(ctx context.Context, req *conne
 type AgentTeamServiceHandler interface {
 	GetAgentTeam(context.Context, *connect.Request[v1.GetAgentTeamRequest]) (*connect.Response[v1.AgentTeam], error)
 	ListAgentTeams(context.Context, *connect.Request[v1.ListAgentTeamsRequest]) (*connect.Response[v1.ListAgentTeamsResponse], error)
+	// GetMyAgentTeam returns the calling agent's current team (an agent can
+	// belong to at most one team). Agent-callable (no auth_method annotation,
+	// identity from GetAgentFromContext).
+	GetMyAgentTeam(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.AgentTeam], error)
 	CreateAgentTeam(context.Context, *connect.Request[v1.CreateAgentTeamRequest]) (*connect.Response[v1.AgentTeam], error)
 	// UpdateAgentTeam is handler-gated (no permission annotation): the team
 	// owner or a workspace admin may update it.
@@ -174,6 +197,12 @@ func NewAgentTeamServiceHandler(svc AgentTeamServiceHandler, opts ...connect.Han
 		connect.WithSchema(agentTeamServiceMethods.ByName("ListAgentTeams")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentTeamServiceGetMyAgentTeamHandler := connect.NewUnaryHandler(
+		AgentTeamServiceGetMyAgentTeamProcedure,
+		svc.GetMyAgentTeam,
+		connect.WithSchema(agentTeamServiceMethods.ByName("GetMyAgentTeam")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentTeamServiceCreateAgentTeamHandler := connect.NewUnaryHandler(
 		AgentTeamServiceCreateAgentTeamProcedure,
 		svc.CreateAgentTeam,
@@ -198,6 +227,8 @@ func NewAgentTeamServiceHandler(svc AgentTeamServiceHandler, opts ...connect.Han
 			agentTeamServiceGetAgentTeamHandler.ServeHTTP(w, r)
 		case AgentTeamServiceListAgentTeamsProcedure:
 			agentTeamServiceListAgentTeamsHandler.ServeHTTP(w, r)
+		case AgentTeamServiceGetMyAgentTeamProcedure:
+			agentTeamServiceGetMyAgentTeamHandler.ServeHTTP(w, r)
 		case AgentTeamServiceCreateAgentTeamProcedure:
 			agentTeamServiceCreateAgentTeamHandler.ServeHTTP(w, r)
 		case AgentTeamServiceUpdateAgentTeamProcedure:
@@ -219,6 +250,10 @@ func (UnimplementedAgentTeamServiceHandler) GetAgentTeam(context.Context, *conne
 
 func (UnimplementedAgentTeamServiceHandler) ListAgentTeams(context.Context, *connect.Request[v1.ListAgentTeamsRequest]) (*connect.Response[v1.ListAgentTeamsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentTeamService.ListAgentTeams is not implemented"))
+}
+
+func (UnimplementedAgentTeamServiceHandler) GetMyAgentTeam(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.AgentTeam], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentTeamService.GetMyAgentTeam is not implemented"))
 }
 
 func (UnimplementedAgentTeamServiceHandler) CreateAgentTeam(context.Context, *connect.Request[v1.CreateAgentTeamRequest]) (*connect.Response[v1.AgentTeam], error) {

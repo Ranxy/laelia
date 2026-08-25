@@ -87,6 +87,11 @@ type Server struct {
 	// header), used by `channel add-member` to resolve user display names.
 	userClientsMu sync.Mutex
 	userClients   map[string]v1connect.UserServiceClient
+
+	// agentTeamClients caches per-agent AgentTeamService clients (same token +
+	// agent header), used by `team get` / `team show`.
+	agentTeamClientsMu sync.Mutex
+	agentTeamClients   map[string]v1connect.AgentTeamServiceClient
 }
 
 // New creates a daemon bound to the well-known unix socket under the Laelia
@@ -121,6 +126,7 @@ func New(managerURL, machineResourceID string, getToken func() string, httpClien
 		mcpProxyTokens:    make(map[string]string),
 		mcpProxyAgents:    make(map[string]string),
 		userClients:       make(map[string]v1connect.UserServiceClient),
+		agentTeamClients:  make(map[string]v1connect.AgentTeamServiceClient),
 	}, nil
 }
 
@@ -171,6 +177,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/task/unclaim", s.handleTaskUnclaim)
 	mux.HandleFunc("/task/update", s.handleTaskUpdate)
 	mux.HandleFunc("/task/create", s.handleTaskCreate)
+	mux.HandleFunc("/team/get", s.handleTeamGet)
+	mux.HandleFunc("/team/show", s.handleTeamShow)
 	mux.HandleFunc("/reminder/convert", s.handleReminderConvert)
 	mux.HandleFunc("/reminder/list", s.handleReminderList)
 	mux.HandleFunc("/reminder/list-due", s.handleReminderListDue)
@@ -235,6 +243,8 @@ type Request struct {
 	// ("conversations/{c}/messages/{m}"), for the task RPCs.
 	Message string `json:"message,omitempty"`
 	// Status is a single task status token (for `task review`/`task done`).
+	// TeamID is the agent team resource id (for `team show <id>`).
+	TeamID string `json:"team_id,omitempty"`
 	Status string `json:"status,omitempty"`
 	// Statuses is the repeatable status filter for `task list --status`.
 	Statuses []string `json:"statuses,omitempty"`
@@ -292,10 +302,11 @@ func (s *Server) deps(r Request) chattools.Deps {
 	// empty value is passed through and fails server-side caller resolution
 	// rather than silently routing to a default.
 	return chattools.Deps{
-		Client:     s.agentClient(r.Agent),
-		UserClient: s.userClient(r.Agent),
-		Agent:      r.Agent,
-		Command:    r.Command,
+		Client:          s.agentClient(r.Agent),
+		UserClient:      s.userClient(r.Agent),
+		AgentTeamClient: s.agentTeamClient(r.Agent),
+		Agent:           r.Agent,
+		Command:         r.Command,
 	}
 }
 
