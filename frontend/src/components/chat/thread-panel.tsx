@@ -193,6 +193,10 @@ export interface ThreadPanelProps {
   // agent-to-agent DMs (type 3), which are admin view-only: a user can read
   // the thread but must not reply in or upload into it.
   readOnly?: boolean;
+  // archived marks a thread whose channel has been archived by its owner. It
+  // also forces readOnly, but the composer notice must say the channel is
+  // archived (not the agent-DM view-only message).
+  archived?: boolean;
   // scrollToMessageId scrolls the thread to a specific message once loaded —
   // used by the Activity detail pane to locate the exact message an activity
   // references (a @mention reply, or the latest reply of a folded task/reminder
@@ -217,6 +221,7 @@ export function ThreadPanel({
   onPreviewImage,
   fluid,
   readOnly,
+  archived,
   scrollToMessageId,
   expanded,
   onToggleExpand,
@@ -844,7 +849,9 @@ export function ThreadPanel({
       <div className="shrink-0 border-t border-control-border bg-background px-3 pb-3 pt-2">
         {readOnly ? (
           <div className="rounded-2xl border border-control-border bg-control-bg/40 px-4 py-3 text-center text-xs text-control-placeholder">
-            {t("chat.agent-dm-view-only")}
+            {archived
+              ? t("chat.channel-archived")
+              : t("chat.agent-dm-view-only")}
           </div>
         ) : (
           <>

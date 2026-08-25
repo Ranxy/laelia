@@ -5,6 +5,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ChannelMembersPanel } from "@/components/chat/channel-members-panel";
 import { EmptyState, LoadingState } from "@/components/chat/states";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { commandServiceClient } from "@/connect";
 import { useAppStore } from "@/stores";
 import type { Conversation } from "@/types/proto-es/v1/command_pb";
@@ -59,6 +67,7 @@ export function ChannelDetailPage() {
 
   const [startingChat, setStartingChat] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
 
   const handleArchiveToggle = async () => {
     if (!channelId || !conv) return;
@@ -68,6 +77,17 @@ export function ChannelDetailPage() {
       setChannel({ ...conv, archived: !conv.archived });
     } finally {
       setArchiving(false);
+    }
+  };
+
+  // Archiving is destructive and irreversible (the channel can no longer
+  // accept new messages), so it requires an explicit second confirmation.
+  // Unarchiving is safe and runs immediately.
+  const handleArchiveClick = () => {
+    if (conv?.archived) {
+      void handleArchiveToggle();
+    } else {
+      setArchiveConfirmOpen(true);
     }
   };
 
@@ -120,7 +140,7 @@ export function ChannelDetailPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => void handleArchiveToggle()}
+            onClick={() => void handleArchiveClick()}
             disabled={archiving}
             className="hidden shrink-0 lg:inline-flex"
             title={
@@ -208,6 +228,33 @@ export function ChannelDetailPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog
+        open={archiveConfirmOpen}
+        onOpenChange={setArchiveConfirmOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogTitle>
+            {t("members.archive-confirm-title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("members.archive-confirm-description")}
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogClose>{t("common.cancel")}</AlertDialogClose>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setArchiveConfirmOpen(false);
+                void handleArchiveToggle();
+              }}
+              disabled={archiving}
+            >
+              {t("members.archive-confirm-action")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

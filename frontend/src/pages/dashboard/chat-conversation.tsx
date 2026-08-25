@@ -1980,6 +1980,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             onJumpToSection={handleJumpToSection}
             onPreviewImage={handlePreviewImage}
             readOnly={isAgentDm || isArchived}
+            archived={isArchived}
             expanded={threadExpanded}
             onToggleExpand={() => setThreadExpanded((v) => !v)}
             fluid={threadExpanded}
