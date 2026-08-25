@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -86,8 +87,8 @@ var piAllowEnv = []string{
 
 // PiConfig is the fully-resolved configuration for a long-lived pi RPC session.
 // The admin only sets AgentACPConfig.{provider, api_provider, api_key, model,
-// persona_prompt}; BuildPiConfig fills in the launch shape and the daemon
-// bootstrap env.
+// persona_prompt, context_window, max_tokens}; BuildPiConfig fills in the
+// launch shape and the daemon bootstrap env.
 //
 //nolint:revive // stutter: mirrors executor.ACPConfig sibling for symmetry.
 type PiConfig struct {
@@ -96,6 +97,12 @@ type PiConfig struct {
 	APIKey        string // AgentACPConfig.api_key
 	BaseURL       string // AgentACPConfig.api_base_url (custom only)
 	PersonaPrompt string
+	// ContextWindow is the optional context window size (in tokens) for a
+	// custom provider. Zero means let pi infer it from the model definition.
+	ContextWindow int64
+	// MaxTokens is the optional maximum output tokens for a custom provider.
+	// Zero means let pi infer it from the model definition.
+	MaxTokens int64
 
 	// ConfigDir is the per-agent pi config directory (PI_CODING_AGENT_DIR).
 	// Only set for custom providers; holds the models.json that declares the
@@ -165,6 +172,8 @@ func BuildPiConfig(
 		APIKey:          user.ApiKey,
 		BaseURL:         strings.TrimSpace(user.ApiBaseUrl),
 		PersonaPrompt:   user.PersonaPrompt,
+		ContextWindow:   user.ContextWindow,
+		MaxTokens:       user.MaxTokens,
 		WorkingDir:      workingDir,
 		PiBinaryPath:    piBinaryPath,
 		AgentResourceID: agentResourceID,
@@ -216,13 +225,15 @@ func agentWorkingDir(machineID, agentID string) string {
 }
 
 // LaunchFingerprint covers everything that shapes the subprocess launch (api
-// provider, model, api key, binary path). The runner compares it across config
-// hot-reloads: an unchanged fingerprint keeps the warm session (conversation +
-// init prompt preserved), a changed one means the running process is stale
-// (e.g. a rotated API key baked into its env) and must be restarted.
+// provider, model, api key, custom base URL, binary path, and the optional
+// context-window/max-token overrides written into models.json). The runner
+// compares it across config hot-reloads: an unchanged fingerprint keeps the
+// warm session (conversation + init prompt preserved), a changed one means the
+// running process is stale (e.g. a rotated API key baked into its env) and must
+// be restarted.
 func (c *PiConfig) LaunchFingerprint() string {
 	h := sha256.New()
-	_, _ = h.Write([]byte(c.APIProvider + "\x00" + c.Model + "\x00" + c.APIKey + "\x00" + c.BaseURL + "\x00" + c.PiBinaryPath))
+	_, _ = h.Write([]byte(c.APIProvider + "\x00" + c.Model + "\x00" + c.APIKey + "\x00" + c.BaseURL + "\x00" + c.PiBinaryPath + "\x00" + strconv.FormatInt(c.ContextWindow, 10) + "\x00" + strconv.FormatInt(c.MaxTokens, 10)))
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
@@ -317,9 +328,10 @@ func (c *PiConfig) launchArgs() []string {
 }
 
 // writeCustomModels writes the per-agent models.json that declares the custom
-// provider's base URL to pi. The API key is referenced through the
-// LAELIA_CUSTOM_API_KEY env var (set in buildPiEnv) so the secret never lands
-// on disk. Only called for custom providers.
+// provider's base URL and optional context-window/max-token overrides to pi.
+// The API key is referenced through the LAELIA_CUSTOM_API_KEY env var (set in
+// buildPiEnv) so the secret never lands on disk. Only called for custom
+// providers.
 func writeCustomModels(cfg *PiConfig) error {
 	if cfg.APIProvider != APIProviderCustom {
 		return nil
@@ -330,13 +342,20 @@ func writeCustomModels(cfg *PiConfig) error {
 	if err := os.MkdirAll(cfg.ConfigDir, 0o700); err != nil {
 		return err
 	}
+	model := map[string]any{"id": cfg.Model}
+	if cfg.ContextWindow > 0 {
+		model["contextWindow"] = cfg.ContextWindow
+	}
+	if cfg.MaxTokens > 0 {
+		model["maxTokens"] = cfg.MaxTokens
+	}
 	doc := map[string]any{
 		"providers": map[string]any{
 			"custom": map[string]any{
 				"baseUrl": cfg.BaseURL,
 				"api":     "openai-completions",
 				"apiKey":  "$LAELIA_CUSTOM_API_KEY",
-				"models":  []map[string]string{{"id": cfg.Model}},
+				"models":  []map[string]any{model},
 			},
 		},
 	}

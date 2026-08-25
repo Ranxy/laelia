@@ -580,6 +580,110 @@ describe("AgentProfilePage", () => {
     });
   });
 
+  it("saves the optional context window and max tokens for a custom pi provider", async () => {
+    mock.getAgent.mockResolvedValue(
+      agent({
+        info: {
+          ...agent().info,
+          acpConfig: acpConfig({
+            provider: "builtin-pi",
+            apiProvider: "custom",
+            apiBaseUrl: "https://example.com/v1",
+            apiKey: "sk-test",
+            model: "my-model",
+          }),
+        } as unknown as AgentInfo,
+      })
+    );
+    renderPage();
+
+    const contextInput = await screen.findByPlaceholderText(
+      "agent.acp-config-pi-context-window-placeholder"
+    );
+    fireEvent.change(contextInput, { target: { value: "128000" } });
+    fireEvent.blur(contextInput);
+
+    await waitFor(() => {
+      expect(mock.updateAgentACPConfig).toHaveBeenCalledWith(
+        "agents/a1",
+        expect.objectContaining({
+          provider: "builtin-pi",
+          apiProvider: "custom",
+          model: "my-model",
+          contextWindow: 128000n,
+        })
+      );
+    });
+
+    const maxTokensInput = screen.getByPlaceholderText(
+      "agent.acp-config-pi-max-tokens-placeholder"
+    );
+    fireEvent.change(maxTokensInput, { target: { value: "4096" } });
+    fireEvent.blur(maxTokensInput);
+
+    await waitFor(() => {
+      expect(mock.updateAgentACPConfig).toHaveBeenCalledWith(
+        "agents/a1",
+        expect.objectContaining({
+          contextWindow: 128000n,
+          maxTokens: 4096n,
+        })
+      );
+    });
+  });
+
+  it("shows context fields for a managed custom provider", async () => {
+    seedStore();
+    mock.fetchApiProviders.mockImplementation(async () => {
+      useAppStore.setState({
+        apiProviders: [
+          {
+            name: "apiProviders/p1",
+            title: "Custom",
+            providerType: "custom",
+            entries: [
+              {
+                name: "apiProviders/p1/entries/e1",
+                model: "my-model",
+              },
+            ],
+          },
+        ],
+      } as never);
+    });
+    mock.getAgent.mockResolvedValue(
+      agent({
+        info: {
+          ...agent().info,
+          acpConfig: acpConfig({
+            provider: "builtin-pi",
+            globalProvider: "apiProviders/p1",
+            globalProviderEntry: "apiProviders/p1/entries/e1",
+          }),
+        } as unknown as AgentInfo,
+      })
+    );
+    renderPage();
+
+    const contextInput = await screen.findByPlaceholderText(
+      "agent.acp-config-pi-context-window-placeholder"
+    );
+    fireEvent.change(contextInput, { target: { value: "200000" } });
+    fireEvent.blur(contextInput);
+
+    await waitFor(() => {
+      expect(mock.updateAgentACPConfig).toHaveBeenCalledWith(
+        "agents/a1",
+        expect.objectContaining({
+          provider: "builtin-pi",
+          globalProvider: "apiProviders/p1",
+          globalProviderEntry: "apiProviders/p1/entries/e1",
+          contextWindow: 200000n,
+        })
+      );
+    });
+  });
+
   it("shows the managed global provider title on a builtin-pi agent", async () => {
     seedStore();
     mock.fetchApiProviders.mockImplementation(async () => {

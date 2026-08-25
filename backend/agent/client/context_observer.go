@@ -140,6 +140,19 @@ func (o *contextObserver) inferCompaction(prevUsed, used int64) bool {
 }
 
 func (o *contextObserver) onCompactionFinished() {
+	o.finishCompaction()
+	// After a direct compaction event the old usage snapshot is stale (pi
+	// reports null tokens/percent until a fresh assistant response). Reset it
+	// so the next CONTEXT_USAGE_UPDATE repopulates with post-compaction values
+	// instead of showing the pre-compaction usage.
+	o.state.Usage = executor.ContextUsage{}
+}
+
+// finishCompaction applies the state transitions shared by direct and inferred
+// compaction finish events. It does not touch Usage: an inferred compaction is
+// triggered by a CONTEXT_USAGE_UPDATE that already carries the post-compaction
+// usage, so that observation must be preserved.
+func (o *contextObserver) finishCompaction() {
 	o.stopWatchdog()
 	o.state.Compaction.Active = false
 	o.state.Compaction.Count++
@@ -150,9 +163,9 @@ func (o *contextObserver) onCompactionFinished() {
 
 // emitInferredCompaction reports a compaction that was detected from a usage
 // drop (no direct agent event) and applies the same finish state as a direct
-// event.
+// event, except that the triggering usage observation is kept.
 func (o *contextObserver) emitInferredCompaction() error {
-	o.onCompactionFinished()
+	o.finishCompaction()
 	event := executor.Event{
 		SeqNo:   nextEventSeq(o.localState),
 		Type:    v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED,

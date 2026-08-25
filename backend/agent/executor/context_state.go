@@ -74,14 +74,22 @@ func (c *ContextState) UsageRatio() float64 {
 	return float64(c.Usage.Used) / float64(c.Usage.Size)
 }
 
-// ResetForFingerprint drops all accumulated stats when the session config
-// fingerprint changes (the old stats describe a different session).
+// ResetForFingerprint drops the session-scoped stats when the session config
+// fingerprint changes (the old usage/session stats describe a different
+// session). Agent-level history — the compaction counter, the last compaction
+// time, and the last owner the session re-anchored with — is preserved so
+// switching harnesses (e.g. pi → codex) or changing a model does not wipe the
+// agent's accumulated context history. The in-progress compaction flag is
+// session-scoped and must not leak into the new session.
 func (c *ContextState) ResetForFingerprint(fingerprint string) {
 	c.Usage = ContextUsage{}
-	c.Compaction = CompactionInfo{}
+	c.Compaction.Active = false
+	c.Compaction.LastStartAt = time.Time{}
 	c.Session = SessionHealth{}
 	c.NeedsReanchor = false
 	c.Fingerprint = fingerprint
+	// Compaction.Count, Compaction.LastAt, and OwnerDisplayName are
+	// intentionally preserved.
 }
 
 func contextStatePath(machineID, agentID string) string {

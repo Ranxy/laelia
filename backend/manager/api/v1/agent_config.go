@@ -474,6 +474,15 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders 
 	if cfg.Protocol != "" && cfg.Protocol != executor.ProtocolV1 && cfg.Protocol != executor.ProtocolV2 {
 		return errors.Errorf("invalid acp_config.protocol %q: must be \"acp-v1\" or \"acp-v2\"", cfg.Protocol)
 	}
+	// These fields are only meaningful for builtin-pi, but the non-negative
+	// invariant is cheap to enforce for every provider and must also cover the
+	// global-provider branch below (which returns before the inline checks).
+	if cfg.ContextWindow < 0 {
+		return errors.New("acp_config.context_window must be non-negative")
+	}
+	if cfg.MaxTokens < 0 {
+		return errors.New("acp_config.max_tokens must be non-negative")
+	}
 	// builtin-pi is a non-ACP runtime: it needs an API provider + API key +
 	// model, not a host-detected executable. Validate its fields and skip the
 	// host-availability / model-config-option checks (pi is always available —

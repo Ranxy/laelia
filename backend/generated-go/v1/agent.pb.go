@@ -3576,7 +3576,18 @@ type AgentACPConfig struct {
 	// api_base_url is the custom LLM API base URL for the built-in pi runtime.
 	// Only meaningful when provider == "builtin-pi" and api_provider == "custom";
 	// ignored by ACP runtimes and by known (deepseek/openrouter) providers.
-	ApiBaseUrl    string `protobuf:"bytes,13,opt,name=api_base_url,json=apiBaseUrl,proto3" json:"api_base_url,omitempty"`
+	ApiBaseUrl string `protobuf:"bytes,13,opt,name=api_base_url,json=apiBaseUrl,proto3" json:"api_base_url,omitempty"`
+	// context_window is the optional context window size (in tokens) for a
+	// custom builtin-pi provider. Only meaningful when provider == "builtin-pi"
+	// and api_provider == "custom"; ignored by ACP runtimes and by known
+	// (deepseek/openrouter) providers. When set, it is injected into pi's
+	// models.json so pi knows when to auto-compact. Zero means "let pi infer it".
+	ContextWindow int64 `protobuf:"varint,14,opt,name=context_window,json=contextWindow,proto3" json:"context_window,omitempty"`
+	// max_tokens is the optional maximum output tokens for a custom builtin-pi
+	// provider. Only meaningful when provider == "builtin-pi" and
+	// api_provider == "custom"; ignored by ACP runtimes and by known
+	// (deepseek/openrouter) providers. Zero means "let pi infer it".
+	MaxTokens     int64 `protobuf:"varint,15,opt,name=max_tokens,json=maxTokens,proto3" json:"max_tokens,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3700,6 +3711,20 @@ func (x *AgentACPConfig) GetApiBaseUrl() string {
 		return x.ApiBaseUrl
 	}
 	return ""
+}
+
+func (x *AgentACPConfig) GetContextWindow() int64 {
+	if x != nil {
+		return x.ContextWindow
+	}
+	return 0
+}
+
+func (x *AgentACPConfig) GetMaxTokens() int64 {
+	if x != nil {
+		return x.MaxTokens
+	}
+	return 0
 }
 
 type AgentCapability struct {
@@ -4280,7 +4305,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x10AgentModelOption\x12\x14\n" +
 	"\x05value\x18\x01 \x01(\tR\x05value\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\"\x98\x04\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\"\xde\x04\n" +
 	"\x0eAgentACPConfig\x12\x1e\n" +
 	"\n" +
 	"executable\x18\x01 \x01(\tR\n" +
@@ -4299,7 +4324,10 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x15global_provider_entry\x18\v \x01(\tR\x13globalProviderEntry\x12\x1a\n" +
 	"\bprotocol\x18\f \x01(\tR\bprotocol\x12 \n" +
 	"\fapi_base_url\x18\r \x01(\tR\n" +
-	"apiBaseUrl\x1a<\n" +
+	"apiBaseUrl\x12%\n" +
+	"\x0econtext_window\x18\x0e \x01(\x03R\rcontextWindow\x12\x1d\n" +
+	"\n" +
+	"max_tokens\x18\x0f \x01(\x03R\tmaxTokens\x1a<\n" +
 	"\x0eCustomEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa0\x03\n" +

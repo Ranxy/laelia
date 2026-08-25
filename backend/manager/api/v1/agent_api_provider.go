@@ -200,6 +200,8 @@ func resolveAcpConfigForDaemon(ctx context.Context, stores *store.Store, cfg *v1
 		Model:         entry.ModelName,
 		ApiBaseUrl:    provider.BaseURL,
 		PersonaPrompt: cfg.PersonaPrompt,
+		ContextWindow: cfg.ContextWindow,
+		MaxTokens:     cfg.MaxTokens,
 	}, nil
 }
 

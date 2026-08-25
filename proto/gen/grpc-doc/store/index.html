@@ -635,6 +635,27 @@ Only meaningful when provider == &#34;builtin-pi&#34; and api_provider == &#34;c
 ignored by ACP runtimes and by known (deepseek/openrouter) providers. </p></td>
                 </tr>
               
+                <tr>
+                  <td>context_window</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>context_window is the optional context window size (in tokens) for a
+custom builtin-pi provider. Only meaningful when provider == &#34;builtin-pi&#34;
+and api_provider == &#34;custom&#34;; ignored by ACP runtimes and by known
+(deepseek/openrouter) providers. When set, it is injected into pi&#39;s
+models.json so pi knows when to auto-compact. Zero means &#34;let pi infer it&#34;. </p></td>
+                </tr>
+
+                <tr>
+                  <td>max_tokens</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>max_tokens is the optional maximum output tokens for a custom builtin-pi
+provider. Only meaningful when provider == &#34;builtin-pi&#34; and
+api_provider == &#34;custom&#34;; ignored by ACP runtimes and by known
+(deepseek/openrouter) providers. Zero means &#34;let pi infer it&#34;. </p></td>
+                </tr>
+
             </tbody>
           </table>
 

@@ -99,7 +99,9 @@ func TestRunCommandEmitsInferredCompaction(t *testing.T) {
 	assert.True(t, inferredFinished, "usage drop must emit an inferred compaction finish")
 	assert.True(t, ctxState.NeedsReanchor, "inferred compaction marks the next turn for re-anchor")
 	assert.Equal(t, int64(1), ctxState.Compaction.Count)
-	assert.Equal(t, int64(100000), ctxState.Usage.Used, "usage state must reflect the latest observation")
+	// The usage update that triggered the inference is already the
+	// post-compaction observation, so it must be preserved.
+	assert.Equal(t, int64(100000), ctxState.Usage.Used, "inferred compaction keeps the triggering usage observation")
 	assert.False(t, ctxState.Compaction.Active)
 }
 
@@ -355,7 +357,9 @@ func TestPersistContextStateFingerprintReset(t *testing.T) {
 
 	assert.Equal(t, "new", state.Fingerprint)
 	assert.Zero(t, state.Usage)
-	assert.Zero(t, state.Compaction)
+	// Compaction history is agent-level and survives a config/harness change,
+	// but the in-progress flag is session-scoped and must be cleared.
+	assert.Equal(t, executor.CompactionInfo{Count: 3}, state.Compaction)
 	assert.Zero(t, state.Session.Turns)
 	assert.Equal(t, 1, state.Session.ColdStarts, "the cold turn is counted after the reset")
 	assert.False(t, state.NeedsReanchor)
@@ -365,6 +369,7 @@ func TestPersistContextStateFingerprintReset(t *testing.T) {
 	require.NotNil(t, loaded)
 	assert.Equal(t, "new", loaded.Fingerprint)
 	assert.Equal(t, 1, loaded.Session.ColdStarts)
+	assert.Equal(t, int64(3), loaded.Compaction.Count, "compaction history survives the fingerprint reset")
 }
 
 func TestPersistContextStateResumeFailures(t *testing.T) {

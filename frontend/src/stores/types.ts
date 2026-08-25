@@ -205,6 +205,13 @@ export interface AgentACPConfigInput {
   apiBaseUrl?: string;
   globalProvider?: string;
   globalProviderEntry?: string;
+  // Optional context configuration for a custom builtin-pi provider. Only
+  // meaningful when provider === "builtin-pi" and apiProvider === "custom".
+  // contextWindow is the context window size in tokens; maxTokens is the max
+  // output tokens. Zero/undefined means let pi infer from the model. These are
+  // bigint because the proto declares int64.
+  contextWindow?: bigint;
+  maxTokens?: bigint;
 }
 
 export interface AgentSlice {

@@ -1837,6 +1837,27 @@ export declare type AgentACPConfig = Message<"laelia.v1.AgentACPConfig"> & {
    * @generated from field: string api_base_url = 13;
    */
   apiBaseUrl: string;
+
+  /**
+   * context_window is the optional context window size (in tokens) for a
+   * custom builtin-pi provider. Only meaningful when provider == "builtin-pi"
+   * and api_provider == "custom"; ignored by ACP runtimes and by known
+   * (deepseek/openrouter) providers. When set, it is injected into pi's
+   * models.json so pi knows when to auto-compact. Zero means "let pi infer it".
+   *
+   * @generated from field: int64 context_window = 14;
+   */
+  contextWindow: bigint;
+
+  /**
+   * max_tokens is the optional maximum output tokens for a custom builtin-pi
+   * provider. Only meaningful when provider == "builtin-pi" and
+   * api_provider == "custom"; ignored by ACP runtimes and by known
+   * (deepseek/openrouter) providers. Zero means "let pi infer it".
+   *
+   * @generated from field: int64 max_tokens = 15;
+   */
+  maxTokens: bigint;
 };
 
 /**

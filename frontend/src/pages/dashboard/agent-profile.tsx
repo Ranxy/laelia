@@ -119,6 +119,8 @@ export function AgentProfilePage() {
   const [apiProvider, setApiProvider] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [apiBaseUrl, setApiBaseUrl] = useState("");
+  const [contextWindow, setContextWindow] = useState(0);
+  const [maxTokens, setMaxTokens] = useState(0);
   const [piMode, setPiMode] = useState<"global" | "self">("global");
   const [globalProvider, setGlobalProvider] = useState("");
   const [globalProviderEntry, setGlobalProviderEntry] = useState("");
@@ -159,6 +161,8 @@ export function AgentProfilePage() {
     apiProvider: "",
     apiKey: "",
     apiBaseUrl: "",
+    contextWindow: 0,
+    maxTokens: 0,
     globalProvider: "",
     globalProviderEntry: "",
     customEnvEntries: [] as { key: string; value: string }[],
@@ -366,6 +370,8 @@ export function AgentProfilePage() {
       // they cannot save anyway. On save, an empty key means "keep existing".
       apiKey: cfg?.apiKey ?? "",
       apiBaseUrl: cfg?.apiBaseUrl ?? "",
+      contextWindow: cfg?.contextWindow ? Number(cfg.contextWindow) : 0,
+      maxTokens: cfg?.maxTokens ? Number(cfg.maxTokens) : 0,
       globalProvider: cfg?.globalProvider ?? "",
       globalProviderEntry: cfg?.globalProviderEntry ?? "",
       customEnvEntries: cfg?.customEnv
@@ -387,6 +393,8 @@ export function AgentProfilePage() {
     setApiProvider(next.apiProvider);
     setApiKey(next.apiKey);
     setApiBaseUrl(next.apiBaseUrl);
+    setContextWindow(next.contextWindow);
+    setMaxTokens(next.maxTokens);
     setPiMode(nextPiMode);
     setGlobalProvider(next.globalProvider);
     setRefreshedModels(null);
@@ -452,6 +460,23 @@ export function AgentProfilePage() {
     return customEnv;
   }
 
+  // toOptionalBigInt converts a non-negative token count from the number input
+  // into the proto int64 representation. Zero/negative means "unset"; fractional
+  // input is truncated so BigInt never receives a non-integer number.
+  function toOptionalBigInt(value: number): bigint | undefined {
+    if (!Number.isFinite(value) || value <= 0) return undefined;
+    return BigInt(Math.trunc(value));
+  }
+
+  // stringifyConfig serializes a config payload for dirty comparison. The
+  // default JSON.stringify throws on BigInt (proto int64 fields are bigint), so
+  // convert those to strings first.
+  function stringifyConfig(cfg: AgentACPConfigInput): string {
+    return JSON.stringify(cfg, (_key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    );
+  }
+
   // Build a full-replace config payload from the live draft, carrying the given
   // persona (the persisted persona for config auto-saves, so an unsaved persona
   // draft is never persisted by a config save).
@@ -474,6 +499,8 @@ export function AgentProfilePage() {
       // Empty apiKey on save means "keep the existing stored key" server-side.
       apiKey: draft.apiKey,
       apiBaseUrl: draft.apiBaseUrl.trim(),
+      contextWindow: toOptionalBigInt(draft.contextWindow),
+      maxTokens: toOptionalBigInt(draft.maxTokens),
       globalProvider: draft.globalProvider.trim(),
       globalProviderEntry: draft.globalProviderEntry.trim(),
     };
@@ -499,6 +526,12 @@ export function AgentProfilePage() {
       // Preserve the stored key on a persona-only save.
       apiKey: cfg?.apiKey ?? "",
       apiBaseUrl: cfg?.apiBaseUrl ?? "",
+      contextWindow:
+        cfg?.contextWindow && cfg.contextWindow > 0n
+          ? cfg.contextWindow
+          : undefined,
+      maxTokens:
+        cfg?.maxTokens && cfg.maxTokens > 0n ? cfg.maxTokens : undefined,
       globalProvider: cfg?.globalProvider ?? "",
       globalProviderEntry: cfg?.globalProviderEntry ?? "",
     };
@@ -658,7 +691,7 @@ export function AgentProfilePage() {
     const cfg = agentRef.current?.info?.acpConfig;
     const draft = buildFromDraft(configRef.current, cfg?.personaPrompt ?? "");
     const persisted = buildFromPersisted(cfg, cfg?.personaPrompt ?? "");
-    return JSON.stringify(draft) !== JSON.stringify(persisted);
+    return stringifyConfig(draft) !== stringifyConfig(persisted);
   }
 
   function saveConfig() {
@@ -833,6 +866,65 @@ export function AgentProfilePage() {
   // machine's display name immediately; the raw machines/{id} is the
   // last-resort fallback (e.g. for a machine that no longer exists).
   const machineDisplay = agent.machineTitle || agent.machine;
+
+  // Optional context-window/max-token inputs for a custom pi provider. Shared
+  // by the self-provided and managed (global custom provider) modes.
+  const renderPiContextFields = () => (
+    <>
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium">
+          {t("agent.acp-config-pi-context-window")}
+        </label>
+        <Input
+          type="number"
+          min={0}
+          step={1}
+          value={contextWindow || ""}
+          onChange={(e) => {
+            const next = Number(e.target.value);
+            const value =
+              Number.isFinite(next) && next > 0 ? Math.trunc(next) : 0;
+            configRef.current = {
+              ...configRef.current,
+              contextWindow: value,
+            };
+            setContextWindow(value);
+          }}
+          onBlur={() => saveConfig()}
+          placeholder={t("agent.acp-config-pi-context-window-placeholder")}
+        />
+        <p className="text-xs text-control-light">
+          {t("agent.acp-config-pi-context-window-hint")}
+        </p>
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium">
+          {t("agent.acp-config-pi-max-tokens")}
+        </label>
+        <Input
+          type="number"
+          min={0}
+          step={1}
+          value={maxTokens || ""}
+          onChange={(e) => {
+            const next = Number(e.target.value);
+            const value =
+              Number.isFinite(next) && next > 0 ? Math.trunc(next) : 0;
+            configRef.current = {
+              ...configRef.current,
+              maxTokens: value,
+            };
+            setMaxTokens(value);
+          }}
+          onBlur={() => saveConfig()}
+          placeholder={t("agent.acp-config-pi-max-tokens-placeholder")}
+        />
+        <p className="text-xs text-control-light">
+          {t("agent.acp-config-pi-max-tokens-hint")}
+        </p>
+      </div>
+    </>
+  );
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -1257,6 +1349,8 @@ export function AgentProfilePage() {
                             globalProvider: "",
                             globalProviderEntry: "",
                             apiBaseUrl: "",
+                            contextWindow: 0,
+                            maxTokens: 0,
                           };
                           setProvider(next);
                           setModel("");
@@ -1269,6 +1363,8 @@ export function AgentProfilePage() {
                           setRefreshedModels(null);
                           setModelsRefreshError("");
                           setApiBaseUrl("");
+                          setContextWindow(0);
+                          setMaxTokens(0);
                           setPiMode("global");
                           saveConfig();
                         }}
@@ -1336,11 +1432,15 @@ export function AgentProfilePage() {
                                   apiKey: "",
                                   apiBaseUrl: "",
                                   model: "",
+                                  contextWindow: 0,
+                                  maxTokens: 0,
                                 };
                                 setApiProvider("");
                                 setApiKey("");
                                 setApiBaseUrl("");
                                 setModel("");
+                                setContextWindow(0);
+                                setMaxTokens(0);
                                 setPiModels([]);
                                 setPiModelsError("");
                               } else {
@@ -1388,13 +1488,32 @@ export function AgentProfilePage() {
                               value={globalProvider}
                               onValueChange={(v) => {
                                 const next = String(v ?? "");
+                                const nextProvider = apiProviders.find(
+                                  (p) => p.name === next
+                                );
+                                const keepContext =
+                                  nextProvider?.providerType === "custom";
                                 configRef.current = {
                                   ...configRef.current,
                                   globalProvider: next,
                                   globalProviderEntry: "",
+                                  contextWindow: keepContext
+                                    ? configRef.current.contextWindow
+                                    : 0,
+                                  maxTokens: keepContext
+                                    ? configRef.current.maxTokens
+                                    : 0,
                                 };
                                 setGlobalProvider(next);
                                 setGlobalProviderEntry("");
+                                setContextWindow(
+                                  keepContext
+                                    ? configRef.current.contextWindow
+                                    : 0
+                                );
+                                setMaxTokens(
+                                  keepContext ? configRef.current.maxTokens : 0
+                                );
                                 saveConfig();
                               }}
                             >
@@ -1473,6 +1592,9 @@ export function AgentProfilePage() {
                                 {t("agent.acp-config-pi-global-entries-empty")}
                               </p>
                             ))}
+                          {selectedGlobalProvider?.providerType === "custom" &&
+                            globalProviderEntry &&
+                            renderPiContextFields()}
                         </>
                       )}
 
@@ -1499,6 +1621,14 @@ export function AgentProfilePage() {
                                     next === "custom"
                                       ? configRef.current.apiBaseUrl
                                       : "",
+                                  contextWindow:
+                                    next === "custom"
+                                      ? configRef.current.contextWindow
+                                      : 0,
+                                  maxTokens:
+                                    next === "custom"
+                                      ? configRef.current.maxTokens
+                                      : 0,
                                 };
                                 if (apiKeyFetchDebounceRef.current) {
                                   clearTimeout(apiKeyFetchDebounceRef.current);
@@ -1510,6 +1640,16 @@ export function AgentProfilePage() {
                                   next === "custom"
                                     ? configRef.current.apiBaseUrl
                                     : ""
+                                );
+                                setContextWindow(
+                                  next === "custom"
+                                    ? configRef.current.contextWindow
+                                    : 0
+                                );
+                                setMaxTokens(
+                                  next === "custom"
+                                    ? configRef.current.maxTokens
+                                    : 0
                                 );
                                 setPiModels([]);
                                 setPiModelsError("");
@@ -1638,6 +1778,8 @@ export function AgentProfilePage() {
                               </p>
                             )}
                           </div>
+
+                          {apiProvider === "custom" && renderPiContextFields()}
 
                           <div className="flex flex-col gap-1">
                             <label className="text-sm font-medium">

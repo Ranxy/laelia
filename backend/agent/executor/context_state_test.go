@@ -62,9 +62,16 @@ func TestSaveContextState_AtomicNoTempLeftBehind(t *testing.T) {
 }
 
 func TestContextState_ResetForFingerprint(t *testing.T) {
+	lastAt := time.Now().Add(-time.Minute)
+	lastStartAt := time.Now().Add(-2 * time.Minute)
 	s := &ContextState{
-		Usage:         ContextUsage{Size: 100, Used: 90},
-		Compaction:    CompactionInfo{Count: 5, Active: true},
+		Usage: ContextUsage{Size: 100, Used: 90},
+		Compaction: CompactionInfo{
+			Count:       5,
+			LastAt:      lastAt,
+			LastStartAt: lastStartAt,
+			Active:      true,
+		},
 		Session:       SessionHealth{Turns: 8, ColdStarts: 2},
 		NeedsReanchor: true,
 		Fingerprint:   "old",
@@ -72,7 +79,12 @@ func TestContextState_ResetForFingerprint(t *testing.T) {
 	s.ResetForFingerprint("new")
 
 	assert.Zero(t, s.Usage)
-	assert.Zero(t, s.Compaction)
+	// Compaction history is agent-level and survives a config/harness change,
+	// but the in-progress flag is session-scoped and must be cleared.
+	assert.Equal(t, int64(5), s.Compaction.Count)
+	assert.True(t, lastAt.Equal(s.Compaction.LastAt))
+	assert.True(t, s.Compaction.LastStartAt.IsZero())
+	assert.False(t, s.Compaction.Active)
 	assert.Zero(t, s.Session)
 	assert.False(t, s.NeedsReanchor)
 	assert.Equal(t, "new", s.Fingerprint)

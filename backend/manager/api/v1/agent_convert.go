@@ -186,6 +186,8 @@ func convertToV1AgentACPConfig(cfg *storepb.AgentACPConfig) *v1pb.AgentACPConfig
 		GlobalProvider:      cfg.GlobalProvider,
 		GlobalProviderEntry: cfg.GlobalProviderEntry,
 		Protocol:            cfg.Protocol,
+		ContextWindow:       cfg.ContextWindow,
+		MaxTokens:           cfg.MaxTokens,
 	}
 }
 
@@ -207,6 +209,8 @@ func convertToStoreAgentACPConfig(cfg *v1pb.AgentACPConfig) *storepb.AgentACPCon
 		GlobalProvider:      cfg.GlobalProvider,
 		GlobalProviderEntry: cfg.GlobalProviderEntry,
 		Protocol:            cfg.Protocol,
+		ContextWindow:       cfg.ContextWindow,
+		MaxTokens:           cfg.MaxTokens,
 	}
 }
 
@@ -217,7 +221,8 @@ func convertToStoreAgentACPConfig(cfg *v1pb.AgentACPConfig) *storepb.AgentACPCon
 func isEmptyAgentACPConfig(cfg *v1pb.AgentACPConfig) bool {
 	return cfg.Executable == "" && len(cfg.Args) == 0 && len(cfg.AllowEnv) == 0 &&
 		cfg.Provider == "" && cfg.Model == "" && len(cfg.CustomEnv) == 0 && cfg.PersonaPrompt == "" &&
-		cfg.ApiBaseUrl == "" && cfg.GlobalProvider == "" && cfg.GlobalProviderEntry == "" && cfg.Protocol == ""
+		cfg.ApiBaseUrl == "" && cfg.GlobalProvider == "" && cfg.GlobalProviderEntry == "" && cfg.Protocol == "" &&
+		cfg.ContextWindow == 0 && cfg.MaxTokens == 0
 }
 
 // buildCapabilityForACPConfig derives the agent capability from the

@@ -131,6 +131,84 @@ func TestValidateAgentACPConfigGlobalProvider(t *testing.T) {
 	}
 }
 
+// TestValidateAgentACPConfigContextWindowNonNegative verifies the optional
+// context-window/max-token fields reject negative values in both the inline
+// and global-provider builtin-pi branches.
+func TestValidateAgentACPConfigContextWindowNonNegative(t *testing.T) {
+	cases := []struct {
+		name    string
+		cfg     *v1pb.AgentACPConfig
+		wantErr bool
+	}{
+		{
+			name: "inline custom ok",
+			cfg: &v1pb.AgentACPConfig{
+				Provider:      pi.BuiltinPiProvider,
+				ApiProvider:   pi.APIProviderCustom,
+				ApiKey:        "sk-test",
+				ApiBaseUrl:    "https://example.com/v1",
+				Model:         "my-model",
+				ContextWindow: 128000,
+				MaxTokens:     4096,
+			},
+		},
+		{
+			name: "inline negative context window",
+			cfg: &v1pb.AgentACPConfig{
+				Provider:      pi.BuiltinPiProvider,
+				ApiProvider:   pi.APIProviderCustom,
+				ApiKey:        "sk-test",
+				ApiBaseUrl:    "https://example.com/v1",
+				Model:         "my-model",
+				ContextWindow: -1,
+			},
+			wantErr: true,
+		},
+		{
+			name: "inline negative max tokens",
+			cfg: &v1pb.AgentACPConfig{
+				Provider:    pi.BuiltinPiProvider,
+				ApiProvider: pi.APIProviderDeepseek,
+				ApiKey:      "sk-test",
+				Model:       "deepseek-chat",
+				MaxTokens:   -1,
+			},
+			wantErr: true,
+		},
+		{
+			name: "global negative context window",
+			cfg: &v1pb.AgentACPConfig{
+				Provider:            pi.BuiltinPiProvider,
+				GlobalProvider:      "apiProviders/abc",
+				GlobalProviderEntry: "apiProviders/abc/entries/1",
+				ContextWindow:       -1,
+			},
+			wantErr: true,
+		},
+		{
+			name: "global negative max tokens",
+			cfg: &v1pb.AgentACPConfig{
+				Provider:            pi.BuiltinPiProvider,
+				GlobalProvider:      "apiProviders/abc",
+				GlobalProviderEntry: "apiProviders/abc/entries/1",
+				MaxTokens:           -1,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateAgentACPConfig(tc.cfg, nil)
+			if tc.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 // TestValidateAgentACPConfigProtocol verifies the protocol field: value
 // whitelist, custom providers may declare either generation, and a built-in
 // provider may only declare acp-v2 when it actually speaks the thread protocol.
@@ -270,6 +348,28 @@ func TestAgentACPConfigGlobalRoundTrip(t *testing.T) {
 	out := convertToV1AgentACPConfig(stored)
 	if out.GetGlobalProvider() != in.GlobalProvider || out.GetGlobalProviderEntry() != in.GlobalProviderEntry {
 		t.Fatalf("v1 conversion dropped global refs: %+v", out)
+	}
+}
+
+// TestAgentACPConfigContextRoundTrip verifies the v1↔store conversion preserves
+// the optional context-window/max-token overrides.
+func TestAgentACPConfigContextRoundTrip(t *testing.T) {
+	in := &v1pb.AgentACPConfig{
+		Provider:      pi.BuiltinPiProvider,
+		ApiProvider:   pi.APIProviderCustom,
+		ApiKey:        "sk-test",
+		ApiBaseUrl:    "https://example.com/v1",
+		Model:         "my-model",
+		ContextWindow: 128000,
+		MaxTokens:     4096,
+	}
+	stored := convertToStoreAgentACPConfig(in)
+	if stored.GetContextWindow() != in.ContextWindow || stored.GetMaxTokens() != in.MaxTokens {
+		t.Fatalf("store conversion dropped context fields: %+v", stored)
+	}
+	out := convertToV1AgentACPConfig(stored)
+	if out.GetContextWindow() != in.ContextWindow || out.GetMaxTokens() != in.MaxTokens {
+		t.Fatalf("v1 conversion dropped context fields: %+v", out)
 	}
 }
 

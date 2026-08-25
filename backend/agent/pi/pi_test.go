@@ -3,6 +3,8 @@ package pi
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -23,6 +25,38 @@ func TestPiFingerprint_StableAndDistinguishing(t *testing.T) {
 	assert.NotEqual(t, a, piFingerprint(&PiConfig{APIProvider: "openrouter", Model: "deepseek-chat", WorkingDir: "/work"}))
 	assert.NotEqual(t, a, piFingerprint(&PiConfig{APIProvider: "deepseek", Model: "deepseek-reasoner", WorkingDir: "/work"}))
 	assert.NotEqual(t, a, piFingerprint(&PiConfig{APIProvider: "deepseek", Model: "deepseek-chat", WorkingDir: "/else"}))
+}
+
+// TestLaunchFingerprint_ContextConfig guards the restart gate: changing the
+// optional context-window/max-token overrides must change the launch
+// fingerprint so the pi subprocess is restarted and models.json is rewritten.
+func TestLaunchFingerprint_ContextConfig(t *testing.T) {
+	base := &PiConfig{
+		APIProvider:   APIProviderCustom,
+		Model:         "my-model",
+		APIKey:        "sk-test",
+		BaseURL:       "https://example.com/v1",
+		PiBinaryPath:  "/bin/pi",
+		ContextWindow: 128000,
+		MaxTokens:     4096,
+	}
+	assert.Equal(t, base.LaunchFingerprint(), (&PiConfig{
+		APIProvider:   APIProviderCustom,
+		Model:         "my-model",
+		APIKey:        "sk-test",
+		BaseURL:       "https://example.com/v1",
+		PiBinaryPath:  "/bin/pi",
+		ContextWindow: 128000,
+		MaxTokens:     4096,
+	}).LaunchFingerprint())
+
+	changedWindow := *base
+	changedWindow.ContextWindow = 200000
+	assert.NotEqual(t, base.LaunchFingerprint(), changedWindow.LaunchFingerprint())
+
+	changedMax := *base
+	changedMax.MaxTokens = 8192
+	assert.NotEqual(t, base.LaunchFingerprint(), changedMax.LaunchFingerprint())
 }
 
 // TestLoadSavePiSession_RoundTrip exercises the durable session file. A missing
@@ -95,6 +129,24 @@ func TestBuildPiConfig_Gating(t *testing.T) {
 	})
 }
 
+// TestBuildPiConfig_ContextConfig verifies the optional context-window and
+// max-token overrides are copied from the user config into PiConfig.
+func TestBuildPiConfig_ContextConfig(t *testing.T) {
+	user := &v1pb.AgentACPConfig{
+		Provider:      BuiltinPiProvider,
+		ApiProvider:   APIProviderCustom,
+		ApiKey:        "sk-test",
+		ApiBaseUrl:    "https://example.com/v1",
+		Model:         "my-model",
+		ContextWindow: 128000,
+		MaxTokens:     4096,
+	}
+	cfg := BuildPiConfig(user, "m", "a", "agents/a", "/bin/pi", "/sock", "tok", "/bin")
+	require.NotNil(t, cfg)
+	assert.Equal(t, int64(128000), cfg.ContextWindow)
+	assert.Equal(t, int64(4096), cfg.MaxTokens)
+}
+
 // TestBuildPiCapability confirms pi agents advertise SupportsPi and NOT
 // SupportsAcp, and that non-pi configs get a zero capability.
 func TestBuildPiCapability(t *testing.T) {
@@ -117,6 +169,63 @@ func TestBuildPiCapability(t *testing.T) {
 		assert.False(t, capability.SupportsPi)
 		assert.False(t, capability.SupportsAcp)
 	})
+}
+
+// TestWriteCustomModels_ContextConfig verifies that optional context_window and
+// max_tokens configured for a custom pi provider are injected into pi's
+// models.json so pi knows the context window and can auto-compact.
+func TestWriteCustomModels_ContextConfig(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cfg := &PiConfig{
+		APIProvider:   APIProviderCustom,
+		BaseURL:       "https://example.com/v1",
+		Model:         "my-model",
+		ContextWindow: 128000,
+		MaxTokens:     4096,
+		ConfigDir:     filepath.Join(t.TempDir(), ".pi-agent"),
+	}
+	require.NoError(t, writeCustomModels(cfg))
+
+	data, err := os.ReadFile(filepath.Join(cfg.ConfigDir, "models.json"))
+	require.NoError(t, err)
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(data, &doc))
+	providers := doc["providers"].(map[string]any)
+	custom := providers["custom"].(map[string]any)
+	models := custom["models"].([]any)
+	require.Len(t, models, 1)
+	model := models[0].(map[string]any)
+	assert.Equal(t, "my-model", model["id"])
+	assert.Equal(t, float64(128000), model["contextWindow"])
+	assert.Equal(t, float64(4096), model["maxTokens"])
+}
+
+// TestWriteCustomModels_NoContextConfig verifies that when context_window and
+// max_tokens are unset, models.json omits them so pi infers from the model.
+func TestWriteCustomModels_NoContextConfig(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cfg := &PiConfig{
+		APIProvider: APIProviderCustom,
+		BaseURL:     "https://example.com/v1",
+		Model:       "my-model",
+		ConfigDir:   filepath.Join(t.TempDir(), ".pi-agent"),
+	}
+	require.NoError(t, writeCustomModels(cfg))
+
+	data, err := os.ReadFile(filepath.Join(cfg.ConfigDir, "models.json"))
+	require.NoError(t, err)
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(data, &doc))
+	providers := doc["providers"].(map[string]any)
+	custom := providers["custom"].(map[string]any)
+	models := custom["models"].([]any)
+	require.Len(t, models, 1)
+	model := models[0].(map[string]any)
+	assert.Equal(t, "my-model", model["id"])
+	_, hasContext := model["contextWindow"]
+	_, hasMaxTokens := model["maxTokens"]
+	assert.False(t, hasContext)
+	assert.False(t, hasMaxTokens)
 }
 
 // TestLaunchArgs confirms the pi argv shape: rpc mode, provider/model from the

@@ -771,6 +771,8 @@ permissions) is derived from a built-in template, not set by the admin.
 | global_provider_entry | [string](#string) |  | global_provider_entry is the resource name of the (key, model) entry within the global provider, in the form &#34;apiProviders/{id}/entries/{entry}&#34;. Only meaningful when provider == &#34;builtin-pi&#34; and global_provider is set. |
 | protocol | [string](#string) |  | protocol declares the ACP protocol generation the provider speaks: empty (inferred from the provider type), &#34;acp-v1&#34; (session protocol) or &#34;acp-v2&#34; (thread protocol). Only meaningful for a &#34;custom&#34; provider: a built-in provider&#39;s protocol is determined by its implementation. |
 | api_base_url | [string](#string) |  | api_base_url is the custom LLM API base URL for the built-in pi runtime. Only meaningful when provider == &#34;builtin-pi&#34; and api_provider == &#34;custom&#34;; ignored by ACP runtimes and by known (deepseek/openrouter) providers. |
+| context_window | [int64](#int64) |  | context_window is the optional context window size (in tokens) for a custom builtin-pi provider. Only meaningful when provider == &#34;builtin-pi&#34; and api_provider == &#34;custom&#34;; ignored by ACP runtimes and by known (deepseek/openrouter) providers. When set, it is injected into pi&#39;s models.json so pi knows when to auto-compact. Zero means &#34;let pi infer it&#34;. |
+| max_tokens | [int64](#int64) |  | max_tokens is the optional maximum output tokens for a custom builtin-pi provider. Only meaningful when provider == &#34;builtin-pi&#34; and api_provider == &#34;custom&#34;; ignored by ACP runtimes and by known (deepseek/openrouter) providers. Zero means &#34;let pi infer it&#34;. |
 
 
 
