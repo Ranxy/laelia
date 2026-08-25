@@ -171,6 +171,8 @@
     - [AgentActivity](#laelia-v1-AgentActivity)
     - [AgentReady](#laelia-v1-AgentReady)
     - [AgentStreamMessage](#laelia-v1-AgentStreamMessage)
+    - [ArchiveChannelRequest](#laelia-v1-ArchiveChannelRequest)
+    - [ArchiveChannelResponse](#laelia-v1-ArchiveChannelResponse)
     - [AssignTaskRequest](#laelia-v1-AssignTaskRequest)
     - [AssignTaskResponse](#laelia-v1-AssignTaskResponse)
     - [Attachment](#laelia-v1-Attachment)
@@ -316,6 +318,8 @@
     - [ToolCallStartedPayload](#laelia-v1-ToolCallStartedPayload)
     - [TransferChannelOwnershipRequest](#laelia-v1-TransferChannelOwnershipRequest)
     - [TransferChannelOwnershipResponse](#laelia-v1-TransferChannelOwnershipResponse)
+    - [UnarchiveChannelRequest](#laelia-v1-UnarchiveChannelRequest)
+    - [UnarchiveChannelResponse](#laelia-v1-UnarchiveChannelResponse)
     - [UnclaimTaskRequest](#laelia-v1-UnclaimTaskRequest)
     - [UnclaimTaskResponse](#laelia-v1-UnclaimTaskResponse)
     - [UpdateChannelMemberRoleRequest](#laelia-v1-UpdateChannelMemberRoleRequest)
@@ -3075,6 +3079,39 @@ never generates conversation activity.
 
 
 
+<a name="laelia-v1-ArchiveChannelRequest"></a>
+
+### ArchiveChannelRequest
+ArchiveChannel marks a channel archived (conversation.archived = true).
+Only the channel owner may archive. An archived channel no longer appears in
+the members-page channels roster, is not listed to agents, and rejects new
+messages from all members, but its messages stay globally searchable.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ArchiveChannelResponse"></a>
+
+### ArchiveChannelResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [Conversation](#laelia-v1-Conversation) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-AssignTaskRequest"></a>
 
 ### AssignTaskRequest
@@ -3677,6 +3714,7 @@ window. usage_ratio is used/size.
 | last_message_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | last_message_at is the send time of last_message. Unset when the conversation has no main-channel messages yet. |
 | closed | [bool](#bool) |  | closed is the requesting user&#39;s per-conversation close state (conversation_member_meta.closed). A closed conversation is hidden from the user&#39;s left-rail list; the first new main-channel message (thread replies excluded) clears the flag, so it reappears automatically. Per-user: each viewer has their own close state. Populated by GetChannel for a user viewer; ListChannels only returns closed conversations when the caller asks with include_closed. |
 | joined_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | joined_at is the time the requesting user joined this conversation (conversation_member_meta.joined_at). Populated by GetChannel for a user viewer; unset for non-user callers. Lets the channel detail page show &#34;joined at&#34; without an extra member lookup. |
+| archived | [bool](#bool) |  | archived is the conversation-level archive state (conversation.archived), set by the channel owner via ArchiveChannel/UnarchiveChannel. An archived channel: is hidden from the members-page channels roster, is not returned to agents by ListChannelsForAgent, and rejects new messages (SendMessage / PostMessage) from all members. It stays in a user&#39;s left-rail chat list until the user closes it, and its messages remain searchable via SearchChatHistory. Populated by ListChannels/GetChannel/ListChannelsForAgent. |
 
 
 
@@ -5650,6 +5688,37 @@ become the new owner. The new owner must already be a member.
 
 
 
+<a name="laelia-v1-UnarchiveChannelRequest"></a>
+
+### UnarchiveChannelRequest
+UnarchiveChannel reopens an archived channel (conversation.archived = false),
+restoring normal membership visibility and message posting.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UnarchiveChannelResponse"></a>
+
+### UnarchiveChannelResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [Conversation](#laelia-v1-Conversation) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-UnclaimTaskRequest"></a>
 
 ### UnclaimTaskRequest
@@ -6117,6 +6186,8 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | GetChannel | [GetChannelRequest](#laelia-v1-GetChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |
 | UpdateChannel | [UpdateChannelRequest](#laelia-v1-UpdateChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |
 | DeleteChannel | [DeleteChannelRequest](#laelia-v1-DeleteChannelRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| ArchiveChannel | [ArchiveChannelRequest](#laelia-v1-ArchiveChannelRequest) | [ArchiveChannelResponse](#laelia-v1-ArchiveChannelResponse) | ArchiveChannel marks a channel archived (conversation.archived = true). Only the channel owner may call it. |
+| UnarchiveChannel | [UnarchiveChannelRequest](#laelia-v1-UnarchiveChannelRequest) | [UnarchiveChannelResponse](#laelia-v1-UnarchiveChannelResponse) | UnarchiveChannel reopens an archived channel. |
 | AddChannelMember | [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest) | [AddChannelMemberResponse](#laelia-v1-AddChannelMemberResponse) |  |
 | RemoveChannelMember | [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 | TransferChannelOwnership | [TransferChannelOwnershipRequest](#laelia-v1-TransferChannelOwnershipRequest) | [TransferChannelOwnershipResponse](#laelia-v1-TransferChannelOwnershipResponse) | TransferChannelOwnership hands channel ownership from the calling owner to another member: the target is promoted to Owner and the caller demoted to Member, atomically. The interceptor gates the call with conversations.manage (Admin&#43;Owner); the handler additionally enforces that the caller is the current Owner. Only channels (type 2) support ownership transfer. |

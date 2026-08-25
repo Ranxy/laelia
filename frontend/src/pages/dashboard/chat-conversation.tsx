@@ -407,6 +407,9 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // three DM shapes (user+agent, agent+agent, user+user).
   const isAgentDm = channel?.type === CONVERSATION_TYPE_AGENT_DM;
   const isUserDm = channel?.type === CONVERSATION_TYPE_USER_DM;
+  // An archived channel (conversation.archived, set by the owner) is read-only:
+  // the composer is replaced with a notice and thread replies are disabled.
+  const isArchived = channel?.archived === true;
   const membershipFixed = isDm || isAgentDm || isUserDm;
   const isOwner =
     channel && currentUser ? channel.ownerId === currentUser.handle : false;
@@ -1674,6 +1677,12 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                     {t("chat.agent-dm-view-only")}
                   </div>
                 </div>
+              ) : isArchived ? (
+                <div className="px-6 py-4">
+                  <div className="rounded-2xl border border-warning/30 bg-warning/5 px-4 py-3 text-center text-xs text-warning">
+                    {t("chat.channel-archived")}
+                  </div>
+                </div>
               ) : (
                 <div className="px-4 pb-2 pt-2 lg:px-6 lg:pb-5">
                   <div
@@ -1970,7 +1979,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             onPreviewAttachment={handlePreviewAttachment}
             onJumpToSection={handleJumpToSection}
             onPreviewImage={handlePreviewImage}
-            readOnly={isAgentDm}
+            readOnly={isAgentDm || isArchived}
             expanded={threadExpanded}
             onToggleExpand={() => setThreadExpanded((v) => !v)}
             fluid={threadExpanded}

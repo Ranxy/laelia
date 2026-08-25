@@ -574,6 +574,14 @@ message Conversation {
   // viewer; unset for non-user callers. Lets the channel detail page show
   // "joined at" without an extra member lookup.
   google.protobuf.Timestamp joined_at = 20;
+  // archived is the conversation-level archive state (conversation.archived),
+  // set by the channel owner via ArchiveChannel/UnarchiveChannel. An archived
+  // channel: is hidden from the members-page channels roster, is not returned
+  // to agents by ListChannelsForAgent, and rejects new messages (SendMessage /
+  // PostMessage) from all members. It stays in a user's left-rail chat list
+  // until the user closes it, and its messages remain searchable via
+  // SearchChatHistory. Populated by ListChannels/GetChannel/ListChannelsForAgent.
+  bool archived = 30;
 }
 
 message ChannelMember {
@@ -873,6 +881,34 @@ message DeleteChannelRequest {
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "laelia/Conversation"}
   ];
+}
+
+// ArchiveChannel marks a channel archived (conversation.archived = true).
+// Only the channel owner may archive. An archived channel no longer appears in
+// the members-page channels roster, is not listed to agents, and rejects new
+// messages from all members, but its messages stay globally searchable.
+message ArchiveChannelRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+}
+
+message ArchiveChannelResponse {
+  Conversation conversation = 1;
+}
+
+// UnarchiveChannel reopens an archived channel (conversation.archived = false),
+// restoring normal membership visibility and message posting.
+message UnarchiveChannelRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+}
+
+message UnarchiveChannelResponse {
+  Conversation conversation = 1;
 }
 
 message AddChannelMemberInput {
@@ -1725,6 +1761,21 @@ service CommandService {
   }
 
   rpc DeleteChannel(DeleteChannelRequest) returns (google.protobuf.Empty) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.manage";
+    option (laelia.v1.audit) = true;
+  }
+
+  // ArchiveChannel marks a channel archived (conversation.archived = true).
+  // Only the channel owner may call it.
+  rpc ArchiveChannel(ArchiveChannelRequest) returns (ArchiveChannelResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.manage";
+    option (laelia.v1.audit) = true;
+  }
+
+  // UnarchiveChannel reopens an archived channel.
+  rpc UnarchiveChannel(UnarchiveChannelRequest) returns (UnarchiveChannelResponse) {
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.manage";
     option (laelia.v1.audit) = true;

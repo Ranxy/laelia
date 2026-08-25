@@ -40,6 +40,7 @@ func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, 
 		Address:     address,
 		ReadVersion: readVersion,
 		Peer:        peerResourceName,
+		Archived:    conv.Archived,
 	}
 }
 

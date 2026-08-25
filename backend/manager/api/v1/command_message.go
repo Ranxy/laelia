@@ -407,6 +407,11 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 	if !isMember {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("not a conversation member"))
 	}
+	// An archived channel is read-only: the owner froze it, so no agent may
+	// post new messages into it either. Messages remain visible and searchable.
+	if conv.Archived {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("this channel has been archived by the owner; new messages are not allowed"))
+	}
 
 	currentVersion := conv.Version
 	if req.Msg.BaseVersion == currentVersion {

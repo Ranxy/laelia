@@ -492,6 +492,14 @@ export interface ChannelSlice {
     conversationId: string,
     closed: boolean
   ) => Promise<void>;
+  // Archive or unarchive a channel (owner-only). Archiving hides the channel
+  // from the members-page roster and freezes it (no new messages); it stays in
+  // the left-rail chat list until the user closes it, and its messages remain
+  // searchable. Unarchiving restores normal membership visibility and posting.
+  setChannelArchived: (
+    conversationId: string,
+    archived: boolean
+  ) => Promise<void>;
   sendChannelMessage: (
     conversationId: string,
     content: string,

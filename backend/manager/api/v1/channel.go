@@ -478,6 +478,51 @@ func (s *CommandService) DeleteChannel(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
+// setChannelArchived is the shared core of ArchiveChannel/UnarchiveChannel: it
+// loads the conversation, enforces the owner-only gate, flips the archive flag,
+// and returns the updated Conversation. Only the channel owner may archive or
+// unarchive.
+func (s *CommandService) setChannelArchived(ctx context.Context, name string, archived bool) (*v1pb.Conversation, error) {
+	convID, err := parseConversationID(name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid channel name"))
+	}
+
+	conv, err := s.store.GetConversation(ctx, convID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	if err := requireChannelOwner(ctx, conv); err != nil {
+		return nil, err
+	}
+
+	updated, err := s.store.SetConversationArchived(ctx, convID, archived)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to set channel archived"))
+	}
+
+	memberCount, _ := s.store.GetConversationMemberCount(ctx, updated.ID)
+	ownerName := resolveUserName(ctx, s.store, updated.OwnerID)
+	ownerHandle := resolveUserHandle(ctx, s.store, updated.OwnerID)
+	return convertToV1Conversation(updated, ownerName, ownerHandle, "", "", memberCount, 0, updated.Title, 0), nil
+}
+
+func (s *CommandService) ArchiveChannel(ctx context.Context, req *connect.Request[v1pb.ArchiveChannelRequest]) (*connect.Response[v1pb.ArchiveChannelResponse], error) {
+	conv, err := s.setChannelArchived(ctx, req.Msg.Name, true)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&v1pb.ArchiveChannelResponse{Conversation: conv}), nil
+}
+
+func (s *CommandService) UnarchiveChannel(ctx context.Context, req *connect.Request[v1pb.UnarchiveChannelRequest]) (*connect.Response[v1pb.UnarchiveChannelResponse], error) {
+	conv, err := s.setChannelArchived(ctx, req.Msg.Name, false)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&v1pb.UnarchiveChannelResponse{Conversation: conv}), nil
+}
+
 // validateChannelUserMember rejects a user member that cannot join a channel:
 // missing/deleted accounts and the internal SYSTEM_BOT (which only serves as
 // owner-of-record for system-created conversations, never as a real member).

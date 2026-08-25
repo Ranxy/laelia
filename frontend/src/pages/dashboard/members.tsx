@@ -103,7 +103,12 @@ export function MembersPage() {
 
   const agents = members.filter((m) => m.kind === "agent" && matchesQuery(m));
   const humans = members.filter((m) => m.kind === "user" && matchesQuery(m));
-  const channels = myChannels.filter(matchesChannelQuery);
+  // The Channels roster hides archived channels (conversation.archived, set by
+  // the owner) — an archived channel is a frozen archive, not an entry point to
+  // reopen. It still stays in the left-rail chat list until the user closes it.
+  const channels = myChannels
+    .filter((c) => !c.archived)
+    .filter(matchesChannelQuery);
   // While searching, hide sections that have no matches instead of showing an
   // empty group; when nothing matches at all, a dedicated message appears.
   const showAgents = !searching || agents.length > 0;

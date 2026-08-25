@@ -351,6 +351,7 @@
   "chat": {
     "agent": "Agent",
     "agent-dm-view-only": "这是两个 Agent 之间的私信。管理员可以查看,但不能在此发送消息。",
+    "channel-archived": "当前 channel 已被 owner 归档,无法发言。",
     "close": "关闭会话",
     "closed-title": "会话已关闭",
     "convert-to-task": "转换为任务",
@@ -695,6 +696,8 @@
     "load-failed": "加载成员目录失败,请重试。",
     "message-agent": "发消息",
     "message-channel": "发消息",
+    "archive-channel": "归档频道",
+    "unarchive-channel": "取消归档",
     "message-human": "发消息",
     "no-data": "暂无成员。",
     "no-search-results": "没有匹配“{{query}}”的 Agent、用户或频道。",

@@ -46,6 +46,12 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 	if conv.Type == store.ConversationTypeAgentDM {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("agent-DM conversations are agent-only; users can view but cannot send"))
 	}
+	// An archived channel is read-only: the owner froze it, so no member
+	// (including the owner) may post new messages. Messages remain visible and
+	// searchable.
+	if conv.Archived {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("this channel has been archived by the owner; new messages are not allowed"))
+	}
 
 	// thread_root, when set, makes this message a reply in an existing thread
 	// rooted at the given message id. Validate the root belongs to this

@@ -186,6 +186,28 @@ func TestChannelTitleUniqueIndexPresent(t *testing.T) {
 // machine_id) denormalized from command so agent/principal/machine + time
 // aggregation needs no join. All declarations are idempotent so re-applying
 // the schema is safe.
+// TestConversationArchivePresent locks in the conversation archiving columns
+// (owner-level, on the conversation table itself — not per-user like close).
+// An archived channel stays hidden from members-page rosters and agent channel
+// lists but remains searchable. All declarations are idempotent so re-applying
+// the schema is safe.
+func TestConversationArchivePresent(t *testing.T) {
+	sql := latestSQL(t)
+
+	for _, want := range []string{
+		"archived BOOLEAN NOT NULL DEFAULT false",
+		"archived_at TIMESTAMPTZ",
+		"ALTER TABLE conversation ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false",
+		"ALTER TABLE conversation ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ",
+		"CREATE INDEX IF NOT EXISTS idx_conversation_archived",
+		"ON conversation(archived) WHERE archived = true",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration missing conversation-archive declaration: %q", want)
+		}
+	}
+}
+
 func TestCommandTokenUsageTablePresent(t *testing.T) {
 	sql := latestSQL(t)
 

@@ -827,6 +827,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ArchiveChannelRequest"><span class="badge">M</span>ArchiveChannelRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ArchiveChannelResponse"><span class="badge">M</span>ArchiveChannelResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.AssignTaskRequest"><span class="badge">M</span>AssignTaskRequest</a>
                 </li>
               
@@ -1404,6 +1412,14 @@
               
                 <li>
                   <a href="#laelia.v1.TransferChannelOwnershipResponse"><span class="badge">M</span>TransferChannelOwnershipResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UnarchiveChannelRequest"><span class="badge">M</span>UnarchiveChannelRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UnarchiveChannelResponse"><span class="badge">M</span>UnarchiveChannelResponse</a>
                 </li>
               
                 <li>
@@ -8236,6 +8252,54 @@ machine app&#39;s per-agent runner; required on the first message. </p></td>
 
         
       
+        <h3 id="laelia.v1.ArchiveChannelRequest">ArchiveChannelRequest</h3>
+        <p>ArchiveChannel marks a channel archived (conversation.archived = true).</p><p>Only the channel owner may archive. An archived channel no longer appears in</p><p>the members-page channels roster, is not listed to agents, and rejects new</p><p>messages from all members, but its messages stay globally searchable.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ArchiveChannelResponse">ArchiveChannelResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#laelia.v1.Conversation">Conversation</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.AssignTaskRequest">AssignTaskRequest</h3>
         <p></p>
 
@@ -9983,6 +10047,19 @@ asks with include_closed. </p></td>
 (conversation_member_meta.joined_at). Populated by GetChannel for a user
 viewer; unset for non-user callers. Lets the channel detail page show
 &#34;joined at&#34; without an extra member lookup. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>archived</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>archived is the conversation-level archive state (conversation.archived),
+set by the channel owner via ArchiveChannel/UnarchiveChannel. An archived
+channel: is hidden from the members-page channels roster, is not returned
+to agents by ListChannelsForAgent, and rejects new messages (SendMessage /
+PostMessage) from all members. It stays in a user&#39;s left-rail chat list
+until the user closes it, and its messages remain searchable via
+SearchChatHistory. Populated by ListChannels/GetChannel/ListChannelsForAgent. </p></td>
                 </tr>
               
             </tbody>
@@ -13964,6 +14041,54 @@ the agent&#39;s processed_version for this conversation. </p></td>
 
         
       
+        <h3 id="laelia.v1.UnarchiveChannelRequest">UnarchiveChannelRequest</h3>
+        <p>UnarchiveChannel reopens an archived channel (conversation.archived = false),</p><p>restoring normal membership visibility and message posting.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UnarchiveChannelResponse">UnarchiveChannelResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#laelia.v1.Conversation">Conversation</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.UnclaimTaskRequest">UnclaimTaskRequest</h3>
         <p></p>
 
@@ -15114,6 +15239,21 @@ detail page&#39;s &#34;Chat&#34; tab. Admin-scoped: gated by laelia.agents.get.<
                 <td><a href="#laelia.v1.DeleteChannelRequest">DeleteChannelRequest</a></td>
                 <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
                 <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ArchiveChannel</td>
+                <td><a href="#laelia.v1.ArchiveChannelRequest">ArchiveChannelRequest</a></td>
+                <td><a href="#laelia.v1.ArchiveChannelResponse">ArchiveChannelResponse</a></td>
+                <td><p>ArchiveChannel marks a channel archived (conversation.archived = true).
+Only the channel owner may call it.</p></td>
+              </tr>
+            
+              <tr>
+                <td>UnarchiveChannel</td>
+                <td><a href="#laelia.v1.UnarchiveChannelRequest">UnarchiveChannelRequest</a></td>
+                <td><a href="#laelia.v1.UnarchiveChannelResponse">UnarchiveChannelResponse</a></td>
+                <td><p>UnarchiveChannel reopens an archived channel.</p></td>
               </tr>
             
               <tr>

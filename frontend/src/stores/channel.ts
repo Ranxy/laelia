@@ -9,6 +9,7 @@ import type {
 import {
   AddChannelMemberInputSchema,
   AddChannelMemberRequestSchema,
+  ArchiveChannelRequestSchema,
   CreateChannelRequestSchema,
   FetchConversationActivityRequestSchema,
   ListChannelMembersRequestSchema,
@@ -21,6 +22,7 @@ import {
   SendMessageRequestSchema,
   SetConversationClosedRequestSchema,
   SetConversationPinnedRequestSchema,
+  UnarchiveChannelRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { appendNewMessages, fetchConversationDelta, toUiMessage } from "./chat";
 import { sleep } from "./polling";
@@ -260,6 +262,35 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
     } catch {
       // reconcile from the server on failure: a failed close restores the row,
       // a failed reopen leaves it hidden.
+      void get().fetchChannels();
+    }
+  },
+
+  async setChannelArchived(conversationId, archived) {
+    const conversation = `conversations/${conversationId}`;
+    try {
+      const res = archived
+        ? await commandServiceClient.archiveChannel(
+            create(ArchiveChannelRequestSchema, { name: conversation })
+          )
+        : await commandServiceClient.unarchiveChannel(
+            create(UnarchiveChannelRequestSchema, { name: conversation })
+          );
+      const updated = res.conversation;
+      if (!updated) return;
+      set((s) => ({
+        channels: s.channels.map((c) =>
+          c.name === conversation ? updated : c
+        ),
+        // The members-page roster hides archived channels, so drop it there on
+        // archive and restore it (via a refetch for correct position) on reopen.
+        myChannels: archived
+          ? s.myChannels.filter((c) => c.name !== conversation)
+          : s.myChannels.map((c) =>
+              c.name === conversation ? updated : c
+            ),
+      }));
+    } catch {
       void get().fetchChannels();
     }
   },

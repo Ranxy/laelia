@@ -38,6 +38,11 @@ type ConversationMessage struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Version   int64
+	// Archived is the owner-level archive state (conversation.archived). An
+	// archived channel is hidden from members-page rosters and agent channel
+	// lists, and rejects new messages, but stays searchable.
+	Archived   bool
+	ArchivedAt sql.NullTime
 }
 
 // userMemberHandle resolves a user's handle ("ran-user-1") from the principal
@@ -96,7 +101,7 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 
 	var newConv ConversationMessage
 	err = tx.QueryRowContext(ctx, insertDirectConversationSQL, agentID, principalID).Scan(
-		&newConv.ID, &newConv.AgentID, &newConv.Title, &newConv.Type, &newConv.CreatedBy, &newConv.OwnerID, &newConv.CreatedAt, &newConv.UpdatedAt, &newConv.Version,
+		&newConv.ID, &newConv.AgentID, &newConv.Title, &newConv.Type, &newConv.CreatedBy, &newConv.OwnerID, &newConv.CreatedAt, &newConv.UpdatedAt, &newConv.Version, &newConv.Archived, &newConv.ArchivedAt,
 	)
 	if err != nil {
 		// ON CONFLICT DO NOTHING returns no row when another caller won the
@@ -147,7 +152,7 @@ const insertAgentDMSQL = `
 	INSERT INTO conversation (agent_id, title, type, created_by, owner_id, agent_dm_a, agent_dm_b)
 	VALUES (NULL, '', 3, $1, $1, $2, $3)
 	ON CONFLICT (agent_dm_a, agent_dm_b) WHERE type = 3 DO NOTHING
-	RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+	RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version, archived, archived_at
 `
 
 // findAgentDM looks up an existing type-3 agent-DM by the ordered agent-id
@@ -155,11 +160,11 @@ const insertAgentDMSQL = `
 func (s *Store) findAgentDM(ctx context.Context, lo, hi int) (*ConversationMessage, error) {
 	var conv ConversationMessage
 	err := s.GetDB().QueryRowContext(ctx, `
-		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version, archived, archived_at
 		FROM conversation
 		WHERE type = 3 AND agent_dm_a = $1 AND agent_dm_b = $2
 	`, lo, hi).Scan(
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -216,7 +221,7 @@ func (s *Store) GetOrCreateAgentDM(ctx context.Context, agentAID, agentBID int) 
 
 	var newConv ConversationMessage
 	err = tx.QueryRowContext(ctx, insertAgentDMSQL, common.SystemBotID, lo, hi).Scan(
-		&newConv.ID, &newConv.AgentID, &newConv.Title, &newConv.Type, &newConv.CreatedBy, &newConv.OwnerID, &newConv.CreatedAt, &newConv.UpdatedAt, &newConv.Version,
+		&newConv.ID, &newConv.AgentID, &newConv.Title, &newConv.Type, &newConv.CreatedBy, &newConv.OwnerID, &newConv.CreatedAt, &newConv.UpdatedAt, &newConv.Version, &newConv.Archived, &newConv.ArchivedAt,
 	)
 	if err != nil {
 		// ON CONFLICT DO NOTHING returns no row when another caller won the
@@ -263,7 +268,7 @@ const insertUserDMSQL = `
 	INSERT INTO conversation (agent_id, title, type, created_by, owner_id, user_dm_a, user_dm_b)
 	VALUES (NULL, '', 4, $1, $1, $2, $3)
 	ON CONFLICT (user_dm_a, user_dm_b) WHERE type = 4 DO NOTHING
-	RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+	RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version, archived, archived_at
 `
 
 // findUserDM looks up an existing type-4 user-DM by the ordered principal-id
@@ -271,11 +276,11 @@ const insertUserDMSQL = `
 func (s *Store) findUserDM(ctx context.Context, lo, hi int) (*ConversationMessage, error) {
 	var conv ConversationMessage
 	err := s.GetDB().QueryRowContext(ctx, `
-		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version, archived, archived_at
 		FROM conversation
 		WHERE type = 4 AND user_dm_a = $1 AND user_dm_b = $2
 	`, lo, hi).Scan(
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -326,7 +331,7 @@ func (s *Store) GetOrCreateUserUserDM(ctx context.Context, callerID, peerID int)
 
 	var newConv ConversationMessage
 	err = tx.QueryRowContext(ctx, insertUserDMSQL, callerID, lo, hi).Scan(
-		&newConv.ID, &newConv.AgentID, &newConv.Title, &newConv.Type, &newConv.CreatedBy, &newConv.OwnerID, &newConv.CreatedAt, &newConv.UpdatedAt, &newConv.Version,
+		&newConv.ID, &newConv.AgentID, &newConv.Title, &newConv.Type, &newConv.CreatedBy, &newConv.OwnerID, &newConv.CreatedAt, &newConv.UpdatedAt, &newConv.Version, &newConv.Archived, &newConv.ArchivedAt,
 	)
 	if err != nil {
 		// ON CONFLICT DO NOTHING returns no row when another caller won the
@@ -370,11 +375,11 @@ func (s *Store) GetOrCreateUserUserDM(ctx context.Context, callerID, peerID int)
 func (s *Store) FindChannelByTitle(ctx context.Context, title string) (*ConversationMessage, error) {
 	var conv ConversationMessage
 	err := s.GetDB().QueryRowContext(ctx, `
-		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version, archived, archived_at
 		FROM conversation
 		WHERE type = 2 AND title = $1
 	`, title).Scan(
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -388,11 +393,11 @@ func (s *Store) FindChannelByTitle(ctx context.Context, title string) (*Conversa
 func (s *Store) GetConversation(ctx context.Context, id uuid.UUID) (*ConversationMessage, error) {
 	var conv ConversationMessage
 	err := s.GetDB().QueryRowContext(ctx, `
-		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version, archived, archived_at
 		FROM conversation
 		WHERE id = $1
 	`, id).Scan(
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -414,9 +419,9 @@ func (s *Store) CreateChannel(ctx context.Context, title string, ownerID int) (*
 	err = tx.QueryRowContext(ctx, `
 		INSERT INTO conversation (title, type, created_by, owner_id)
 		VALUES ($1, 2, $2, $2)
-		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version, archived, archived_at
 	`, title, ownerID).Scan(
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create channel")
@@ -450,15 +455,39 @@ func (s *Store) UpdateChannel(ctx context.Context, id uuid.UUID, title string) (
 	err := s.GetDB().QueryRowContext(ctx, `
 		UPDATE conversation SET title = $1, updated_at = now()
 		WHERE id = $2
-		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version, archived, archived_at
 	`, title, id).Scan(
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.Errorf("conversation %s not found", id)
 		}
 		return nil, errors.Wrapf(err, "failed to update channel")
+	}
+	return &conv, nil
+}
+
+// SetConversationArchived sets (or clears) the owner-level archive flag on a
+// conversation. When archiving (archived=true) the archived_at timestamp is
+// recorded; when unarchiving it is cleared. Returns the updated conversation.
+func (s *Store) SetConversationArchived(ctx context.Context, id uuid.UUID, archived bool) (*ConversationMessage, error) {
+	var conv ConversationMessage
+	err := s.GetDB().QueryRowContext(ctx, `
+		UPDATE conversation
+		SET archived = $1,
+		    archived_at = CASE WHEN $1 THEN now() ELSE NULL END,
+		    updated_at = now()
+		WHERE id = $2
+		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version, archived, archived_at
+	`, archived, id).Scan(
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Errorf("conversation %s not found", id)
+		}
+		return nil, errors.Wrapf(err, "failed to set conversation archived")
 	}
 	return &conv, nil
 }
@@ -477,7 +506,7 @@ func (s *Store) ListUserConversations(ctx context.Context, principalID int, limi
 		return nil, err
 	}
 	rows, err := s.GetDB().QueryContext(ctx, `
-		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version
+		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version, c.archived, c.archived_at
 		FROM conversation c
 		JOIN conversation_member_meta cm ON cm.conversation_id = c.id
 		WHERE cm.member_type = $1 AND cm.member_id = $2
@@ -492,7 +521,7 @@ func (s *Store) ListUserConversations(ctx context.Context, principalID int, limi
 	var convs []*ConversationMessage
 	for rows.Next() {
 		var conv ConversationMessage
-		if err := rows.Scan(&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version); err != nil {
+		if err := rows.Scan(&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan conversation")
 		}
 		convs = append(convs, &conv)
@@ -543,7 +572,7 @@ type UserConversation struct {
 // lock in the thread-scoping (thread_root_message_id IS NULL) and the preview
 // join without a live database.
 const listUserConversationsWithUnreadSQL = `
-		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version,
+		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version, c.archived, c.archived_at,
 		       COALESCE((
 		         SELECT count(*)::int
 		         FROM chat_message m
@@ -608,7 +637,7 @@ func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID
 		var lmAttachments []byte
 		var lmCreatedAt sql.NullTime
 		if err := rows.Scan(
-			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt,
 			&uc.UnreadCount,
 			&uc.Pinned, &uc.PinnedAt, &uc.Closed,
 			&lmContent, &lmAttachments, &lmCreatedAt, &lmSender, &lmPrincipalID,
@@ -672,10 +701,10 @@ func attachmentListPreview(attachments []*v1pb.Attachment) string {
 func (s *Store) ListAgentConversations(ctx context.Context, agentResourceID string, viewer *ConversationMemberFilter, limit, offset int) ([]*UserConversation, error) {
 	args := []any{MemberTypeAgent, agentResourceID}
 	query := `
-		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version
+		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version, c.archived, c.archived_at
 		FROM conversation c
 		JOIN conversation_member_meta cm ON cm.conversation_id = c.id
-		WHERE cm.member_type = $1 AND cm.member_id = $2`
+		WHERE cm.member_type = $1 AND cm.member_id = $2 AND c.archived = false`
 	if viewer != nil {
 		query += ` AND EXISTS (SELECT 1 FROM conversation_member_meta cmv WHERE cmv.conversation_id = c.id AND cmv.member_type = $3 AND cmv.member_id = $4)`
 		args = append(args, viewer.MemberType, viewer.MemberID)
@@ -694,7 +723,7 @@ func (s *Store) ListAgentConversations(ctx context.Context, agentResourceID stri
 		var uc UserConversation
 		conv := &uc.Conversation
 		if err := rows.Scan(
-			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan agent conversation")
 		}
@@ -731,17 +760,19 @@ func (s *Store) ListAccessibleChannels(ctx context.Context, agentResourceID stri
 	}
 	args = append(args, limit, offset)
 	query := `
-		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version,
+		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version, c.archived, c.archived_at,
 		       EXISTS (
 		         SELECT 1 FROM conversation_member_meta cm
 		         WHERE cm.conversation_id = c.id AND cm.member_type = $1 AND cm.member_id = $2
 		       )
 		FROM conversation c
-		WHERE EXISTS (
-		        SELECT 1 FROM conversation_member_meta cm
-		        WHERE cm.conversation_id = c.id AND cm.member_type = $1 AND cm.member_id = $2
-		      )
-		   OR (` + ownerClause + `)
+		WHERE (
+		        EXISTS (
+		          SELECT 1 FROM conversation_member_meta cm
+		          WHERE cm.conversation_id = c.id AND cm.member_type = $1 AND cm.member_id = $2
+		        )
+		   OR (` + ownerClause + `))
+		AND c.archived = false
 		ORDER BY c.updated_at DESC
 		LIMIT $` + itoa(len(args)-1) + ` OFFSET $` + itoa(len(args))
 
@@ -756,7 +787,7 @@ func (s *Store) ListAccessibleChannels(ctx context.Context, agentResourceID stri
 		var uc UserConversation
 		conv := &uc.Conversation
 		if err := rows.Scan(
-			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt,
 			&uc.IsMember,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan accessible channel")

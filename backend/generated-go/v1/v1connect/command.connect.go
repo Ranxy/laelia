@@ -105,6 +105,12 @@ const (
 	// CommandServiceDeleteChannelProcedure is the fully-qualified name of the CommandService's
 	// DeleteChannel RPC.
 	CommandServiceDeleteChannelProcedure = "/laelia.v1.CommandService/DeleteChannel"
+	// CommandServiceArchiveChannelProcedure is the fully-qualified name of the CommandService's
+	// ArchiveChannel RPC.
+	CommandServiceArchiveChannelProcedure = "/laelia.v1.CommandService/ArchiveChannel"
+	// CommandServiceUnarchiveChannelProcedure is the fully-qualified name of the CommandService's
+	// UnarchiveChannel RPC.
+	CommandServiceUnarchiveChannelProcedure = "/laelia.v1.CommandService/UnarchiveChannel"
 	// CommandServiceAddChannelMemberProcedure is the fully-qualified name of the CommandService's
 	// AddChannelMember RPC.
 	CommandServiceAddChannelMemberProcedure = "/laelia.v1.CommandService/AddChannelMember"
@@ -292,6 +298,11 @@ type CommandServiceClient interface {
 	GetChannel(context.Context, *connect.Request[v1.GetChannelRequest]) (*connect.Response[v1.Conversation], error)
 	UpdateChannel(context.Context, *connect.Request[v1.UpdateChannelRequest]) (*connect.Response[v1.Conversation], error)
 	DeleteChannel(context.Context, *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error)
+	// ArchiveChannel marks a channel archived (conversation.archived = true).
+	// Only the channel owner may call it.
+	ArchiveChannel(context.Context, *connect.Request[v1.ArchiveChannelRequest]) (*connect.Response[v1.ArchiveChannelResponse], error)
+	// UnarchiveChannel reopens an archived channel.
+	UnarchiveChannel(context.Context, *connect.Request[v1.UnarchiveChannelRequest]) (*connect.Response[v1.UnarchiveChannelResponse], error)
 	AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.AddChannelMemberResponse], error)
 	RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error)
 	// TransferChannelOwnership hands channel ownership from the calling owner to
@@ -581,6 +592,18 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("DeleteChannel")),
 			connect.WithClientOptions(opts...),
 		),
+		archiveChannel: connect.NewClient[v1.ArchiveChannelRequest, v1.ArchiveChannelResponse](
+			httpClient,
+			baseURL+CommandServiceArchiveChannelProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ArchiveChannel")),
+			connect.WithClientOptions(opts...),
+		),
+		unarchiveChannel: connect.NewClient[v1.UnarchiveChannelRequest, v1.UnarchiveChannelResponse](
+			httpClient,
+			baseURL+CommandServiceUnarchiveChannelProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("UnarchiveChannel")),
+			connect.WithClientOptions(opts...),
+		),
 		addChannelMember: connect.NewClient[v1.AddChannelMemberRequest, v1.AddChannelMemberResponse](
 			httpClient,
 			baseURL+CommandServiceAddChannelMemberProcedure,
@@ -861,6 +884,8 @@ type commandServiceClient struct {
 	getChannel                *connect.Client[v1.GetChannelRequest, v1.Conversation]
 	updateChannel             *connect.Client[v1.UpdateChannelRequest, v1.Conversation]
 	deleteChannel             *connect.Client[v1.DeleteChannelRequest, emptypb.Empty]
+	archiveChannel            *connect.Client[v1.ArchiveChannelRequest, v1.ArchiveChannelResponse]
+	unarchiveChannel          *connect.Client[v1.UnarchiveChannelRequest, v1.UnarchiveChannelResponse]
 	addChannelMember          *connect.Client[v1.AddChannelMemberRequest, v1.AddChannelMemberResponse]
 	removeChannelMember       *connect.Client[v1.RemoveChannelMemberRequest, emptypb.Empty]
 	transferChannelOwnership  *connect.Client[v1.TransferChannelOwnershipRequest, v1.TransferChannelOwnershipResponse]
@@ -1018,6 +1043,16 @@ func (c *commandServiceClient) UpdateChannel(ctx context.Context, req *connect.R
 // DeleteChannel calls laelia.v1.CommandService.DeleteChannel.
 func (c *commandServiceClient) DeleteChannel(ctx context.Context, req *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error) {
 	return c.deleteChannel.CallUnary(ctx, req)
+}
+
+// ArchiveChannel calls laelia.v1.CommandService.ArchiveChannel.
+func (c *commandServiceClient) ArchiveChannel(ctx context.Context, req *connect.Request[v1.ArchiveChannelRequest]) (*connect.Response[v1.ArchiveChannelResponse], error) {
+	return c.archiveChannel.CallUnary(ctx, req)
+}
+
+// UnarchiveChannel calls laelia.v1.CommandService.UnarchiveChannel.
+func (c *commandServiceClient) UnarchiveChannel(ctx context.Context, req *connect.Request[v1.UnarchiveChannelRequest]) (*connect.Response[v1.UnarchiveChannelResponse], error) {
+	return c.unarchiveChannel.CallUnary(ctx, req)
 }
 
 // AddChannelMember calls laelia.v1.CommandService.AddChannelMember.
@@ -1286,6 +1321,11 @@ type CommandServiceHandler interface {
 	GetChannel(context.Context, *connect.Request[v1.GetChannelRequest]) (*connect.Response[v1.Conversation], error)
 	UpdateChannel(context.Context, *connect.Request[v1.UpdateChannelRequest]) (*connect.Response[v1.Conversation], error)
 	DeleteChannel(context.Context, *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error)
+	// ArchiveChannel marks a channel archived (conversation.archived = true).
+	// Only the channel owner may call it.
+	ArchiveChannel(context.Context, *connect.Request[v1.ArchiveChannelRequest]) (*connect.Response[v1.ArchiveChannelResponse], error)
+	// UnarchiveChannel reopens an archived channel.
+	UnarchiveChannel(context.Context, *connect.Request[v1.UnarchiveChannelRequest]) (*connect.Response[v1.UnarchiveChannelResponse], error)
 	AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.AddChannelMemberResponse], error)
 	RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error)
 	// TransferChannelOwnership hands channel ownership from the calling owner to
@@ -1569,6 +1609,18 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		CommandServiceDeleteChannelProcedure,
 		svc.DeleteChannel,
 		connect.WithSchema(commandServiceMethods.ByName("DeleteChannel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceArchiveChannelHandler := connect.NewUnaryHandler(
+		CommandServiceArchiveChannelProcedure,
+		svc.ArchiveChannel,
+		connect.WithSchema(commandServiceMethods.ByName("ArchiveChannel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceUnarchiveChannelHandler := connect.NewUnaryHandler(
+		CommandServiceUnarchiveChannelProcedure,
+		svc.UnarchiveChannel,
+		connect.WithSchema(commandServiceMethods.ByName("UnarchiveChannel")),
 		connect.WithHandlerOptions(opts...),
 	)
 	commandServiceAddChannelMemberHandler := connect.NewUnaryHandler(
@@ -1871,6 +1923,10 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceUpdateChannelHandler.ServeHTTP(w, r)
 		case CommandServiceDeleteChannelProcedure:
 			commandServiceDeleteChannelHandler.ServeHTTP(w, r)
+		case CommandServiceArchiveChannelProcedure:
+			commandServiceArchiveChannelHandler.ServeHTTP(w, r)
+		case CommandServiceUnarchiveChannelProcedure:
+			commandServiceUnarchiveChannelHandler.ServeHTTP(w, r)
 		case CommandServiceAddChannelMemberProcedure:
 			commandServiceAddChannelMemberHandler.ServeHTTP(w, r)
 		case CommandServiceRemoveChannelMemberProcedure:
@@ -2054,6 +2110,14 @@ func (UnimplementedCommandServiceHandler) UpdateChannel(context.Context, *connec
 
 func (UnimplementedCommandServiceHandler) DeleteChannel(context.Context, *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.DeleteChannel is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ArchiveChannel(context.Context, *connect.Request[v1.ArchiveChannelRequest]) (*connect.Response[v1.ArchiveChannelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ArchiveChannel is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) UnarchiveChannel(context.Context, *connect.Request[v1.UnarchiveChannelRequest]) (*connect.Response[v1.UnarchiveChannelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.UnarchiveChannel is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.AddChannelMemberResponse], error) {

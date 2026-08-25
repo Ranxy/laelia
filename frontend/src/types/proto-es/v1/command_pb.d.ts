@@ -1570,6 +1570,19 @@ export declare type Conversation = Message<"laelia.v1.Conversation"> & {
    * @generated from field: google.protobuf.Timestamp joined_at = 20;
    */
   joinedAt?: Timestamp | undefined;
+
+  /**
+   * archived is the conversation-level archive state (conversation.archived),
+   * set by the channel owner via ArchiveChannel/UnarchiveChannel. An archived
+   * channel: is hidden from the members-page channels roster, is not returned
+   * to agents by ListChannelsForAgent, and rejects new messages (SendMessage /
+   * PostMessage) from all members. It stays in a user's left-rail chat list
+   * until the user closes it, and its messages remain searchable via
+   * SearchChatHistory. Populated by ListChannels/GetChannel/ListChannelsForAgent.
+   *
+   * @generated from field: bool archived = 30;
+   */
+  archived: boolean;
 };
 
 /**
@@ -2434,6 +2447,78 @@ export declare type DeleteChannelRequest = Message<"laelia.v1.DeleteChannelReque
  * Use `create(DeleteChannelRequestSchema)` to create a new message.
  */
 export declare const DeleteChannelRequestSchema: GenMessage<DeleteChannelRequest>;
+
+/**
+ * ArchiveChannel marks a channel archived (conversation.archived = true).
+ * Only the channel owner may archive. An archived channel no longer appears in
+ * the members-page channels roster, is not listed to agents, and rejects new
+ * messages from all members, but its messages stay globally searchable.
+ *
+ * @generated from message laelia.v1.ArchiveChannelRequest
+ */
+export declare type ArchiveChannelRequest = Message<"laelia.v1.ArchiveChannelRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.ArchiveChannelRequest.
+ * Use `create(ArchiveChannelRequestSchema)` to create a new message.
+ */
+export declare const ArchiveChannelRequestSchema: GenMessage<ArchiveChannelRequest>;
+
+/**
+ * @generated from message laelia.v1.ArchiveChannelResponse
+ */
+export declare type ArchiveChannelResponse = Message<"laelia.v1.ArchiveChannelResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Conversation conversation = 1;
+   */
+  conversation?: Conversation | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ArchiveChannelResponse.
+ * Use `create(ArchiveChannelResponseSchema)` to create a new message.
+ */
+export declare const ArchiveChannelResponseSchema: GenMessage<ArchiveChannelResponse>;
+
+/**
+ * UnarchiveChannel reopens an archived channel (conversation.archived = false),
+ * restoring normal membership visibility and message posting.
+ *
+ * @generated from message laelia.v1.UnarchiveChannelRequest
+ */
+export declare type UnarchiveChannelRequest = Message<"laelia.v1.UnarchiveChannelRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.UnarchiveChannelRequest.
+ * Use `create(UnarchiveChannelRequestSchema)` to create a new message.
+ */
+export declare const UnarchiveChannelRequestSchema: GenMessage<UnarchiveChannelRequest>;
+
+/**
+ * @generated from message laelia.v1.UnarchiveChannelResponse
+ */
+export declare type UnarchiveChannelResponse = Message<"laelia.v1.UnarchiveChannelResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Conversation conversation = 1;
+   */
+  conversation?: Conversation | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.UnarchiveChannelResponse.
+ * Use `create(UnarchiveChannelResponseSchema)` to create a new message.
+ */
+export declare const UnarchiveChannelResponseSchema: GenMessage<UnarchiveChannelResponse>;
 
 /**
  * @generated from message laelia.v1.AddChannelMemberInput
@@ -5983,6 +6068,27 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof DeleteChannelRequestSchema;
     output: typeof EmptySchema;
+  },
+  /**
+   * ArchiveChannel marks a channel archived (conversation.archived = true).
+   * Only the channel owner may call it.
+   *
+   * @generated from rpc laelia.v1.CommandService.ArchiveChannel
+   */
+  archiveChannel: {
+    methodKind: "unary";
+    input: typeof ArchiveChannelRequestSchema;
+    output: typeof ArchiveChannelResponseSchema;
+  },
+  /**
+   * UnarchiveChannel reopens an archived channel.
+   *
+   * @generated from rpc laelia.v1.CommandService.UnarchiveChannel
+   */
+  unarchiveChannel: {
+    methodKind: "unary";
+    input: typeof UnarchiveChannelRequestSchema;
+    output: typeof UnarchiveChannelResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.CommandService.AddChannelMember

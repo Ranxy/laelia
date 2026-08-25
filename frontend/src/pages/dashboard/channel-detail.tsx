@@ -1,4 +1,4 @@
-import { ArrowLeft, Hash, Loader2, MessageSquare, Users } from "lucide-react";
+import { ArrowLeft, Archive, ArchiveRestore, Hash, Loader2, MessageSquare, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -21,6 +21,7 @@ export function ChannelDetailPage() {
   const { channelId } = useParams<{ channelId: string }>();
   const currentUser = useAppStore((s) => s.currentUser);
   const setConversationClosed = useAppStore((s) => s.setConversationClosed);
+  const setChannelArchived = useAppStore((s) => s.setChannelArchived);
   const myChannels = useAppStore((s) => s.myChannels);
   const conversationName = `conversations/${channelId ?? ""}`;
 
@@ -57,6 +58,18 @@ export function ChannelDetailPage() {
     !!conv && !!currentUser?.handle && conv.ownerId === currentUser.handle;
 
   const [startingChat, setStartingChat] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+
+  const handleArchiveToggle = async () => {
+    if (!channelId || !conv) return;
+    setArchiving(true);
+    try {
+      await setChannelArchived(channelId, !conv.archived);
+      setChannel({ ...conv, archived: !conv.archived });
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   const handleMessage = async () => {
     if (!channelId) return;
@@ -103,6 +116,31 @@ export function ChannelDetailPage() {
           )}
           {t("members.message-channel")}
         </Button>
+        {isOwner && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void handleArchiveToggle()}
+            disabled={archiving}
+            className="hidden shrink-0 lg:inline-flex"
+            title={
+              conv?.archived
+                ? t("members.unarchive-channel")
+                : t("members.archive-channel")
+            }
+          >
+            {archiving ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : conv?.archived ? (
+              <ArchiveRestore className="size-4" />
+            ) : (
+              <Archive className="size-4" />
+            )}
+            {conv?.archived
+              ? t("members.unarchive-channel")
+              : t("members.archive-channel")}
+          </Button>
+        )}
       </div>
 
       {/* Mobile send-message FAB: replaces the header Message button on touch

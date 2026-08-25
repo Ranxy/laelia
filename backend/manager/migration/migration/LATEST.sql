@@ -441,7 +441,9 @@ CREATE TABLE conversation (
     title TEXT NOT NULL DEFAULT '',
     type SMALLINT NOT NULL DEFAULT 1,
     created_by INTEGER NOT NULL REFERENCES principal(id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    archived BOOLEAN NOT NULL DEFAULT false,
+    archived_at TIMESTAMPTZ
 );
 
 CREATE UNIQUE INDEX idx_conversation_agent_principal ON conversation(agent_id, created_by, type);
@@ -1075,3 +1077,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_team_member_agent
 ALTER TABLE task ADD COLUMN IF NOT EXISTS assignee_team_id UUID REFERENCES agent_team(id) ON DELETE SET NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_task_team_active
     ON task(assignee_team_id) WHERE assignee_team_id IS NOT NULL AND status IN (1,2,3);
+
+ALTER TABLE conversation ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE conversation ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_conversation_archived ON conversation(archived) WHERE archived = true;
