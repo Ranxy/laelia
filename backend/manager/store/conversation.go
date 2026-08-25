@@ -68,7 +68,7 @@ const insertDirectConversationSQL = `
 	INSERT INTO conversation (agent_id, title, type, created_by, owner_id)
 	VALUES ($1, '', 1, $2, $2)
 	ON CONFLICT (agent_id, created_by) WHERE type = 1 DO NOTHING
-	RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+	RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version, archived, archived_at
 `
 
 func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, principalID int) (*ConversationMessage, error) {

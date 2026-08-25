@@ -421,7 +421,7 @@ func (s *Store) TransferChannelOwnership(ctx context.Context, convID uuid.UUID, 
 func (s *Store) findDirectConversation(ctx context.Context, userHandle, agentResourceID string) (*ConversationMessage, error) {
 	var conv ConversationMessage
 	err := s.GetDB().QueryRowContext(ctx, `
-		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version
+		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version, c.archived, c.archived_at
 		FROM conversation c
 		WHERE c.id IN (
 			SELECT cmu.conversation_id
@@ -435,7 +435,7 @@ func (s *Store) findDirectConversation(ctx context.Context, userHandle, agentRes
 		AND c.type = 1
 		LIMIT 1
 	`, MemberTypeUser, userHandle, MemberTypeAgent, agentResourceID).Scan(
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

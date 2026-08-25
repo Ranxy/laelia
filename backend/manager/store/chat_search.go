@@ -235,7 +235,7 @@ WHERE mf.conversation_id = cm.conversation_id
 
 	query := fmt.Sprintf(`
 %sSELECT `+chatMessageColumns+`,
-       c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version,
+       c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version, c.archived, c.archived_at,
        cm.search_text, %s, %s
 FROM chat_message cm
 JOIN principal p ON p.id = cm.principal_id
@@ -305,7 +305,7 @@ func scanChatSearchResultRow(row interface {
 		&msg.SenderAgentID, &msg.AgentResourceID, &msg.AgentName,
 		&msg.Role, &msg.Content, &msg.CommandID, &msg.CreatedAt, &msg.RoomVersion, &msg.SenderType,
 		&mentionsBytes, &attachmentsBytes, &msg.ThreadRootMessageID, &msg.PrincipalHandle,
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt,
 		&searchText, &matchField, &matchedAttachmentName,
 	); err != nil {
 		return nil, errors.Wrapf(err, "failed to scan chat search result")
