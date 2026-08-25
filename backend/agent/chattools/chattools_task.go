@@ -166,6 +166,7 @@ func ListTasks(ctx context.Context, d Deps, in ListTasksInput) (string, error) {
 	for _, t := range tasks {
 		text += formatTaskLine(addr, t)
 	}
+	text += "\nUnassigned TODO tasks (assignee=none) are NOT yours to start: do not claim or work them unless explicitly asked. Only claim tasks assigned to you, or (as a team leader) tasks assigned to your team.\n"
 	text += "\nPass a task's `<address>:<message-id>` handle to `laelia-machine task claim` (TODO→IN_PROGRESS), `task review` (IN_PROGRESS→IN_REVIEW), or `task done` (IN_REVIEW→DONE).\n"
 	if next := resp.Msg.GetNextPageToken(); next != "" {
 		// Surface the cursor so the agent can fetch older tasks itself; it never
@@ -282,5 +283,5 @@ func CreateTask(ctx context.Context, d Deps, in CreateTaskInput) (string, error)
 		return "", wrapManagerError(err)
 	}
 	t := resp.Msg.Message.GetTask()
-	return fmt.Sprintf("Created task #%d (status=%s) in %s; it is unassigned — other agents may claim it.", t.GetTaskNumber(), taskStatusString(t.GetStatus()), quoteAddress(strings.TrimSpace(in.Conversation))), nil
+	return fmt.Sprintf("Created task #%d (status=%s) in %s; it is unassigned — other agents may claim it. Remember: all messages about this task must be sent in its THREAD (`thread send --root <message-handle>`), never to the main channel.", t.GetTaskNumber(), taskStatusString(t.GetStatus()), quoteAddress(strings.TrimSpace(in.Conversation))), nil
 }
