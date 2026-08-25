@@ -62,7 +62,7 @@
 
 ## 4. 构建脚本 `scripts/build_test_server.sh`
 
-只构建 manager（前端内嵌），产物进共享缓存。
+只构建 manager（前端内嵌），产物进按 worktree 隔离的缓存（`$CACHE_DIR/worktrees/<worktree-id>/`），保证每个 git worktree 都由自己的最新代码构建。
 
 ```bash
 #!/usr/bin/env bash

@@ -1,11 +1,14 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -38,10 +41,18 @@ func defaultCacheDir() string {
 	return filepath.Join(home, ".cache", "laelia-test")
 }
 
-// defaultBinaryPath returns the path of the built laelia manager binary in the
-// shared cache.
-func defaultBinaryPath(cacheDir string) string {
-	return filepath.Join(cacheDir, "laelia")
+// worktreeID returns a stable per-worktree id derived from the absolute repo
+// root path. It must match scripts/build_init.sh's worktree_id so the Go
+// launcher and the build script agree on where artifacts live.
+func worktreeID(repo string) string {
+	sum := sha256.Sum256([]byte(repo))
+	return hex.EncodeToString(sum[:8])
+}
+
+// worktreeBinaryPath returns the per-worktree path of the built laelia manager
+// binary. Different git worktrees never share or clobber each other's builds.
+func worktreeBinaryPath(cacheDir, repo string) string {
+	return filepath.Join(cacheDir, "worktrees", worktreeID(repo), "laelia")
 }
 
 // randomPassword returns a random alphanumeric string of the given length.
@@ -85,4 +96,34 @@ func portOpen(port int) bool {
 	}
 	_ = conn.Close()
 	return true
+}
+
+// pgPasswordPath returns the file where the per-workdir postgres password is
+// persisted. Reusing the same password across restarts is required because the
+// embedded postgres data directory is reused (not re-initialized) on subsequent
+// starts; a fresh random password would no longer match the existing cluster.
+func pgPasswordPath(workdir string) string {
+	return filepath.Join(workdir, "pgpassword")
+}
+
+// loadOrCreatePGPassword reads the persisted postgres password for this
+// workdir, or generates and persists a new one on first use.
+func loadOrCreatePGPassword(workdir string) (string, error) {
+	p := pgPasswordPath(workdir)
+	if b, err := os.ReadFile(p); err == nil {
+		if pw := strings.TrimSpace(string(b)); pw != "" {
+			return pw, nil
+		}
+	}
+	pw := randomPassword(24)
+	if err := os.WriteFile(p, []byte(pw+"\n"), 0o600); err != nil {
+		return "", fmt.Errorf("failed to persist postgres password: %w", err)
+	}
+	return pw, nil
+}
+
+// dirExists reports whether path exists and is a directory.
+func dirExists(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && info.IsDir()
 }

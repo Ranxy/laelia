@@ -51,15 +51,16 @@ rm -rf /tmp/laelia-test-1
 
 ## 架构
 
-- **构建**：`scripts/build_test_server.sh` 只构建 manager（前端内嵌），产物进共享缓存（默认 `~/.cache/laelia-test/`），用 flock 串行化并发构建 + git stamp 跳过重复构建。
+- **构建**：`scripts/build_test_server.sh` 只构建 manager（前端内嵌），产物进入**按 worktree 隔离的缓存**（默认 `~/.cache/laelia-test/worktrees/<worktree-id>/`），用 flock 串行化并发构建 + 基于源码指纹的 stamp 跳过重复构建。
 - **启动器**：`tools/testserver/`（独立 Go module，`replace` 指向主模块），负责嵌入式 PG、服务拉起、就绪轮询、种子写入、优雅停机。
-- **数据库**：嵌入式 PostgreSQL（`github.com/fergusstrange/embedded-postgres`），数据目录在 `workdir/pgdata`，二进制下载到共享缓存 `<cache>/pg`。
+- **数据库**：嵌入式 PostgreSQL（`github.com/fergusstrange/embedded-postgres`），数据目录在 `workdir/pgdata`，二进制下载到共享缓存 `<cache>/pg`。PG 密码持久化在 `workdir/pgpassword`，重启同一 workdir 时复用同一密码，避免因数据目录复用导致认证失败。
 - **种子数据**：复用 `store` 包创建 admin/alice/bob 三个用户，并把 admin 绑定为 `workspaceAdmin`。
 
 ## 并发与隔离
 
 - 每个实例独立 `workdir`、独立 PG 实例（独立数据目录 + 独立端口）、独立 HTTP 端口。
-- 构建产物共享缓存，构建后只读复用；并发构建由 flock 串行化。
+- 构建产物按 git worktree 隔离：每个 worktree 有独立的 `laelia` 二进制和 stamp，多个 agent 在多个 worktree 中启动互不覆盖。
+- 构建 stamp 包含当前 worktree 的源码指纹（HEAD、已暂存/未暂存 diff、未跟踪文件），因此**当前 worktree 启动的服务一定由当前最新代码构建**；未提交的改动也会触发重新构建。
 - 删除 `workdir` 即清理全部运行时状态。
 
 ## 注意事项

@@ -23,7 +23,7 @@ Run options:
   --build             force rebuild of the laelia binary
   --keep              keep postgres data on exit (debugging)
   --cache <dir>       shared cache dir (default LAELIA_TEST_CACHE or ~/.cache/laelia-test)
-  --binary <path>     path to the laelia binary
+  --binary <path>     path to the laelia binary (default: per-worktree cache entry)
   --admin-email <e>   admin email (default admin@laelia.test)
   --admin-password <p> admin password (default admin1234)
 `)

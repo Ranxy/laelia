@@ -10,11 +10,16 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 . ./scripts/build_init.sh
 
 CACHE_DIR="${LAELIA_TEST_CACHE:-$HOME/.cache/laelia-test}"
-BIN="$CACHE_DIR/laelia"
-STAMP="$CACHE_DIR/build.stamp"
+# Per-worktree artifacts: the binary and stamp live under
+# $CACHE_DIR/worktrees/<worktree-id>/ so multiple git worktrees never share or
+# clobber each other's builds.
+WORKTREE_ID="$(worktree_id)"
+WORKTREE_CACHE="$CACHE_DIR/worktrees/$WORKTREE_ID"
+BIN="$WORKTREE_CACHE/laelia"
+STAMP="$WORKTREE_CACHE/build.stamp"
 RELEASE="${RELEASE:-false}"
 FORCE=0
-mkdir -p "$CACHE_DIR"
+mkdir -p "$CACHE_DIR" "$WORKTREE_CACHE"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -56,13 +61,26 @@ flock 9
 
 # build-info-v3 invalidates caches produced before the manager binary started
 # embedding version/git commit/build time; the release flag is part of the
-# stamp so dev and release artifacts never share a cache entry.
-BUILD_STAMP="${GIT_COMMIT}|${VERSION}|${RELEASE}|build-info-v3"
+# stamp so dev and release artifacts never share a cache entry. The worktree
+# fingerprint additionally captures uncommitted/untracked source changes so a
+# per-worktree cache is only reused when the current code is truly unchanged.
+BUILD_STAMP="${GIT_COMMIT}|${VERSION}|${RELEASE}|$(worktree_fingerprint)|build-info-v3"
 if [[ -f "$BIN" && -f "$STAMP" && "$(cat "$STAMP")" == "$BUILD_STAMP" && "${FORCE}" -ne 1 ]]; then
-  echo "laelia already built ($GIT_COMMIT, ${RELEASE}); skipping."
+  if [[ "${RELEASE}" == "true" ]]; then
+    MODE="release"
+  else
+    MODE="dev"
+  fi
+  echo "laelia already built and matches current worktree source (git commit ${GIT_COMMIT}, ${MODE} mode, including any uncommitted changes); skipping."
   exit 0
 fi
 
+if [[ "${RELEASE}" == "true" ]]; then
+  MODE="release"
+else
+  MODE="dev"
+fi
+echo "Building laelia from current worktree source (git commit ${GIT_COMMIT}, ${MODE} mode, including any uncommitted changes)..."
 echo "Building frontend..."
 rm -rf backend/manager/server/dist
 pnpm --dir frontend i --frozen-lockfile

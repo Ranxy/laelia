@@ -40,7 +40,7 @@ func runCmd(args []string) int {
 	fs.BoolVar(&opts.build, "build", false, "force rebuild of the laelia binary")
 	fs.BoolVar(&opts.keep, "keep", false, "keep postgres data on exit (for debugging)")
 	fs.StringVar(&opts.cache, "cache", "", "shared cache dir (default: LAELIA_TEST_CACHE or ~/.cache/laelia-test)")
-	fs.StringVar(&opts.binary, "binary", "", "path to the laelia binary (default: <cache>/laelia)")
+	fs.StringVar(&opts.binary, "binary", "", "path to the laelia binary (default: per-worktree cache entry)")
 	fs.StringVar(&opts.adminEmail, "admin-email", "admin@laelia.test", "admin email")
 	fs.StringVar(&opts.adminPassword, "admin-password", "admin1234", "admin password")
 	if err := fs.Parse(args); err != nil {
@@ -59,8 +59,21 @@ func runCmd(args []string) int {
 	if opts.cache == "" {
 		opts.cache = defaultCacheDir()
 	}
+	// Normalize the repo root so the per-worktree cache id is stable and
+	// matches the one computed by scripts/build_init.sh.
+	if opts.repo == "" {
+		if cwd, err := os.Getwd(); err == nil {
+			opts.repo = cwd
+		}
+	}
+	if opts.repo != "" {
+		if abs, err := filepath.Abs(opts.repo); err == nil {
+			opts.repo = abs
+		}
+	}
+	explicitBinary := opts.binary != ""
 	if opts.binary == "" {
-		opts.binary = defaultBinaryPath(opts.cache)
+		opts.binary = worktreeBinaryPath(opts.cache, opts.repo)
 	}
 
 	if err := os.MkdirAll(filepath.Join(opts.workdir, "logs"), 0o755); err != nil {
@@ -72,8 +85,18 @@ func runCmd(args []string) int {
 		return 1
 	}
 
-	// Ensure the laelia binary exists (build if requested or missing).
-	if opts.build || !fileExists(opts.binary) {
+	// For the default per-worktree binary we always run the build script: it
+	// fast-skips when the source fingerprint is unchanged, and rebuilds when
+	// the current worktree code has changed (including uncommitted edits). An
+	// explicitly supplied --binary is only built when missing or --build.
+	if explicitBinary {
+		if opts.build || !fileExists(opts.binary) {
+			if err := buildBinary(opts); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return 1
+			}
+		}
+	} else {
 		if err := buildBinary(opts); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
@@ -96,7 +119,24 @@ func runCmd(args []string) int {
 		}
 	}
 
-	pgPassword := randomPassword(24)
+	// Reuse the persisted postgres password for this workdir. The embedded PG
+	// data directory is reused across restarts, so the password must stay the
+	// same or the new instance cannot authenticate against the existing data.
+	hadPassword := fileExists(pgPasswordPath(opts.workdir))
+	pgPassword, err := loadOrCreatePGPassword(opts.workdir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	// If an existing data directory was created by an older version that did
+	// not persist a password, wipe it so the new password is used for a fresh
+	// initdb instead of failing authentication on reuse.
+	if !hadPassword && dirExists(filepath.Join(opts.workdir, "pgdata")) {
+		if err := os.RemoveAll(filepath.Join(opts.workdir, "pgdata")); err != nil {
+			fmt.Fprintf(os.Stderr, "error: failed to reset stale pgdata: %v\n", err)
+			return 1
+		}
+	}
 	pgCfg := pgConfig{workdir: opts.workdir, cacheDir: opts.cache, port: opts.pgPort, password: pgPassword}
 
 	// Start embedded postgres.
@@ -200,7 +240,13 @@ func buildBinary(opts *runOptions) error {
 		return fmt.Errorf("cannot locate repo root; pass --repo or set LAELIA_TEST_REPO")
 	}
 	script := filepath.Join(repo, "scripts", "build_test_server.sh")
-	cmd := exec.Command("bash", script)
+	args := []string{script}
+	if opts.build {
+		// --build means the user explicitly wants a fresh build; forward
+		// --force so the build script does not skip due to a matching stamp.
+		args = append(args, "--force")
+	}
+	cmd := exec.Command("bash", args...)
 	cmd.Env = append(os.Environ(), "LAELIA_TEST_CACHE="+opts.cache)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
