@@ -244,6 +244,16 @@ func (s *CommandService) ClaimTask(ctx context.Context, req *connect.Request[v1p
 	if err := s.store.AddThreadParticipants(ctx, msgID, []int{agent.ID}); err != nil {
 		slog.Warn("failed to subscribe claiming agent to task thread", "rootID", msgID, "error", err)
 	}
+
+	// When a team leader claims a team-assigned task, re-post the team
+	// instruction into the task thread so the leader immediately sees the team
+	// composition, member responsibilities, and the expectation to split and
+	// delegate the work.
+	if current.TaskInfo != nil && current.TaskInfo.AssigneeType == 3 && msg.TaskInfo != nil && msg.TaskInfo.AssigneeTeamID != "" {
+		if team, teamErr := s.store.GetAgentTeamByResourceID(ctx, msg.TaskInfo.AssigneeTeamID); teamErr == nil && team != nil {
+			s.postTeamAssignmentMessage(ctx, convID, msgID, team, msg)
+		}
+	}
 	s.postTaskSystemNotification(ctx, convID, fmt.Sprintf("🙋 %s claimed task #%d %q", agent.Name, msg.TaskInfo.TaskNumber, truncateContent(msg.Content)))
 
 	return connect.NewResponse(&v1pb.ClaimTaskResponse{Message: storeToV1ChatMessage(msg)}), nil
@@ -350,6 +360,7 @@ func (s *CommandService) AssignTask(ctx context.Context, req *connect.Request[v1
 			return nil, err
 		}
 	}
+
 	s.postTaskSystemNotification(ctx, convID, fmt.Sprintf("👤 %s assigned task #%d to %s", resolveActorName(ctx), msg.TaskInfo.TaskNumber, msg.TaskInfo.AssigneeName))
 	return connect.NewResponse(&v1pb.AssignTaskResponse{Message: storeToV1ChatMessage(msg)}), nil
 }
@@ -417,30 +428,44 @@ func (s *CommandService) afterTeamAssign(ctx context.Context, convID, msgID uuid
 	// Write the team instruction as an AGENT message (not SYSTEM) so it is a
 	// real wake signal: agent wake routing deliberately excludes SYSTEM rows.
 	// Using the leader as the sender keeps the message attributable to the
+	// Write the team instruction as an AGENT message (not SYSTEM) so it is a
+	// real wake signal: agent wake routing deliberately excludes SYSTEM rows.
+	// Using the leader as the sender keeps the message attributable to the
 	// team lead, which is the natural actor for a team assignment.
-	content := buildTeamAssignmentMessage(team, msg)
-	if content != "" {
-		leader := teamLeaderMember(team)
-		if leader != nil {
-			if _, _, err := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
-				ConversationID:      convID,
-				PrincipalID:         1,
-				PrincipalHandle:     common.SystemBotHandle,
-				Role:                2,
-				Content:             content,
-				SenderType:          store.SenderTypeAgent,
-				SenderAgentID:       sql.NullInt32{Int32: int32(leader.AgentID), Valid: true},
-				AgentResourceID:     leader.AgentResourceID,
-				AgentName:           leader.AgentResourceID,
-				ThreadRootMessageID: uuid.NullUUID{UUID: msgID, Valid: true},
-			}); err != nil {
-				slog.Warn("failed to post team assignment message", "conversationID", convID, "rootID", msgID, "error", err)
-			}
-		}
-	}
+	s.postTeamAssignmentMessage(ctx, convID, msgID, team, msg)
+
 	// Wake all team agents so they discover the assignment.
 	s.notifyConversationAgents(ctx, convID, 0, nil)
 	return nil
+}
+
+// postTeamAssignmentMessage writes the team instruction into the task thread
+// using the leader's agent identity. It is called both when a team is assigned
+// and when the leader claims the task, so the leader always sees the team
+// composition and responsibilities right where the work happens.
+func (s *CommandService) postTeamAssignmentMessage(ctx context.Context, convID, msgID uuid.UUID, team *store.AgentTeamMessage, msg *store.ChatMessage) {
+	content := buildTeamAssignmentMessage(team, msg)
+	if content == "" {
+		return
+	}
+	leader := teamLeaderMember(team)
+	if leader == nil {
+		return
+	}
+	if _, _, err := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
+		ConversationID:      convID,
+		PrincipalID:         1,
+		PrincipalHandle:     common.SystemBotHandle,
+		Role:                2,
+		Content:             content,
+		SenderType:          store.SenderTypeAgent,
+		SenderAgentID:       sql.NullInt32{Int32: int32(leader.AgentID), Valid: true},
+		AgentResourceID:     leader.AgentResourceID,
+		AgentName:           leader.AgentResourceID,
+		ThreadRootMessageID: uuid.NullUUID{UUID: msgID, Valid: true},
+	}); err != nil {
+		slog.Warn("failed to post team assignment message", "conversationID", convID, "rootID", msgID, "error", err)
+	}
 }
 
 // buildTeamAssignmentMessage renders the system message posted into a task

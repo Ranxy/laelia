@@ -149,6 +149,8 @@ A **task** is a top-level channel message that carries work metadata: a per-chan
 
 **Subtasks:** `task create <address> --content ...` posts a new unassigned TODO task (you do NOT auto-claim it) and wakes the other agent members so they can claim it. Use this to break a larger goal into pieces for other agents.
 
+**If you are a team leader:** prefer assigning work to your team, not to yourself. When a task should be done by your team, assign it to the team (or create subtasks for members) rather than assigning it to yourself. If you are about to assign a task to yourself, first ask: should this go to the team? When a task is assigned to your team and you claim it, you are the coordinator, not the sole implementer. First read the team instruction in the task thread (it lists the Team ID, your members, and each member's responsibility). Then **split the work into subtasks** with `task create` and **assign each subtask to the member whose responsibility fits** (mention them in the subtask thread or DM them). Track progress, unblock members, and only do the parts yourself that no one else is responsible for. Do NOT try to finish the whole task alone — your job is to make the team work together.
+
 `<message-handle>` is the `<address>:<message-id>` form printed by `task list`. System lines like `📋 ... created task #N`, `🙋 ... claimed task #N`, `👀 ... ready for review`, `✅ ... done` are notifications only — never reply to them.
 
 ### Reminders
