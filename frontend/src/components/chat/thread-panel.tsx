@@ -89,6 +89,8 @@ const ThreadReplies = memo(function ThreadReplies({
   debugMode,
   currentPrincipalId,
   onSenderClick,
+  onCopyMarkdown,
+  onConvertToTask,
   scrollRoot,
 }: {
   replies: ChatMessageUI[];
@@ -106,6 +108,8 @@ const ThreadReplies = memo(function ThreadReplies({
   currentPrincipalId?: string;
   mentionLabel?: (handle: string) => string | undefined;
   onSenderClick?: (type: "user" | "agent", id: string, name: string) => void;
+  onCopyMarkdown?: (content: string) => void;
+  onConvertToTask?: (msg: ChatMessageUI) => void;
   scrollRoot?: RefObject<HTMLDivElement | null>;
 }) {
   const { t } = useTranslation();
@@ -147,6 +151,11 @@ const ThreadReplies = memo(function ThreadReplies({
               debugMode={debugMode}
               currentPrincipalId={currentPrincipalId}
               scrollRoot={scrollRoot}
+              onCopyMarkdown={onCopyMarkdown}
+              onConvertToTask={onConvertToTask}
+              // In a thread, opening a thread from a reply is meaningless, so
+              // hide the context-menu "Open thread" entry on every row.
+              contextMenuRootOnly
               // Small threads render markdown synchronously to avoid the
               // per-row fallback→swap flash on open; large threads keep the
               // lazy gate so off-screen replies stay cheap.
@@ -224,6 +233,7 @@ export function ThreadPanel({
   const agents = useAppStore((s) => s.agents);
   const openImagePreview = useAppStore((s) => s.openImagePreview);
   const currentUser = useAppStore((s) => s.currentUser);
+  const convertMessageToTask = useAppStore((s) => s.convertMessageToTask);
   // Per-user chat keybinding (see chat-conversation.tsx for rationale).
   const enterToSend = currentUser?.chatPreferences?.enterToSend ?? true;
   const navigate = useNavigate();
@@ -666,6 +676,51 @@ export function ThreadPanel({
     []
   );
 
+  // Right-click "Copy markdown" (shared with main chat): copy the raw
+  // markdown body and surface a success/error toast.
+  const handleCopyMarkdown = useCallback(
+    async (content: string) => {
+      try {
+        await navigator.clipboard.writeText(content);
+        toastManager.add({
+          type: "success",
+          title: t("chat.copy-markdown-success"),
+        });
+      } catch {
+        toastManager.add({
+          type: "error",
+          title: t("chat.copy-markdown-error"),
+        });
+      }
+    },
+    [t]
+  );
+
+  // Right-click "Convert to task" (shared with main chat): turn a root,
+  // non-task message into a channel task. msg.id is the full resource name
+  // ("conversations/c/messages/m"), so strip it to the bare id the store
+  // action expects. Replies already carry a threadRoot, so the context menu
+  // only offers this on the thread's root message.
+  const handleConvertToTask = useCallback(
+    async (msg: ChatMessageUI) => {
+      if (!channelId) return;
+      const messageId = msg.id.split("/").pop() ?? msg.id;
+      try {
+        await convertMessageToTask(channelId, messageId);
+        toastManager.add({
+          type: "success",
+          title: t("channelTask.convert-success"),
+        });
+      } catch {
+        toastManager.add({
+          type: "error",
+          title: t("channelTask.convert-error"),
+        });
+      }
+    },
+    [channelId, convertMessageToTask, t]
+  );
+
   if (loading && !rootMsg) {
     return (
       <aside
@@ -752,6 +807,11 @@ export function ThreadPanel({
                 debugMode={currentUser?.debugMode ?? false}
                 currentPrincipalId={currentUser?.handle}
                 scrollRoot={scrollRef}
+                onCopyMarkdown={handleCopyMarkdown}
+                onConvertToTask={handleConvertToTask}
+                // A thread's root message is already in a thread; hide the
+                // context-menu "Open thread" entry for it too.
+                contextMenuRootOnly
                 // The root is a single message — render its markdown synchronously
                 // so opening the thread doesn't flash as it swaps the raw-text
                 // placeholder for the real markdown a frame later.
@@ -772,6 +832,8 @@ export function ThreadPanel({
             currentPrincipalId={currentUser?.handle}
             mentionLabel={mentionLabel}
             onSenderClick={handleSenderClick}
+            onCopyMarkdown={handleCopyMarkdown}
+            onConvertToTask={handleConvertToTask}
             scrollRoot={scrollRef}
           />
         </div>
