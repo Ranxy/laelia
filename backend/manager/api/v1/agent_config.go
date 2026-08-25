@@ -248,6 +248,81 @@ func (s *AgentService) RefreshAgentProviders(ctx context.Context, req *connect.R
 	}
 }
 
+// RefreshAgentModels probes one provider's models on the agent's machine using
+// the given (draft) ACP config's custom_env, so a model picker reflects an
+// agent's custom env (e.g. CODEX_HOME) before the config is saved. The result
+// is NOT persisted; it is returned to the caller for this session only. The
+// probe runs on the agent's host, reached via the MachineChannel.
+func (s *AgentService) RefreshAgentModels(ctx context.Context, req *connect.Request[v1pb.RefreshAgentModelsRequest]) (*connect.Response[v1pb.RefreshAgentModelsResponse], error) {
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !s.canEditAgent(ctx, user, agent) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a holder of laelia.agents.edit can refresh this agent's models"))
+	}
+	if agent.MachineID <= 0 {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent has no owning machine; cannot probe models"))
+	}
+	if s.dispatcher == nil || !s.dispatcher.IsMachineConnected(agent.MachineID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent's machine is not connected; cannot probe models"))
+	}
+	cfg := req.Msg.AcpConfig
+	if cfg == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("acp_config is required to refresh models"))
+	}
+	providerID := cfg.Provider
+	if providerID == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("acp_config.provider is required to refresh models"))
+	}
+	// The per-provider probe only makes sense for a host-detected built-in
+	// provider; "custom" (raw command) and builtin-pi (API-based) do not probe
+	// models this way.
+	if !knownProviderID(providerID) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid acp_config.provider %q", providerID))
+	}
+	if providerID == "custom" || providerID == pi.BuiltinPiProvider {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("provider %q does not support on-host model probing", providerID))
+	}
+
+	requestID := uuid.NewString()
+	replyCh := s.dispatcher.RegisterPendingModels(requestID)
+	defer s.dispatcher.CancelPendingModels(requestID)
+
+	if err := s.dispatcher.SendDiscoverModelsToMachine(agent.MachineID, providerID, cfg.GetCustomEnv(), requestID); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Wrap(err, "failed to request model discovery"))
+	}
+
+	select {
+	case msg := <-replyCh:
+		if msg == nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.New("model discovery returned no result"))
+		}
+		if msg.Error != "" {
+			return connect.NewResponse(&v1pb.RefreshAgentModelsResponse{
+				Provider: providerID,
+				Error:    msg.Error,
+			}), nil
+		}
+		return connect.NewResponse(&v1pb.RefreshAgentModelsResponse{
+			Provider: providerID,
+			Models:   msg.Models,
+		}), nil
+	case <-time.After(60 * time.Second):
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, errors.New("timed out waiting for model discovery"))
+	case <-ctx.Done():
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, ctx.Err())
+	}
+}
+
 // ListAgentWorkspace lists one directory level of an agent's workspace on its
 // host machine. Requires the caller to be the agent owner or a workspace admin
 // (canEditAgent), and the agent to be online: the listing runs on the agent's

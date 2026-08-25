@@ -2,6 +2,7 @@ import { create, equals } from "@bufbuild/protobuf";
 import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 import { agentServiceClient } from "@/connect";
 import type {
+  AgentModelOption,
   AgentProviderInfo,
   AgentSummary,
   PiModel,
@@ -14,6 +15,7 @@ import {
   CreateAgentRequestSchema,
   DeleteAgentRequestSchema,
   ListPiModelsRequestSchema,
+  RefreshAgentModelsRequestSchema,
   RefreshAgentProvidersRequestSchema,
   RevokeAgentTokenRequestSchema,
   RotateAgentTokenRequestSchema,
@@ -240,6 +242,24 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
         apiBaseUrl: apiBaseUrl ?? "",
       })
     );
+    return res.models;
+  },
+
+  // refreshAgentModels probes one provider's models on the agent's machine using
+  // the given (possibly unsaved) ACP config's custom_env, so the model picker
+  // reflects an agent's custom env (e.g. CODEX_HOME) before saving. The result
+  // is session-only (not persisted). Returns the fresh model list, or throws on
+  // a probe failure surfaced in the response error.
+  async refreshAgentModels(
+    name: string,
+    acpConfig: AgentACPConfigInput
+  ): Promise<AgentModelOption[]> {
+    const res = await agentServiceClient.refreshAgentModels(
+      create(RefreshAgentModelsRequestSchema, { name, acpConfig })
+    );
+    if (res.error) {
+      throw new Error(res.error);
+    }
     return res.models;
   },
 });

@@ -115,7 +115,7 @@ func (*CodexProvider) ProbeModelsV2(ctx context.Context, workspaceDir string) ([
 	if err == nil && len(models) > 0 {
 		return models, nil
 	}
-	if cached := codexModelsFromCache(); len(cached) > 0 {
+	if cached := codexModelsFromCache(ctx); len(cached) > 0 {
 		return cached, nil
 	}
 	if err != nil {
@@ -298,7 +298,7 @@ func probeCodexModelsFromAppServer(ctx context.Context, workspaceDir string) ([]
 	}
 	cmd := exec.CommandContext(ctx, exe, "app-server", "--listen", "stdio://")
 	cmd.Dir = workspaceDir
-	cmd.Env = probeEnv()
+	cmd.Env = probeEnv(ctx)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -359,9 +359,9 @@ type codexModelsCacheEntry struct {
 
 // codexModelsFromCache reads the local codex models cache, filtering out
 // hidden and API-unsupported entries. It returns nil when no cache is found.
-func codexModelsFromCache() []ModelOption {
+func codexModelsFromCache(ctx context.Context) []ModelOption {
 	var models []ModelOption
-	for _, root := range codexStateRoots() {
+	for _, root := range codexStateRoots(ctx) {
 		raw, err := os.ReadFile(filepath.Join(root, "models_cache.json"))
 		if err != nil {
 			continue
@@ -396,10 +396,11 @@ func codexModelsFromCache() []ModelOption {
 }
 
 // codexStateRoots returns the candidate codex state roots: CODEX_HOME (or
-// ~/.codex) plus the nested <root>/.codex variant.
-func codexStateRoots() []string {
+// ~/.codex) plus the nested <root>/.codex variant. The overlay-env CODEX_HOME
+// (set by WithProbeEnv) wins over the host environment.
+func codexStateRoots(ctx context.Context) []string {
 	var roots []string
-	if home := os.Getenv("CODEX_HOME"); home != "" {
+	if home := probeEnvValue(ctx, "CODEX_HOME"); home != "" {
 		roots = append(roots, home)
 	} else if home, err := os.UserHomeDir(); err == nil {
 		roots = append(roots, filepath.Join(home, ".codex"))

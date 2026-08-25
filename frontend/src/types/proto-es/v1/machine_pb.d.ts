@@ -4,7 +4,7 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { AgentACPConfig, AgentCapability, AgentProviderInfo, AgentSummary } from "./agent_pb";
+import type { AgentACPConfig, AgentCapability, AgentModelOption, AgentProviderInfo, AgentSummary } from "./agent_pb";
 import type { EmptySchema, Timestamp } from "@bufbuild/protobuf/wkt";
 import type { State } from "./common_pb";
 import type { DiscoverProviders, Ping, Pong, ProvidersDiscovered } from "./command_pb";
@@ -215,6 +215,61 @@ export declare type RefreshMachineProvidersResponse = Message<"laelia.v1.Refresh
  * Use `create(RefreshMachineProvidersResponseSchema)` to create a new message.
  */
 export declare const RefreshMachineProvidersResponseSchema: GenMessage<RefreshMachineProvidersResponse>;
+
+/**
+ * RefreshMachineModelsRequest names a machine and carries the (possibly
+ * unsaved) ACP config whose custom_env the probe should apply. The provider to
+ * probe and the env overlay are taken from acp_config; everything else ignored.
+ *
+ * @generated from message laelia.v1.RefreshMachineModelsRequest
+ */
+export declare type RefreshMachineModelsRequest = Message<"laelia.v1.RefreshMachineModelsRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: laelia.v1.AgentACPConfig acp_config = 2;
+   */
+  acpConfig?: AgentACPConfig | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.RefreshMachineModelsRequest.
+ * Use `create(RefreshMachineModelsRequestSchema)` to create a new message.
+ */
+export declare const RefreshMachineModelsRequestSchema: GenMessage<RefreshMachineModelsRequest>;
+
+/**
+ * @generated from message laelia.v1.RefreshMachineModelsResponse
+ */
+export declare type RefreshMachineModelsResponse = Message<"laelia.v1.RefreshMachineModelsResponse"> & {
+  /**
+   * @generated from field: string provider = 1;
+   */
+  provider: string;
+
+  /**
+   * freshly probed models for the provider
+   *
+   * @generated from field: repeated laelia.v1.AgentModelOption models = 2;
+   */
+  models: AgentModelOption[];
+
+  /**
+   * probe failure message; empty on success
+   *
+   * @generated from field: string error = 3;
+   */
+  error: string;
+};
+
+/**
+ * Describes the message laelia.v1.RefreshMachineModelsResponse.
+ * Use `create(RefreshMachineModelsResponseSchema)` to create a new message.
+ */
+export declare const RefreshMachineModelsResponseSchema: GenMessage<RefreshMachineModelsResponse>;
 
 /**
  * @generated from message laelia.v1.UpgradeMachineRequest
@@ -1004,6 +1059,14 @@ export declare type MachineStreamMessage = Message<"laelia.v1.MachineStreamMessa
      */
     value: UpgradeProgress;
     case: "upgradeProgress";
+  } | {
+    /**
+     * response to ManagerMachineStreamMessage.discover_models
+     *
+     * @generated from field: laelia.v1.ModelsDiscovered models_discovered = 10;
+     */
+    value: ModelsDiscovered;
+    case: "modelsDiscovered";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1090,6 +1153,14 @@ export declare type ManagerMachineStreamMessage = Message<"laelia.v1.ManagerMach
      */
     value: UpgradeRequest;
     case: "upgradeRequest";
+  } | {
+    /**
+     * probe one provider's models with an env overlay
+     *
+     * @generated from field: laelia.v1.DiscoverModels discover_models = 11;
+     */
+    value: DiscoverModels;
+    case: "discoverModels";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1186,6 +1257,80 @@ export declare type MachineDisconnectNotice = Message<"laelia.v1.MachineDisconne
  * Use `create(MachineDisconnectNoticeSchema)` to create a new message.
  */
 export declare const MachineDisconnectNoticeSchema: GenMessage<MachineDisconnectNotice>;
+
+/**
+ * DiscoverModels asks the machine app to probe a single provider's models with
+ * an env overlay (the agent's custom_env, e.g. CODEX_HOME pointing at a
+ * profile-specific codex home). The machine replies with
+ * MachineStreamMessage.models_discovered. Used by the unary RefreshAgentModels
+ * RPC so the model picker reflects an agent's custom env before saving.
+ *
+ * @generated from message laelia.v1.DiscoverModels
+ */
+export declare type DiscoverModels = Message<"laelia.v1.DiscoverModels"> & {
+  /**
+   * correlation id for the pending RefreshAgentModels call
+   *
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * provider id to probe, e.g. "codex"
+   *
+   * @generated from field: string provider = 2;
+   */
+  provider: string;
+
+  /**
+   * KEY=VALUE overlay applied on top of the host env
+   *
+   * @generated from field: map<string, string> env = 3;
+   */
+  env: { [key: string]: string };
+};
+
+/**
+ * Describes the message laelia.v1.DiscoverModels.
+ * Use `create(DiscoverModelsSchema)` to create a new message.
+ */
+export declare const DiscoverModelsSchema: GenMessage<DiscoverModels>;
+
+/**
+ * ModelsDiscovered carries one provider's freshly probed models back to the
+ * manager, which hands them to the pending RefreshAgentModels caller.
+ *
+ * @generated from message laelia.v1.ModelsDiscovered
+ */
+export declare type ModelsDiscovered = Message<"laelia.v1.ModelsDiscovered"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string provider = 2;
+   */
+  provider: string;
+
+  /**
+   * @generated from field: repeated laelia.v1.AgentModelOption models = 3;
+   */
+  models: AgentModelOption[];
+
+  /**
+   * probe failure message; empty on success
+   *
+   * @generated from field: string error = 4;
+   */
+  error: string;
+};
+
+/**
+ * Describes the message laelia.v1.ModelsDiscovered.
+ * Use `create(ModelsDiscoveredSchema)` to create a new message.
+ */
+export declare const ModelsDiscoveredSchema: GenMessage<ModelsDiscovered>;
 
 /**
  * ReloadAgentAssignment is a full re-sync of a single agent's assignment (used
@@ -1408,6 +1553,22 @@ export declare const MachineService: GenService<{
     methodKind: "unary";
     input: typeof RefreshMachineProvidersRequestSchema;
     output: typeof RefreshMachineProvidersResponseSchema;
+  },
+  /**
+   * Probe one provider's models on this machine using the given (draft) ACP
+   * config's custom_env — the add-agent form uses it so a model picker reflects
+   * a custom env (e.g. CODEX_HOME) before the agent exists. Returns the freshly
+   * probed model list for that provider; NOT persisted (session-only).
+   * Authorized in the handler for the machine's creator or a holder of
+   * laelia.machines.edit; no permission annotation so the creator short-circuit
+   * can run.
+   *
+   * @generated from rpc laelia.v1.MachineService.RefreshMachineModels
+   */
+  refreshMachineModels: {
+    methodKind: "unary";
+    input: typeof RefreshMachineModelsRequestSchema;
+    output: typeof RefreshMachineModelsResponseSchema;
   },
   /**
    * UpgradeMachine asks an online machine to upgrade itself: the manager sends

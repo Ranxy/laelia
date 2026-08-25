@@ -75,6 +75,9 @@ const (
 	// AgentServiceRefreshAgentProvidersProcedure is the fully-qualified name of the AgentService's
 	// RefreshAgentProviders RPC.
 	AgentServiceRefreshAgentProvidersProcedure = "/laelia.v1.AgentService/RefreshAgentProviders"
+	// AgentServiceRefreshAgentModelsProcedure is the fully-qualified name of the AgentService's
+	// RefreshAgentModels RPC.
+	AgentServiceRefreshAgentModelsProcedure = "/laelia.v1.AgentService/RefreshAgentModels"
 	// AgentServiceListAgentWorkspaceProcedure is the fully-qualified name of the AgentService's
 	// ListAgentWorkspace RPC.
 	AgentServiceListAgentWorkspaceProcedure = "/laelia.v1.AgentService/ListAgentWorkspace"
@@ -177,6 +180,14 @@ type AgentServiceClient interface {
 	// handler for the agent's owner or a holder of laelia.agents.edit on the
 	// agent; no permission annotation so the owner short-circuit can run.
 	RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error)
+	// Probe one provider's models on the agent's machine using the given (draft)
+	// ACP config's custom_env — so a model picker reflects an agent's custom env
+	// (e.g. CODEX_HOME) before the config is saved. Returns the freshly probed
+	// model list for that provider; it is NOT persisted (the picker uses it for
+	// this session only). Authorized in the handler for the agent's owner or a
+	// holder of laelia.agents.edit on the agent; no permission annotation so the
+	// owner short-circuit can run.
+	RefreshAgentModels(context.Context, *connect.Request[v1.RefreshAgentModelsRequest]) (*connect.Response[v1.RefreshAgentModelsResponse], error)
 	// ListAgentWorkspace lists one directory level of an agent's workspace on its
 	// machine (~/.laelia/<machineID>/<agentID>/), lazily loading the tree level by
 	// level. Workspace content is sensitive: authorized in the handler for the
@@ -318,6 +329,12 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(agentServiceMethods.ByName("RefreshAgentProviders")),
 			connect.WithClientOptions(opts...),
 		),
+		refreshAgentModels: connect.NewClient[v1.RefreshAgentModelsRequest, v1.RefreshAgentModelsResponse](
+			httpClient,
+			baseURL+AgentServiceRefreshAgentModelsProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("RefreshAgentModels")),
+			connect.WithClientOptions(opts...),
+		),
 		listAgentWorkspace: connect.NewClient[v1.ListAgentWorkspaceRequest, v1.ListAgentWorkspaceResponse](
 			httpClient,
 			baseURL+AgentServiceListAgentWorkspaceProcedure,
@@ -404,6 +421,7 @@ type agentServiceClient struct {
 	updateAgentACPConfig   *connect.Client[v1.UpdateAgentACPConfigRequest, emptypb.Empty]
 	updateAgentMcpConfig   *connect.Client[v1.UpdateAgentMcpConfigRequest, emptypb.Empty]
 	refreshAgentProviders  *connect.Client[v1.RefreshAgentProvidersRequest, v1.RefreshAgentProvidersResponse]
+	refreshAgentModels     *connect.Client[v1.RefreshAgentModelsRequest, v1.RefreshAgentModelsResponse]
 	listAgentWorkspace     *connect.Client[v1.ListAgentWorkspaceRequest, v1.ListAgentWorkspaceResponse]
 	readAgentWorkspaceFile *connect.Client[v1.ReadAgentWorkspaceFileRequest, v1.ReadAgentWorkspaceFileResponse]
 	listPiModels           *connect.Client[v1.ListPiModelsRequest, v1.ListPiModelsResponse]
@@ -490,6 +508,11 @@ func (c *agentServiceClient) UpdateAgentMcpConfig(ctx context.Context, req *conn
 // RefreshAgentProviders calls laelia.v1.AgentService.RefreshAgentProviders.
 func (c *agentServiceClient) RefreshAgentProviders(ctx context.Context, req *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error) {
 	return c.refreshAgentProviders.CallUnary(ctx, req)
+}
+
+// RefreshAgentModels calls laelia.v1.AgentService.RefreshAgentModels.
+func (c *agentServiceClient) RefreshAgentModels(ctx context.Context, req *connect.Request[v1.RefreshAgentModelsRequest]) (*connect.Response[v1.RefreshAgentModelsResponse], error) {
+	return c.refreshAgentModels.CallUnary(ctx, req)
 }
 
 // ListAgentWorkspace calls laelia.v1.AgentService.ListAgentWorkspace.
@@ -615,6 +638,14 @@ type AgentServiceHandler interface {
 	// handler for the agent's owner or a holder of laelia.agents.edit on the
 	// agent; no permission annotation so the owner short-circuit can run.
 	RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error)
+	// Probe one provider's models on the agent's machine using the given (draft)
+	// ACP config's custom_env — so a model picker reflects an agent's custom env
+	// (e.g. CODEX_HOME) before the config is saved. Returns the freshly probed
+	// model list for that provider; it is NOT persisted (the picker uses it for
+	// this session only). Authorized in the handler for the agent's owner or a
+	// holder of laelia.agents.edit on the agent; no permission annotation so the
+	// owner short-circuit can run.
+	RefreshAgentModels(context.Context, *connect.Request[v1.RefreshAgentModelsRequest]) (*connect.Response[v1.RefreshAgentModelsResponse], error)
 	// ListAgentWorkspace lists one directory level of an agent's workspace on its
 	// machine (~/.laelia/<machineID>/<agentID>/), lazily loading the tree level by
 	// level. Workspace content is sensitive: authorized in the handler for the
@@ -752,6 +783,12 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(agentServiceMethods.ByName("RefreshAgentProviders")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentServiceRefreshAgentModelsHandler := connect.NewUnaryHandler(
+		AgentServiceRefreshAgentModelsProcedure,
+		svc.RefreshAgentModels,
+		connect.WithSchema(agentServiceMethods.ByName("RefreshAgentModels")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentServiceListAgentWorkspaceHandler := connect.NewUnaryHandler(
 		AgentServiceListAgentWorkspaceProcedure,
 		svc.ListAgentWorkspace,
@@ -850,6 +887,8 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 			agentServiceUpdateAgentMcpConfigHandler.ServeHTTP(w, r)
 		case AgentServiceRefreshAgentProvidersProcedure:
 			agentServiceRefreshAgentProvidersHandler.ServeHTTP(w, r)
+		case AgentServiceRefreshAgentModelsProcedure:
+			agentServiceRefreshAgentModelsHandler.ServeHTTP(w, r)
 		case AgentServiceListAgentWorkspaceProcedure:
 			agentServiceListAgentWorkspaceHandler.ServeHTTP(w, r)
 		case AgentServiceReadAgentWorkspaceFileProcedure:
@@ -939,6 +978,10 @@ func (UnimplementedAgentServiceHandler) UpdateAgentMcpConfig(context.Context, *c
 
 func (UnimplementedAgentServiceHandler) RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.RefreshAgentProviders is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) RefreshAgentModels(context.Context, *connect.Request[v1.RefreshAgentModelsRequest]) (*connect.Response[v1.RefreshAgentModelsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.RefreshAgentModels is not implemented"))
 }
 
 func (UnimplementedAgentServiceHandler) ListAgentWorkspace(context.Context, *connect.Request[v1.ListAgentWorkspaceRequest]) (*connect.Response[v1.ListAgentWorkspaceResponse], error) {

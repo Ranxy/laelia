@@ -10,6 +10,7 @@ import (
 
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/home"
+	"github.com/Ranxy/laelia/backend/agent/provider"
 	"github.com/Ranxy/laelia/backend/agent/supervisor"
 	"github.com/Ranxy/laelia/backend/agent/workspace"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -103,6 +104,11 @@ func (c *MachineClient) runControlStream(ctx context.Context, _ *daemonsrv.Serve
 				// pump, delaying AgentAssignment / RemoveAgent / AgentConfigUpdate
 				// for the whole probe window.
 				go c.handleDiscoverProviders(ctx, sendStream, m.DiscoverProviders.GetRequestId())
+
+			case *v1pb.ManagerMachineStreamMessage_DiscoverModels:
+				// Probe one provider's models with an env overlay off the receive
+				// pump, like the full DiscoverProviders path.
+				go handleDiscoverModels(ctx, sendStream, m.DiscoverModels)
 
 			case *v1pb.ManagerMachineStreamMessage_MachineWorkspaceScanRequest:
 				// Scanning the workspace root can take a while on a big disk;
@@ -259,6 +265,58 @@ func (c *MachineClient) handleDiscoverProviders(ctx context.Context, send func(*
 	}); err != nil {
 		slog.Error("failed to send providers_discovered", "requestID", requestID, "error", err)
 	}
+}
+
+// handleDiscoverModels probes one provider's models with an env overlay (the
+// agent's custom_env, e.g. CODEX_HOME) and replies with ModelsDiscovered. It
+// runs off the receive pump; failures are reported in the reply's error field
+// rather than killing the stream.
+func handleDiscoverModels(ctx context.Context, send func(*v1pb.MachineStreamMessage) error, req *v1pb.DiscoverModels) {
+	if req == nil {
+		return
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	models, _, _, err := provider.Default().ProbeModelOptions(probeCtx, req.GetProvider(), envOverlayFromMap(req.GetEnv()))
+	cancel()
+
+	var errMsg string
+	if err != nil {
+		errMsg = err.Error()
+		slog.Warn("model discovery probe failed", "provider", req.GetProvider(), "requestID", req.GetRequestId(), "error", err)
+	}
+	out := make([]*v1pb.AgentModelOption, 0, len(models))
+	for _, m := range models {
+		out = append(out, &v1pb.AgentModelOption{
+			Value:       m.Value,
+			Name:        m.Name,
+			Description: m.Description,
+		})
+	}
+	if err := send(&v1pb.MachineStreamMessage{
+		Message: &v1pb.MachineStreamMessage_ModelsDiscovered{
+			ModelsDiscovered: &v1pb.ModelsDiscovered{
+				RequestId: req.GetRequestId(),
+				Provider:  req.GetProvider(),
+				Models:    out,
+				Error:     errMsg,
+			},
+		},
+	}); err != nil {
+		slog.Error("failed to send models_discovered", "requestID", req.GetRequestId(), "error", err)
+	}
+}
+
+// envOverlayFromMap flattens a KEY=VALUE map into a slice of "KEY=VALUE" entries
+// suitable for provider.WithProbeEnv.
+func envOverlayFromMap(env map[string]string) []string {
+	if len(env) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(env))
+	for key, value := range env {
+		out = append(out, key+"="+value)
+	}
+	return out
 }
 
 // handleMachineWorkspaceScan summarizes every per-agent workspace directory

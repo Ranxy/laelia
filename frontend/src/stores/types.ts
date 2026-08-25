@@ -9,6 +9,7 @@ import type {
 } from "@/types/proto-es/store/setting_pb";
 import type {
   Agent,
+  AgentModelOption,
   AgentProviderInfo,
   AgentStatus_ConnectionState,
   AgentSummary,
@@ -285,6 +286,13 @@ export interface AgentSlice {
     apiKey: string,
     apiBaseUrl?: string
   ) => Promise<PiModel[]>;
+  // refreshAgentModels probes one provider's models on the agent's machine with
+  // the given (possibly unsaved) custom_env, so the model picker reflects an
+  // agent's custom env (e.g. CODEX_HOME) before saving. Session-only.
+  refreshAgentModels: (
+    name: string,
+    acpConfig: AgentACPConfigInput
+  ) => Promise<AgentModelOption[]>;
 }
 
 // MachineSlice owns the machine roster and the machine-management mutations.
@@ -314,6 +322,12 @@ export interface MachineSlice {
   revokeMachineToken: (name: string, reason?: string) => Promise<void>;
   forceDisconnectMachine: (name: string, reason?: string) => Promise<void>;
   refreshMachineProviders: (name: string) => Promise<AgentProviderInfo[]>;
+  // refreshMachineModels probes one provider's models on the machine with the
+  // given (possibly unsaved) custom_env, for the add-agent form. Session-only.
+  refreshMachineModels: (
+    name: string,
+    acpConfig: AgentACPConfigInput
+  ) => Promise<AgentModelOption[]>;
   upgradeMachine: (name: string, reason?: string) => Promise<void>;
   listMachineAgents: (name: string) => Promise<AgentSummary[]>;
 }

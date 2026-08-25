@@ -77,6 +77,7 @@ import {
   buildMachineSetupCommand,
   machineInstallOSFromInfo,
 } from "@/lib/machine-token";
+import { toastManager } from "@/lib/toast";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -87,6 +88,7 @@ import {
   IamPolicySchema,
 } from "@/types/proto-es/store/policy_pb";
 import {
+  type AgentModelOption,
   type AgentProviderInfo,
   type AgentSummary,
   type PiModel,
@@ -176,6 +178,14 @@ export function MachineProfilePage() {
   const [allowEnv, setAllowEnv] = useState<string[]>([]);
   const [executable, setExecutable] = useState("");
   const [args, setArgs] = useState<string[]>([]);
+  // refreshedModels is a session-only override of the add-agent model picker,
+  // produced by the "refresh models" action (which probes with the draft custom
+  // env, e.g. CODEX_HOME). null means "use the machine-discovered list".
+  const [refreshedModels, setRefreshedModels] = useState<
+    AgentModelOption[] | null
+  >(null);
+  const [modelsRefreshing, setModelsRefreshing] = useState(false);
+  const [modelsRefreshError, setModelsRefreshError] = useState("");
   const [allowAddToChannel, setAllowAddToChannel] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
@@ -412,10 +422,62 @@ export function MachineProfilePage() {
   const selectedProviderInfo = availableProviders.find(
     (p) => p.providerId === provider
   );
-  const modelOptions = selectedProviderInfo?.models ?? [];
+  // A refresh (probe with the draft custom env) overrides the machine-discovered
+  // model list for this session. It resets when the provider changes so a stale
+  // override is never shown for a different provider.
+  const modelOptions = refreshedModels ?? selectedProviderInfo?.models ?? [];
   const modelRequired =
     !!selectedProviderInfo?.supportsModelConfigOption &&
     modelOptions.length > 0;
+
+  // refreshModels probes the selected provider's models on the machine with the
+  // current draft custom_env (e.g. CODEX_HOME), so the add-agent picker reflects
+  // the env being configured before the agent exists. Session-only.
+  async function refreshModels() {
+    if (!provider || !machineName) return;
+    setModelsRefreshing(true);
+    setModelsRefreshError("");
+    try {
+      const customEnv: Record<string, string> = {};
+      for (const entry of customEnvEntries) {
+        const key = entry.key.trim();
+        if (!key) continue;
+        customEnv[key] = entry.value;
+      }
+      const models = await useAppStore
+        .getState()
+        .refreshMachineModels(machineName, {
+          executable: executable.trim(),
+          args: args.map((a) => a.trim()).filter((a) => a !== ""),
+          allowEnv: allowEnv.map((e) => e.trim()).filter((e) => e !== ""),
+          provider: provider.trim(),
+          model: model.trim(),
+          protocol: "",
+          personaPrompt: personaPrompt.trim(),
+          customEnv,
+          globalProvider: globalProvider.trim(),
+          globalProviderEntry: globalProviderEntry.trim(),
+          apiProvider: apiProvider.trim(),
+          apiKey: apiKey.trim(),
+          apiBaseUrl: apiBaseUrl.trim(),
+        });
+      setRefreshedModels(models);
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : t("agent.acp-config-models-refresh-failed");
+      setModelsRefreshError(msg);
+      setRefreshedModels(null);
+      toastManager.add({
+        type: "error",
+        title: t("agent.acp-config-models-refresh-failed"),
+        description: msg,
+      });
+    } finally {
+      setModelsRefreshing(false);
+    }
+  }
   // The global-provider selection for the builtin-pi runtime: the provider
   // (one the caller may use) and the entry (one (key, model) pair) the agent
   // will use. The model resolves from the entry server-side.
@@ -441,6 +503,8 @@ export function MachineProfilePage() {
     setAllowEnv([]);
     setExecutable("");
     setArgs([]);
+    setRefreshedModels(null);
+    setModelsRefreshError("");
     setAllowAddToChannel(false);
     setAddError("");
   }
@@ -1210,6 +1274,8 @@ export function MachineProfilePage() {
                     setModel("");
                     setGlobalProvider("");
                     setGlobalProviderEntry("");
+                    setRefreshedModels(null);
+                    setModelsRefreshError("");
                     setAddError("");
                   }}
                 >
@@ -1525,32 +1591,71 @@ export function MachineProfilePage() {
                     {t("agent.acp-config-model")}
                   </label>
                   {modelRequired ? (
-                    <Select
-                      value={model}
-                      onValueChange={(v) => {
-                        setModel(String(v ?? ""));
-                        setAddError("");
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue>
-                          {(v: string | null) =>
-                            v ? modelLabel(v, modelOptions) : ""
-                          }
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {modelOptions.map((m) => (
-                          <SelectItem key={m.value} value={m.value}>
-                            {m.name || m.value}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <Select
+                          value={model}
+                          onValueChange={(v) => {
+                            setModel(String(v ?? ""));
+                            setAddError("");
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue>
+                              {(v: string | null) =>
+                                v ? modelLabel(v, modelOptions) : ""
+                              }
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {modelOptions.map((m) => (
+                              <SelectItem key={m.value} value={m.value}>
+                                {m.name || m.value}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!canCreateAgent || modelsRefreshing}
+                        onClick={() => void refreshModels()}
+                        title={t("agent.acp-config-models-refresh-hint")}
+                      >
+                        {modelsRefreshing ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          t("agent.acp-config-models-refresh")
+                        )}
+                      </Button>
+                    </div>
                   ) : (
-                    <p className="text-xs text-control-light">
-                      {t("agent.acp-config-model-unsupported")}
-                    </p>
+                    <div className="flex flex-col gap-1">
+                      <p className="text-xs text-control-light">
+                        {t("agent.acp-config-model-unsupported")}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={!canCreateAgent || modelsRefreshing}
+                          onClick={() => void refreshModels()}
+                          title={t("agent.acp-config-models-refresh-hint")}
+                        >
+                          {modelsRefreshing ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            t("agent.acp-config-models-refresh")
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {modelsRefreshError && (
+                    <p className="text-xs text-error">{modelsRefreshError}</p>
                   )}
                 </div>
               )}

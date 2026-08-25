@@ -405,6 +405,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.RefreshAgentModelsRequest"><span class="badge">M</span>RefreshAgentModelsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RefreshAgentModelsResponse"><span class="badge">M</span>RefreshAgentModelsResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.RefreshAgentProvidersRequest"><span class="badge">M</span>RefreshAgentProvidersRequest</a>
                 </li>
               
@@ -1842,6 +1850,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.DiscoverModels"><span class="badge">M</span>DiscoverModels</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DiscoverModels.EnvEntry"><span class="badge">M</span>DiscoverModels.EnvEntry</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ForceDisconnectMachineRequest"><span class="badge">M</span>ForceDisconnectMachineRequest</a>
                 </li>
               
@@ -1935,6 +1951,18 @@
               
                 <li>
                   <a href="#laelia.v1.ManagerMachineStreamMessage"><span class="badge">M</span>ManagerMachineStreamMessage</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ModelsDiscovered"><span class="badge">M</span>ModelsDiscovered</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RefreshMachineModelsRequest"><span class="badge">M</span>RefreshMachineModelsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RefreshMachineModelsResponse"><span class="badge">M</span>RefreshMachineModelsResponse</a>
                 </li>
               
                 <li>
@@ -4540,6 +4568,75 @@ the list to agents bound to that machine. Empty lists all agents. </p></td>
 
         
       
+        <h3 id="laelia.v1.RefreshAgentModelsRequest">RefreshAgentModelsRequest</h3>
+        <p>RefreshAgentModelsRequest names an agent and carries the (possibly unsaved)</p><p>ACP config whose custom_env the probe should apply. The provider to probe and</p><p>the env overlay are taken from acp_config; everything else is ignored.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>acp_config</td>
+                  <td><a href="#laelia.v1.AgentACPConfig">AgentACPConfig</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RefreshAgentModelsResponse">RefreshAgentModelsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>provider</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>models</td>
+                  <td><a href="#laelia.v1.AgentModelOption">AgentModelOption</a></td>
+                  <td>repeated</td>
+                  <td><p>freshly probed models for the provider </p></td>
+                </tr>
+              
+                <tr>
+                  <td>error</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>probe failure message; empty on success </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.RefreshAgentProvidersRequest">RefreshAgentProvidersRequest</h3>
         <p></p>
 
@@ -5319,6 +5416,19 @@ providers and their models. Returns the freshly discovered provider list
 (also persisted into agent.info.available_providers). Authorized in the
 handler for the agent&#39;s owner or a holder of laelia.agents.edit on the
 agent; no permission annotation so the owner short-circuit can run.</p></td>
+              </tr>
+            
+              <tr>
+                <td>RefreshAgentModels</td>
+                <td><a href="#laelia.v1.RefreshAgentModelsRequest">RefreshAgentModelsRequest</a></td>
+                <td><a href="#laelia.v1.RefreshAgentModelsResponse">RefreshAgentModelsResponse</a></td>
+                <td><p>Probe one provider&#39;s models on the agent&#39;s machine using the given (draft)
+ACP config&#39;s custom_env — so a model picker reflects an agent&#39;s custom env
+(e.g. CODEX_HOME) before the config is saved. Returns the freshly probed
+model list for that provider; it is NOT persisted (the picker uses it for
+this session only). Authorized in the handler for the agent&#39;s owner or a
+holder of laelia.agents.edit on the agent; no permission annotation so the
+owner short-circuit can run.</p></td>
               </tr>
             
               <tr>
@@ -18084,6 +18194,75 @@ AgentChannel per entry immediately after connect (and on every reconnect). </p><
 
         
       
+        <h3 id="laelia.v1.DiscoverModels">DiscoverModels</h3>
+        <p>DiscoverModels asks the machine app to probe a single provider's models with</p><p>an env overlay (the agent's custom_env, e.g. CODEX_HOME pointing at a</p><p>profile-specific codex home). The machine replies with</p><p>MachineStreamMessage.models_discovered. Used by the unary RefreshAgentModels</p><p>RPC so the model picker reflects an agent's custom env before saving.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>correlation id for the pending RefreshAgentModels call </p></td>
+                </tr>
+              
+                <tr>
+                  <td>provider</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>provider id to probe, e.g. &#34;codex&#34; </p></td>
+                </tr>
+              
+                <tr>
+                  <td>env</td>
+                  <td><a href="#laelia.v1.DiscoverModels.EnvEntry">DiscoverModels.EnvEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>KEY=VALUE overlay applied on top of the host env </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DiscoverModels.EnvEntry">DiscoverModels.EnvEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ForceDisconnectMachineRequest">ForceDisconnectMachineRequest</h3>
         <p></p>
 
@@ -18843,6 +19022,13 @@ Machine-scoped: every agent hosted on this machine selects from this list. </p><
                   <td><p>self-upgrade progress report, response to ManagerMachineStreamMessage.upgrade_request </p></td>
                 </tr>
               
+                <tr>
+                  <td>models_discovered</td>
+                  <td><a href="#laelia.v1.ModelsDiscovered">ModelsDiscovered</a></td>
+                  <td></td>
+                  <td><p>response to ManagerMachineStreamMessage.discover_models </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -19126,6 +19312,127 @@ Machine.upgrade_available for the list view&#39;s upgrade badge. </p></td>
                   <td><a href="#laelia.v1.UpgradeRequest">UpgradeRequest</a></td>
                   <td></td>
                   <td><p>self-upgrade to the manager&#39;s embedded binary </p></td>
+                </tr>
+              
+                <tr>
+                  <td>discover_models</td>
+                  <td><a href="#laelia.v1.DiscoverModels">DiscoverModels</a></td>
+                  <td></td>
+                  <td><p>probe one provider&#39;s models with an env overlay </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ModelsDiscovered">ModelsDiscovered</h3>
+        <p>ModelsDiscovered carries one provider's freshly probed models back to the</p><p>manager, which hands them to the pending RefreshAgentModels caller.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>provider</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>models</td>
+                  <td><a href="#laelia.v1.AgentModelOption">AgentModelOption</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>error</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>probe failure message; empty on success </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RefreshMachineModelsRequest">RefreshMachineModelsRequest</h3>
+        <p>RefreshMachineModelsRequest names a machine and carries the (possibly</p><p>unsaved) ACP config whose custom_env the probe should apply. The provider to</p><p>probe and the env overlay are taken from acp_config; everything else ignored.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>acp_config</td>
+                  <td><a href="#laelia.v1.AgentACPConfig">AgentACPConfig</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RefreshMachineModelsResponse">RefreshMachineModelsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>provider</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>models</td>
+                  <td><a href="#laelia.v1.AgentModelOption">AgentModelOption</a></td>
+                  <td>repeated</td>
+                  <td><p>freshly probed models for the provider </p></td>
+                </tr>
+              
+                <tr>
+                  <td>error</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>probe failure message; empty on success </p></td>
                 </tr>
               
             </tbody>
@@ -19685,6 +19992,19 @@ and their models. Returns the freshly discovered provider list (also
 persisted into machine.info.available_providers). Authorized in the handler
 for the machine&#39;s creator or a holder of laelia.machines.edit
 (workspace-scope); no permission annotation so the creator short-circuit
+can run.</p></td>
+              </tr>
+            
+              <tr>
+                <td>RefreshMachineModels</td>
+                <td><a href="#laelia.v1.RefreshMachineModelsRequest">RefreshMachineModelsRequest</a></td>
+                <td><a href="#laelia.v1.RefreshMachineModelsResponse">RefreshMachineModelsResponse</a></td>
+                <td><p>Probe one provider&#39;s models on this machine using the given (draft) ACP
+config&#39;s custom_env — the add-agent form uses it so a model picker reflects
+a custom env (e.g. CODEX_HOME) before the agent exists. Returns the freshly
+probed model list for that provider; NOT persisted (session-only).
+Authorized in the handler for the machine&#39;s creator or a holder of
+laelia.machines.edit; no permission annotation so the creator short-circuit
 can run.</p></td>
               </tr>
             

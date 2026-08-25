@@ -71,6 +71,27 @@ func TestDispatcher_PendingDiscoverUsesGenericReplies(t *testing.T) {
 	d.CancelPendingDiscover(reqID) // must be safe after completion
 }
 
+func TestDispatcher_PendingModelsRoundTrip(t *testing.T) {
+	d := New(nil)
+	defer d.Stop()
+
+	reqID := "models-1"
+	ch := d.RegisterPendingModels(reqID)
+	require.NotNil(t, ch)
+
+	msg := &v1pb.ModelsDiscovered{RequestId: reqID, Provider: "codex", Models: []*v1pb.AgentModelOption{{Value: "gpt-5.2-codex"}}}
+	d.CompletePendingModels(msg)
+
+	select {
+	case got := <-ch:
+		require.Same(t, msg, got)
+	case <-time.After(time.Second):
+		t.Fatal("pending models was not delivered")
+	}
+
+	d.CancelPendingModels(reqID) // must be safe after completion
+}
+
 func TestDispatcher_SendMethodsReturnErrorWhenOffline(t *testing.T) {
 	d := New(nil)
 	defer d.Stop()
@@ -102,10 +123,18 @@ func TestDispatcher_MachineSendMethods(t *testing.T) {
 	require.NoError(t, d.SendPongToMachine(1))
 	require.NoError(t, d.SendUpgradeRequest(1, &v1pb.UpgradeRequest{}))
 	require.NoError(t, d.SendDeleteAgentWorkspace(1, "a1"))
+	require.NoError(t, d.SendDiscoverModelsToMachine(1, "codex", map[string]string{"CODEX_HOME": "/tmp/cx"}, "req-models"))
 
 	mu.Lock()
-	require.Len(t, received, 8)
+	require.Len(t, received, 9)
 	mu.Unlock()
+
+	// The DiscoverModels message must carry the provider + env overlay.
+	dm := received[8].GetDiscoverModels()
+	require.NotNil(t, dm)
+	require.Equal(t, "req-models", dm.GetRequestId())
+	require.Equal(t, "codex", dm.GetProvider())
+	require.Equal(t, "/tmp/cx", dm.GetEnv()["CODEX_HOME"])
 }
 
 func TestDispatcher_AgentSendMethods(t *testing.T) {

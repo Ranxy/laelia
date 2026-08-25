@@ -61,6 +61,8 @@
     - [PiModel](#laelia-v1-PiModel)
     - [ReadAgentWorkspaceFileRequest](#laelia-v1-ReadAgentWorkspaceFileRequest)
     - [ReadAgentWorkspaceFileResponse](#laelia-v1-ReadAgentWorkspaceFileResponse)
+    - [RefreshAgentModelsRequest](#laelia-v1-RefreshAgentModelsRequest)
+    - [RefreshAgentModelsResponse](#laelia-v1-RefreshAgentModelsResponse)
     - [RefreshAgentProvidersRequest](#laelia-v1-RefreshAgentProvidersRequest)
     - [RefreshAgentProvidersResponse](#laelia-v1-RefreshAgentProvidersResponse)
     - [RefreshAgentTokenRequest](#laelia-v1-RefreshAgentTokenRequest)
@@ -431,6 +433,8 @@
     - [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse)
     - [DeleteAgentWorkspace](#laelia-v1-DeleteAgentWorkspace)
     - [DeleteMachineRequest](#laelia-v1-DeleteMachineRequest)
+    - [DiscoverModels](#laelia-v1-DiscoverModels)
+    - [DiscoverModels.EnvEntry](#laelia-v1-DiscoverModels-EnvEntry)
     - [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest)
     - [GetMachineRequest](#laelia-v1-GetMachineRequest)
     - [ListMachineAgentsRequest](#laelia-v1-ListMachineAgentsRequest)
@@ -455,6 +459,9 @@
     - [MachineWorkspaceScanResponse](#laelia-v1-MachineWorkspaceScanResponse)
     - [MachineWorkspaceSummary](#laelia-v1-MachineWorkspaceSummary)
     - [ManagerMachineStreamMessage](#laelia-v1-ManagerMachineStreamMessage)
+    - [ModelsDiscovered](#laelia-v1-ModelsDiscovered)
+    - [RefreshMachineModelsRequest](#laelia-v1-RefreshMachineModelsRequest)
+    - [RefreshMachineModelsResponse](#laelia-v1-RefreshMachineModelsResponse)
     - [RefreshMachineProvidersRequest](#laelia-v1-RefreshMachineProvidersRequest)
     - [RefreshMachineProvidersResponse](#laelia-v1-RefreshMachineProvidersResponse)
     - [RefreshMachineTokenRequest](#laelia-v1-RefreshMachineTokenRequest)
@@ -1450,6 +1457,41 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 
 
 
+<a name="laelia-v1-RefreshAgentModelsRequest"></a>
+
+### RefreshAgentModelsRequest
+RefreshAgentModelsRequest names an agent and carries the (possibly unsaved)
+ACP config whose custom_env the probe should apply. The provider to probe and
+the env overlay are taken from acp_config; everything else is ignored.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| acp_config | [AgentACPConfig](#laelia-v1-AgentACPConfig) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RefreshAgentModelsResponse"></a>
+
+### RefreshAgentModelsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| provider | [string](#string) |  |  |
+| models | [AgentModelOption](#laelia-v1-AgentModelOption) | repeated | freshly probed models for the provider |
+| error | [string](#string) |  | probe failure message; empty on success |
+
+
+
+
+
+
 <a name="laelia-v1-RefreshAgentProvidersRequest"></a>
 
 ### RefreshAgentProvidersRequest
@@ -1786,6 +1828,7 @@ ReadAgentWorkspaceFile RPC.
 | UpdateAgentACPConfig | [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Update the agent&#39;s ACP config. Handler-gated (no permission annotation): the agent&#39;s owner or a workspace admin may update it. Setting a legacy inline api_provider/api_key additionally requires laelia.agents.edit (only workspace admin today); owners without it must use a global provider. |
 | UpdateAgentMcpConfig | [UpdateAgentMcpConfigRequest](#laelia-v1-UpdateAgentMcpConfigRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | UpdateAgentMcpConfig replaces the MCP servers enabled on an agent. Only servers the caller may use (members of the server&#39;s user/group list, or workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig: the agent&#39;s owner or a workspace admin may update it. |
 | RefreshAgentProviders | [RefreshAgentProvidersRequest](#laelia-v1-RefreshAgentProvidersRequest) | [RefreshAgentProvidersResponse](#laelia-v1-RefreshAgentProvidersResponse) | Ask the agent daemon to re-probe its host for installed LLM agent providers and their models. Returns the freshly discovered provider list (also persisted into agent.info.available_providers). Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit on the agent; no permission annotation so the owner short-circuit can run. |
+| RefreshAgentModels | [RefreshAgentModelsRequest](#laelia-v1-RefreshAgentModelsRequest) | [RefreshAgentModelsResponse](#laelia-v1-RefreshAgentModelsResponse) | Probe one provider&#39;s models on the agent&#39;s machine using the given (draft) ACP config&#39;s custom_env — so a model picker reflects an agent&#39;s custom env (e.g. CODEX_HOME) before the config is saved. Returns the freshly probed model list for that provider; it is NOT persisted (the picker uses it for this session only). Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit on the agent; no permission annotation so the owner short-circuit can run. |
 | ListAgentWorkspace | [ListAgentWorkspaceRequest](#laelia-v1-ListAgentWorkspaceRequest) | [ListAgentWorkspaceResponse](#laelia-v1-ListAgentWorkspaceResponse) | ListAgentWorkspace lists one directory level of an agent&#39;s workspace on its machine (~/.laelia/&lt;machineID&gt;/&lt;agentID&gt;/), lazily loading the tree level by level. Workspace content is sensitive: authorized in the handler for the agent&#39;s owner or a workspace admin (canEditAgent); like UpdateAgent this RPC carries no permission annotation (agents.edit is admin-only) and is handler-gated. |
 | ReadAgentWorkspaceFile | [ReadAgentWorkspaceFileRequest](#laelia-v1-ReadAgentWorkspaceFileRequest) | [ReadAgentWorkspaceFileResponse](#laelia-v1-ReadAgentWorkspaceFileResponse) | ReadAgentWorkspaceFile reads a single workspace file for text/image preview. Same handler-gated authorization as ListAgentWorkspace (owner or workspace admin). Sensitive files (secret/credential/token patterns) are rejected by the machine app and surface as a per-file error, not a transport error. |
 | ListPiModels | [ListPiModelsRequest](#laelia-v1-ListPiModelsRequest) | [ListPiModelsResponse](#laelia-v1-ListPiModelsResponse) | List the models a built-in pi agent&#39;s LLM API provider exposes. The manager proxies the provider&#39;s model-listing HTTP API (DeepSeek `GET /models` with the caller&#39;s api_key; OpenRouter `GET /models`, public) so the model list is fetched dynamically rather than hardcoded. Not agent-scoped: the add-agent form calls it before the agent exists. Admin (agents.edit) only. |
@@ -7383,6 +7426,43 @@ permanently remove its workspace directory under the machine data root.
 
 
 
+<a name="laelia-v1-DiscoverModels"></a>
+
+### DiscoverModels
+DiscoverModels asks the machine app to probe a single provider&#39;s models with
+an env overlay (the agent&#39;s custom_env, e.g. CODEX_HOME pointing at a
+profile-specific codex home). The machine replies with
+MachineStreamMessage.models_discovered. Used by the unary RefreshAgentModels
+RPC so the model picker reflects an agent&#39;s custom env before saving.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  | correlation id for the pending RefreshAgentModels call |
+| provider | [string](#string) |  | provider id to probe, e.g. &#34;codex&#34; |
+| env | [DiscoverModels.EnvEntry](#laelia-v1-DiscoverModels-EnvEntry) | repeated | KEY=VALUE overlay applied on top of the host env |
+
+
+
+
+
+
+<a name="laelia-v1-DiscoverModels-EnvEntry"></a>
+
+### DiscoverModels.EnvEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-ForceDisconnectMachineRequest"></a>
 
 ### ForceDisconnectMachineRequest
@@ -7705,6 +7785,7 @@ permanently remove its workspace directory under the machine data root.
 | disconnect_notice | [MachineDisconnectNotice](#laelia-v1-MachineDisconnectNotice) |  | graceful shutdown |
 | machine_workspace_scan_response | [MachineWorkspaceScanResponse](#laelia-v1-MachineWorkspaceScanResponse) |  | response to ManagerMachineStreamMessage.machine_workspace_scan_request |
 | upgrade_progress | [UpgradeProgress](#laelia-v1-UpgradeProgress) |  | self-upgrade progress report, response to ManagerMachineStreamMessage.upgrade_request |
+| models_discovered | [ModelsDiscovered](#laelia-v1-ModelsDiscovered) |  | response to ManagerMachineStreamMessage.discover_models |
 
 
 
@@ -7807,6 +7888,61 @@ MachineWorkspaceSummary is one agent workspace directory&#39;s usage summary.
 | machine_workspace_scan_request | [MachineWorkspaceScanRequest](#laelia-v1-MachineWorkspaceScanRequest) |  | scan per-agent workspace directories on this machine |
 | delete_agent_workspace | [DeleteAgentWorkspace](#laelia-v1-DeleteAgentWorkspace) |  | stop the runner and delete an agent&#39;s workspace directory |
 | upgrade_request | [UpgradeRequest](#laelia-v1-UpgradeRequest) |  | self-upgrade to the manager&#39;s embedded binary |
+| discover_models | [DiscoverModels](#laelia-v1-DiscoverModels) |  | probe one provider&#39;s models with an env overlay |
+
+
+
+
+
+
+<a name="laelia-v1-ModelsDiscovered"></a>
+
+### ModelsDiscovered
+ModelsDiscovered carries one provider&#39;s freshly probed models back to the
+manager, which hands them to the pending RefreshAgentModels caller.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  |  |
+| provider | [string](#string) |  |  |
+| models | [AgentModelOption](#laelia-v1-AgentModelOption) | repeated |  |
+| error | [string](#string) |  | probe failure message; empty on success |
+
+
+
+
+
+
+<a name="laelia-v1-RefreshMachineModelsRequest"></a>
+
+### RefreshMachineModelsRequest
+RefreshMachineModelsRequest names a machine and carries the (possibly
+unsaved) ACP config whose custom_env the probe should apply. The provider to
+probe and the env overlay are taken from acp_config; everything else ignored.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| acp_config | [AgentACPConfig](#laelia-v1-AgentACPConfig) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RefreshMachineModelsResponse"></a>
+
+### RefreshMachineModelsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| provider | [string](#string) |  |  |
+| models | [AgentModelOption](#laelia-v1-AgentModelOption) | repeated | freshly probed models for the provider |
+| error | [string](#string) |  | probe failure message; empty on success |
 
 
 
@@ -8082,6 +8218,7 @@ own AgentChannel over the machine&#39;s access token.
 | ForceDisconnectMachine | [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Force-disconnects a machine: terminate all its sessions and fail all in-flight commands for every agent hosted on it. Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
 | ListMachineAgents | [ListMachineAgentsRequest](#laelia-v1-ListMachineAgentsRequest) | [ListMachineAgentsResponse](#laelia-v1-ListMachineAgentsResponse) | List the agents hosted on a machine. |
 | RefreshMachineProviders | [RefreshMachineProvidersRequest](#laelia-v1-RefreshMachineProvidersRequest) | [RefreshMachineProvidersResponse](#laelia-v1-RefreshMachineProvidersResponse) | Ask the machine app to re-probe its host for installed LLM agent providers and their models. Returns the freshly discovered provider list (also persisted into machine.info.available_providers). Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
+| RefreshMachineModels | [RefreshMachineModelsRequest](#laelia-v1-RefreshMachineModelsRequest) | [RefreshMachineModelsResponse](#laelia-v1-RefreshMachineModelsResponse) | Probe one provider&#39;s models on this machine using the given (draft) ACP config&#39;s custom_env — the add-agent form uses it so a model picker reflects a custom env (e.g. CODEX_HOME) before the agent exists. Returns the freshly probed model list for that provider; NOT persisted (session-only). Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit; no permission annotation so the creator short-circuit can run. |
 | UpgradeMachine | [UpgradeMachineRequest](#laelia-v1-UpgradeMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | UpgradeMachine asks an online machine to upgrade itself: the manager sends an UpgradeRequest over the machine control stream and the machine&#39;s supervisor process downloads the new binary from the manager, installs it, and restarts. Progress is reported through Machine.upgrade_status. |
 | ListMachineWorkspaces | [ListMachineWorkspacesRequest](#laelia-v1-ListMachineWorkspacesRequest) | [ListMachineWorkspacesResponse](#laelia-v1-ListMachineWorkspacesResponse) | ListMachineWorkspaces summarizes every per-agent workspace directory on a machine (~/.laelia/&lt;machineID&gt;/). Workspace content is sensitive: authorized in the handler for the machine&#39;s creator or a workspace admin (isMachineAdmin, matching Machine.can_manage); no permission annotation. |
 | ConnectMachine | [ConnectMachineRequest](#laelia-v1-ConnectMachineRequest) | [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse) | Machine initial connection using a registration token. Returns access &#43; refresh tokens, the machine session id, and the full list of agents the machine must host (so the machine app can open an AgentChannel for each). |

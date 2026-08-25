@@ -496,6 +496,38 @@ exit 0
 	}
 }
 
+func TestCodexProbeModelsV2HonorsProbeEnvOverlay(t *testing.T) {
+	dir := t.TempDir()
+	// A codex that starts but never answers the handshake, forcing the cache.
+	writeFakeCodex(t, dir, "#!/bin/sh\nexit 0\n")
+	t.Setenv("PATH", dir)
+
+	// Host CODEX_HOME has no models cache.
+	hostHome := t.TempDir()
+	t.Setenv("CODEX_HOME", hostHome)
+
+	// The overlay CODEX_HOME (e.g. an agent's custom_env) has a models cache.
+	overlayHome := t.TempDir()
+	cache := `{"models":[{"slug":"gpt-5.2-codex","display_name":"GPT-5.2 Codex","visibility":"public"}]}`
+	if err := os.WriteFile(filepath.Join(overlayHome, "models_cache.json"), []byte(cache), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	ctx = WithProbeEnv(ctx, []string{"CODEX_HOME=" + overlayHome})
+
+	p := &CodexProvider{}
+	models, err := p.ProbeModelsV2(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []ModelOption{{Value: "gpt-5.2-codex", Name: "GPT-5.2 Codex"}}
+	if !reflect.DeepEqual(models, want) {
+		t.Fatalf("models = %+v, want %+v (overlay CODEX_HOME must win over host env)", models, want)
+	}
+}
+
 func TestCodexThreadCommand(t *testing.T) {
 	p := &CodexProvider{}
 	exe, args := p.ThreadCommand("/ws")

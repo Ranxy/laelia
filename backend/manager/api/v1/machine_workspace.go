@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/Ranxy/laelia/backend/agent/pi"
 	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/component/machinebuild"
@@ -97,6 +98,75 @@ func (s *MachineService) RefreshMachineProviders(ctx context.Context, req *conne
 		}), nil
 	case <-time.After(60 * time.Second):
 		return nil, connect.NewError(connect.CodeDeadlineExceeded, errors.New("timed out waiting for provider discovery"))
+	case <-ctx.Done():
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, ctx.Err())
+	}
+}
+
+// RefreshMachineModels probes one provider's models on this machine using the
+// given (draft) ACP config's custom_env, so the add-agent form's model picker
+// reflects a custom env (e.g. CODEX_HOME) before the agent exists. The result
+// is NOT persisted; it is returned to the caller for this session only. The
+// probe runs on the machine's host, reached via the MachineChannel.
+func (s *MachineService) RefreshMachineModels(ctx context.Context, req *connect.Request[v1pb.RefreshMachineModelsRequest]) (*connect.Response[v1pb.RefreshMachineModelsResponse], error) {
+	resourceID, err := common.GetMachineResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	machine, err := s.store.GetMachineByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if machine == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !isMachineAdmin(ctx, s.iam, user, machine) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can refresh this machine's models"))
+	}
+	if s.dispatcher == nil || !s.dispatcher.IsMachineConnected(machine.ID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("machine is not connected; cannot probe models"))
+	}
+	cfg := req.Msg.AcpConfig
+	if cfg == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("acp_config is required to refresh models"))
+	}
+	providerID := cfg.Provider
+	if providerID == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("acp_config.provider is required to refresh models"))
+	}
+	if !knownProviderID(providerID) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid acp_config.provider %q", providerID))
+	}
+	if providerID == "custom" || providerID == pi.BuiltinPiProvider {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("provider %q does not support on-host model probing", providerID))
+	}
+
+	requestID := uuid.NewString()
+	replyCh := s.dispatcher.RegisterPendingModels(requestID)
+	defer s.dispatcher.CancelPendingModels(requestID)
+
+	if err := s.dispatcher.SendDiscoverModelsToMachine(machine.ID, providerID, cfg.GetCustomEnv(), requestID); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Wrap(err, "failed to request model discovery"))
+	}
+
+	select {
+	case msg := <-replyCh:
+		if msg == nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.New("model discovery returned no result"))
+		}
+		if msg.Error != "" {
+			return connect.NewResponse(&v1pb.RefreshMachineModelsResponse{
+				Provider: providerID,
+				Error:    msg.Error,
+			}), nil
+		}
+		return connect.NewResponse(&v1pb.RefreshMachineModelsResponse{
+			Provider: providerID,
+			Models:   msg.Models,
+		}), nil
+	case <-time.After(60 * time.Second):
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, errors.New("timed out waiting for model discovery"))
 	case <-ctx.Done():
 		return nil, connect.NewError(connect.CodeDeadlineExceeded, ctx.Err())
 	}

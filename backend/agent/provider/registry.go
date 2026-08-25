@@ -53,6 +53,37 @@ func (r *Registry) All() []Provider {
 	return out
 }
 
+// ProbeModelOptions detects a single provider and probes its models with an env
+// overlay (e.g. an agent's custom_env such as CODEX_HOME), returning the
+// advertised models and whether the provider exposes model selection. present
+// is false when the provider is unknown or not installed on the host. This is
+// the per-agent model-refresh path: the machine probes one provider with the
+// agent's env rather than re-running the full host scan.
+func (r *Registry) ProbeModelOptions(ctx context.Context, providerID string, envOverlay []string) (models []ModelOption, supports bool, present bool, err error) {
+	p, ok := r.byID[providerID]
+	if !ok {
+		return nil, false, false, nil
+	}
+	info, present, err := p.Detect(ctx)
+	if err != nil || !present || info == nil {
+		return nil, false, false, nil
+	}
+	probeCtx, cancel := context.WithTimeout(WithProbeEnv(ctx, envOverlay), probeTimeout)
+	defer cancel()
+	if tp, ok := p.(ThreadProvider); ok {
+		models, err = tp.ProbeModelsV2(probeCtx, "")
+		if err != nil {
+			return nil, false, true, err
+		}
+		return models, true, true, nil
+	}
+	models, supports, err = p.ProbeModels(probeCtx, "")
+	if err != nil {
+		return nil, false, true, err
+	}
+	return models, supports, true, nil
+}
+
 // Discover runs Detect + ProbeModels for every registered provider concurrently
 // and returns the providers that were present on the host, in registration
 // order. A provider whose Detect reports absent is skipped; a provider whose

@@ -144,6 +144,9 @@ type Dispatcher struct {
 	// over the bidi command stream. Used by the unary RefreshAgentProviders RPC
 	// to do a request/response round trip over the bidi command stream.
 	pendingDiscovers *pendingReplies[*v1pb.ProvidersDiscovered]
+	// pendingModels correlates DiscoverModels request/response round trips over
+	// the machine control stream to their waiting unary RefreshAgentModels calls.
+	pendingModels *pendingReplies[*v1pb.ModelsDiscovered]
 
 	// pendingWorkspace* correlate the workspace request/response round trips
 	// over the per-agent and machine control bidi streams to their waiting
@@ -171,6 +174,7 @@ func New(s *store.Store) *Dispatcher {
 		pingTimeout:           45 * time.Second,
 		grace:                 make(map[int]map[string]context.CancelFunc),
 		pendingDiscovers:      newPendingReplies[*v1pb.ProvidersDiscovered](),
+		pendingModels:         newPendingReplies[*v1pb.ModelsDiscovered](),
 		pendingWorkspaceLists: newPendingReplies[*v1pb.WorkspaceListResponse](),
 		pendingWorkspaceReads: newPendingReplies[*v1pb.WorkspaceReadResponse](),
 		pendingMachineScans:   newPendingReplies[*v1pb.MachineWorkspaceScanResponse](),
@@ -286,6 +290,45 @@ func (d *Dispatcher) CompletePendingDiscover(msg *v1pb.ProvidersDiscovered) {
 		return
 	}
 	d.pendingDiscovers.complete(msg.RequestId, msg)
+}
+
+// SendDiscoverModelsToMachine asks a connected machine to probe one provider's
+// models with an env overlay (the agent's custom_env) and reply with
+// ModelsDiscovered. The reply resolves a pending models entry registered via
+// RegisterPendingModels.
+func (d *Dispatcher) SendDiscoverModelsToMachine(machineID int, providerID string, env map[string]string, requestID string) error {
+	return d.sendToMachine(machineID, &v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_DiscoverModels{
+			DiscoverModels: &v1pb.DiscoverModels{
+				RequestId: requestID,
+				Provider:  providerID,
+				Env:       env,
+			},
+		},
+	})
+}
+
+// RegisterPendingModels creates a response channel keyed by requestID for an
+// in-flight DiscoverModels round trip. CancelPendingModels must be called if
+// the caller gives up waiting, to avoid leaking the entry.
+func (d *Dispatcher) RegisterPendingModels(requestID string) chan *v1pb.ModelsDiscovered {
+	return d.pendingModels.register(requestID)
+}
+
+// CancelPendingModels removes a pending models entry without delivering a
+// result. Safe to call after the reply arrived (it is a no-op in that case).
+func (d *Dispatcher) CancelPendingModels(requestID string) {
+	d.pendingModels.cancel(requestID)
+}
+
+// CompletePendingModels delivers a ModelsDiscovered reply to the waiting caller
+// and removes the pending entry. Called from the machine bidi receive loop.
+// Unknown request ids (late replies, already-cancelled callers) are dropped.
+func (d *Dispatcher) CompletePendingModels(msg *v1pb.ModelsDiscovered) {
+	if msg == nil {
+		return
+	}
+	d.pendingModels.complete(msg.RequestId, msg)
 }
 
 // SendUpgradeRequest pushes a self-upgrade command to a connected machine's

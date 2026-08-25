@@ -800,6 +800,61 @@ export declare type RefreshAgentProvidersResponse = Message<"laelia.v1.RefreshAg
 export declare const RefreshAgentProvidersResponseSchema: GenMessage<RefreshAgentProvidersResponse>;
 
 /**
+ * RefreshAgentModelsRequest names an agent and carries the (possibly unsaved)
+ * ACP config whose custom_env the probe should apply. The provider to probe and
+ * the env overlay are taken from acp_config; everything else is ignored.
+ *
+ * @generated from message laelia.v1.RefreshAgentModelsRequest
+ */
+export declare type RefreshAgentModelsRequest = Message<"laelia.v1.RefreshAgentModelsRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: laelia.v1.AgentACPConfig acp_config = 2;
+   */
+  acpConfig?: AgentACPConfig | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.RefreshAgentModelsRequest.
+ * Use `create(RefreshAgentModelsRequestSchema)` to create a new message.
+ */
+export declare const RefreshAgentModelsRequestSchema: GenMessage<RefreshAgentModelsRequest>;
+
+/**
+ * @generated from message laelia.v1.RefreshAgentModelsResponse
+ */
+export declare type RefreshAgentModelsResponse = Message<"laelia.v1.RefreshAgentModelsResponse"> & {
+  /**
+   * @generated from field: string provider = 1;
+   */
+  provider: string;
+
+  /**
+   * freshly probed models for the provider
+   *
+   * @generated from field: repeated laelia.v1.AgentModelOption models = 2;
+   */
+  models: AgentModelOption[];
+
+  /**
+   * probe failure message; empty on success
+   *
+   * @generated from field: string error = 3;
+   */
+  error: string;
+};
+
+/**
+ * Describes the message laelia.v1.RefreshAgentModelsResponse.
+ * Use `create(RefreshAgentModelsResponseSchema)` to create a new message.
+ */
+export declare const RefreshAgentModelsResponseSchema: GenMessage<RefreshAgentModelsResponse>;
+
+/**
  * WorkspaceEntry is one file/directory node of a lazily loaded workspace tree.
  *
  * @generated from message laelia.v1.WorkspaceEntry
@@ -2167,6 +2222,22 @@ export declare const AgentService: GenService<{
     methodKind: "unary";
     input: typeof RefreshAgentProvidersRequestSchema;
     output: typeof RefreshAgentProvidersResponseSchema;
+  },
+  /**
+   * Probe one provider's models on the agent's machine using the given (draft)
+   * ACP config's custom_env — so a model picker reflects an agent's custom env
+   * (e.g. CODEX_HOME) before the config is saved. Returns the freshly probed
+   * model list for that provider; it is NOT persisted (the picker uses it for
+   * this session only). Authorized in the handler for the agent's owner or a
+   * holder of laelia.agents.edit on the agent; no permission annotation so the
+   * owner short-circuit can run.
+   *
+   * @generated from rpc laelia.v1.AgentService.RefreshAgentModels
+   */
+  refreshAgentModels: {
+    methodKind: "unary";
+    input: typeof RefreshAgentModelsRequestSchema;
+    output: typeof RefreshAgentModelsResponseSchema;
   },
   /**
    * ListAgentWorkspace lists one directory level of an agent's workspace on its

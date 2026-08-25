@@ -123,6 +123,11 @@ func (s *MachineStreamService) MachineChannel(
 		case *v1pb.MachineStreamMessage_MachineWorkspaceScanResponse:
 			s.dispatcher.CompletePendingMachineWorkspaceScan(m.MachineWorkspaceScanResponse)
 
+		case *v1pb.MachineStreamMessage_ModelsDiscovered:
+			// Completes a pending RefreshAgentModels round-trip; the
+			// DiscoverModels request is correlated by request_id.
+			s.dispatcher.CompletePendingModels(m.ModelsDiscovered)
+
 		case *v1pb.MachineStreamMessage_UpgradeProgress:
 			s.dispatcher.RecordMachineUpgrade(machine.ID, m.UpgradeProgress)
 			slog.Info("machine upgrade progress", "machineID", machine.ID, "version", m.UpgradeProgress.GetVersion(), "stage", m.UpgradeProgress.GetStage(), "error", m.UpgradeProgress.GetError())

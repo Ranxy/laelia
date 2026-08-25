@@ -144,6 +144,18 @@ service AgentService {
     option (laelia.v1.audit) = true;
   }
 
+  // Probe one provider's models on the agent's machine using the given (draft)
+  // ACP config's custom_env — so a model picker reflects an agent's custom env
+  // (e.g. CODEX_HOME) before the config is saved. Returns the freshly probed
+  // model list for that provider; it is NOT persisted (the picker uses it for
+  // this session only). Authorized in the handler for the agent's owner or a
+  // holder of laelia.agents.edit on the agent; no permission annotation so the
+  // owner short-circuit can run.
+  rpc RefreshAgentModels(RefreshAgentModelsRequest) returns (RefreshAgentModelsResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
   // ListAgentWorkspace lists one directory level of an agent's workspace on its
   // machine (~/.laelia/<machineID>/<agentID>/), lazily loading the tree level by
   // level. Workspace content is sensitive: authorized in the handler for the
@@ -463,6 +475,23 @@ message RefreshAgentProvidersRequest {
 
 message RefreshAgentProvidersResponse {
   repeated AgentProviderInfo providers = 1;
+}
+
+// RefreshAgentModelsRequest names an agent and carries the (possibly unsaved)
+// ACP config whose custom_env the probe should apply. The provider to probe and
+// the env overlay are taken from acp_config; everything else is ignored.
+message RefreshAgentModelsRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+  AgentACPConfig acp_config = 2;
+}
+
+message RefreshAgentModelsResponse {
+  string provider = 1;
+  repeated AgentModelOption models = 2; // freshly probed models for the provider
+  string error = 3; // probe failure message; empty on success
 }
 
 // WorkspaceEntry is one file/directory node of a lazily loaded workspace tree.

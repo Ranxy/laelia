@@ -99,6 +99,18 @@ service MachineService {
     option (laelia.v1.audit) = true;
   }
 
+  // Probe one provider's models on this machine using the given (draft) ACP
+  // config's custom_env — the add-agent form uses it so a model picker reflects
+  // a custom env (e.g. CODEX_HOME) before the agent exists. Returns the freshly
+  // probed model list for that provider; NOT persisted (session-only).
+  // Authorized in the handler for the machine's creator or a holder of
+  // laelia.machines.edit; no permission annotation so the creator short-circuit
+  // can run.
+  rpc RefreshMachineModels(RefreshMachineModelsRequest) returns (RefreshMachineModelsResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
   // UpgradeMachine asks an online machine to upgrade itself: the manager sends
   // an UpgradeRequest over the machine control stream and the machine's
   // supervisor process downloads the new binary from the manager, installs it,
@@ -229,6 +241,23 @@ message RefreshMachineProvidersRequest {
 
 message RefreshMachineProvidersResponse {
   repeated AgentProviderInfo providers = 1;
+}
+
+// RefreshMachineModelsRequest names a machine and carries the (possibly
+// unsaved) ACP config whose custom_env the probe should apply. The provider to
+// probe and the env overlay are taken from acp_config; everything else ignored.
+message RefreshMachineModelsRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Machine"}
+  ];
+  AgentACPConfig acp_config = 2;
+}
+
+message RefreshMachineModelsResponse {
+  string provider = 1;
+  repeated AgentModelOption models = 2; // freshly probed models for the provider
+  string error = 3; // probe failure message; empty on success
 }
 
 // --- Upgrade Machine ---
@@ -478,6 +507,7 @@ message MachineStreamMessage {
     MachineDisconnectNotice disconnect_notice = 4; // graceful shutdown
     MachineWorkspaceScanResponse machine_workspace_scan_response = 5; // response to ManagerMachineStreamMessage.machine_workspace_scan_request
     UpgradeProgress upgrade_progress = 6; // self-upgrade progress report, response to ManagerMachineStreamMessage.upgrade_request
+    ModelsDiscovered models_discovered = 10; // response to ManagerMachineStreamMessage.discover_models
   }
 }
 
@@ -492,6 +522,7 @@ message ManagerMachineStreamMessage {
     MachineWorkspaceScanRequest machine_workspace_scan_request = 7; // scan per-agent workspace directories on this machine
     DeleteAgentWorkspace delete_agent_workspace = 8; // stop the runner and delete an agent's workspace directory
     UpgradeRequest upgrade_request = 9; // self-upgrade to the manager's embedded binary
+    DiscoverModels discover_models = 11; // probe one provider's models with an env overlay
   }
 }
 
@@ -516,6 +547,26 @@ message AgentConfigUpdate {
 
 message MachineDisconnectNotice {
   string reason = 1;
+}
+
+// DiscoverModels asks the machine app to probe a single provider's models with
+// an env overlay (the agent's custom_env, e.g. CODEX_HOME pointing at a
+// profile-specific codex home). The machine replies with
+// MachineStreamMessage.models_discovered. Used by the unary RefreshAgentModels
+// RPC so the model picker reflects an agent's custom env before saving.
+message DiscoverModels {
+  string request_id = 1; // correlation id for the pending RefreshAgentModels call
+  string provider = 2; // provider id to probe, e.g. "codex"
+  map<string, string> env = 3; // KEY=VALUE overlay applied on top of the host env
+}
+
+// ModelsDiscovered carries one provider's freshly probed models back to the
+// manager, which hands them to the pending RefreshAgentModels caller.
+message ModelsDiscovered {
+  string request_id = 1;
+  string provider = 2;
+  repeated AgentModelOption models = 3;
+  string error = 4; // probe failure message; empty on success
 }
 
 // ReloadAgentAssignment is a full re-sync of a single agent's assignment (used

@@ -1,6 +1,7 @@
 import { create, equals } from "@bufbuild/protobuf";
 import { machineServiceClient } from "@/connect";
 import type {
+  AgentModelOption,
   AgentProviderInfo,
   AgentSummary,
 } from "@/types/proto-es/v1/agent_pb";
@@ -9,13 +10,18 @@ import {
   DeleteMachineRequestSchema,
   ForceDisconnectMachineRequestSchema,
   MachineSummarySchema,
+  RefreshMachineModelsRequestSchema,
   RefreshMachineProvidersRequestSchema,
   RevokeMachineTokenRequestSchema,
   TransferMachineOwnershipRequestSchema,
   UpdateMachineRequestSchema,
   UpgradeMachineRequestSchema,
 } from "@/types/proto-es/v1/machine_pb";
-import type { AppSliceCreator, MachineSlice } from "./types";
+import type {
+  AgentACPConfigInput,
+  AppSliceCreator,
+  MachineSlice,
+} from "./types";
 
 export const createMachineSlice: AppSliceCreator<MachineSlice> = (
   set,
@@ -115,6 +121,24 @@ export const createMachineSlice: AppSliceCreator<MachineSlice> = (
       create(RefreshMachineProvidersRequestSchema, { name })
     );
     return res.providers;
+  },
+
+  // refreshMachineModels probes one provider's models on the machine with the
+  // given (possibly unsaved) custom_env, so the add-agent form's model picker
+  // reflects a custom env (e.g. CODEX_HOME) before the agent exists.
+  // Session-only. Returns the fresh model list, or throws on a probe failure
+  // surfaced in the response error.
+  async refreshMachineModels(
+    name: string,
+    acpConfig: AgentACPConfigInput
+  ): Promise<AgentModelOption[]> {
+    const res = await machineServiceClient.refreshMachineModels(
+      create(RefreshMachineModelsRequestSchema, { name, acpConfig })
+    );
+    if (res.error) {
+      throw new Error(res.error);
+    }
+    return res.models;
   },
 
   // upgradeMachine asks the machine to self-upgrade to the manager's embedded

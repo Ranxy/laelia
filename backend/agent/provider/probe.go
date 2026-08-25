@@ -20,7 +20,7 @@ func probeModelConfigOption(ctx context.Context, executable string, args []strin
 	}
 	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Dir = workspaceDir
-	cmd.Env = probeEnv()
+	cmd.Env = probeEnv(ctx)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

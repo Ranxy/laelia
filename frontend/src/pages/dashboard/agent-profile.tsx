@@ -68,6 +68,7 @@ import type { AgentACPConfigInput } from "@/stores/types";
 import {
   type Agent,
   type AgentACPConfig,
+  type AgentModelOption,
   type AgentProviderInfo,
   type PiModel,
 } from "@/types/proto-es/v1/agent_pb";
@@ -181,6 +182,14 @@ export function AgentProfilePage() {
   const [machineProviders, setMachineProviders] = useState<AgentProviderInfo[]>(
     []
   );
+  // refreshedModels is a session-only override of the model picker options,
+  // produced by the "refresh models" action (which probes with the agent's
+  // custom env, e.g. CODEX_HOME). null means "use the machine-discovered list".
+  const [refreshedModels, setRefreshedModels] = useState<
+    AgentModelOption[] | null
+  >(null);
+  const [modelsRefreshing, setModelsRefreshing] = useState(false);
+  const [modelsRefreshError, setModelsRefreshError] = useState("");
 
   const agentAvatarName = agent?.avatar || undefined;
   const avatarSrc = useAvatar(agentAvatarName);
@@ -380,6 +389,8 @@ export function AgentProfilePage() {
     setApiBaseUrl(next.apiBaseUrl);
     setPiMode(nextPiMode);
     setGlobalProvider(next.globalProvider);
+    setRefreshedModels(null);
+    setModelsRefreshError("");
     setGlobalProviderEntry(next.globalProviderEntry);
     setCustomEnvEntries(next.customEnvEntries);
     setPersonaDraft(cfg?.personaPrompt ?? "");
@@ -541,9 +552,41 @@ export function AgentProfilePage() {
   const selectedProviderInfo = availableProviders.find(
     (p) => p.providerId === provider
   );
-  const modelOptions = selectedProviderInfo?.models ?? [];
+  // A refresh (probe with the agent's custom env) overrides the machine-discovered
+  // model list for this session. It resets to null when the provider changes so
+  // a stale override is never shown for a different provider.
+  const modelOptions = refreshedModels ?? selectedProviderInfo?.models ?? [];
   const providerSupportsModel =
     !!selectedProviderInfo?.supportsModelConfigOption;
+
+  // refreshModels probes the selected provider's models on the agent's machine
+  // with the current draft custom_env (e.g. CODEX_HOME), so the picker reflects
+  // the env the user is configuring before saving. Session-only; not persisted.
+  async function refreshModels() {
+    if (!provider || !agentName) return;
+    setModelsRefreshing(true);
+    setModelsRefreshError("");
+    try {
+      const models = await useAppStore
+        .getState()
+        .refreshAgentModels(agentName, buildFromDraft(configRef.current, ""));
+      setRefreshedModels(models);
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : t("agent.acp-config-models-refresh-failed");
+      setModelsRefreshError(msg);
+      setRefreshedModels(null);
+      toastManager.add({
+        type: "error",
+        title: t("agent.acp-config-models-refresh-failed"),
+        description: msg,
+      });
+    } finally {
+      setModelsRefreshing(false);
+    }
+  }
   // fetchPiModels loads the model list for an API provider from the manager
   // (ListPiModels). deepseek requires the api_key; openrouter is public. Results
   // are cached per provider so toggling back does not refetch.
@@ -1223,6 +1266,8 @@ export function AgentProfilePage() {
                           setApiProvider("");
                           setGlobalProvider("");
                           setGlobalProviderEntry("");
+                          setRefreshedModels(null);
+                          setModelsRefreshError("");
                           setApiBaseUrl("");
                           setPiMode("global");
                           saveConfig();
@@ -1658,36 +1703,77 @@ export function AgentProfilePage() {
                         {t("agent.acp-config-model")}
                       </label>
                       {providerSupportsModel && modelOptions.length > 0 ? (
-                        <Select
-                          value={model}
-                          onValueChange={(v) => {
-                            const next = String(v ?? "");
-                            configRef.current = {
-                              ...configRef.current,
-                              model: next,
-                            };
-                            setModel(next);
-                            saveConfig();
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue>
-                              {(v: string | null) =>
-                                v ? modelLabel(v, modelOptions) : ""
-                              }
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {modelOptions.map((m) => (
-                              <SelectItem key={m.value} value={m.value}>
-                                {m.name || m.value}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <Select
+                              value={model}
+                              onValueChange={(v) => {
+                                const next = String(v ?? "");
+                                configRef.current = {
+                                  ...configRef.current,
+                                  model: next,
+                                };
+                                setModel(next);
+                                saveConfig();
+                              }}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue>
+                                  {(v: string | null) =>
+                                    v ? modelLabel(v, modelOptions) : ""
+                                  }
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {modelOptions.map((m) => (
+                                  <SelectItem key={m.value} value={m.value}>
+                                    {m.name || m.value}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={!canEdit || modelsRefreshing}
+                            onClick={() => void refreshModels()}
+                            title={t("agent.acp-config-models-refresh-hint")}
+                          >
+                            {modelsRefreshing ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              t("agent.acp-config-models-refresh")
+                            )}
+                          </Button>
+                        </div>
                       ) : (
-                        <p className="text-xs text-control-light">
-                          {t("agent.acp-config-model-unsupported")}
+                        <div className="flex flex-col gap-1">
+                          <p className="text-xs text-control-light">
+                            {t("agent.acp-config-model-unsupported")}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={!canEdit || modelsRefreshing}
+                              onClick={() => void refreshModels()}
+                              title={t("agent.acp-config-models-refresh-hint")}
+                            >
+                              {modelsRefreshing ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : (
+                                t("agent.acp-config-models-refresh")
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      {modelsRefreshError && (
+                        <p className="text-xs text-error">
+                          {modelsRefreshError}
                         </p>
                       )}
                     </div>
