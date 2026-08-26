@@ -6,6 +6,7 @@ import {
   resolveAuthRedirect,
 } from "@/router/auth-redirect";
 import { useAppStore } from "@/stores";
+import { OfflineBanner } from "@/components/offline-banner";
 
 export function RootLayout() {
   const location = useLocation();
@@ -57,5 +58,10 @@ export function RootLayout() {
     return null;
   }
 
-  return <Outlet />;
+  return (
+    <>
+      <OfflineBanner />
+      <Outlet />
+    </>
+  );
 }

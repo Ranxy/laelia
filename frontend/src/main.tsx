@@ -5,6 +5,9 @@ import "@/lib/i18n";
 import { AppRoot } from "@/app/root";
 import "@/assets/css/tailwind.css";
 import "markstream-react/index.css";
+import { registerServiceWorker } from "@/lib/pwa";
+
+registerServiceWorker();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

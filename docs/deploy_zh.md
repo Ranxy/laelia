@@ -215,7 +215,7 @@ machine 显示在线后，可以在 UI 中为其创建代理。请配置代理�
 
 ## 5. 外部访问
 
-Manager 默认在 8181 端口提供明文 HTTP。生产环境建议在前面放置带 HTTPS 的反向代理。当 machine 流量也经过公共端点时，请使用 Caddy——它的 `h2c` upstream 可以保持后端为 HTTP/2：
+Manager 默认在 8181 端口提供明文 HTTP。生产环境建议在前面放置带 HTTPS 的反向代理。**HTTPS 也是 PWA 生效的前提**（Web 应用安装、Service Worker、离线应用壳都需要安全源；浏览器仅在 HTTPS 或 localhost 下启用 Service Worker）。当 machine 流量也经过公共端点时，请使用 Caddy——它的 `h2c` upstream 可以保持后端为 HTTP/2：
 
 ```caddyfile
 laelia.example.com {

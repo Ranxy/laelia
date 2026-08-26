@@ -6,6 +6,19 @@
 */
 @config "../../../tailwind.config.js";
 
+/* Installed PWA windows can be narrower than the desktop breakpoint even on
+   desktop hardware. Treat a standalone app on a desktop-class device (fine
+   pointer + hover) as the desktop layout so it never falls back to the
+   mobile/phone UI. */
+@custom-variant lg {
+  @media (width >= 64rem) {
+    @slot;
+  }
+  @media (display-mode: standalone) and (hover: hover) and (pointer: fine) {
+    @slot;
+  }
+}
+
 /*
   The default border color has changed to `currentcolor` in Tailwind CSS v4,
   so we've added these compatibility styles to make sure everything still

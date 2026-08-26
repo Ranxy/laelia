@@ -293,8 +293,10 @@ API providers (for example DeepSeek or OpenRouter) that the agents should use.
 ## 5. External access
 
 The manager serves plain HTTP on 8181 by default. For production, put a reverse
-proxy with HTTPS in front of it. Use Caddy when machine traffic also goes
-through the public endpoint — its `h2c` upstream keeps the backend leg on
+proxy with HTTPS in front of it. **HTTPS is also required for the PWA** (web app
+install, service worker, offline app shell): browsers only enable service
+workers on secure origins (or localhost). Use Caddy when machine traffic also
+goes through the public endpoint — its `h2c` upstream keeps the backend leg on
 HTTP/2:
 
 ```caddyfile

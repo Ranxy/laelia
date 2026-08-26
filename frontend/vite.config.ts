@@ -2,9 +2,30 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    VitePWA({
+      // PWA app-shell precaching + Web Push in one service worker. We ship a
+      // hand-written manifest in public/ (manifest:false) and register the SW
+      // ourselves at app boot (injectRegister:null), so the existing
+      // web-push.ts keeps working unchanged.
+      strategies: "injectManifest",
+      srcDir: "sw",
+      filename: "sw.ts",
+      registerType: "autoUpdate",
+      injectRegister: null,
+      manifest: false,
+      injectManifest: {
+        globPatterns: ["**/*.{js,css,html,svg,png,webmanifest,woff2}"],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+      },
+      devOptions: { enabled: false },
+    }),
+  ],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
