@@ -57,6 +57,9 @@ func TestListUserConversationsWithUnreadSQL(t *testing.T) {
 	if !strings.Contains(listUserConversationsWithUnreadSQL, "AND ($6 OR NOT cm.closed)") {
 		t.Fatal("list must exclude closed conversations by default but include them when include_closed is requested; a closed chat only reappears when a new main-channel message clears the flag")
 	}
+	if !strings.Contains(listUserConversationsWithUnreadSQL, "NOT (m.sender_type = 1 AND m.principal_id = $3)") {
+		t.Fatal("unread count must exclude the user's own messages: a sender's own message (including an in-channel @self mention) must never surface as an unread badge, regardless of cursor timing")
+	}
 }
 
 func TestAttachmentListPreview(t *testing.T) {

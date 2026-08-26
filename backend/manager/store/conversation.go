@@ -579,6 +579,7 @@ const listUserConversationsWithUnreadSQL = `
 		         WHERE m.conversation_id = c.id
 		           AND m.thread_root_message_id IS NULL
 		           AND m.room_version > COALESCE(ucc.read_version, c.version)
+		           AND NOT (m.sender_type = 1 AND m.principal_id = $3)
 		       ), 0),
 		       cm.pinned, cm.pinned_at, cm.closed,
 		       lm.content, lm.attachments, lm.created_at, lm.sender_name, lm.sender_principal_id
@@ -608,7 +609,13 @@ const listUserConversationsWithUnreadSQL = `
 // chat_message rows whose room_version is beyond the user's read cursor. A
 // missing cursor row is treated as caught-up (COALESCE to conversation.version),
 // mirroring agent_channel_cursor semantics, so a newly joined user does not see
-// existing history as unread. When includeClosed is true, the user's closed
+// existing history as unread. The user's own messages are always excluded from
+// the count: a sender must never see their own message surface as an unread
+// badge, regardless of cursor timing. This covers both the send-then-leave race
+// (cursor lags one behind) and the in-channel self-mention case where the user
+// is still viewing the conversation and the periodic left-rail poll would
+// otherwise report their own @self message as unread. When includeClosed is
+// true, the user's closed
 // conversations (hidden from the left rail) are included too; the Closed flag
 // on each result tells the caller which ones they are.
 //
