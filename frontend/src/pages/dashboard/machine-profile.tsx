@@ -1403,22 +1403,39 @@ export function MachineProfilePage() {
                       <label className="text-sm font-medium">
                         {t("agent.acp-config-model")}
                       </label>
-                      <ModelCombobox
-                        className="flex-1"
-                        value={model}
-                        options={(selectedProviderInfo?.models ?? []).map(
-                          (m) => ({ id: m.value, name: m.name || m.value })
-                        )}
-                        loading={modelsRefreshing}
-                        placeholder={t(
-                          "agent.acp-config-pi-own-model-placeholder"
-                        )}
-                        emptyLabel={t("agent.acp-config-pi-own-models-empty")}
-                        onValueChange={(next) => {
-                          setModel(next);
-                          setAddError("");
-                        }}
-                      />
+                      {selectedProviderInfo?.models?.length ? (
+                        <Select
+                          value={model}
+                          onValueChange={(v) => {
+                            setModel(String(v ?? ""));
+                            setAddError("");
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue>
+                              {(v: string | null) =>
+                                v
+                                  ? modelLabel(
+                                      v,
+                                      selectedProviderInfo?.models ?? []
+                                    )
+                                  : ""
+                              }
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(selectedProviderInfo?.models ?? []).map((m) => (
+                              <SelectItem key={m.value} value={m.value}>
+                                {m.name || m.value}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-xs text-control-light">
+                          {t("agent.acp-config-pi-own-models-empty")}
+                        </p>
+                      )}
                       <p className="text-xs text-control-light">
                         {t("agent.acp-config-pi-own-model-hint")}
                       </p>
