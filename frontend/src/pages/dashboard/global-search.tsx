@@ -1,13 +1,16 @@
 import { create } from "@bufbuild/protobuf";
 import { TimestampSchema } from "@bufbuild/protobuf/wkt";
 import {
+  Bot,
   CalendarClock,
   ChevronDown,
+  Hash,
   Loader2,
   Search,
   SearchX,
   SlidersHorizontal,
   User as UserIcon,
+  Users,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -36,8 +39,12 @@ import { buildUserFilter } from "@/lib/user-filter";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
-import type { SearchChatHistoryEntry } from "@/types/proto-es/v1/command_pb";
+import type {
+  Conversation,
+  SearchChatHistoryEntry,
+} from "@/types/proto-es/v1/command_pb";
 import {
+  ListChannelsRequestSchema,
   SearchChatHistoryRequestSchema,
   SearchScope,
 } from "@/types/proto-es/v1/command_pb";
@@ -400,19 +407,267 @@ function FromSenderPicker({
   );
 }
 
-// GlobalSearchPage searches every conversation the current user can read:
-// message content (main channel and thread replies) plus attachment file
+// Conversation type values mirror Conversation.type from the API:
+// 1 = user↔agent DM, 2 = channel, 3 = agent↔agent DM, 4 = user↔user DM.
+const CONVERSATION_TYPE_DM = 1;
+const CONVERSATION_TYPE_CHANNEL = 2;
+const CONVERSATION_TYPE_AGENT_DM = 3;
+const CONVERSATION_TYPE_USER_DM = 4;
+
+function conversationDisplayName(conv: Conversation): string {
+  return conv.title || conv.address || conv.name;
+}
+
+function conversationSubLabel(conv: Conversation): string {
+  return conv.address || conv.peer || conv.name;
+}
+
+function conversationSearchText(conv: Conversation): string {
+  return [conv.title, conv.address, conv.peer, conv.name]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function ConversationTypeIcon({
+  type,
+  className,
+}: {
+  type: number;
+  className?: string;
+}) {
+  switch (type) {
+    case CONVERSATION_TYPE_CHANNEL:
+      return <Hash className={className} />;
+    case CONVERSATION_TYPE_USER_DM:
+      return <Users className={className} />;
+    case CONVERSATION_TYPE_DM:
+    case CONVERSATION_TYPE_AGENT_DM:
+    default:
+      return <Bot className={className} />;
+  }
+}
+
+// ConversationPicker is a searchable single-select for the "All conversations"
+// filter. It lists every conversation the current user participates in
+// (channels, user DMs, agent DMs), lets the user type to filter by title,
+// address, peer or id, and commits the full conversation resource name.
+function ConversationPicker({
+  value,
+  onChange,
+  conversations,
+  loading = false,
+  placeholder,
+  fullWidth = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  conversations: Conversation[];
+  loading?: boolean;
+  placeholder: string;
+  fullWidth?: boolean;
+}) {
+  const current = conversations.find((c) => c.name === value);
+  const [query, setQuery] = useState(() =>
+    current ? conversationDisplayName(current) : ""
+  );
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Keep the visible label in sync when the selected value changes from
+  // outside (e.g. another control clears the filter) while the popup is
+  // closed.
+  useEffect(() => {
+    if (open) return;
+    const selected = conversations.find((c) => c.name === value);
+    setQuery(selected ? conversationDisplayName(selected) : "");
+  }, [conversations, open, value]);
+
+  // Close on outside click.
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: MouseEvent) {
+      if (!containerRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open]);
+
+  const q = query.trim().toLowerCase();
+  const filtered = useMemo(
+    () =>
+      conversations.filter(
+        (c) => q === "" || conversationSearchText(c).toLowerCase().includes(q)
+      ),
+    [conversations, q]
+  );
+
+  const currentLabel = current ? conversationDisplayName(current) : "";
+
+  function select(conv: Conversation) {
+    onChange(conv.name);
+    setQuery(conversationDisplayName(conv));
+    setOpen(false);
+  }
+
+  function clear() {
+    onChange("");
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div ref={containerRef} className={cn("relative", fullWidth && "w-full")}>
+      <div className="flex items-center gap-1.5 rounded-md border border-control-border px-2 py-1">
+        {current ? (
+          <ConversationTypeIcon
+            type={current.type}
+            className="size-3.5 shrink-0 text-control-light"
+          />
+        ) : (
+          <SlidersHorizontal className="size-3.5 shrink-0 text-control-light" />
+        )}
+        <Input
+          value={query}
+          onChange={(e) => {
+            const next = e.target.value;
+            setQuery(next);
+            setOpen(true);
+            // Typing away from the selected conversation starts a fresh
+            // lookup over all conversations.
+            if (value && currentLabel !== next) {
+              onChange("");
+            }
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          aria-label={placeholder}
+          autoComplete="off"
+          spellCheck={false}
+          className={cn(
+            "h-6 border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0",
+            fullWidth ? "w-full min-w-0" : "w-48"
+          )}
+        />
+        {(value || query) && (
+          <button
+            type="button"
+            onClick={clear}
+            className="shrink-0 rounded p-0.5 text-control-light transition-colors hover:bg-control-bg hover:text-main"
+            aria-label={placeholder}
+          >
+            <X className="size-3" />
+          </button>
+        )}
+        <ChevronDown className="size-3.5 shrink-0 text-control-light" />
+      </div>
+      {open && (
+        <div className="absolute left-0 right-0 z-30 mt-1 max-h-60 overflow-auto rounded border border-control-border bg-background py-1 shadow-md">
+          {loading && conversations.length === 0 ? (
+            <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-control-placeholder">
+              <Loader2 className="size-3.5 animate-spin" />
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  clear();
+                }}
+                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-control-bg"
+              >
+                <SlidersHorizontal className="size-3.5 shrink-0 text-control-light" />
+                <span className="truncate text-main">{placeholder}</span>
+              </button>
+              {filtered.length === 0 ? (
+                <div className="px-2 py-1.5 text-xs text-control-placeholder">
+                  {placeholder}
+                </div>
+              ) : (
+                filtered.map((conv) => (
+                  <button
+                    key={conv.name}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      select(conv);
+                    }}
+                    className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-control-bg"
+                  >
+                    <ConversationTypeIcon
+                      type={conv.type}
+                      className="size-3.5 shrink-0 text-control-light"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-main">
+                        {conversationDisplayName(conv)}
+                      </span>
+                      {conversationSubLabel(conv) && (
+                        <span className="block truncate text-xs text-control-placeholder">
+                          {conversationSubLabel(conv)}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                ))
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// GlobalSearchPage searches every conversation the current user participates
+// in: message content (main channel and thread replies) plus attachment file
 // names. Results link back into the channel chat at the exact message.
 export function GlobalSearchPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
-  const myChannels = useAppStore((s) => s.myChannels);
-  const fetchChannels = useAppStore((s) => s.fetchChannels);
+
+  // The search filter should list every conversation the current user
+  // participates in (channels, user DMs and agent DMs), including closed ones
+  // that are hidden from the left rail. ListChannels already returns those
+  // with includeClosed=true, so we fetch and paginate the full set here.
+  const [conversations, setConversations] = useState<Conversation[]>(
+    () => useAppStore.getState().channels
+  );
+  const [conversationsLoading, setConversationsLoading] = useState(true);
 
   useEffect(() => {
-    void fetchChannels();
-  }, [fetchChannels]);
+    let cancelled = false;
+    async function loadConversations() {
+      setConversationsLoading(true);
+      const all: Conversation[] = [];
+      let pageToken = "";
+      try {
+        do {
+          const res = await commandServiceClient.listChannels(
+            create(ListChannelsRequestSchema, {
+              pageSize: 100,
+              pageToken,
+              includeClosed: true,
+            })
+          );
+          all.push(...(res.channels ?? []));
+          pageToken = res.nextPageToken ?? "";
+        } while (pageToken);
+        if (!cancelled) setConversations(all);
+      } catch {
+        // Keep whatever was loaded before; the picker will show an empty list.
+      } finally {
+        if (!cancelled) setConversationsLoading(false);
+      }
+    }
+    void loadConversations();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [query, setQuery] = useState("");
   const [fromSender, setFromSender] = useState<FromSender | null>(null);
@@ -634,26 +889,13 @@ export function GlobalSearchPage() {
             </SelectContent>
           </Select>
 
-          <Select value={channel} onValueChange={(v) => setChannel(v ?? "")}>
-            <SelectTrigger size="sm" className="max-w-48">
-              <SelectValue>
-                {(value) =>
-                  value
-                    ? (myChannels.find((c) => c.name === value)?.title ??
-                      t("globalSearch.channel"))
-                    : t("globalSearch.all-channels")
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">{t("globalSearch.all-channels")}</SelectItem>
-              {myChannels.map((c) => (
-                <SelectItem key={c.name} value={c.name ?? ""}>
-                  {c.title || c.address || c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <ConversationPicker
+            value={channel}
+            onChange={setChannel}
+            conversations={conversations}
+            loading={conversationsLoading}
+            placeholder={t("globalSearch.all-channels")}
+          />
 
           <Select
             value={timeRange}
@@ -730,31 +972,14 @@ export function GlobalSearchPage() {
                 </SelectContent>
               </Select>
 
-              <Select
+              <ConversationPicker
+                fullWidth
                 value={channel}
-                onValueChange={(v) => setChannel(v ?? "")}
-              >
-                <SelectTrigger size="md" className="w-full">
-                  <SelectValue>
-                    {(value) =>
-                      value
-                        ? (myChannels.find((c) => c.name === value)?.title ??
-                          t("globalSearch.channel"))
-                        : t("globalSearch.all-channels")
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">
-                    {t("globalSearch.all-channels")}
-                  </SelectItem>
-                  {myChannels.map((c) => (
-                    <SelectItem key={c.name} value={c.name ?? ""}>
-                      {c.title || c.address || c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={setChannel}
+                conversations={conversations}
+                loading={conversationsLoading}
+                placeholder={t("globalSearch.all-channels")}
+              />
 
               <Select
                 value={timeRange}

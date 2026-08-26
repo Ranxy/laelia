@@ -561,7 +561,6 @@
   },
   "globalSearch": {
     "all-channels": "全部会话",
-    "channel": "频道",
     "clear": "清空",
     "empty": "搜索频道、私信、消息与文件",
     "filters": "筛选",
