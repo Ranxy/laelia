@@ -432,6 +432,22 @@
   transform: scale(1);
 }
 
+/* Soft fade/slide used when the chat list switches between filters. */
+.chat-filter-fade {
+  animation: chat-filter-fade 160ms ease-out;
+}
+
+@keyframes chat-filter-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* SchemaDiagram screenshot capture: while `useScreenshot` flips this
    attribute on <body>, any element marked `data-screenshot-hide` is
    omitted from the html-to-image pass. Used for chrome affordances

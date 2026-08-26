@@ -2,6 +2,7 @@ import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
   Bell,
   BellOff,
+  Filter,
   Hash,
   Loader2,
   Pin,
@@ -48,9 +49,10 @@ const CONVERSATION_TYPE_USER_DM = 4;
 type ChatFilter = "unread" | "humans" | "agents" | "groups" | null;
 
 const CHAT_FILTERS: ReadonlyArray<{
-  value: NonNullable<ChatFilter>;
+  value: "all" | NonNullable<ChatFilter>;
   labelKey: string;
 }> = [
+  { value: "all", labelKey: "chat.filter-all" },
   { value: "unread", labelKey: "chat.filter-unread" },
   { value: "humans", labelKey: "chat.filter-humans" },
   { value: "agents", labelKey: "chat.filter-agents" },
@@ -102,6 +104,9 @@ export function ConversationList() {
   // True once the list has been scrolled down; the mobile create-channel
   // FAB collapses to a bare icon while the list is not at the top.
   const [listScrolled, setListScrolled] = useState(false);
+  // Mobile filter chips can be collapsed/expanded via the funnel icon next to
+  // the search entry to keep the top area compact.
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
 
   // Filter preference is persisted per account: the same browser can hold
   // multiple users' choices without one leaking into another.
@@ -117,9 +122,11 @@ export function ConversationList() {
   }, [account]);
 
   const handleFilterChange = useCallback(
-    (next: NonNullable<ChatFilter>) => {
+    (next: "all" | NonNullable<ChatFilter>) => {
       setFilter((prev) => {
-        const value = prev === next ? null : next;
+        // "all" always means no filter; clicking it again intentionally does
+        // not toggle back to a category.
+        const value = next === "all" ? null : prev === next ? null : next;
         try {
           const key = `${CHAT_FILTER_STORAGE_PREFIX}:${account}`;
           if (value) {
@@ -135,6 +142,8 @@ export function ConversationList() {
     },
     [account]
   );
+
+  const activeFilter = CHAT_FILTERS.find((f) => f.value === filter);
 
   // No mount fetch here: ChatLayout (the only host of this list) owns the
   // listChannels fetch + 5s poll, so fetching again here duplicated the request
@@ -234,32 +243,53 @@ export function ConversationList() {
 
       {/* Search: desktop keeps the local conversation-list filter; mobile
           turns the field into an entry point to the global /search page. */}
-      <div className="shrink-0 px-2 py-2 lg:px-3">
+      <div className="shrink-0 px-4 py-2 lg:px-3">
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("chat.search-placeholder")}
           className="hidden h-8 rounded-full text-sm lg:block"
         />
-        <button
-          type="button"
-          onClick={() => navigate("/search")}
-          aria-label={t("globalSearch.placeholder")}
-          className="flex h-10 w-full items-center gap-2 rounded-full border border-control-border bg-background px-3 text-left text-sm text-control-placeholder transition-colors hover:bg-control-bg lg:hidden"
-        >
-          <Search className="size-4 shrink-0" />
-          <span className="truncate">{t("globalSearch.placeholder")}</span>
-        </button>
-        {/* Desktop-only filter tags under the search box. Mobile intentionally
-            keeps the list unfiltered for now. */}
-        {isDesktop && (
+        {/* Mobile search entry + funnel shortcut. The funnel collapses/expands
+            the chip row below so the top area can stay compact. */}
+        <div className="flex items-center gap-2 lg:hidden">
+          <button
+            type="button"
+            onClick={() => navigate("/search")}
+            aria-label={t("globalSearch.placeholder")}
+            className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full border border-control-border bg-background px-3 text-left text-sm text-control-placeholder transition-colors hover:bg-control-bg"
+          >
+            <Search className="size-4 shrink-0" />
+            <span className="truncate">{t("globalSearch.placeholder")}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFiltersExpanded((v) => !v)}
+            aria-label={t(
+              filtersExpanded ? "chat.filter-collapse" : "chat.filter-expand"
+            )}
+            aria-expanded={filtersExpanded}
+            className="flex size-10 shrink-0 items-center justify-center rounded-full border border-control-border bg-control-bg text-control transition-colors hover:bg-control-bg-hover"
+          >
+            <Filter className="size-4" />
+          </button>
+        </div>
+        {/* Filter chips: desktop wraps, mobile scrolls horizontally with the
+            scrollbar hidden. */}
+        {(isDesktop || filtersExpanded) && (
           <div
-            className="mt-2 flex flex-wrap items-center gap-1.5"
+            className={cn(
+              "mt-2",
+              isDesktop
+                ? "grid w-full grid-cols-5 gap-1"
+                : "grid grid-cols-5 gap-1.5"
+            )}
             role="group"
             aria-label={t("chat.filter-label")}
           >
             {CHAT_FILTERS.map(({ value, labelKey }) => {
-              const active = filter === value;
+              const active =
+                value === "all" ? filter === null : filter === value;
               return (
                 <button
                   key={value}
@@ -267,10 +297,15 @@ export function ConversationList() {
                   aria-pressed={active}
                   onClick={() => handleFilterChange(value)}
                   className={cn(
-                    "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                    "rounded-full text-xs font-medium transition-colors",
+                    isDesktop
+                      ? "w-full px-0 py-1 text-center text-[11px]"
+                      : "w-full truncate px-1 py-1.5 text-center",
                     active
-                      ? "bg-accent text-accent-foreground"
-                      : "text-control-light hover:bg-control-bg"
+                      ? "bg-accent/10 text-accent"
+                      : isDesktop
+                        ? "text-control-light hover:bg-control-bg"
+                        : "bg-control-bg text-control"
                   )}
                 >
                   {t(labelKey)}
@@ -281,12 +316,31 @@ export function ConversationList() {
         )}
       </div>
 
+      {/* Active-filter notice: makes it explicit which category the list is
+          currently showing, with a one-tap clear action. */}
+      {filter && activeFilter && (
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-control-border/50 px-3 py-1.5 text-xs text-control-light">
+          <span className="truncate">
+            {t("chat.filter-notice", { filter: t(activeFilter.labelKey) })}
+          </span>
+          <button
+            type="button"
+            onClick={() => handleFilterChange(activeFilter.value)}
+            aria-label={t("chat.filter-clear")}
+            className="flex size-5 shrink-0 items-center justify-center rounded-full text-control-light transition-colors hover:bg-control-bg hover:text-control"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* List */}
       {/* divide-y gives each row a hairline top border so the rail scans
           quickly; /50 keeps the divider light against the row whitespace. */}
       <div
+        key={filter ?? "all"}
         data-testid="conversation-list-scroll"
-        className="flex-1 divide-y divide-control-border/50 overflow-y-auto"
+        className="chat-filter-fade flex-1 divide-y divide-control-border/50 overflow-y-auto"
         onScroll={(e) => setListScrolled(e.currentTarget.scrollTop > 8)}
       >
         {channelsLoading && channels.length === 0 && (

@@ -6,8 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // stub the store with a selector stand-in carrying a fixed channel roster.
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, params?: { count?: number }) =>
-      params?.count != null ? `${key}:${params.count}` : key,
+    t: (key: string, params?: { count?: number; filter?: string }) =>
+      params?.count != null
+        ? `${key}:${params.count}`
+        : params?.filter != null
+          ? `${key}:${params.filter}`
+          : key,
   }),
 }));
 
@@ -160,11 +164,14 @@ describe("ConversationList filters", () => {
     mock.useIsDesktop.mockReturnValue(true);
   });
 
-  it("renders the four desktop filter tags", () => {
+  it("renders the five desktop filter tags", () => {
     mock.channels = [channel()];
     render(<ConversationList />);
     expect(
       screen.getByRole("group", { name: "chat.filter-label" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "chat.filter-all" })
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "chat.filter-unread" })
@@ -258,6 +265,32 @@ describe("ConversationList filters", () => {
     expect(screen.getByText("Agent")).toBeInTheDocument();
   });
 
+  it("shows all conversations from the all tag and keeps them on re-click", () => {
+    mock.channels = [
+      channel({ name: "conversations/ch1", title: "Group", type: 2 }),
+      channel({
+        name: "conversations/ch2",
+        title: "Agent",
+        type: 1,
+        peer: "agents/agent-1",
+      }),
+    ];
+    render(<ConversationList />);
+
+    fireEvent.click(screen.getByRole("button", { name: "chat.filter-agents" }));
+    expect(screen.queryByText("Group")).not.toBeInTheDocument();
+    expect(screen.getByText("Agent")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "chat.filter-all" }));
+    expect(screen.getByText("Group")).toBeInTheDocument();
+    expect(screen.getByText("Agent")).toBeInTheDocument();
+
+    // Clicking All again keeps showing everything (no toggle back to a filter).
+    fireEvent.click(screen.getByRole("button", { name: "chat.filter-all" }));
+    expect(screen.getByText("Group")).toBeInTheDocument();
+    expect(screen.getByText("Agent")).toBeInTheDocument();
+  });
+
   it("persists the selection to localStorage for the current account", () => {
     mock.channels = [channel()];
     render(<ConversationList />);
@@ -283,13 +316,50 @@ describe("ConversationList filters", () => {
     expect(screen.getByText("Human")).toBeInTheDocument();
   });
 
-  it("does not render the filter tags on mobile", () => {
+  it("renders the filter chips on mobile and collapses via the funnel", () => {
     mock.useIsDesktop.mockReturnValue(false);
     mock.channels = [channel()];
     render(<ConversationList />);
     expect(
+      screen.getByRole("group", { name: "chat.filter-label" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "chat.filter-collapse" })
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "chat.filter-collapse" })
+    );
+    expect(
       screen.queryByRole("group", { name: "chat.filter-label" })
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "chat.filter-expand" })
+    ).toBeInTheDocument();
+  });
+
+  it("shows an active-filter notice with a clear action", () => {
+    mock.channels = [
+      channel({ name: "conversations/ch1", title: "Group", type: 2 }),
+      channel({
+        name: "conversations/ch2",
+        title: "Human",
+        type: 4,
+        peer: "users/alice",
+      }),
+    ];
+    render(<ConversationList />);
+    fireEvent.click(screen.getByRole("button", { name: "chat.filter-humans" }));
+    expect(
+      screen.getByText("chat.filter-notice:chat.filter-humans")
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "chat.filter-clear" }));
+    expect(
+      screen.queryByText("chat.filter-notice:chat.filter-humans")
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Group")).toBeInTheDocument();
+    expect(screen.getByText("Human")).toBeInTheDocument();
   });
 });
 
