@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ConversationList uses react-i18next (no provider in tests) and the app
 // store. Stub i18n with a key/count mapper so assertions read the keys, and
@@ -14,6 +14,7 @@ vi.mock("react-i18next", () => ({
 const mock = vi.hoisted(() => ({
   channels: [] as Array<Record<string, unknown>>,
   currentUser: { name: "users/ran-user-1", handle: "ran-user-1" },
+  unreadByConv: {} as Record<string, number>,
   setConversationPinned: vi.fn(),
   setConversationClosed: vi.fn(),
   setConversationMuted: vi.fn(),
@@ -26,7 +27,7 @@ vi.mock("@/stores", () => ({
     selector({
       channels: mock.channels,
       channelsLoading: false,
-      unreadByConv: {},
+      unreadByConv: mock.unreadByConv,
       createChannel: async () => {},
       setConversationPinned: mock.setConversationPinned,
       setConversationClosed: mock.setConversationClosed,
@@ -60,6 +61,13 @@ vi.mock("@/lib/use-is-desktop", () => ({
 
 import type { Conversation } from "@/types/proto-es/v1/command_pb";
 import { ConversationList } from "./conversation-list";
+
+beforeEach(() => {
+  localStorage.clear();
+  mock.unreadByConv = {};
+  mock.channels = [];
+  mock.useIsDesktop.mockReturnValue(true);
+});
 
 function channel(overrides: Record<string, unknown> = {}): Conversation {
   return {
@@ -141,6 +149,147 @@ describe("ConversationList last-message preview", () => {
     // The row still renders its title and no preview text or time appears.
     expect(screen.getByText("Design")).toBeInTheDocument();
     expect(screen.queryByText(/chat.you:|Alice:|Bob:/)).not.toBeInTheDocument();
+  });
+});
+
+describe("ConversationList filters", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+    mock.channels = [];
+    mock.unreadByConv = {};
+    mock.useIsDesktop.mockReturnValue(true);
+  });
+
+  it("renders the four desktop filter tags", () => {
+    mock.channels = [channel()];
+    render(<ConversationList />);
+    expect(
+      screen.getByRole("group", { name: "chat.filter-label" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "chat.filter-unread" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "chat.filter-humans" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "chat.filter-agents" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "chat.filter-groups" })
+    ).toBeInTheDocument();
+  });
+
+  it("shows only unread conversations when the unread tag is selected", () => {
+    mock.channels = [
+      channel({ name: "conversations/ch1", title: "Channel", type: 2 }),
+      channel({
+        name: "conversations/ch2",
+        title: "Agent DM",
+        type: 1,
+        peer: "agents/agent-1",
+      }),
+    ];
+    mock.unreadByConv = { "conversations/ch2": 2 };
+    render(<ConversationList />);
+    expect(screen.getByText("Channel")).toBeInTheDocument();
+    expect(screen.getByText("Agent DM")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "chat.filter-unread" }));
+    expect(screen.queryByText("Channel")).not.toBeInTheDocument();
+    expect(screen.getByText("Agent DM")).toBeInTheDocument();
+  });
+
+  it("filters humans, agents and groups by conversation type", () => {
+    mock.channels = [
+      channel({ name: "conversations/ch1", title: "Group", type: 2 }),
+      channel({
+        name: "conversations/ch2",
+        title: "Agent",
+        type: 1,
+        peer: "agents/agent-1",
+      }),
+      channel({
+        name: "conversations/ch3",
+        title: "Human",
+        type: 4,
+        peer: "users/alice",
+      }),
+    ];
+    render(<ConversationList />);
+    expect(screen.getByText("Group")).toBeInTheDocument();
+    expect(screen.getByText("Agent")).toBeInTheDocument();
+    expect(screen.getByText("Human")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "chat.filter-humans" }));
+    expect(screen.queryByText("Group")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+    expect(screen.getByText("Human")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "chat.filter-agents" }));
+    expect(screen.queryByText("Group")).not.toBeInTheDocument();
+    expect(screen.getByText("Agent")).toBeInTheDocument();
+    expect(screen.queryByText("Human")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "chat.filter-groups" }));
+    expect(screen.getByText("Group")).toBeInTheDocument();
+    expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+    expect(screen.queryByText("Human")).not.toBeInTheDocument();
+  });
+
+  it("clears the filter when clicking the active tag again", () => {
+    mock.channels = [
+      channel({ name: "conversations/ch1", title: "Group", type: 2 }),
+      channel({
+        name: "conversations/ch2",
+        title: "Agent",
+        type: 1,
+        peer: "agents/agent-1",
+      }),
+    ];
+    render(<ConversationList />);
+
+    fireEvent.click(screen.getByRole("button", { name: "chat.filter-agents" }));
+    expect(screen.queryByText("Group")).not.toBeInTheDocument();
+    expect(screen.getByText("Agent")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "chat.filter-agents" }));
+    expect(screen.getByText("Group")).toBeInTheDocument();
+    expect(screen.getByText("Agent")).toBeInTheDocument();
+  });
+
+  it("persists the selection to localStorage for the current account", () => {
+    mock.channels = [channel()];
+    render(<ConversationList />);
+    fireEvent.click(screen.getByRole("button", { name: "chat.filter-groups" }));
+    expect(localStorage.getItem("laelia-chat-filter:ran-user-1")).toBe(
+      "groups"
+    );
+  });
+
+  it("restores a persisted selection on mount", () => {
+    localStorage.setItem("laelia-chat-filter:ran-user-1", "humans");
+    mock.channels = [
+      channel({ name: "conversations/ch1", title: "Group", type: 2 }),
+      channel({
+        name: "conversations/ch2",
+        title: "Human",
+        type: 4,
+        peer: "users/user",
+      }),
+    ];
+    render(<ConversationList />);
+    expect(screen.queryByText("Group")).not.toBeInTheDocument();
+    expect(screen.getByText("Human")).toBeInTheDocument();
+  });
+
+  it("does not render the filter tags on mobile", () => {
+    mock.useIsDesktop.mockReturnValue(false);
+    mock.channels = [channel()];
+    render(<ConversationList />);
+    expect(
+      screen.queryByRole("group", { name: "chat.filter-label" })
+    ).not.toBeInTheDocument();
   });
 });
 

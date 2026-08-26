@@ -39,7 +39,44 @@ import { useAppStore } from "@/stores";
 // Conversation type values mirror Conversation.type: 1 = user↔agent DM,
 // 2 = channel, 4 = user↔user DM.
 const CONVERSATION_TYPE_DM = 1;
+const CONVERSATION_TYPE_CHANNEL = 2;
 const CONVERSATION_TYPE_USER_DM = 4;
+
+// Chat left-rail filters. Mutually exclusive; clicking the active filter again
+// clears it (back to showing every conversation). The selection is persisted
+// per browser account so different users keep their own preference.
+type ChatFilter = "unread" | "humans" | "agents" | "groups" | null;
+
+const CHAT_FILTERS: ReadonlyArray<{
+  value: NonNullable<ChatFilter>;
+  labelKey: string;
+}> = [
+  { value: "unread", labelKey: "chat.filter-unread" },
+  { value: "humans", labelKey: "chat.filter-humans" },
+  { value: "agents", labelKey: "chat.filter-agents" },
+  { value: "groups", labelKey: "chat.filter-groups" },
+];
+
+const CHAT_FILTER_STORAGE_PREFIX = "laelia-chat-filter";
+
+function loadChatFilter(account: string): ChatFilter {
+  try {
+    const raw = localStorage.getItem(
+      `${CHAT_FILTER_STORAGE_PREFIX}:${account}`
+    );
+    if (
+      raw === "unread" ||
+      raw === "humans" ||
+      raw === "agents" ||
+      raw === "groups"
+    ) {
+      return raw;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 export function ConversationList() {
   const { t } = useTranslation();
@@ -56,6 +93,7 @@ export function ConversationList() {
   // The viewer's own handle tags their messages in the last-message preview
   // ("You: ..."); last_message_principal_id carries the sender handle.
   const myPrincipalId = useAppStore((s) => s.currentUser?.handle);
+  const isDesktop = useIsDesktop();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -65,15 +103,54 @@ export function ConversationList() {
   // FAB collapses to a bare icon while the list is not at the top.
   const [listScrolled, setListScrolled] = useState(false);
 
+  // Filter preference is persisted per account: the same browser can hold
+  // multiple users' choices without one leaking into another.
+  const account = myPrincipalId || "anonymous";
+  const [filter, setFilter] = useState<ChatFilter>(() =>
+    loadChatFilter(account)
+  );
+
+  // If the signed-in account changes while this component stays mounted (e.g.
+  // a session switch on the same tab), reload that account's own preference.
+  useEffect(() => {
+    setFilter(loadChatFilter(account));
+  }, [account]);
+
+  const handleFilterChange = useCallback(
+    (next: NonNullable<ChatFilter>) => {
+      setFilter((prev) => {
+        const value = prev === next ? null : next;
+        try {
+          const key = `${CHAT_FILTER_STORAGE_PREFIX}:${account}`;
+          if (value) {
+            localStorage.setItem(key, value);
+          } else {
+            localStorage.removeItem(key);
+          }
+        } catch {
+          // ignore quota/security errors; the toggle still applies in-memory
+        }
+        return value;
+      });
+    },
+    [account]
+  );
+
   // No mount fetch here: ChatLayout (the only host of this list) owns the
   // listChannels fetch + 5s poll, so fetching again here duplicated the request
   // on every /chat entry.
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return channels;
-    return channels.filter((c) => (c.title ?? "").toLowerCase().includes(q));
-  }, [channels, query]);
+    return channels.filter((c) => {
+      if (q && !(c.title ?? "").toLowerCase().includes(q)) return false;
+      if (filter === "unread") return (unreadByConv[c.name] ?? 0) > 0;
+      if (filter === "humans") return c.type === CONVERSATION_TYPE_USER_DM;
+      if (filter === "agents") return c.type === CONVERSATION_TYPE_DM;
+      if (filter === "groups") return c.type === CONVERSATION_TYPE_CHANNEL;
+      return true;
+    });
+  }, [channels, query, filter, unreadByConv]);
 
   const handleCreate = useCallback(async () => {
     const title = newTitle.trim();
@@ -173,6 +250,35 @@ export function ConversationList() {
           <Search className="size-4 shrink-0" />
           <span className="truncate">{t("globalSearch.placeholder")}</span>
         </button>
+        {/* Desktop-only filter tags under the search box. Mobile intentionally
+            keeps the list unfiltered for now. */}
+        {isDesktop && (
+          <div
+            className="mt-2 flex flex-wrap items-center gap-1.5"
+            role="group"
+            aria-label={t("chat.filter-label")}
+          >
+            {CHAT_FILTERS.map(({ value, labelKey }) => {
+              const active = filter === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => handleFilterChange(value)}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                    active
+                      ? "bg-accent text-accent-foreground"
+                      : "text-control-light hover:bg-control-bg"
+                  )}
+                >
+                  {t(labelKey)}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* List */}
@@ -196,7 +302,11 @@ export function ConversationList() {
               <Hash className="size-5" />
             </div>
             <p className="text-control-light text-xs max-w-[200px]">
-              {query ? t("chat.select-conversation") : t("channel.empty")}
+              {filter
+                ? t("chat.filter-empty")
+                : query
+                  ? t("chat.select-conversation")
+                  : t("channel.empty")}
             </p>
           </div>
         )}
