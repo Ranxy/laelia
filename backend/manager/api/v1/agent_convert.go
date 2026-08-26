@@ -226,15 +226,15 @@ func isEmptyAgentACPConfig(cfg *v1pb.AgentACPConfig) bool {
 }
 
 // buildCapabilityForACPConfig derives the agent capability from the
-// user-configurable ACP settings, branching on the runtime. A builtin-pi agent
-// (provider == pi.BuiltinPiProvider) is a non-ACP runtime: its capability comes
-// from the pi package (SupportsPi, not SupportsAcp) and does not depend on a
-// host-detected executable. Every other provider is an ACP runtime and goes
-// through the existing executor.BuildCapability path. This is the single place
-// the manager picks a runtime's capability, so the executor package stays
+// user-configurable ACP settings, branching on the runtime. A pi agent
+// (builtin-pi or user-installed "pi") is a non-ACP runtime: its capability
+// comes from the pi package (SupportsPi, not SupportsAcp) and does not depend
+// on a host-detected executable. Every other provider is an ACP runtime and
+// goes through the existing executor.BuildCapability path. This is the single
+// place the manager picks a runtime's capability, so the executor package stays
 // pi-free (no import cycle: pi already imports executor).
 func buildCapabilityForACPConfig(cfg *v1pb.AgentACPConfig) *v1pb.AgentCapability {
-	if cfg != nil && cfg.GetProvider() == pi.BuiltinPiProvider {
+	if cfg != nil && pi.IsPiProvider(cfg.GetProvider()) {
 		return pi.BuildPiCapability(cfg)
 	}
 	return executor.BuildCapability(cfg)
@@ -254,6 +254,8 @@ func convertToV1Providers(in []*storepb.AgentProviderInfo) []*v1pb.AgentProvider
 			Models:                    convertToV1Models(p.Models),
 			SupportsModelConfigOption: p.SupportsModelConfigOption,
 			DetectedAt:                p.DetectedAt,
+			Compatible:                p.Compatible,
+			IncompatibilityReason:     p.IncompatibilityReason,
 		})
 	}
 	return out
@@ -273,6 +275,8 @@ func convertToStoreProviders(in []*v1pb.AgentProviderInfo) []*storepb.AgentProvi
 			Models:                    convertToStoreModels(p.Models),
 			SupportsModelConfigOption: p.SupportsModelConfigOption,
 			DetectedAt:                p.DetectedAt,
+			Compatible:                p.Compatible,
+			IncompatibilityReason:     p.IncompatibilityReason,
 		})
 	}
 	return out

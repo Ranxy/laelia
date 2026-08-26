@@ -146,24 +146,36 @@ type PiConfig struct {
 }
 
 // BuildPiConfig resolves the user-configurable AgentACPConfig into a PiConfig
-// when provider == "builtin-pi". It returns nil otherwise (or when the required
-// api_provider/api_key are missing), which the runner treats as "not a pi agent
-// / not yet configured".
+// when provider selects a pi runtime ("builtin-pi" or user-installed "pi"). It
+// returns nil otherwise (or when required fields are missing), which the runner
+// treats as "not a pi agent / not yet configured".
+//
+// For the user-installed "pi" provider, two modes are supported:
+//   - pi's own model/auth: api_provider and global_provider are both empty; only
+//     model is required and laelia does not inject an API key.
+//   - laelia-managed: api_provider/api_key (self) or a global provider reference
+//     resolved by the manager before it reaches the daemon.
 func BuildPiConfig(
 	user *v1pb.AgentACPConfig,
 	machineID, agentID, agentResourceID, piBinaryPath, daemonSocket, sessionToken, binaryDir string,
 ) *PiConfig {
-	if user == nil || user.Provider != BuiltinPiProvider {
+	if user == nil || !IsPiProvider(user.Provider) {
 		return nil
 	}
-	if _, ok := apiProviders[user.ApiProvider]; !ok {
+	if strings.TrimSpace(user.Model) == "" {
 		return nil
 	}
-	if strings.TrimSpace(user.ApiKey) == "" {
-		return nil
-	}
-	if user.ApiProvider == APIProviderCustom && strings.TrimSpace(user.ApiBaseUrl) == "" {
-		return nil
+	ownMode := user.Provider == UserPiProvider && user.GlobalProvider == "" && user.ApiProvider == ""
+	if !ownMode {
+		if _, ok := apiProviders[user.ApiProvider]; !ok {
+			return nil
+		}
+		if strings.TrimSpace(user.ApiKey) == "" {
+			return nil
+		}
+		if user.ApiProvider == APIProviderCustom && strings.TrimSpace(user.ApiBaseUrl) == "" {
+			return nil
+		}
 	}
 
 	workingDir := agentWorkingDir(machineID, agentID)
@@ -198,12 +210,12 @@ func BuildPiConfig(
 	return cfg
 }
 
-// BuildPiCapability derives the agent capability for a builtin-pi config. It does
-// not touch the filesystem; it only reflects that the pi runtime supports the
-// same structured surface (diff, raw events, tool traces, autonomous decisions)
-// as the ACP runtimes.
+// BuildPiCapability derives the agent capability for a pi config (built-in or
+// user-installed). It does not touch the filesystem; it only reflects that the
+// pi runtime supports the same structured surface (diff, raw events, tool
+// traces, autonomous decisions) as the ACP runtimes.
 func BuildPiCapability(user *v1pb.AgentACPConfig) *v1pb.AgentCapability {
-	if user == nil || user.Provider != BuiltinPiProvider {
+	if user == nil || !IsPiProvider(user.Provider) {
 		return &v1pb.AgentCapability{SupportsAcp: false, SupportsPi: false}
 	}
 	return &v1pb.AgentCapability{
@@ -317,15 +329,18 @@ func (c *PiConfig) buildPiEnv(commandID string) []string {
 // (written under .pi/extensions) can register MCP tools. --approve trusts the
 // working dir so AGENTS.md/CLAUDE.md and project settings load.
 func (c *PiConfig) launchArgs() []string {
-	return []string{
-		"--mode", "rpc",
-		"--provider", apiProviders[c.APIProvider].piProvider,
+	args := []string{"--mode", "rpc"}
+	if spec, ok := apiProviders[c.APIProvider]; ok {
+		args = append(args, "--provider", spec.piProvider)
+	}
+	args = append(args,
 		"--model", c.Model,
 		"--session-dir", c.WorkingDir,
 		"--no-skills",
 		"--no-prompt-templates",
 		"--approve",
-	}
+	)
+	return args
 }
 
 // writeCustomModels writes the per-agent models.json that declares the custom

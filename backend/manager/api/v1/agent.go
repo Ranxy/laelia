@@ -134,7 +134,8 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 		}
 		// Legacy inline api_provider/api_key is gated by the workspace toggle (or
 		// agents.edit). When the toggle is off, only admins may self-provide a key.
-		if reqACP.GetGlobalProvider() == "" && reqACP.Provider == pi.BuiltinPiProvider {
+		// User-installed pi's own-model mode (api_provider empty) needs no key.
+		if reqACP.GetGlobalProvider() == "" && pi.IsPiProvider(reqACP.Provider) && reqACP.ApiProvider != "" {
 			if !s.canUseInlineAPIKeyAtCreate(ctx, user) {
 				return nil, connect.NewError(connect.CodePermissionDenied, errors.New("self-provided api keys are disabled; use a global provider"))
 			}
@@ -268,11 +269,11 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 	if !out.CanEdit && out.Info != nil && out.Info.AcpConfig != nil {
 		out.Info.AcpConfig.PersonaPrompt = ""
 	}
-	// The builtin-pi api_key is a plaintext secret. Admins see the full key;
-	// the owner sees a masked preview when the workspace toggle enables
-	// self-provided keys; everyone else sees nothing. Global-provider agents
-	// never carry an inline key.
-	if out.GetInfo().GetAcpConfig().GetProvider() == pi.BuiltinPiProvider && out.Info.AcpConfig != nil && out.Info.AcpConfig.ApiKey != "" {
+	// The pi api_key is a plaintext secret. Admins see the full key; the owner
+	// sees a masked preview when the workspace toggle enables self-provided
+	// keys; everyone else sees nothing. Global-provider agents never carry an
+	// inline key.
+	if out.GetInfo().GetAcpConfig() != nil && pi.IsPiProvider(out.Info.AcpConfig.GetProvider()) && out.Info.AcpConfig.ApiKey != "" {
 		if view, masked := s.canViewInlineKey(ctx, caller, agent); view && masked {
 			out.Info.AcpConfig.ApiKey = maskKeyPreview(out.Info.AcpConfig.ApiKey)
 		} else if !view {

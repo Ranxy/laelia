@@ -45,18 +45,20 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 	// caller holding agents.edit may always set it; otherwise the toggle must be
 	// on (the agent's owner may then self-configure their own key).
 	reqACP := req.Msg.AcpConfig
-	if reqACP != nil && reqACP.Provider == pi.BuiltinPiProvider && reqACP.GlobalProvider == "" && reqACP.GlobalProviderEntry == "" {
+	if reqACP != nil && pi.IsPiProvider(reqACP.Provider) && reqACP.GlobalProvider == "" && reqACP.GlobalProviderEntry == "" && reqACP.ApiProvider != "" {
 		if !s.canUseInlineAPIKey(ctx, user, agent) {
 			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("self-provided api keys are disabled; use a global provider"))
 		}
 	}
 
-	// builtin-pi api_key is a secret: the config form does not echo it back on
-	// save (the password field is left empty to avoid retransmitting it). An
-	// empty api_key — or a "****"-prefixed masked preview echoed back — means
-	// "keep the existing key", so copy it from the stored config before
-	// validation so the required-field check passes.
-	if reqACP != nil && reqACP.Provider == pi.BuiltinPiProvider {
+	// pi api_key is a secret: the config form does not echo it back on save
+	// (the password field is left empty to avoid retransmitting it). An empty
+	// api_key — or a "****"-prefixed masked preview echoed back — means "keep
+	// the existing key", so copy it from the stored config before validation
+	// so the required-field check passes. This does not apply to the
+	// user-installed pi "own model/auth" mode, where laelia intentionally does
+	// not manage a key.
+	if reqACP != nil && pi.IsPiProvider(reqACP.Provider) && reqACP.ApiProvider != "" {
 		key := strings.TrimSpace(reqACP.ApiKey)
 		if key == "" || strings.HasPrefix(key, secretMaskPrefix) {
 			if existing := agent.Info.GetAcpConfig(); existing != nil {
@@ -298,7 +300,7 @@ func (s *AgentService) RefreshAgentModels(ctx context.Context, req *connect.Requ
 	if !knownProviderID(providerID) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid acp_config.provider %q", providerID))
 	}
-	if providerID == "custom" || providerID == pi.BuiltinPiProvider {
+	if providerID == "custom" || pi.IsPiProvider(providerID) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("provider %q does not support on-host model probing", providerID))
 	}
 
@@ -492,11 +494,10 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders 
 	if cfg.MaxTokens < 0 {
 		return errors.New("acp_config.max_tokens must be non-negative")
 	}
-	// builtin-pi is a non-ACP runtime: it needs an API provider + API key +
-	// model, not a host-detected executable. Validate its fields and skip the
-	// host-availability / model-config-option checks (pi is always available —
-	// it is bundled with laelia, not installed on the host).
-	if cfg.Provider == pi.BuiltinPiProvider {
+	// pi is a non-ACP runtime. builtin-pi needs an API provider + API key +
+	// model (or a global provider); user-installed pi additionally supports
+	// pi's own model/auth mode where laelia does not manage a key.
+	if pi.IsPiProvider(cfg.Provider) {
 		// A global-provider reference replaces the inline api_provider/api_key
 		// (the model resolves from the referenced entry). Both fields must be
 		// set and consistent; access to the provider is checked by the handler.
@@ -517,17 +518,38 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders 
 			}
 			return nil
 		}
+		// User-installed pi must actually be installed on the owning machine and
+		// satisfy the minimum version when the machine has already probed.
+		if cfg.Provider == pi.UserPiProvider && len(machineAvailableProviders) > 0 {
+			if !providerAvailable(cfg.Provider, machineAvailableProviders) {
+				return errors.Errorf("acp_config.provider %q is not available on the owning machine (available: %s)",
+					cfg.Provider, availableProviderIDs(machineAvailableProviders))
+			}
+			for _, p := range machineAvailableProviders {
+				if p.ProviderId == cfg.Provider && !p.Compatible {
+					return errors.Errorf("acp_config.provider %q is not compatible: %s", cfg.Provider, p.IncompatibilityReason)
+				}
+			}
+		}
+		// User-installed pi may use pi's own model/auth: no api_provider and no
+		// global provider means laelia does not manage the key.
+		if cfg.Provider == pi.UserPiProvider && cfg.ApiProvider == "" {
+			if strings.TrimSpace(cfg.Model) == "" {
+				return errors.New("acp_config.model must be set for user pi")
+			}
+			return nil
+		}
 		if !pi.IsKnownAPIProvider(cfg.ApiProvider) && cfg.ApiProvider != pi.APIProviderCustom {
 			return errors.Errorf("acp_config.api_provider %q is not supported (phase 1: deepseek, openrouter, custom)", cfg.ApiProvider)
 		}
 		if cfg.ApiProvider == pi.APIProviderCustom && strings.TrimSpace(cfg.ApiBaseUrl) == "" {
-			return errors.New("acp_config.api_base_url must be set for custom builtin-pi")
+			return errors.New("acp_config.api_base_url must be set for custom pi")
 		}
 		if strings.TrimSpace(cfg.ApiKey) == "" {
-			return errors.New("acp_config.api_key must be set for builtin-pi")
+			return errors.New("acp_config.api_key must be set for pi")
 		}
 		if strings.TrimSpace(cfg.Model) == "" {
-			return errors.New("acp_config.model must be set for builtin-pi")
+			return errors.New("acp_config.model must be set for pi")
 		}
 		return nil
 	}
@@ -625,8 +647,9 @@ func availableProviderIDs(available []*storepb.AgentProviderInfo) string {
 	return strings.Join(ids, ", ")
 }
 
-// knownProviderID reports whether id is a recognized provider id (a built-in,
-// the bundled non-ACP pi runtime, or the "custom" escape hatch).
+// knownProviderID reports whether id is a recognized provider id (a built-in
+// ACP provider, the bundled or user-installed non-ACP pi runtime, or the
+// "custom" escape hatch).
 func knownProviderID(id string) bool {
 	if id == "custom" || id == pi.BuiltinPiProvider {
 		return true

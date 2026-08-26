@@ -25,11 +25,11 @@ import (
 // ReloadAgentAssignment, picked up at the next BeginSession.
 //
 // An agent is backed by EXACTLY ONE runtime: either an ACP config (claude-code
-// / opencode, spawned per turn) OR a pi config (builtin-pi, one long-lived
-// `pi --mode rpc` subprocess shared across turns). The two never coexist on the
-// same runner; applyAssignment flips between them and tears down the other side.
-// All runners share the machine's access token and the machine-level daemon
-// socket.
+// / opencode, spawned per turn) OR a pi config (builtin-pi or user-installed
+// pi, one long-lived `pi --mode rpc` subprocess shared across turns). The two
+// never coexist on the same runner; applyAssignment flips between them and
+// tears down the other side. All runners share the machine's access token and
+// the machine-level daemon socket.
 type agentRunner struct {
 	machine     *MachineClient
 	daemon      *daemonsrv.Server
@@ -71,13 +71,33 @@ func (r *agentRunner) buildAcpConfig(assignment *v1pb.AgentAssignment) *executor
 
 // buildPiConfig resolves the server-owned AgentACPConfig into a pi config +
 // creates the per-agent working dir. Returns nil if the assignment is not a
-// configured builtin-pi agent (provider != builtin-pi, unknown api_provider,
-// or empty api key), which keeps the runner inert.
+// configured pi agent (provider != builtin-pi/user-pi, unknown api_provider,
+// missing key/model, or unavailable binary), which keeps the runner inert.
 func (r *agentRunner) buildPiConfig(assignment *v1pb.AgentAssignment) *pi.PiConfig {
-	piBinary, err := pi.ResolveBinary()
-	if err != nil {
-		slog.Warn("pi binary unavailable; agent stays inert", "agent", r.agentName, "error", err)
-		return nil
+	var piBinary string
+	if assignment.GetAcpConfig().GetProvider() == pi.UserPiProvider {
+		p, ok := provider.Default().Lookup(provider.PiProviderID)
+		if !ok {
+			slog.Warn("user pi provider not registered; agent stays inert", "agent", r.agentName)
+			return nil
+		}
+		info, present, err := p.Detect(context.Background())
+		if err != nil || !present || info == nil {
+			slog.Warn("user pi not detected; agent stays inert", "agent", r.agentName, "error", err)
+			return nil
+		}
+		if !info.Compatible {
+			slog.Warn("user pi incompatible; agent stays inert", "agent", r.agentName, "version", info.Version, "reason", info.IncompatibilityReason)
+			return nil
+		}
+		piBinary = info.ExecutablePath
+	} else {
+		var err error
+		piBinary, err = pi.ResolveBinary()
+		if err != nil {
+			slog.Warn("pi binary unavailable; agent stays inert", "agent", r.agentName, "error", err)
+			return nil
+		}
 	}
 	cfg := pi.BuildPiConfig(
 		assignment.GetAcpConfig(),
@@ -110,7 +130,7 @@ func (r *agentRunner) buildPiConfig(assignment *v1pb.AgentAssignment) *pi.PiConf
 // reload cause instead of a generic "session exited mid-turn".
 func (r *agentRunner) applyAssignment(a *v1pb.AgentAssignment) {
 	acp := a.GetAcpConfig()
-	if acp != nil && acp.GetProvider() == pi.BuiltinPiProvider {
+	if acp != nil && pi.IsPiProvider(acp.GetProvider()) {
 		// pi owns the runner: tear down any resident thread subprocess first
 		// (coordinated so an in-flight thread turn reports a reload cause).
 		r.coordinateInFlightTurn()

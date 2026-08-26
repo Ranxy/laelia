@@ -138,7 +138,7 @@ func (s *MachineService) RefreshMachineModels(ctx context.Context, req *connect.
 	if !knownProviderID(providerID) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid acp_config.provider %q", providerID))
 	}
-	if providerID == "custom" || providerID == pi.BuiltinPiProvider {
+	if providerID == "custom" || pi.IsPiProvider(providerID) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("provider %q does not support on-host model probing", providerID))
 	}
 

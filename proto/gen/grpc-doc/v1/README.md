@@ -974,6 +974,8 @@ the same way it preserves acp_config.
 | models | [AgentModelOption](#laelia-v1-AgentModelOption) | repeated | empty when the provider does not advertise a model config option |
 | supports_model_config_option | [bool](#bool) |  | whether probing observed a category==&#34;model&#34; config option |
 | detected_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| compatible | [bool](#bool) |  | compatible is false when a detected provider exists but does not satisfy laelia&#39;s minimum version / protocol compatibility requirements. The UI shows the provider but prevents selecting it. |
+| incompatibility_reason | [string](#string) |  | incompatibility_reason explains why a detected provider is not compatible (e.g. &#34;requires pi &gt;= 0.82.1&#34;). Empty when compatible is true. |
 
 
 

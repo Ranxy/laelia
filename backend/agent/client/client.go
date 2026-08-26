@@ -636,6 +636,8 @@ func discoveredToProto(in []provider.Discovered, at time.Time) []*v1pb.AgentProv
 			Models:                    models,
 			SupportsModelConfigOption: d.SupportsModelConfigOption,
 			DetectedAt:                ts,
+			Compatible:                d.Compatible,
+			IncompatibilityReason:     d.IncompatibilityReason,
 		})
 	}
 	return out

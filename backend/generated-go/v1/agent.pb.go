@@ -3438,8 +3438,15 @@ type AgentProviderInfo struct {
 	Models                    []*AgentModelOption    `protobuf:"bytes,5,rep,name=models,proto3" json:"models,omitempty"`                                                                             // empty when the provider does not advertise a model config option
 	SupportsModelConfigOption bool                   `protobuf:"varint,6,opt,name=supports_model_config_option,json=supportsModelConfigOption,proto3" json:"supports_model_config_option,omitempty"` // whether probing observed a category=="model" config option
 	DetectedAt                *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=detected_at,json=detectedAt,proto3" json:"detected_at,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	// compatible is false when a detected provider exists but does not satisfy
+	// laelia's minimum version / protocol compatibility requirements. The UI
+	// shows the provider but prevents selecting it.
+	Compatible bool `protobuf:"varint,8,opt,name=compatible,proto3" json:"compatible,omitempty"`
+	// incompatibility_reason explains why a detected provider is not compatible
+	// (e.g. "requires pi >= 0.82.1"). Empty when compatible is true.
+	IncompatibilityReason string `protobuf:"bytes,9,opt,name=incompatibility_reason,json=incompatibilityReason,proto3" json:"incompatibility_reason,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *AgentProviderInfo) Reset() {
@@ -3519,6 +3526,20 @@ func (x *AgentProviderInfo) GetDetectedAt() *timestamppb.Timestamp {
 		return x.DetectedAt
 	}
 	return nil
+}
+
+func (x *AgentProviderInfo) GetCompatible() bool {
+	if x != nil {
+		return x.Compatible
+	}
+	return false
+}
+
+func (x *AgentProviderInfo) GetIncompatibilityReason() string {
+	if x != nil {
+		return x.IncompatibilityReason
+	}
+	return ""
 }
 
 // AgentModelOption is one model selectable via the ACP session config option
@@ -4338,7 +4359,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	" \x01(\v2\x19.laelia.v1.AgentACPConfigR\tacpConfig\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xcd\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa4\x03\n" +
 	"\x11AgentProviderInfo\x12\x1f\n" +
 	"\vprovider_id\x18\x01 \x01(\tR\n" +
 	"providerId\x12!\n" +
@@ -4348,7 +4369,11 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x06models\x18\x05 \x03(\v2\x1b.laelia.v1.AgentModelOptionR\x06models\x12?\n" +
 	"\x1csupports_model_config_option\x18\x06 \x01(\bR\x19supportsModelConfigOption\x12;\n" +
 	"\vdetected_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"detectedAt\"^\n" +
+	"detectedAt\x12\x1e\n" +
+	"\n" +
+	"compatible\x18\b \x01(\bR\n" +
+	"compatible\x125\n" +
+	"\x16incompatibility_reason\x18\t \x01(\tR\x15incompatibilityReason\"^\n" +
 	"\x10AgentModelOption\x12\x14\n" +
 	"\x05value\x18\x01 \x01(\tR\x05value\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +

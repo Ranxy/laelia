@@ -8,6 +8,10 @@ package provider
 
 import "context"
 
+// PiProviderID is the provider id for a user-installed pi binary detected on
+// the host. It is distinct from the always-available builtin-pi runtime.
+const PiProviderID = "pi"
+
 // ModelOption is one model selectable via the ACP session config option round
 // trip. Value is the valueId the client sends to SetSessionConfigOption.
 type ModelOption struct {
@@ -27,6 +31,12 @@ type Discovered struct {
 	// option (SupportsModelConfigOption false).
 	Models                    []ModelOption
 	SupportsModelConfigOption bool
+	// Compatible is false when a detected provider exists but does not satisfy
+	// laelia's minimum version / protocol compatibility requirements.
+	Compatible bool
+	// IncompatibilityReason explains why a detected provider is incompatible.
+	// Empty when Compatible is true.
+	IncompatibilityReason string
 }
 
 // Provider is the extension point for a built-in LLM agent provider.
@@ -62,4 +72,17 @@ type Detected struct {
 	DisplayName    string
 	Version        string
 	ExecutablePath string
+	// Compatible reports whether the detected provider satisfies laelia's
+	// minimum version / protocol compatibility requirements.
+	Compatible bool
+	// IncompatibilityReason explains why a detected provider is incompatible.
+	// Empty when Compatible is true.
+	IncompatibilityReason string
+}
+
+// NonACPRuntime marks a provider that is discovered on the host but is not
+// driven over ACP (e.g. user-installed pi). ACP command/capability builders
+// must treat these as inert rather than deriving an ACP launch command.
+type NonACPRuntime interface {
+	IsNonACPRuntime() bool
 }

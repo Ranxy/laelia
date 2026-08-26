@@ -558,6 +558,8 @@ type AgentProviderInfo struct {
 	Models                    []*AgentModelOption    `protobuf:"bytes,5,rep,name=models,proto3" json:"models,omitempty"`
 	SupportsModelConfigOption bool                   `protobuf:"varint,6,opt,name=supports_model_config_option,json=supportsModelConfigOption,proto3" json:"supports_model_config_option,omitempty"`
 	DetectedAt                *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=detected_at,json=detectedAt,proto3" json:"detected_at,omitempty"`
+	Compatible                bool                   `protobuf:"varint,8,opt,name=compatible,proto3" json:"compatible,omitempty"`
+	IncompatibilityReason     string                 `protobuf:"bytes,9,opt,name=incompatibility_reason,json=incompatibilityReason,proto3" json:"incompatibility_reason,omitempty"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -639,6 +641,20 @@ func (x *AgentProviderInfo) GetDetectedAt() *timestamppb.Timestamp {
 		return x.DetectedAt
 	}
 	return nil
+}
+
+func (x *AgentProviderInfo) GetCompatible() bool {
+	if x != nil {
+		return x.Compatible
+	}
+	return false
+}
+
+func (x *AgentProviderInfo) GetIncompatibilityReason() string {
+	if x != nil {
+		return x.IncompatibilityReason
+	}
+	return ""
 }
 
 type AgentModelOption struct {
@@ -940,7 +956,7 @@ const file_store_agent_proto_rawDesc = "" +
 	"max_tokens\x18\x0f \x01(\x03R\tmaxTokens\x1a<\n" +
 	"\x0eCustomEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd0\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa7\x03\n" +
 	"\x11AgentProviderInfo\x12\x1f\n" +
 	"\vprovider_id\x18\x01 \x01(\tR\n" +
 	"providerId\x12!\n" +
@@ -950,7 +966,11 @@ const file_store_agent_proto_rawDesc = "" +
 	"\x06models\x18\x05 \x03(\v2\x1e.laelia.store.AgentModelOptionR\x06models\x12?\n" +
 	"\x1csupports_model_config_option\x18\x06 \x01(\bR\x19supportsModelConfigOption\x12;\n" +
 	"\vdetected_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"detectedAt\"^\n" +
+	"detectedAt\x12\x1e\n" +
+	"\n" +
+	"compatible\x18\b \x01(\bR\n" +
+	"compatible\x125\n" +
+	"\x16incompatibility_reason\x18\t \x01(\tR\x15incompatibilityReason\"^\n" +
 	"\x10AgentModelOption\x12\x14\n" +
 	"\x05value\x18\x01 \x01(\tR\x05value\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +

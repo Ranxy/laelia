@@ -244,6 +244,8 @@
 | models | [AgentModelOption](#laelia-store-AgentModelOption) | repeated |  |
 | supports_model_config_option | [bool](#bool) |  |  |
 | detected_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| compatible | [bool](#bool) |  |  |
+| incompatibility_reason | [string](#string) |  |  |
 
 
 

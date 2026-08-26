@@ -1704,6 +1704,23 @@ export declare type AgentProviderInfo = Message<"laelia.v1.AgentProviderInfo"> &
    * @generated from field: google.protobuf.Timestamp detected_at = 7;
    */
   detectedAt?: Timestamp | undefined;
+
+  /**
+   * compatible is false when a detected provider exists but does not satisfy
+   * laelia's minimum version / protocol compatibility requirements. The UI
+   * shows the provider but prevents selecting it.
+   *
+   * @generated from field: bool compatible = 8;
+   */
+  compatible: boolean;
+
+  /**
+   * incompatibility_reason explains why a detected provider is not compatible
+   * (e.g. "requires pi >= 0.82.1"). Empty when compatible is true.
+   *
+   * @generated from field: string incompatibility_reason = 9;
+   */
+  incompatibilityReason: string;
 };
 
 /**

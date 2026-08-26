@@ -19,6 +19,7 @@ import {
   Card,
   entryLabel,
   Field,
+  isPiProvider,
   modelLabel,
   piAPIProviderIds,
   providerDisplayName,
@@ -122,7 +123,7 @@ export function AgentProfilePage() {
   const [apiBaseUrl, setApiBaseUrl] = useState("");
   const [contextWindow, setContextWindow] = useState(0);
   const [maxTokens, setMaxTokens] = useState(0);
-  const [piMode, setPiMode] = useState<"global" | "self">("global");
+  const [piMode, setPiMode] = useState<"own" | "global" | "self">("global");
   const [globalProvider, setGlobalProvider] = useState("");
   const [globalProviderEntry, setGlobalProviderEntry] = useState("");
   const [customEnvEntries, setCustomEnvEntries] = useState<
@@ -399,11 +400,14 @@ export function AgentProfilePage() {
         ? Object.entries(cfg.customEnv).map(([key, value]) => ({ key, value }))
         : [],
     };
-    const nextPiMode: "global" | "self" = cfg?.globalProvider
-      ? "global"
-      : cfg?.apiProvider
-        ? "self"
-        : "global";
+    const nextPiMode: "own" | "global" | "self" =
+      cfg?.provider === "pi" && !cfg?.globalProvider && !cfg?.apiProvider
+        ? "own"
+        : cfg?.globalProvider
+          ? "global"
+          : cfg?.apiProvider
+            ? "self"
+            : "global";
     configRef.current = next;
     setExecutable(next.executable);
     setArgs(next.args);
@@ -595,10 +599,10 @@ export function AgentProfilePage() {
   // not know about.
   const availableProviders: AgentProviderInfo[] = machineProviders;
   const isCustomProvider = provider === "custom";
-  const isPiProvider = provider === "builtin-pi";
-  // Global-provider selection for the builtin-pi runtime: the provider (one the
-  // caller may use) and the entry (one (key, model) pair) the agent will use.
-  // The model resolves from the entry server-side.
+  const isPiRuntime = isPiProvider(provider);
+  // Global-provider selection for the pi runtime: the provider (one the caller
+  // may use) and the entry (one (key, model) pair) the agent will use. The
+  // model resolves from the entry server-side.
   const selectedGlobalProvider = apiProviders.find(
     (p) => p.name === globalProvider
   );
@@ -611,7 +615,7 @@ export function AgentProfilePage() {
   // a stale override is never shown for a different provider.
   const modelOptions = refreshedModels ?? selectedProviderInfo?.models ?? [];
   const providerSupportsModel =
-    !!selectedProviderInfo?.supportsModelConfigOption;
+    !isPiRuntime && !!selectedProviderInfo?.supportsModelConfigOption;
 
   // refreshModels probes the selected provider's models on the agent's machine
   // with the current draft custom_env (e.g. CODEX_HOME), so the picker reflects
@@ -690,7 +694,15 @@ export function AgentProfilePage() {
   // is optional on save (empty means keep the existing stored key).
   function canSaveFor(draft: typeof configRef.current): boolean {
     if (draft.provider === "custom") return draft.executable.trim() !== "";
-    if (draft.provider === "builtin-pi") {
+    if (isPiProvider(draft.provider)) {
+      // User-installed pi may use pi's own model/auth: only a model is needed.
+      if (
+        draft.provider === "pi" &&
+        !draft.globalProvider &&
+        !draft.apiProvider
+      ) {
+        return draft.model.trim() !== "";
+      }
       // Global-provider mode needs a provider + entry; self-provided mode
       // needs an api provider + model.
       if (draft.globalProvider) {
@@ -1379,6 +1391,7 @@ export function AgentProfilePage() {
                                 ? configRef.current.protocol
                                 : "",
                             apiProvider: "",
+                            apiKey: "",
                             globalProvider: "",
                             globalProviderEntry: "",
                             apiBaseUrl: "",
@@ -1391,6 +1404,7 @@ export function AgentProfilePage() {
                             next === "custom" ? configRef.current.protocol : ""
                           );
                           setApiProvider("");
+                          setApiKey("");
                           setGlobalProvider("");
                           setGlobalProviderEntry("");
                           setRefreshedModels(null);
@@ -1398,7 +1412,7 @@ export function AgentProfilePage() {
                           setApiBaseUrl("");
                           setContextWindow(0);
                           setMaxTokens(0);
-                          setPiMode("global");
+                          setPiMode(next === "pi" ? "own" : "global");
                           saveConfig();
                         }}
                       >
@@ -1421,8 +1435,15 @@ export function AgentProfilePage() {
                             {t("agent.acp-config-provider-builtin-pi")}
                           </SelectItem>
                           {availableProviders.map((p) => (
-                            <SelectItem key={p.providerId} value={p.providerId}>
+                            <SelectItem
+                              key={p.providerId}
+                              value={p.providerId}
+                              disabled={p.compatible === false}
+                            >
                               {providerDisplayName(p)}
+                              {p.compatible === false && p.incompatibilityReason
+                                ? ` — ${p.incompatibilityReason}`
+                                : ""}
                             </SelectItem>
                           ))}
                           <SelectItem value="custom">
@@ -1446,9 +1467,9 @@ export function AgentProfilePage() {
                     )}
                   </div>
 
-                  {isPiProvider && (
+                  {isPiRuntime && (
                     <>
-                      {showLegacyInline && (
+                      {(showLegacyInline || provider === "pi") && (
                         <div className="flex flex-col gap-1">
                           <label className="text-sm font-medium">
                             {t("agent.acp-config-pi-mode")}
@@ -1456,9 +1477,10 @@ export function AgentProfilePage() {
                           <Select
                             value={piMode}
                             onValueChange={(v) => {
-                              const next = v === "self" ? "self" : "global";
+                              const next =
+                                v === "own" || v === "self" ? v : "global";
                               if (next === "global") {
-                                // Switching to managed: clear the inline side.
+                                // Switching to managed: clear the inline/own side.
                                 configRef.current = {
                                   ...configRef.current,
                                   apiProvider: "",
@@ -1477,7 +1499,7 @@ export function AgentProfilePage() {
                                 setPiModels([]);
                                 setPiModelsError("");
                               } else {
-                                // Switching to self-provided: clear the managed side.
+                                // Switching to self/own: clear the managed side.
                                 configRef.current = {
                                   ...configRef.current,
                                   globalProvider: "",
@@ -1486,6 +1508,21 @@ export function AgentProfilePage() {
                                 setGlobalProvider("");
                                 setGlobalProviderEntry("");
                               }
+                              if (next === "own") {
+                                configRef.current = {
+                                  ...configRef.current,
+                                  apiProvider: "",
+                                  apiKey: "",
+                                  apiBaseUrl: "",
+                                  model: "",
+                                };
+                                setApiProvider("");
+                                setApiKey("");
+                                setApiBaseUrl("");
+                                setModel("");
+                                setPiModels([]);
+                                setPiModelsError("");
+                              }
                               setPiMode(next);
                               saveConfig();
                             }}
@@ -1493,21 +1530,63 @@ export function AgentProfilePage() {
                             <SelectTrigger>
                               <SelectValue>
                                 {(v: string | null) =>
-                                  v === "self"
-                                    ? t("agent.acp-config-pi-mode-self")
-                                    : t("agent.acp-config-pi-mode-managed")
+                                  v === "own"
+                                    ? t("agent.acp-config-pi-mode-own")
+                                    : v === "self"
+                                      ? t("agent.acp-config-pi-mode-self")
+                                      : t("agent.acp-config-pi-mode-managed")
                                 }
                               </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
+                              {provider === "pi" && (
+                                <SelectItem value="own">
+                                  {t("agent.acp-config-pi-mode-own")}
+                                </SelectItem>
+                              )}
                               <SelectItem value="global">
                                 {t("agent.acp-config-pi-mode-managed")}
                               </SelectItem>
-                              <SelectItem value="self">
-                                {t("agent.acp-config-pi-mode-self")}
-                              </SelectItem>
+                              {showLegacyInline && (
+                                <SelectItem value="self">
+                                  {t("agent.acp-config-pi-mode-self")}
+                                </SelectItem>
+                              )}
                             </SelectContent>
                           </Select>
+                        </div>
+                      )}
+
+                      {piMode === "own" && provider === "pi" && (
+                        <div className="flex flex-col gap-1">
+                          <label className="text-sm font-medium">
+                            {t("agent.acp-config-model")}
+                          </label>
+                          <ModelCombobox
+                            className="flex-1"
+                            value={model}
+                            options={(selectedProviderInfo?.models ?? []).map(
+                              (m) => ({ id: m.value, name: m.name || m.value })
+                            )}
+                            loading={modelsRefreshing}
+                            placeholder={t(
+                              "agent.acp-config-pi-own-model-placeholder"
+                            )}
+                            emptyLabel={t(
+                              "agent.acp-config-pi-own-models-empty"
+                            )}
+                            onValueChange={(next) => {
+                              configRef.current = {
+                                ...configRef.current,
+                                model: next,
+                              };
+                              setModel(next);
+                              saveConfig();
+                            }}
+                          />
+                          <p className="text-xs text-control-light">
+                            {t("agent.acp-config-pi-own-model-hint")}
+                          </p>
                         </div>
                       )}
 
@@ -1872,7 +1951,7 @@ export function AgentProfilePage() {
                     </>
                   )}
 
-                  {selectedProviderInfo && (
+                  {selectedProviderInfo && !isPiRuntime && (
                     <div className="flex flex-col gap-1">
                       <label className="text-sm font-medium">
                         {t("agent.acp-config-model")}
@@ -1954,7 +2033,7 @@ export function AgentProfilePage() {
                     </div>
                   )}
 
-                  {isCustomProvider && !isPiProvider && (
+                  {isCustomProvider && !isPiRuntime && (
                     <>
                       <div className="flex flex-col gap-1">
                         <label className="text-sm font-medium">
@@ -2048,13 +2127,13 @@ export function AgentProfilePage() {
 
                   {selectedProviderInfo &&
                     !isCustomProvider &&
-                    !isPiProvider && (
+                    !isPiRuntime && (
                       <p className="text-xs text-control-light">
                         {t("agent.acp-config-derived-command-hint")}
                       </p>
                     )}
 
-                  {!isPiProvider && (
+                  {!isPiRuntime && (
                     <KeyValueEnvEditor
                       label={t("agent.acp-config-custom-env")}
                       entries={customEnvEntries}
@@ -2076,7 +2155,7 @@ export function AgentProfilePage() {
                     />
                   )}
 
-                  {!isPiProvider && (
+                  {!isPiRuntime && (
                     <StringListEditor
                       label={t("agent.acp-config-allow-env")}
                       placeholder={t("agent.acp-config-allow-env-placeholder")}

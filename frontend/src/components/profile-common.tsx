@@ -68,6 +68,10 @@ export function providerLabel(
   return p ? providerDisplayName(p) : id;
 }
 
+export function isPiProvider(id: string): boolean {
+  return id === "builtin-pi" || id === "pi";
+}
+
 export function modelLabel(
   value: string,
   models: { value: string; name: string }[]

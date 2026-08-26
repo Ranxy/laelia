@@ -87,6 +87,8 @@ message AgentProviderInfo {
   repeated AgentModelOption models = 5;
   bool supports_model_config_option = 6;
   google.protobuf.Timestamp detected_at = 7;
+  bool compatible = 8;
+  string incompatibility_reason = 9;
 }
 
 message AgentModelOption {

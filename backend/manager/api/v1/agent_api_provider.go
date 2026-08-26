@@ -158,14 +158,14 @@ func (s *AgentService) validateGlobalProviderReference(ctx context.Context, user
 	return nil
 }
 
-// resolveAcpConfigForDaemon resolves a stored builtin-pi config to the concrete
-// config sent to the agent daemon. A global-provider reference is resolved to
+// resolveAcpConfigForDaemon resolves a stored pi config to the concrete config
+// sent to the agent daemon. A global-provider reference is resolved to
 // api_provider/api_key/model from the provider's entry (the key never lives in
 // the stored agent config); a legacy inline config passes through unchanged.
 // The v1 API surface never calls this for read-back — only the daemon-boundary
 // configs (ConnectAgent, dispatcher assignments, machine sync) do.
 func resolveAcpConfigForDaemon(ctx context.Context, stores *store.Store, cfg *v1pb.AgentACPConfig) (*v1pb.AgentACPConfig, error) {
-	if cfg == nil || cfg.Provider != pi.BuiltinPiProvider || cfg.GlobalProvider == "" {
+	if cfg == nil || !pi.IsPiProvider(cfg.Provider) || cfg.GlobalProvider == "" {
 		return cfg, nil
 	}
 	providerResourceID, err := common.GetAPIProviderResourceID(cfg.GlobalProvider)

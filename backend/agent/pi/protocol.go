@@ -1,7 +1,8 @@
-// Package pi drives the built-in non-ACP pi coding agent (github.com/earendil-works/pi)
+// Package pi drives the non-ACP pi coding agent (github.com/earendil-works/pi)
 // over its RPC mode: a long-lived `pi --mode rpc` subprocess speaking JSONL over
 // stdin/stdout. This is the non-ACP parallel to backend/agent/executor's ACP path;
-// the runner picks this runtime when an agent's provider is "builtin-pi".
+// the runner picks this runtime when an agent's provider is "builtin-pi" or the
+// host-detected user-installed "pi".
 //
 // The protocol is LF-delimited JSONL: one JSON object per line on each direction.
 // Commands (stdin) carry an optional `id` for request/response correlation; events
@@ -15,6 +16,17 @@ import "encoding/json"
 // runtime. It is a known provider id (accepted by the manager validation) but is
 // NOT a host-detected provider.Provider — pi is bundled, not installed on PATH.
 const BuiltinPiProvider = "builtin-pi"
+
+// UserPiProvider is the AgentACPConfig.provider value for a user-installed pi
+// binary discovered on the host (PATH + version probe). It is distinct from
+// BuiltinPiProvider and both options are independent.
+const UserPiProvider = "pi"
+
+// IsPiProvider reports whether id selects a pi runtime (built-in or
+// user-installed).
+func IsPiProvider(id string) bool {
+	return id == BuiltinPiProvider || id == UserPiProvider
+}
 
 // command envelopes written to the pi subprocess stdin. Each is one JSON line.
 

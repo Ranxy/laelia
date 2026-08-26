@@ -811,6 +811,13 @@ message AgentProviderInfo {
   repeated AgentModelOption models = 5; // empty when the provider does not advertise a model config option
   bool supports_model_config_option = 6; // whether probing observed a category=="model" config option
   google.protobuf.Timestamp detected_at = 7;
+  // compatible is false when a detected provider exists but does not satisfy
+  // laelia's minimum version / protocol compatibility requirements. The UI
+  // shows the provider but prevents selecting it.
+  bool compatible = 8;
+  // incompatibility_reason explains why a detected provider is not compatible
+  // (e.g. "requires pi >= 0.82.1"). Empty when compatible is true.
+  string incompatibility_reason = 9;
 }
 
 // AgentModelOption is one model selectable via the ACP session config option

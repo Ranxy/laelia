@@ -35,7 +35,7 @@ func New(providers ...Provider) *Registry {
 
 // Default is the registry of built-in providers, ordered by preference.
 func Default() *Registry {
-	return New(&OpenCodeProvider{}, &ClaudeCodeProvider{}, &CodexProvider{})
+	return New(&OpenCodeProvider{}, &ClaudeCodeProvider{}, &CodexProvider{}, &PiProvider{})
 }
 
 // Lookup returns the provider with the given id, or (nil, false) when unknown.
@@ -118,6 +118,14 @@ func discoverOne(ctx context.Context, p Provider) Discovered {
 		DisplayName:    info.DisplayName,
 		Version:        info.Version,
 		ExecutablePath: info.ExecutablePath,
+		Compatible:     true,
+	}
+	// Providers that do not opt into compatibility reporting (all ACP
+	// providers today) are always compatible. Pi sets Compatible=false and an
+	// IncompatibilityReason when its version is too old.
+	if !info.Compatible && info.IncompatibilityReason != "" {
+		d.Compatible = false
+		d.IncompatibilityReason = info.IncompatibilityReason
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, probeTimeout)
 	defer cancel()

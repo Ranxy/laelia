@@ -99,6 +99,13 @@ func BuildACPConfig(user *v1pb.AgentACPConfig, machineID, agentID string) *ACPCo
 	if user == nil {
 		return nil
 	}
+	// A host-detected non-ACP runtime (e.g. user-installed pi) is never driven
+	// through the ACP executor.
+	if p, ok := provider.Default().Lookup(user.Provider); ok {
+		if _, nonACP := p.(provider.NonACPRuntime); nonACP {
+			return nil
+		}
+	}
 
 	executable, args := resolvedCommand(user, machineID, agentID)
 	if executable == "" {

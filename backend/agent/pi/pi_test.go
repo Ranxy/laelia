@@ -660,3 +660,33 @@ func newTestExecutor(t *testing.T) *PiExecutor {
 	}
 	return e
 }
+
+// TestBuildPiConfig_UserPiOwnMode verifies that a user-installed pi agent can
+// use pi's own model/auth: no api_provider and no global provider are required,
+// only a model.
+func TestBuildPiConfig_UserPiOwnMode(t *testing.T) {
+	user := &v1pb.AgentACPConfig{
+		Provider: UserPiProvider,
+		Model:    "anthropic/claude-sonnet-4-5",
+	}
+	cfg := BuildPiConfig(user, "m", "a", "agents/a", "/usr/local/bin/pi", "/sock", "tok", "/bin")
+	require.NotNil(t, cfg)
+	assert.Empty(t, cfg.APIProvider)
+	assert.Empty(t, cfg.APIKey)
+	assert.Equal(t, "anthropic/claude-sonnet-4-5", cfg.Model)
+}
+
+// TestBuildPiConfig_UserPiManagedMode verifies that a user-installed pi can
+// also use laelia-managed self-provider fields exactly like builtin-pi.
+func TestBuildPiConfig_UserPiManagedMode(t *testing.T) {
+	user := &v1pb.AgentACPConfig{
+		Provider:    UserPiProvider,
+		ApiProvider: APIProviderDeepseek,
+		ApiKey:      "sk-test",
+		Model:       "deepseek-chat",
+	}
+	cfg := BuildPiConfig(user, "m", "a", "agents/a", "/usr/local/bin/pi", "/sock", "tok", "/bin")
+	require.NotNil(t, cfg)
+	assert.Equal(t, APIProviderDeepseek, cfg.APIProvider)
+	assert.Equal(t, "sk-test", cfg.APIKey)
+}
