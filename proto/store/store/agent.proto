@@ -31,6 +31,22 @@ message AgentInfo {
   AgentCapability capability = 8;
   repeated AgentProviderInfo available_providers = 9;
   AgentACPConfig acp_config = 10;
+  // prompt_version is the composite "<static>.<dynamic>" system-prompt version
+  // this agent last confirmed via PromptReleaseNoticeAck. Stored in the agent
+  // info JSONB; used by the manager to avoid re-pushing already-confirmed
+  // notices.
+  string prompt_version = 11;
+  // pending_prompt_notice is a system-prompt release notice that could not be
+  // pushed while the agent was offline. It is re-sent on every BeginSession
+  // until the agent acks it.
+  PendingPromptNotice pending_prompt_notice = 12;
+}
+
+// PendingPromptNotice is the storage-layer mirror of laelia.v1.PromptReleaseNotice.
+message PendingPromptNotice {
+  string notice_key = 1;
+  string message = 2;
+  string prompt_version = 3;
 }
 
 message AgentACPConfig {

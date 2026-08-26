@@ -67,14 +67,15 @@ func convertToV1MachineInfo(info *storepb.MachineInfo) *v1pb.MachineInfo {
 		return nil
 	}
 	return &v1pb.MachineInfo{
-		Hostname:           info.Hostname,
-		Os:                 info.Os,
-		Arch:               info.Arch,
-		Ip:                 info.Ip,
-		Version:            info.Version,
-		Labels:             info.Labels,
-		Capability:         convertToV1AgentCapability(info.Capability),
-		AvailableProviders: convertToV1Providers(info.AvailableProviders),
+		Hostname:            info.Hostname,
+		Os:                  info.Os,
+		Arch:                info.Arch,
+		Ip:                  info.Ip,
+		Version:             info.Version,
+		PromptBundleVersion: info.PromptBundleVersion,
+		Labels:              info.Labels,
+		Capability:          convertToV1AgentCapability(info.Capability),
+		AvailableProviders:  convertToV1Providers(info.AvailableProviders),
 	}
 }
 
@@ -83,14 +84,15 @@ func convertToStoreMachineInfo(info *v1pb.MachineInfo) *storepb.MachineInfo {
 		return nil
 	}
 	return &storepb.MachineInfo{
-		Hostname:           info.Hostname,
-		Os:                 info.Os,
-		Arch:               info.Arch,
-		Ip:                 info.Ip,
-		Version:            info.Version,
-		Labels:             info.Labels,
-		Capability:         convertToStoreAgentCapability(info.Capability),
-		AvailableProviders: convertToStoreProviders(info.AvailableProviders),
+		Hostname:            info.Hostname,
+		Os:                  info.Os,
+		Arch:                info.Arch,
+		Ip:                  info.Ip,
+		Version:             info.Version,
+		PromptBundleVersion: info.PromptBundleVersion,
+		Labels:              info.Labels,
+		Capability:          convertToStoreAgentCapability(info.Capability),
+		AvailableProviders:  convertToStoreProviders(info.AvailableProviders),
 	}
 }
 

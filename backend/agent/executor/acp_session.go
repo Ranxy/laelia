@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 
 	"github.com/Ranxy/laelia/backend/agent/home"
+	"github.com/Ranxy/laelia/backend/agent/version"
 )
 
 // maxResumeFailuresBeforeWarning is the consecutive ResumeSession failure count
@@ -50,6 +51,10 @@ func sessionFingerprint(cfg *ACPConfig, workingDir, protocol string) string {
 	write("workdir\x00" + workingDir + "\x00")
 	write("protocol\x00" + protocol + "\x00")
 	write("persona\x00" + cfg.PersonaPrompt + "\x00")
+	// The machine binary's embedded static prompt bundle is baked into the init
+	// prompt, so a binary upgrade (new communication.md etc.) must invalidate
+	// the resumed session and cold-start with the fresh prompt.
+	write("promptbundle\x00" + version.PromptBundleVersion + "\x00")
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 

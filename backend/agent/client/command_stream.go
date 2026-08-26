@@ -94,6 +94,54 @@ type commandStream struct {
 	// drain turn, using the auth-bearing CommandServiceClient the daemon exposes.
 	// Nil in tests (the test supplies TurnPrompt directly on the request).
 	buildTurnBatch func(ctx context.Context) (string, error)
+
+	// pendingPromptNotice is a manager-pushed prompt release notice that could
+	// not be steered into the in-flight turn. It is consumed by the next
+	// runSession (prepended to the turn) and acked. Guarded by promptNoticeMu
+	// because the receive pump writes it and the drain loop reads it.
+	promptNoticeMu      sync.Mutex
+	pendingPromptNotice *v1pb.PromptReleaseNotice
+	// steeredPromptVersion records the prompt_version of a notice that was
+	// successfully steered into the current turn (pi path). The next runSession
+	// treats it as already confirmed so applyPromptVersion does not inject a
+	// duplicate notice.
+	steeredPromptVersion string
+}
+
+// setPendingPromptNotice queues a prompt release notice for the next drain turn.
+func (c *commandStream) setPendingPromptNotice(n *v1pb.PromptReleaseNotice) {
+	if n == nil {
+		return
+	}
+	c.promptNoticeMu.Lock()
+	defer c.promptNoticeMu.Unlock()
+	c.pendingPromptNotice = n
+}
+
+// takePendingPromptNotice returns and clears the queued prompt release notice.
+func (c *commandStream) takePendingPromptNotice() *v1pb.PromptReleaseNotice {
+	c.promptNoticeMu.Lock()
+	defer c.promptNoticeMu.Unlock()
+	n := c.pendingPromptNotice
+	c.pendingPromptNotice = nil
+	return n
+}
+
+// recordSteeredPromptVersion marks a prompt_version as already delivered via
+// same-turn steering so the next drain turn does not re-inject it.
+func (c *commandStream) recordSteeredPromptVersion(v string) {
+	c.promptNoticeMu.Lock()
+	defer c.promptNoticeMu.Unlock()
+	c.steeredPromptVersion = v
+}
+
+// takeSteeredPromptVersion returns and clears the recorded steered version.
+func (c *commandStream) takeSteeredPromptVersion() string {
+	c.promptNoticeMu.Lock()
+	defer c.promptNoticeMu.Unlock()
+	v := c.steeredPromptVersion
+	c.steeredPromptVersion = ""
+	return v
 }
 
 func newCommandStream(httpClient *http.Client, managerURL, socketPath, sessionToken, binaryDir, agentName, agentID, machineID string) *commandStream {

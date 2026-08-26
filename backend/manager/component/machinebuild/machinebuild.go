@@ -23,8 +23,9 @@ type Target struct {
 }
 
 type manifest struct {
-	Version string            `json:"version"`
-	Targets map[string]Target `json:"targets"`
+	Version             string            `json:"version"`
+	PromptBundleVersion string            `json:"prompt_bundle_version"`
+	Targets             map[string]Target `json:"targets"`
 }
 
 var (
@@ -53,6 +54,18 @@ func LatestVersion() string {
 		return ""
 	}
 	return current.Version
+}
+
+// LatestPromptBundleVersion returns the expected static prompt bundle version
+// of the machine binary this manager embeds, or "" when the manager has no
+// embedded binaries (e.g. a dev build that does not embed laelia-machine).
+func LatestPromptBundleVersion() string {
+	mu.RLock()
+	defer mu.RUnlock()
+	if current == nil {
+		return ""
+	}
+	return current.PromptBundleVersion
 }
 
 // GetTarget returns the manifest entry for a target (e.g. "linux-x64").

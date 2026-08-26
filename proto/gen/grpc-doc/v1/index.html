@@ -1307,6 +1307,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.PromptReleaseNotice"><span class="badge">M</span>PromptReleaseNotice</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.PromptReleaseNoticeAck"><span class="badge">M</span>PromptReleaseNoticeAck</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ProvidersDiscovered"><span class="badge">M</span>ProvidersDiscovered</a>
                 </li>
               
@@ -2956,7 +2964,7 @@ and api_provider == &#34;custom&#34;; ignored by ACP runtimes and by known
 (deepseek/openrouter) providers. When set, it is injected into pi&#39;s
 models.json so pi knows when to auto-compact. Zero means &#34;let pi infer it&#34;. </p></td>
                 </tr>
-
+              
                 <tr>
                   <td>max_tokens</td>
                   <td><a href="#int64">int64</a></td>
@@ -2966,7 +2974,7 @@ provider. Only meaningful when provider == &#34;builtin-pi&#34; and
 api_provider == &#34;custom&#34;; ignored by ACP runtimes and by known
 (deepseek/openrouter) providers. Zero means &#34;let pi infer it&#34;. </p></td>
                 </tr>
-
+              
             </tbody>
           </table>
 
@@ -8376,6 +8384,13 @@ machine app&#39;s per-agent runner; required on the first message. </p></td>
                   <td><p>response to ManagerStreamMessage.workspace_read_request </p></td>
                 </tr>
               
+                <tr>
+                  <td>prompt_release_notice_ack</td>
+                  <td><a href="#laelia.v1.PromptReleaseNoticeAck">PromptReleaseNoticeAck</a></td>
+                  <td></td>
+                  <td><p>ack that a prompt release notice was injected </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -8627,6 +8642,27 @@ agents with no recorded owner. </p></td>
 Populated when the agent is a member of a team; empty otherwise. The agent
 client may inject it into the cold-start init prompt as a &#34;Your Team&#34;
 section. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>prompt_version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>prompt_version is a composite &#34;&lt;static_expected&gt;.&lt;dynamic_hash&gt;&#34; fingerprint
+describing the system prompt the manager currently expects: the static part
+is the expected machine-binary prompt bundle version, the dynamic part is
+the hash of persona/team/owner. The agent client compares it against its
+locally confirmed version and re-anchors / cold-starts / notifies when it
+changes. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>prompt_release_notice</td>
+                  <td><a href="#laelia.v1.PromptReleaseNotice">PromptReleaseNotice</a></td>
+                  <td></td>
+                  <td><p>prompt_release_notice is a pending system-prompt release notice the manager
+wants this agent to inject (e.g. a push that failed while the agent was
+offline). It is re-sent on every BeginSession until the agent acks it. </p></td>
                 </tr>
               
             </tbody>
@@ -12526,6 +12562,13 @@ ask the agent daemon to re-probe installed LLM agent providers </p></td>
                   <td><p>inject a follow-up message into the in-flight turn </p></td>
                 </tr>
               
+                <tr>
+                  <td>prompt_release_notice</td>
+                  <td><a href="#laelia.v1.PromptReleaseNotice">PromptReleaseNotice</a></td>
+                  <td></td>
+                  <td><p>push a system-prompt release notice to the agent </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -12950,6 +12993,75 @@ rooted at the given message name. Empty posts a normal channel message. </p></td
               
                 <tr>
                   <td>conflict_description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.PromptReleaseNotice">PromptReleaseNotice</h3>
+        <p>PromptReleaseNotice tells an agent that its system prompt has changed. The</p><p>manager pushes it when persona/team/owner changes (dynamic) or when the</p><p>machine's bundled static prompt is out of date. The agent injects it into the</p><p>current turn when steerable, otherwise on the next drain turn, and acks with</p><p>PromptReleaseNoticeAck.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>notice_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>prompt_version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.PromptReleaseNoticeAck">PromptReleaseNoticeAck</h3>
+        <p>PromptReleaseNoticeAck confirms that an agent injected a PromptReleaseNotice.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>notice_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>prompt_version</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -18875,6 +18987,16 @@ self-upgrade triggered via UpgradeMachine. </p></td>
                   <td>repeated</td>
                   <td><p>LLM agent providers auto-discovered by the machine app on its host.
 Machine-scoped: every agent hosted on this machine selects from this list. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>prompt_bundle_version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>prompt_bundle_version is the content hash of the machine binary&#39;s embedded
+static prompt bundle (communication.md / agent_memory.md / reanchor.md /
+AgentFirstPromptBody). The manager compares it against the expected version
+to detect when a machine&#39;s bundled system prompt is out of date. </p></td>
                 </tr>
               
             </tbody>

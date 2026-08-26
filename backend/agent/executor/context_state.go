@@ -39,6 +39,11 @@ type ContextState struct {
 	// re-anchors with the new owner before the old owner's authority could be
 	// relied on. Empty for legacy agents (no ownership section).
 	OwnerDisplayName string `json:"owner_display_name,omitempty"`
+	// PromptVersion is the composite "<static>.<dynamic>" prompt version this
+	// agent last confirmed from BeginSessionResponse.prompt_version. The runner
+	// compares it against the manager's fresh value each turn and injects a
+	// prompt-update notice / forces re-anchor / cold-start when it changes.
+	PromptVersion string `json:"prompt_version,omitempty"`
 }
 
 // ContextUsage is a point-in-time snapshot of the session context window.

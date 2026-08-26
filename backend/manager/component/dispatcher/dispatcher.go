@@ -2,6 +2,8 @@ package dispatcher
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -10,7 +12,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/common"
+	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
+	"github.com/Ranxy/laelia/backend/manager/component/machinebuild"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
@@ -198,6 +202,109 @@ func (d *Dispatcher) sendToMachine(machineID int, msg *v1pb.ManagerMachineStream
 // agent is offline.
 func (d *Dispatcher) sendToAgent(agentID int, msg *v1pb.ManagerStreamMessage) error {
 	return d.registry.sendToAgent(agentID, msg)
+}
+
+// SendPromptReleaseNotice pushes a system-prompt release notice to a connected
+// agent's AgentChannel so it can inject the change into the current or next
+// turn. Best-effort: if the agent is offline the notice is recovered on the
+// next BeginSession via the prompt_version comparison.
+func (d *Dispatcher) SendPromptReleaseNotice(agentID int, notice *v1pb.PromptReleaseNotice) error {
+	if notice == nil {
+		return nil
+	}
+	return d.sendToAgent(agentID, &v1pb.ManagerStreamMessage{
+		Message: &v1pb.ManagerStreamMessage_PromptReleaseNotice{
+			PromptReleaseNotice: notice,
+		},
+	})
+}
+
+// HandlePromptReleaseNoticeAck records that an agent saw a prompt release
+// notice, so the manager stops re-pushing it. A notice with a prompt_version
+// (a real persona/team/owner change) also updates the confirmed version; a
+// stale-machine notice (empty prompt_version) only clears the pending one so
+// the agent is not told to upgrade on every turn, while the staleness signal
+// keeps coming from the BeginSession prompt_version comparison.
+func (d *Dispatcher) HandlePromptReleaseNoticeAck(ctx context.Context, agentID int, ack *v1pb.PromptReleaseNoticeAck) error {
+	if ack == nil {
+		return nil
+	}
+	if ack.GetPromptVersion() == "" {
+		return d.store.ClearPendingPromptNotice(ctx, agentID)
+	}
+	return d.store.UpdateAgentPromptVersion(ctx, agentID, ack.GetPromptVersion())
+}
+
+// PushPromptReleaseNotice computes the agent's current composite prompt version
+// and pushes a release notice to it so a running agent perceives the change
+// immediately (steer) or on the next turn. Best-effort: an offline agent is
+// recovered by the BeginSession prompt_version comparison.
+func (d *Dispatcher) PushPromptReleaseNotice(ctx context.Context, agentID int) error {
+	agent, err := d.store.GetAgent(ctx, agentID)
+	if err != nil || agent == nil {
+		return err
+	}
+	ownerDisplayName := ""
+	if agent.OwnerID != 0 {
+		if owner, err := d.store.GetUserByID(ctx, agent.OwnerID); err == nil && owner != nil {
+			ownerDisplayName = owner.Name
+		}
+	}
+	var teamCtx *v1pb.TeamContext
+	if team, err := d.store.GetAgentTeamByAgentID(ctx, agentID); err == nil && team != nil {
+		teamCtx = &v1pb.TeamContext{TeamPrompt: team.TeamPrompt}
+	}
+	promptVersion := buildPromptVersion(ownerDisplayName, teamCtx, agent)
+	notice := &v1pb.PromptReleaseNotice{
+		NoticeKey:     "prompt-" + promptVersion,
+		Message:       "Your system prompt has been updated. Re-read the relevant sections before continuing.",
+		PromptVersion: promptVersion,
+	}
+	if err := d.SendPromptReleaseNotice(agentID, notice); err != nil {
+		// Agent offline: persist so the next BeginSession re-sends it.
+		slog.Info("prompt release notice push failed; persisting for next BeginSession", "agentID", agentID, "error", err)
+		return d.persistPendingPromptNotice(ctx, agentID, notice)
+	}
+	return nil
+}
+
+// persistPendingPromptNotice stores a prompt release notice in the agent info
+// so it is re-sent on the next BeginSession until acked.
+func (d *Dispatcher) persistPendingPromptNotice(ctx context.Context, agentID int, notice *v1pb.PromptReleaseNotice) error {
+	if notice == nil {
+		return nil
+	}
+	return d.store.SetPendingPromptNotice(ctx, agentID, &storepb.PendingPromptNotice{
+		NoticeKey:     notice.GetNoticeKey(),
+		Message:       notice.GetMessage(),
+		PromptVersion: notice.GetPromptVersion(),
+	})
+}
+
+// PushPromptReleaseNoticeToMachine pushes a prompt release notice to every
+// enabled agent bound to a machine. Used when a machine reports a static prompt
+// bundle version that differs from the manager's expected version, so running
+// agents on a stale machine are told to upgrade.
+func (d *Dispatcher) PushPromptReleaseNoticeToMachine(ctx context.Context, machineID int, notice *v1pb.PromptReleaseNotice) error {
+	if notice == nil {
+		return nil
+	}
+	agents, err := d.store.ListAgents(ctx, &store.FindAgentMessage{MachineID: &machineID})
+	if err != nil {
+		return err
+	}
+	for _, agent := range agents {
+		if agent == nil || !agent.Enabled {
+			continue
+		}
+		if err := d.SendPromptReleaseNotice(agent.ID, notice); err != nil {
+			slog.Warn("best-effort prompt release notice push skipped for agent; persisting", "agentID", agent.ID, "error", err)
+			if perr := d.persistPendingPromptNotice(ctx, agent.ID, notice); perr != nil {
+				slog.Warn("failed to persist pending prompt notice", "agentID", agent.ID, "error", perr)
+			}
+		}
+	}
+	return nil
 }
 
 // SendAgentAssignment pushes a new agent assignment to the machine so it opens
@@ -597,11 +704,50 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 	}
 
 	return &v1pb.BeginSessionResponse{
-		CommandId:        cmd.ID.String(),
-		AgentDisplayName: agent.Name,
-		OwnerDisplayName: ownerDisplayName,
-		Team:             teamCtx,
+		CommandId:           cmd.ID.String(),
+		AgentDisplayName:    agent.Name,
+		OwnerDisplayName:    ownerDisplayName,
+		Team:                teamCtx,
+		PromptVersion:       buildPromptVersion(ownerDisplayName, teamCtx, agent),
+		PromptReleaseNotice: pendingPromptNoticeToV1(agent.Info.GetPendingPromptNotice()),
 	}, nil
+}
+
+// pendingPromptNoticeToV1 converts a stored pending prompt notice to the v1
+// wire form, or nil when there is none.
+func pendingPromptNoticeToV1(p *storepb.PendingPromptNotice) *v1pb.PromptReleaseNotice {
+	if p == nil {
+		return nil
+	}
+	return &v1pb.PromptReleaseNotice{
+		NoticeKey:     p.GetNoticeKey(),
+		Message:       p.GetMessage(),
+		PromptVersion: p.GetPromptVersion(),
+	}
+}
+
+// buildPromptVersion derives the composite prompt version the manager expects
+// for an agent: "<static_expected>.<dynamic_hash>". The static part is the
+// machine binary's embedded prompt bundle version (empty in dev builds that do
+// not embed machines); the dynamic part is a hash of the agent's
+// persona/team/owner. The agent client compares this against its locally
+// confirmed version to decide whether to re-anchor / cold-start / notify.
+func buildPromptVersion(ownerDisplayName string, team *v1pb.TeamContext, agent *store.AgentMessage) string {
+	static := machinebuild.LatestPromptBundleVersion()
+	h := sha256.New()
+	persona := ""
+	if agent != nil && agent.Info != nil {
+		if acp := agent.Info.GetAcpConfig(); acp != nil {
+			persona = acp.GetPersonaPrompt()
+		}
+	}
+	teamPrompt := ""
+	if team != nil {
+		teamPrompt = team.TeamPrompt
+	}
+	_, _ = h.Write([]byte(persona + "\x00" + teamPrompt + "\x00" + ownerDisplayName))
+	dynamic := hex.EncodeToString(h.Sum(nil))[:16]
+	return static + "." + dynamic
 }
 
 // agentStopped reports whether the agent has been stopped (StopAgent). A

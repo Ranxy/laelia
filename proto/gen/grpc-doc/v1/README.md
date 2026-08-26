@@ -291,6 +291,8 @@
     - [Pong](#laelia-v1-Pong)
     - [PostMessageRequest](#laelia-v1-PostMessageRequest)
     - [PostMessageResponse](#laelia-v1-PostMessageResponse)
+    - [PromptReleaseNotice](#laelia-v1-PromptReleaseNotice)
+    - [PromptReleaseNoticeAck](#laelia-v1-PromptReleaseNoticeAck)
     - [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered)
     - [RawAcpPayload](#laelia-v1-RawAcpPayload)
     - [Reaction](#laelia-v1-Reaction)
@@ -3118,6 +3120,7 @@ never generates conversation activity.
 | providers_discovered | [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered) |  | response to ManagerStreamMessage.discover_providers |
 | workspace_list_response | [WorkspaceListResponse](#laelia-v1-WorkspaceListResponse) |  | response to ManagerStreamMessage.workspace_list_request |
 | workspace_read_response | [WorkspaceReadResponse](#laelia-v1-WorkspaceReadResponse) |  | response to ManagerStreamMessage.workspace_read_request |
+| prompt_release_notice_ack | [PromptReleaseNoticeAck](#laelia-v1-PromptReleaseNoticeAck) |  | ack that a prompt release notice was injected |
 
 
 
@@ -3244,6 +3247,8 @@ the agent uses to anchor its execution events and link any posted replies.
 | agent_display_name | [string](#string) |  | agent_display_name is the posting agent&#39;s human-readable name, sourced from the manager (the source of truth for agent identity). The agent client injects it into its system prompt so it knows who it is and can recognize its own messages and @mentions of itself. |
 | owner_display_name | [string](#string) |  | owner_display_name is the agent&#39;s owner&#39;s display name, sourced from the manager (the source of truth for ownership). The agent client injects it into its system prompt (the Ownership &amp; Safety section) so the agent knows whom to DM for approval of high-risk requests from non-owners. Empty for legacy agents with no recorded owner. |
 | team | [TeamContext](#laelia-v1-TeamContext) |  | team is the agent&#39;s current team (an agent can belong to at most one team). Populated when the agent is a member of a team; empty otherwise. The agent client may inject it into the cold-start init prompt as a &#34;Your Team&#34; section. |
+| prompt_version | [string](#string) |  | prompt_version is a composite &#34;&lt;static_expected&gt;.&lt;dynamic_hash&gt;&#34; fingerprint describing the system prompt the manager currently expects: the static part is the expected machine-binary prompt bundle version, the dynamic part is the hash of persona/team/owner. The agent client compares it against its locally confirmed version and re-anchors / cold-starts / notifies when it changes. |
+| prompt_release_notice | [PromptReleaseNotice](#laelia-v1-PromptReleaseNotice) |  | prompt_release_notice is a pending system-prompt release notice the manager wants this agent to inject (e.g. a push that failed while the agent was offline). It is re-sent on every BeginSession until the agent acks it. |
 
 
 
@@ -4996,6 +5001,7 @@ ask the agent daemon to re-probe installed LLM agent providers |
 | workspace_list_request | [WorkspaceListRequest](#laelia-v1-WorkspaceListRequest) |  | ask the agent daemon to list one level of its workspace |
 | workspace_read_request | [WorkspaceReadRequest](#laelia-v1-WorkspaceReadRequest) |  | ask the agent daemon to read a workspace file |
 | steer | [SteerMessage](#laelia-v1-SteerMessage) |  | inject a follow-up message into the in-flight turn |
+| prompt_release_notice | [PromptReleaseNotice](#laelia-v1-PromptReleaseNotice) |  | push a system-prompt release notice to the agent |
 
 
 
@@ -5196,6 +5202,43 @@ is never populated here.
 | current_version | [int64](#int64) |  |  |
 | new_messages | [ChatMessage](#laelia-v1-ChatMessage) | repeated |  |
 | conflict_description | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-PromptReleaseNotice"></a>
+
+### PromptReleaseNotice
+PromptReleaseNotice tells an agent that its system prompt has changed. The
+manager pushes it when persona/team/owner changes (dynamic) or when the
+machine&#39;s bundled static prompt is out of date. The agent injects it into the
+current turn when steerable, otherwise on the next drain turn, and acks with
+PromptReleaseNoticeAck.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| notice_key | [string](#string) |  |  |
+| message | [string](#string) |  |  |
+| prompt_version | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-PromptReleaseNoticeAck"></a>
+
+### PromptReleaseNoticeAck
+PromptReleaseNoticeAck confirms that an agent injected a PromptReleaseNotice.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| notice_key | [string](#string) |  |  |
+| prompt_version | [string](#string) |  |  |
 
 
 
@@ -7717,6 +7760,7 @@ RPC so the model picker reflects an agent&#39;s custom env before saving.
 | labels | [MachineInfo.LabelsEntry](#laelia-v1-MachineInfo-LabelsEntry) | repeated |  |
 | capability | [AgentCapability](#laelia-v1-AgentCapability) |  |  |
 | available_providers | [AgentProviderInfo](#laelia-v1-AgentProviderInfo) | repeated | LLM agent providers auto-discovered by the machine app on its host. Machine-scoped: every agent hosted on this machine selects from this list. |
+| prompt_bundle_version | [string](#string) |  | prompt_bundle_version is the content hash of the machine binary&#39;s embedded static prompt bundle (communication.md / agent_memory.md / reanchor.md / AgentFirstPromptBody). The manager compares it against the expected version to detect when a machine&#39;s bundled system prompt is out of date. |
 
 
 

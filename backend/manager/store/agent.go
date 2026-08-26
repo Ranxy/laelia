@@ -620,6 +620,60 @@ func (s *Store) UpdateAgent(ctx context.Context, current *AgentMessage, patch *U
 	return agent, nil
 }
 
+// UpdateAgentPromptVersion records the composite system-prompt version an agent
+// has confirmed via PromptReleaseNoticeAck. It is stored in the agent info
+// JSONB so the manager can avoid re-pushing already-confirmed notices. It also
+// clears any pending prompt notice, since the agent has now confirmed.
+func (s *Store) UpdateAgentPromptVersion(ctx context.Context, agentID int, promptVersion string) error {
+	agent, err := s.GetAgent(ctx, agentID)
+	if err != nil {
+		return err
+	}
+	if agent == nil {
+		return nil
+	}
+	info := proto.Clone(agent.Info).(*models.AgentInfo)
+	info.PromptVersion = promptVersion
+	info.PendingPromptNotice = nil
+	_, err = s.UpdateAgent(ctx, agent, &UpdateAgentMessage{Info: info})
+	return err
+}
+
+// SetPendingPromptNotice persists a prompt release notice that could not be
+// pushed while the agent was offline, so it is re-sent on the next BeginSession.
+func (s *Store) SetPendingPromptNotice(ctx context.Context, agentID int, notice *models.PendingPromptNotice) error {
+	if notice == nil {
+		return nil
+	}
+	agent, err := s.GetAgent(ctx, agentID)
+	if err != nil {
+		return err
+	}
+	if agent == nil {
+		return nil
+	}
+	info := proto.Clone(agent.Info).(*models.AgentInfo)
+	info.PendingPromptNotice = notice
+	_, err = s.UpdateAgent(ctx, agent, &UpdateAgentMessage{Info: info})
+	return err
+}
+
+// ClearPendingPromptNotice drops any pending prompt release notice for an agent
+// after it has been seen (acked), without touching the confirmed version.
+func (s *Store) ClearPendingPromptNotice(ctx context.Context, agentID int) error {
+	agent, err := s.GetAgent(ctx, agentID)
+	if err != nil {
+		return err
+	}
+	if agent == nil {
+		return nil
+	}
+	info := proto.Clone(agent.Info).(*models.AgentInfo)
+	info.PendingPromptNotice = nil
+	_, err = s.UpdateAgent(ctx, agent, &UpdateAgentMessage{Info: info})
+	return err
+}
+
 func (s *Store) DeleteAgent(ctx context.Context, resourceID string) error {
 	agent, err := s.GetAgentByResourceID(ctx, resourceID)
 	if err != nil {

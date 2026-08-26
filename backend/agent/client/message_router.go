@@ -68,6 +68,30 @@ func (r *messageRouter) route(ctx context.Context, sender streamSender, msg *v1p
 			}
 		}
 
+	case *v1pb.ManagerStreamMessage_PromptReleaseNotice:
+		notice := m.PromptReleaseNotice
+		if notice == nil {
+			break
+		}
+		// Same-turn steering: only the pi runtime (steerer) reports delivery
+		// success/failure, so only it may ack and mark the version as seen. The
+		// ACP v2 ThreadExecutor.Steer has no success signal (it silently no-ops
+		// when the turn gate is closed), so we do NOT ack on that path — we fall
+		// through to queueing for the next drain turn to guarantee delivery.
+		if ex := r.stream.getCurrentExecutor(); ex != nil {
+			if s, ok := ex.(steerer); ok {
+				if err := s.Steer(notice.GetMessage()); err == nil {
+					r.stream.recordSteeredPromptVersion(notice.GetPromptVersion())
+					_ = sendPromptReleaseNoticeAck(sender, notice)
+					break
+				}
+			}
+		}
+		// Fallback: queue for the next drain turn and wake so it is picked up
+		// promptly.
+		r.stream.setPendingPromptNotice(notice)
+		r.stream.wake()
+
 	case *v1pb.ManagerStreamMessage_WorkspaceListRequest:
 		// File reads run on their own goroutine: a slow disk must not
 		// block the receive pump (BeginSession / NewMessages / Cancel).
@@ -86,6 +110,23 @@ func (r *messageRouter) route(ctx context.Context, sender streamSender, msg *v1p
 // turn; it must be non-blocking and best-effort.
 type steerer interface {
 	Steer(text string) error
+}
+
+// sendPromptReleaseNoticeAck reports to the manager that a prompt release
+// notice was injected (steered or queued into a turn), so the manager can stop
+// re-pushing it.
+func sendPromptReleaseNoticeAck(sender streamSender, notice *v1pb.PromptReleaseNotice) error {
+	if sender == nil || notice == nil {
+		return nil
+	}
+	return sender.Send(&v1pb.AgentStreamMessage{
+		Message: &v1pb.AgentStreamMessage_PromptReleaseNoticeAck{
+			PromptReleaseNoticeAck: &v1pb.PromptReleaseNoticeAck{
+				NoticeKey:     notice.GetNoticeKey(),
+				PromptVersion: notice.GetPromptVersion(),
+			},
+		},
+	})
 }
 
 // buildSteerNotice renders the content-free inbox notice steered into a running

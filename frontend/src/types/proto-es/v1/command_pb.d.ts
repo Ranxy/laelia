@@ -4513,6 +4513,14 @@ export declare type AgentStreamMessage = Message<"laelia.v1.AgentStreamMessage">
      */
     value: WorkspaceReadResponse;
     case: "workspaceReadResponse";
+  } | {
+    /**
+     * ack that a prompt release notice was injected
+     *
+     * @generated from field: laelia.v1.PromptReleaseNoticeAck prompt_release_notice_ack = 12;
+     */
+    value: PromptReleaseNoticeAck;
+    case: "promptReleaseNoticeAck";
   } | { case: undefined; value?: undefined };
 };
 
@@ -4587,6 +4595,14 @@ export declare type ManagerStreamMessage = Message<"laelia.v1.ManagerStreamMessa
      */
     value: SteerMessage;
     case: "steer";
+  } | {
+    /**
+     * push a system-prompt release notice to the agent
+     *
+     * @generated from field: laelia.v1.PromptReleaseNotice prompt_release_notice = 13;
+     */
+    value: PromptReleaseNotice;
+    case: "promptReleaseNotice";
   } | { case: undefined; value?: undefined };
 };
 
@@ -4595,6 +4611,61 @@ export declare type ManagerStreamMessage = Message<"laelia.v1.ManagerStreamMessa
  * Use `create(ManagerStreamMessageSchema)` to create a new message.
  */
 export declare const ManagerStreamMessageSchema: GenMessage<ManagerStreamMessage>;
+
+/**
+ * PromptReleaseNotice tells an agent that its system prompt has changed. The
+ * manager pushes it when persona/team/owner changes (dynamic) or when the
+ * machine's bundled static prompt is out of date. The agent injects it into the
+ * current turn when steerable, otherwise on the next drain turn, and acks with
+ * PromptReleaseNoticeAck.
+ *
+ * @generated from message laelia.v1.PromptReleaseNotice
+ */
+export declare type PromptReleaseNotice = Message<"laelia.v1.PromptReleaseNotice"> & {
+  /**
+   * @generated from field: string notice_key = 1;
+   */
+  noticeKey: string;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+
+  /**
+   * @generated from field: string prompt_version = 3;
+   */
+  promptVersion: string;
+};
+
+/**
+ * Describes the message laelia.v1.PromptReleaseNotice.
+ * Use `create(PromptReleaseNoticeSchema)` to create a new message.
+ */
+export declare const PromptReleaseNoticeSchema: GenMessage<PromptReleaseNotice>;
+
+/**
+ * PromptReleaseNoticeAck confirms that an agent injected a PromptReleaseNotice.
+ *
+ * @generated from message laelia.v1.PromptReleaseNoticeAck
+ */
+export declare type PromptReleaseNoticeAck = Message<"laelia.v1.PromptReleaseNoticeAck"> & {
+  /**
+   * @generated from field: string notice_key = 1;
+   */
+  noticeKey: string;
+
+  /**
+   * @generated from field: string prompt_version = 2;
+   */
+  promptVersion: string;
+};
+
+/**
+ * Describes the message laelia.v1.PromptReleaseNoticeAck.
+ * Use `create(PromptReleaseNoticeAckSchema)` to create a new message.
+ */
+export declare const PromptReleaseNoticeAckSchema: GenMessage<PromptReleaseNoticeAck>;
 
 /**
  * @generated from message laelia.v1.AgentReady
@@ -5263,6 +5334,27 @@ export declare type BeginSessionResponse = Message<"laelia.v1.BeginSessionRespon
    * @generated from field: laelia.v1.TeamContext team = 5;
    */
   team?: TeamContext | undefined;
+
+  /**
+   * prompt_version is a composite "<static_expected>.<dynamic_hash>" fingerprint
+   * describing the system prompt the manager currently expects: the static part
+   * is the expected machine-binary prompt bundle version, the dynamic part is
+   * the hash of persona/team/owner. The agent client compares it against its
+   * locally confirmed version and re-anchors / cold-starts / notifies when it
+   * changes.
+   *
+   * @generated from field: string prompt_version = 6;
+   */
+  promptVersion: string;
+
+  /**
+   * prompt_release_notice is a pending system-prompt release notice the manager
+   * wants this agent to inject (e.g. a push that failed while the agent was
+   * offline). It is re-sent on every BeginSession until the agent acks it.
+   *
+   * @generated from field: laelia.v1.PromptReleaseNotice prompt_release_notice = 7;
+   */
+  promptReleaseNotice?: PromptReleaseNotice | undefined;
 };
 
 /**

@@ -71,7 +71,7 @@ func configureV1Routers(
 	roleService := apiv1.NewRoleService(stores)
 	iamService := apiv1.NewIamService(stores, iamManager)
 	groupService := apiv1.NewGroupService(stores, iamManager)
-	agentTeamService := apiv1.NewAgentTeamService(stores, iamManager)
+	agentTeamService := apiv1.NewAgentTeamService(stores, iamManager, cmdDispatcher)
 	apiProviderService := apiv1.NewAPIProviderService(stores, iamManager)
 	mcpServerService := apiv1.NewMcpServerService(stores, iamManager)
 	mcpGatewayService := apiv1.NewMcpGatewayService(stores, iamManager)

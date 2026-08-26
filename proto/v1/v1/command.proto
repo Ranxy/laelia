@@ -2092,6 +2092,7 @@ message AgentStreamMessage {
     ProvidersDiscovered providers_discovered = 9; // response to ManagerStreamMessage.discover_providers
     WorkspaceListResponse workspace_list_response = 10; // response to ManagerStreamMessage.workspace_list_request
     WorkspaceReadResponse workspace_read_response = 11; // response to ManagerStreamMessage.workspace_read_request
+    PromptReleaseNoticeAck prompt_release_notice_ack = 12; // ack that a prompt release notice was injected
   }
 }
 
@@ -2106,7 +2107,25 @@ message ManagerStreamMessage {
     WorkspaceListRequest workspace_list_request = 10; // ask the agent daemon to list one level of its workspace
     WorkspaceReadRequest workspace_read_request = 11; // ask the agent daemon to read a workspace file
     SteerMessage steer = 12; // inject a follow-up message into the in-flight turn
+    PromptReleaseNotice prompt_release_notice = 13; // push a system-prompt release notice to the agent
   }
+}
+
+// PromptReleaseNotice tells an agent that its system prompt has changed. The
+// manager pushes it when persona/team/owner changes (dynamic) or when the
+// machine's bundled static prompt is out of date. The agent injects it into the
+// current turn when steerable, otherwise on the next drain turn, and acks with
+// PromptReleaseNoticeAck.
+message PromptReleaseNotice {
+  string notice_key = 1;
+  string message = 2;
+  string prompt_version = 3;
+}
+
+// PromptReleaseNoticeAck confirms that an agent injected a PromptReleaseNotice.
+message PromptReleaseNoticeAck {
+  string notice_key = 1;
+  string prompt_version = 2;
 }
 
 message AgentReady {
@@ -2316,6 +2335,17 @@ message BeginSessionResponse {
   // client may inject it into the cold-start init prompt as a "Your Team"
   // section.
   TeamContext team = 5;
+  // prompt_version is a composite "<static_expected>.<dynamic_hash>" fingerprint
+  // describing the system prompt the manager currently expects: the static part
+  // is the expected machine-binary prompt bundle version, the dynamic part is
+  // the hash of persona/team/owner. The agent client compares it against its
+  // locally confirmed version and re-anchors / cold-starts / notifies when it
+  // changes.
+  string prompt_version = 6;
+  // prompt_release_notice is a pending system-prompt release notice the manager
+  // wants this agent to inject (e.g. a push that failed while the agent was
+  // offline). It is re-sent on every BeginSession until the agent acks it.
+  PromptReleaseNotice prompt_release_notice = 7;
 }
 
 // TeamContext describes the agent's current team membership for injection into

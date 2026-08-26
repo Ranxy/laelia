@@ -14,6 +14,16 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 EMBED_DIR="${1:-backend/manager/server/embedded_machine}"
 
+# Prompt bundle hash: the content hash of the machine binary's embedded static
+# prompt files (communication.md / agent_memory.md / reanchor.md plus the
+# AgentFirstPromptBody constant in prompt.go). Any change to these files changes
+# the hash, which is baked into the binary as version.PromptBundleVersion and
+# written into the manager manifest as the expected prompt bundle version.
+PROMPT_HASH="$({
+  sha256sum "backend/agent/executor/prompt"/*.md
+  sha256sum backend/agent/executor/prompt.go
+} | sha256sum | cut -c1-16)"
+
 # Target matrix: GOOS GOARCH target-name
 TARGETS=(
   "linux amd64 linux-x64"
@@ -29,6 +39,7 @@ manifest_file="${EMBED_DIR}/manifest.json"
 cat > "${manifest_file}" <<JSON
 {
   "version": "${VERSION}",
+  "prompt_bundle_version": "${PROMPT_HASH}",
   "targets": {
 JSON
 
@@ -48,7 +59,7 @@ for entry in "${TARGETS[@]}"; do
   gz_path="${EMBED_DIR}/${gz_name}"
 
   GOOS="${goos}" GOARCH="${goarch}" CGO_ENABLED=0 go build -tags release \
-    -ldflags "-w -s -X github.com/Ranxy/laelia/backend/agent/version.Version=${VERSION} -X github.com/Ranxy/laelia/backend/agent/version.GitCommit=${GIT_COMMIT} -X github.com/Ranxy/laelia/backend/agent/version.BuildTime=${BUILD_TIME}" -p=16 \
+    -ldflags "-w -s -X github.com/Ranxy/laelia/backend/agent/version.Version=${VERSION} -X github.com/Ranxy/laelia/backend/agent/version.GitCommit=${GIT_COMMIT} -X github.com/Ranxy/laelia/backend/agent/version.BuildTime=${BUILD_TIME} -X github.com/Ranxy/laelia/backend/agent/version.PromptBundleVersion=${PROMPT_HASH}" -p=16 \
     -o "${bin_path}" ./backend/agent/bin/agent/main.go
 
   gzip -9 -c "${bin_path}" > "${gz_path}"

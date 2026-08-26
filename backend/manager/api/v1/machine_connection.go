@@ -11,6 +11,7 @@ import (
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
+	"github.com/Ranxy/laelia/backend/manager/component/machinebuild"
 	"github.com/Ranxy/laelia/backend/manager/store"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -92,6 +93,27 @@ func (s *MachineService) ConnectMachine(ctx context.Context, req *connect.Reques
 	assigned, err := s.buildAssignedAgents(ctx, machine.ID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to list assigned agents"))
+	}
+
+	// If the machine's bundled static prompt is out of date relative to the
+	// manager's expected version, tell every agent on it to upgrade so running
+	// agents perceive the system-prompt change.
+	if req.Msg.Info != nil {
+		reported := req.Msg.Info.GetPromptBundleVersion()
+		expected := machinebuild.LatestPromptBundleVersion()
+		if reported != "" && expected != "" && reported != expected {
+			notice := &v1pb.PromptReleaseNotice{
+				NoticeKey: "prompt-bundle-" + expected,
+				Message:   "The system prompt has been updated on the server, but this machine's bundled system prompt is out of date. Upgrade laelia-machine to receive the latest instructions.",
+				// Deliberately no prompt_version: a stale-machine notice does not
+				// mean the agent has actually seen the new prompt, so it must not
+				// be recorded as a confirmed version (which would mask the
+				// staleness signal).
+			}
+			if pushErr := s.dispatcher.PushPromptReleaseNoticeToMachine(ctx, machine.ID, notice); pushErr != nil {
+				slog.Info("best-effort stale prompt bundle notice push skipped", "machineID", machine.ID, "error", pushErr)
+			}
+		}
 	}
 
 	return connect.NewResponse(&v1pb.ConnectMachineResponse{

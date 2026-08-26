@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/version"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -237,7 +238,7 @@ func TestRunSessionReanchorInjectionAndPersistence(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "TestAgent", "", nil)
+		cs.runSession(ctx, stream, "drain-1", "TestAgent", "", nil, "", nil)
 		close(done)
 	}()
 	select {
@@ -285,7 +286,7 @@ func TestRunSessionOwnerChangeForcesReanchor(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "TestAgent", "New Owner", nil)
+		cs.runSession(ctx, stream, "drain-1", "TestAgent", "New Owner", nil, "", nil)
 		close(done)
 	}()
 	select {
@@ -326,7 +327,7 @@ func TestRunSessionInitializesContextStateForFreshAgent(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "FreshAgent", "", nil)
+		cs.runSession(ctx, stream, "drain-1", "FreshAgent", "", nil, "", nil)
 		close(done)
 	}()
 	select {
@@ -386,4 +387,47 @@ func TestPersistContextStateResumeFailures(t *testing.T) {
 	cs.persistContextState(state, &executor.Result{Fingerprint: "fp", Resumed: true, ResumeFailures: 0})
 	assert.Zero(t, state.Session.ResumeFailures, "successful warm resume clears the failure counter")
 	assert.Equal(t, 1, state.Session.Turns)
+}
+
+func TestApplyPromptVersion(t *testing.T) {
+	cs := &commandStream{machineID: "m", agentID: "a"}
+	old := version.PromptBundleVersion
+	version.PromptBundleVersion = "static1"
+	t.Cleanup(func() { version.PromptBundleVersion = old })
+
+	// No previous version: prime without injecting a notice.
+	state := &executor.ContextState{}
+	got := cs.applyPromptVersion(state, "static1.dyn1", "batch")
+	assert.Equal(t, "batch", got, "first confirmation is silent")
+	assert.Equal(t, "static1.dyn1", state.PromptVersion)
+
+	// Dynamic change (same static, new dynamic hash): inject notice + reanchor.
+	state = &executor.ContextState{PromptVersion: "static1.dyn1"}
+	got = cs.applyPromptVersion(state, "static1.dyn2", "batch")
+	assert.Contains(t, got, "System prompt update notice.")
+	assert.Contains(t, got, "persona, team, or owner")
+	assert.True(t, state.NeedsReanchor)
+	assert.Equal(t, "static1.dyn2", state.PromptVersion)
+
+	// Stale machine: local binary prompt bundle differs from the manager's
+	// expected static part → upgrade notice, no reanchor-only.
+	version.PromptBundleVersion = "local-abc"
+	state = &executor.ContextState{PromptVersion: "local-abc.dyn1"}
+	got = cs.applyPromptVersion(state, "expected-xyz.dyn1", "batch")
+	assert.Contains(t, got, "out of date")
+	assert.Contains(t, got, "Upgrade laelia-machine")
+	assert.Equal(t, "expected-xyz.dyn1", state.PromptVersion)
+
+	// Binary upgraded since last confirmed turn (prev static != local binary,
+	// and local matches the manager's expected): reanchor + notice, no stale.
+	version.PromptBundleVersion = "v2hash"
+	state = &executor.ContextState{PromptVersion: "v1hash.dyn1"}
+	got = cs.applyPromptVersion(state, "v2hash.dyn1", "batch")
+	assert.Contains(t, got, "bundled system prompt has been updated")
+	assert.True(t, state.NeedsReanchor)
+	assert.Equal(t, "v2hash.dyn1", state.PromptVersion)
+
+	// Already confirmed: no change.
+	got = cs.applyPromptVersion(state, "v2hash.dyn1", "batch")
+	assert.Equal(t, "batch", got)
 }

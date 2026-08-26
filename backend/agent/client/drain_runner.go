@@ -136,7 +136,7 @@ func (c *commandStream) drainLoop(ctx context.Context, stream streamSender, done
 			}
 
 			lastSessionStart = time.Now()
-			c.runSession(ctx, stream, resp.CommandId, resp.AgentDisplayName, resp.OwnerDisplayName, resp.Team)
+			c.runSession(ctx, stream, resp.CommandId, resp.AgentDisplayName, resp.OwnerDisplayName, resp.Team, resp.PromptVersion, resp.PromptReleaseNotice)
 		}
 	}
 }
@@ -168,7 +168,7 @@ func (c *commandStream) beginSession(ctx context.Context, stream streamSender, d
 // runCommand. The agent itself decides which channel to process and how, by
 // shelling out to the `laelia-machine` CLI over the local daemon. Blocking:
 // returns when the session finishes.
-func (c *commandStream) runSession(ctx context.Context, stream streamSender, commandID string, agentDisplayName, ownerDisplayName string, team *v1pb.TeamContext) {
+func (c *commandStream) runSession(ctx context.Context, stream streamSender, commandID string, agentDisplayName, ownerDisplayName string, team *v1pb.TeamContext, promptVersion string, promptNotice *v1pb.PromptReleaseNotice) {
 	// Per-agent context state drives re-anchor / usage-warning decisions for
 	// this turn and is updated from the events below. A load failure disables
 	// context tracking for the turn (never blocks work).
@@ -206,6 +206,49 @@ func (c *commandStream) runSession(ctx context.Context, stream streamSender, com
 		}
 	}
 	turnPrompt = appendContextWarning(turnPrompt, ctxState)
+
+	// Consume a manager-pushed prompt release notice that could not be steered
+	// into the previous in-flight turn, or one re-sent via BeginSession because
+	// the agent was offline. Prepend it to this turn and ack.
+	notice := c.takePendingPromptNotice()
+	if notice == nil {
+		notice = promptNotice
+	}
+	if notice != nil {
+		// A real prompt-version notice (persona/team/owner change) marks the new
+		// version as confirmed and forces a re-anchor. A stale-machine notice
+		// carries no prompt_version: it only tells the agent to upgrade and must
+		// not overwrite the locally confirmed version (which would mask the
+		// staleness signal).
+		if ctxState != nil && notice.GetPromptVersion() != "" {
+			ctxState.PromptVersion = notice.GetPromptVersion()
+			ctxState.NeedsReanchor = true
+		}
+		if msg := strings.TrimSpace(notice.GetMessage()); msg != "" {
+			if strings.TrimSpace(turnPrompt) == "" {
+				turnPrompt = msg
+			} else {
+				turnPrompt = msg + "\n\n" + turnPrompt
+			}
+		}
+		_ = sendPromptReleaseNoticeAck(stream, notice)
+	}
+
+	// A notice successfully steered into the previous in-flight turn is already
+	// seen; mark it confirmed so applyPromptVersion does not inject a duplicate.
+	if ctxState != nil {
+		if v := c.takeSteeredPromptVersion(); v != "" {
+			ctxState.PromptVersion = v
+		}
+	}
+
+	// Prompt-version change detection: the manager's composite prompt version
+	// changes when the static prompt bundle or the dynamic persona/team/owner
+	// changes. The agent injects a notice / forces re-anchor so the change is
+	// perceived on the very next turn.
+	if ctxState != nil && promptVersion != "" {
+		turnPrompt = c.applyPromptVersion(ctxState, promptVersion, turnPrompt)
+	}
 
 	name := agentDisplayName
 	if name == "" {

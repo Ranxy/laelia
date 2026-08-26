@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	models "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -501,5 +503,37 @@ func TestDispatcher_ShutdownJoinsGoroutines(t *testing.T) {
 	case <-done:
 	case <-time.After(3 * time.Second):
 		t.Fatal("Stop did not join ping monitor + grace goroutines within 3s")
+	}
+}
+
+func TestBuildPromptVersion(t *testing.T) {
+	agent := &store.AgentMessage{Info: &models.AgentInfo{
+		AcpConfig: &models.AgentACPConfig{PersonaPrompt: "be concise"},
+	}}
+
+	// Same persona/team/owner must produce the same dynamic hash; changing any
+	// of them changes the dynamic part.
+	v1 := buildPromptVersion("Alice Owner", &v1pb.TeamContext{TeamPrompt: "team A"}, agent)
+	v2 := buildPromptVersion("Alice Owner", &v1pb.TeamContext{TeamPrompt: "team A"}, agent)
+	if v1 != v2 {
+		t.Fatalf("identical inputs produced different versions: %q vs %q", v1, v2)
+	}
+	v3 := buildPromptVersion("Alice Owner", &v1pb.TeamContext{TeamPrompt: "team B"}, agent)
+	if v1 == v3 {
+		t.Fatalf("team change did not change the prompt version: %q", v1)
+	}
+	v4 := buildPromptVersion("Bob Owner", &v1pb.TeamContext{TeamPrompt: "team A"}, agent)
+	if v1 == v4 {
+		t.Fatalf("owner change did not change the prompt version: %q", v1)
+	}
+
+	// The composite is "<static>.<dynamic>": static part is the manager's
+	// expected machine prompt bundle version, dynamic part is 16 hex chars.
+	parts := strings.Split(v1, ".")
+	if len(parts) != 2 {
+		t.Fatalf("expected composite \"<static>.<dynamic>\", got %q", v1)
+	}
+	if len(parts[1]) != 16 {
+		t.Fatalf("expected 16-char dynamic hash, got %q (len=%d)", parts[1], len(parts[1]))
 	}
 }

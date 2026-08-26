@@ -184,17 +184,18 @@ func (MachineStatus_ConnectionState) EnumDescriptor() ([]byte, []int) {
 // the host metadata the machine app reports on connect and the machine-scoped
 // provider list.
 type MachineInfo struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	Hostname           string                 `protobuf:"bytes,2,opt,name=hostname,proto3" json:"hostname,omitempty"`
-	Os                 string                 `protobuf:"bytes,3,opt,name=os,proto3" json:"os,omitempty"`
-	Arch               string                 `protobuf:"bytes,4,opt,name=arch,proto3" json:"arch,omitempty"`
-	Ip                 string                 `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"`
-	Version            string                 `protobuf:"bytes,6,opt,name=version,proto3" json:"version,omitempty"`
-	Labels             map[string]string      `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Capability         *AgentCapability       `protobuf:"bytes,8,opt,name=capability,proto3" json:"capability,omitempty"`
-	AvailableProviders []*AgentProviderInfo   `protobuf:"bytes,9,rep,name=available_providers,json=availableProviders,proto3" json:"available_providers,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Hostname            string                 `protobuf:"bytes,2,opt,name=hostname,proto3" json:"hostname,omitempty"`
+	Os                  string                 `protobuf:"bytes,3,opt,name=os,proto3" json:"os,omitempty"`
+	Arch                string                 `protobuf:"bytes,4,opt,name=arch,proto3" json:"arch,omitempty"`
+	Ip                  string                 `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"`
+	Version             string                 `protobuf:"bytes,6,opt,name=version,proto3" json:"version,omitempty"`
+	Labels              map[string]string      `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Capability          *AgentCapability       `protobuf:"bytes,8,opt,name=capability,proto3" json:"capability,omitempty"`
+	AvailableProviders  []*AgentProviderInfo   `protobuf:"bytes,9,rep,name=available_providers,json=availableProviders,proto3" json:"available_providers,omitempty"`
+	PromptBundleVersion string                 `protobuf:"bytes,10,opt,name=prompt_bundle_version,json=promptBundleVersion,proto3" json:"prompt_bundle_version,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *MachineInfo) Reset() {
@@ -281,6 +282,13 @@ func (x *MachineInfo) GetAvailableProviders() []*AgentProviderInfo {
 		return x.AvailableProviders
 	}
 	return nil
+}
+
+func (x *MachineInfo) GetPromptBundleVersion() string {
+	if x != nil {
+		return x.PromptBundleVersion
+	}
+	return ""
 }
 
 type MachineStatus struct {
@@ -489,7 +497,7 @@ var File_store_machine_proto protoreflect.FileDescriptor
 
 const file_store_machine_proto_rawDesc = "" +
 	"\n" +
-	"\x13store/machine.proto\x12\flaelia.store\x1a\x11store/agent.proto\"\x82\x03\n" +
+	"\x13store/machine.proto\x12\flaelia.store\x1a\x11store/agent.proto\"\xb6\x03\n" +
 	"\vMachineInfo\x12\x1a\n" +
 	"\bhostname\x18\x02 \x01(\tR\bhostname\x12\x0e\n" +
 	"\x02os\x18\x03 \x01(\tR\x02os\x12\x12\n" +
@@ -500,7 +508,9 @@ const file_store_machine_proto_rawDesc = "" +
 	"\n" +
 	"capability\x18\b \x01(\v2\x1d.laelia.store.AgentCapabilityR\n" +
 	"capability\x12P\n" +
-	"\x13available_providers\x18\t \x03(\v2\x1f.laelia.store.AgentProviderInfoR\x12availableProviders\x1a9\n" +
+	"\x13available_providers\x18\t \x03(\v2\x1f.laelia.store.AgentProviderInfoR\x12availableProviders\x122\n" +
+	"\x15prompt_bundle_version\x18\n" +
+	" \x01(\tR\x13promptBundleVersion\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd7\x02\n" +

@@ -113,6 +113,15 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 			slog.Info("best-effort agent config update push skipped", "agent", agent.ResourceID, "machineID", agent.MachineID, "error", pushErr)
 		}
 	}
+	// Push a prompt release notice only when the persona actually changed, so a
+	// running agent is not told "your system prompt has been updated" (and forced
+	// to re-anchor) when only the model/provider/api-key changed.
+	personaChanged := req.Msg.AcpConfig.GetPersonaPrompt() != agent.Info.GetAcpConfig().GetPersonaPrompt()
+	if personaChanged && s.dispatcher != nil {
+		if pushErr := s.dispatcher.PushPromptReleaseNotice(ctx, agent.ID); pushErr != nil {
+			slog.Info("best-effort prompt release notice push skipped", "agent", agent.ResourceID, "error", pushErr)
+		}
+	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 

@@ -891,6 +891,16 @@ export declare type MachineInfo = Message<"laelia.v1.MachineInfo"> & {
    * @generated from field: repeated laelia.v1.AgentProviderInfo available_providers = 9;
    */
   availableProviders: AgentProviderInfo[];
+
+  /**
+   * prompt_bundle_version is the content hash of the machine binary's embedded
+   * static prompt bundle (communication.md / agent_memory.md / reanchor.md /
+   * AgentFirstPromptBody). The manager compares it against the expected version
+   * to detect when a machine's bundled system prompt is out of date.
+   *
+   * @generated from field: string prompt_bundle_version = 10;
+   */
+  promptBundleVersion: string;
 };
 
 /**

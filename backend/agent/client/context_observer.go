@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/version"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -208,6 +209,52 @@ func reanchorPrompt(ctxState *executor.ContextState, name, ownerDisplayName, tea
 
 // appendContextWarning appends the context-window warning to the turn batch
 // when the last observed usage is at or above contextWarningThreshold.
+// applyPromptVersion compares the manager's composite prompt version against
+// the locally confirmed one and, when it changed, injects a prompt-update
+// notice into the turn and/or forces a re-anchor. The composite is
+// "<static_expected>.<dynamic_hash>": the static part is the manager's expected
+// machine-binary prompt bundle version, the dynamic part is the hash of
+// persona/team/owner. It updates ctxState.PromptVersion to the newly confirmed
+// value (the caller persists it via persistContextState).
+func (c *commandStream) applyPromptVersion(ctxState *executor.ContextState, promptVersion, turnPrompt string) string {
+	if ctxState == nil || promptVersion == "" || ctxState.PromptVersion == promptVersion {
+		return turnPrompt
+	}
+	expectedStatic, dynamicHash, _ := strings.Cut(promptVersion, ".")
+	prevStatic, prevDynamic, _ := strings.Cut(ctxState.PromptVersion, ".")
+
+	var notices []string
+	dynamicChanged := prevDynamic != "" && prevDynamic != dynamicHash
+	if dynamicChanged {
+		ctxState.NeedsReanchor = true
+		notices = append(notices, "Your system prompt has been updated (persona, team, or owner). Re-read the relevant sections before continuing.")
+	}
+	// Static detection: either the machine binary's bundled prompt version
+	// changed since the last confirmed turn (binary upgraded), or the manager
+	// expects a different version than the local binary provides (stale
+	// machine). A binary upgrade already forces a cold start via the session /
+	// launch fingerprint; the notice here makes the change explicit to the
+	// agent.
+	staticChanged := prevStatic != "" && prevStatic != version.PromptBundleVersion
+	stale := expectedStatic != "" && version.PromptBundleVersion != expectedStatic
+	if stale {
+		notices = append(notices, "The system prompt has been updated on the server, but this machine's bundled system prompt is out of date. Upgrade laelia-machine to receive the latest instructions.")
+	} else if staticChanged {
+		ctxState.NeedsReanchor = true
+		notices = append(notices, "Your machine's bundled system prompt has been updated. Re-read the latest instructions.")
+	}
+
+	ctxState.PromptVersion = promptVersion
+	if len(notices) == 0 {
+		return turnPrompt
+	}
+	notice := "System prompt update notice.\n\n" + strings.Join(notices, "\n\n")
+	if strings.TrimSpace(turnPrompt) == "" {
+		return notice
+	}
+	return notice + "\n\n" + turnPrompt
+}
+
 func appendContextWarning(prompt string, ctxState *executor.ContextState) string {
 	if prompt == "" || ctxState == nil || ctxState.Usage.Size <= 0 {
 		return prompt

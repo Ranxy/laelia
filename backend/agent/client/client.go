@@ -580,7 +580,8 @@ func (c *MachineClient) collectMachineInfo() *v1pb.MachineInfo {
 			"git_commit": version.GitCommit,
 			"build_time": version.BuildTime,
 		},
-		AvailableProviders: discoveredToProto(providers, discoveredAt),
+		PromptBundleVersion: version.PromptBundleVersion,
+		AvailableProviders:  discoveredToProto(providers, discoveredAt),
 	}
 }
 

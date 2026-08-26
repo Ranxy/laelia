@@ -32,6 +32,7 @@ message MachineInfo {
   map<string, string> labels = 7;
   AgentCapability capability = 8;
   repeated AgentProviderInfo available_providers = 9;
+  string prompt_bundle_version = 10;
 }
 
 message MachineStatus {

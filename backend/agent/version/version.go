@@ -13,3 +13,9 @@ var GitCommit = "unknown"
 
 // BuildTime is the UTC build timestamp of the machine binary.
 var BuildTime = "unknown"
+
+// PromptBundleVersion is the content hash of the machine binary's embedded
+// static prompt bundle (communication.md / agent_memory.md / reanchor.md /
+// AgentFirstPromptBody). "dev" for local go build/run; release builds overwrite
+// it with the build PROMPT_HASH so the manager can detect stale prompt bundles.
+var PromptBundleVersion = "dev"

@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -12,6 +13,7 @@ import (
 	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
+	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -21,13 +23,14 @@ import (
 // admin may manage it.
 type AgentTeamService struct {
 	v1connect.UnimplementedAgentTeamServiceHandler
-	store *store.Store
-	iam   *iam.Manager
+	store      *store.Store
+	iam        *iam.Manager
+	dispatcher *dispatcher.Dispatcher
 }
 
 // NewAgentTeamService returns a new AgentTeamService.
-func NewAgentTeamService(s *store.Store, iamManager *iam.Manager) *AgentTeamService {
-	return &AgentTeamService{store: s, iam: iamManager}
+func NewAgentTeamService(s *store.Store, iamManager *iam.Manager, d *dispatcher.Dispatcher) *AgentTeamService {
+	return &AgentTeamService{store: s, iam: iamManager, dispatcher: d}
 }
 
 // GetAgentTeam gets a team.
@@ -199,6 +202,19 @@ func (s *AgentTeamService) UpdateAgentTeam(ctx context.Context, req *connect.Req
 	updated, err := s.store.UpdateAgentTeam(ctx, team.ID, patch)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update agent team"))
+	}
+	// A team_prompt change is part of the agent's system prompt, so push a
+	// release notice to every member so running agents perceive it on the
+	// current or next turn.
+	if patch.TeamPrompt != nil && s.dispatcher != nil {
+		for _, member := range updated.Members {
+			if member == nil {
+				continue
+			}
+			if pushErr := s.dispatcher.PushPromptReleaseNotice(ctx, member.AgentID); pushErr != nil {
+				slog.Info("best-effort prompt release notice push skipped for team member", "agentID", member.AgentID, "error", pushErr)
+			}
+		}
 	}
 	canManage, err = s.callerCanManage(ctx, updated)
 	if err != nil {

@@ -471,6 +471,11 @@ message MachineInfo {
   // LLM agent providers auto-discovered by the machine app on its host.
   // Machine-scoped: every agent hosted on this machine selects from this list.
   repeated AgentProviderInfo available_providers = 9;
+  // prompt_bundle_version is the content hash of the machine binary's embedded
+  // static prompt bundle (communication.md / agent_memory.md / reanchor.md /
+  // AgentFirstPromptBody). The manager compares it against the expected version
+  // to detect when a machine's bundled system prompt is out of date.
+  string prompt_bundle_version = 10;
 }
 
 message MachineStatus {

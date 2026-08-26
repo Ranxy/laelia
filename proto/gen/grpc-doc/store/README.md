@@ -12,6 +12,7 @@
     - [AgentModelOption](#laelia-store-AgentModelOption)
     - [AgentProviderInfo](#laelia-store-AgentProviderInfo)
     - [AgentStatus](#laelia-store-AgentStatus)
+    - [PendingPromptNotice](#laelia-store-PendingPromptNotice)
   
     - [AgentStatus.ConnectionState](#laelia-store-AgentStatus-ConnectionState)
     - [AgentTokenState](#laelia-store-AgentTokenState)
@@ -187,6 +188,8 @@
 | capability | [AgentCapability](#laelia-store-AgentCapability) |  |  |
 | available_providers | [AgentProviderInfo](#laelia-store-AgentProviderInfo) | repeated |  |
 | acp_config | [AgentACPConfig](#laelia-store-AgentACPConfig) |  |  |
+| prompt_version | [string](#string) |  | prompt_version is the composite &#34;&lt;static&gt;.&lt;dynamic&gt;&#34; system-prompt version this agent last confirmed via PromptReleaseNoticeAck. Stored in the agent info JSONB; used by the manager to avoid re-pushing already-confirmed notices. |
+| pending_prompt_notice | [PendingPromptNotice](#laelia-store-PendingPromptNotice) |  | pending_prompt_notice is a system-prompt release notice that could not be pushed while the agent was offline. It is re-sent on every BeginSession until the agent acks it. |
 
 
 
@@ -260,6 +263,23 @@
 | connected_at | [int64](#int64) |  |  |
 | error_message | [string](#string) |  |  |
 | active_session_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-store-PendingPromptNotice"></a>
+
+### PendingPromptNotice
+PendingPromptNotice is the storage-layer mirror of laelia.v1.PromptReleaseNotice.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| notice_key | [string](#string) |  |  |
+| message | [string](#string) |  |  |
+| prompt_version | [string](#string) |  |  |
 
 
 
@@ -650,6 +670,7 @@ provider list.
 | labels | [MachineInfo.LabelsEntry](#laelia-store-MachineInfo-LabelsEntry) | repeated |  |
 | capability | [AgentCapability](#laelia-store-AgentCapability) |  |  |
 | available_providers | [AgentProviderInfo](#laelia-store-AgentProviderInfo) | repeated |  |
+| prompt_bundle_version | [string](#string) |  |  |
 
 
 

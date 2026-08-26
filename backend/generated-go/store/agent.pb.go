@@ -178,7 +178,7 @@ func (x AgentStatus_ConnectionState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AgentStatus_ConnectionState.Descriptor instead.
 func (AgentStatus_ConnectionState) EnumDescriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{5, 0}
+	return file_store_agent_proto_rawDescGZIP(), []int{6, 0}
 }
 
 type AgentInfo struct {
@@ -193,8 +193,17 @@ type AgentInfo struct {
 	Capability         *AgentCapability       `protobuf:"bytes,8,opt,name=capability,proto3" json:"capability,omitempty"`
 	AvailableProviders []*AgentProviderInfo   `protobuf:"bytes,9,rep,name=available_providers,json=availableProviders,proto3" json:"available_providers,omitempty"`
 	AcpConfig          *AgentACPConfig        `protobuf:"bytes,10,opt,name=acp_config,json=acpConfig,proto3" json:"acp_config,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// prompt_version is the composite "<static>.<dynamic>" system-prompt version
+	// this agent last confirmed via PromptReleaseNoticeAck. Stored in the agent
+	// info JSONB; used by the manager to avoid re-pushing already-confirmed
+	// notices.
+	PromptVersion string `protobuf:"bytes,11,opt,name=prompt_version,json=promptVersion,proto3" json:"prompt_version,omitempty"`
+	// pending_prompt_notice is a system-prompt release notice that could not be
+	// pushed while the agent was offline. It is re-sent on every BeginSession
+	// until the agent acks it.
+	PendingPromptNotice *PendingPromptNotice `protobuf:"bytes,12,opt,name=pending_prompt_notice,json=pendingPromptNotice,proto3" json:"pending_prompt_notice,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *AgentInfo) Reset() {
@@ -297,6 +306,81 @@ func (x *AgentInfo) GetAcpConfig() *AgentACPConfig {
 	return nil
 }
 
+func (x *AgentInfo) GetPromptVersion() string {
+	if x != nil {
+		return x.PromptVersion
+	}
+	return ""
+}
+
+func (x *AgentInfo) GetPendingPromptNotice() *PendingPromptNotice {
+	if x != nil {
+		return x.PendingPromptNotice
+	}
+	return nil
+}
+
+// PendingPromptNotice is the storage-layer mirror of laelia.v1.PromptReleaseNotice.
+type PendingPromptNotice struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NoticeKey     string                 `protobuf:"bytes,1,opt,name=notice_key,json=noticeKey,proto3" json:"notice_key,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	PromptVersion string                 `protobuf:"bytes,3,opt,name=prompt_version,json=promptVersion,proto3" json:"prompt_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PendingPromptNotice) Reset() {
+	*x = PendingPromptNotice{}
+	mi := &file_store_agent_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PendingPromptNotice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PendingPromptNotice) ProtoMessage() {}
+
+func (x *PendingPromptNotice) ProtoReflect() protoreflect.Message {
+	mi := &file_store_agent_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PendingPromptNotice.ProtoReflect.Descriptor instead.
+func (*PendingPromptNotice) Descriptor() ([]byte, []int) {
+	return file_store_agent_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *PendingPromptNotice) GetNoticeKey() string {
+	if x != nil {
+		return x.NoticeKey
+	}
+	return ""
+}
+
+func (x *PendingPromptNotice) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *PendingPromptNotice) GetPromptVersion() string {
+	if x != nil {
+		return x.PromptVersion
+	}
+	return ""
+}
+
 type AgentACPConfig struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	Executable          string                 `protobuf:"bytes,1,opt,name=executable,proto3" json:"executable,omitempty"`
@@ -332,7 +416,7 @@ type AgentACPConfig struct {
 
 func (x *AgentACPConfig) Reset() {
 	*x = AgentACPConfig{}
-	mi := &file_store_agent_proto_msgTypes[1]
+	mi := &file_store_agent_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -344,7 +428,7 @@ func (x *AgentACPConfig) String() string {
 func (*AgentACPConfig) ProtoMessage() {}
 
 func (x *AgentACPConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_store_agent_proto_msgTypes[1]
+	mi := &file_store_agent_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -357,7 +441,7 @@ func (x *AgentACPConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentACPConfig.ProtoReflect.Descriptor instead.
 func (*AgentACPConfig) Descriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{1}
+	return file_store_agent_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *AgentACPConfig) GetExecutable() string {
@@ -480,7 +564,7 @@ type AgentProviderInfo struct {
 
 func (x *AgentProviderInfo) Reset() {
 	*x = AgentProviderInfo{}
-	mi := &file_store_agent_proto_msgTypes[2]
+	mi := &file_store_agent_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -492,7 +576,7 @@ func (x *AgentProviderInfo) String() string {
 func (*AgentProviderInfo) ProtoMessage() {}
 
 func (x *AgentProviderInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_store_agent_proto_msgTypes[2]
+	mi := &file_store_agent_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -505,7 +589,7 @@ func (x *AgentProviderInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentProviderInfo.ProtoReflect.Descriptor instead.
 func (*AgentProviderInfo) Descriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{2}
+	return file_store_agent_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AgentProviderInfo) GetProviderId() string {
@@ -568,7 +652,7 @@ type AgentModelOption struct {
 
 func (x *AgentModelOption) Reset() {
 	*x = AgentModelOption{}
-	mi := &file_store_agent_proto_msgTypes[3]
+	mi := &file_store_agent_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -580,7 +664,7 @@ func (x *AgentModelOption) String() string {
 func (*AgentModelOption) ProtoMessage() {}
 
 func (x *AgentModelOption) ProtoReflect() protoreflect.Message {
-	mi := &file_store_agent_proto_msgTypes[3]
+	mi := &file_store_agent_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -593,7 +677,7 @@ func (x *AgentModelOption) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentModelOption.ProtoReflect.Descriptor instead.
 func (*AgentModelOption) Descriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{3}
+	return file_store_agent_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AgentModelOption) GetValue() string {
@@ -634,7 +718,7 @@ type AgentCapability struct {
 
 func (x *AgentCapability) Reset() {
 	*x = AgentCapability{}
-	mi := &file_store_agent_proto_msgTypes[4]
+	mi := &file_store_agent_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -646,7 +730,7 @@ func (x *AgentCapability) String() string {
 func (*AgentCapability) ProtoMessage() {}
 
 func (x *AgentCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_store_agent_proto_msgTypes[4]
+	mi := &file_store_agent_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -659,7 +743,7 @@ func (x *AgentCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentCapability.ProtoReflect.Descriptor instead.
 func (*AgentCapability) Descriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{4}
+	return file_store_agent_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AgentCapability) GetSupportsAcp() bool {
@@ -738,7 +822,7 @@ type AgentStatus struct {
 
 func (x *AgentStatus) Reset() {
 	*x = AgentStatus{}
-	mi := &file_store_agent_proto_msgTypes[5]
+	mi := &file_store_agent_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -750,7 +834,7 @@ func (x *AgentStatus) String() string {
 func (*AgentStatus) ProtoMessage() {}
 
 func (x *AgentStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_store_agent_proto_msgTypes[5]
+	mi := &file_store_agent_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -763,7 +847,7 @@ func (x *AgentStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentStatus.ProtoReflect.Descriptor instead.
 func (*AgentStatus) Descriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{5}
+	return file_store_agent_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *AgentStatus) GetState() AgentStatus_ConnectionState {
@@ -805,7 +889,7 @@ var File_store_agent_proto protoreflect.FileDescriptor
 
 const file_store_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x11store/agent.proto\x12\flaelia.store\x1a\x1fgoogle/protobuf/timestamp.proto\"\xda\x03\n" +
+	"\x11store/agent.proto\x12\flaelia.store\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd8\x04\n" +
 	"\tAgentInfo\x12\x1d\n" +
 	"\n" +
 	"agent_type\x18\x01 \x01(\tR\tagentType\x12\x1a\n" +
@@ -821,10 +905,17 @@ const file_store_agent_proto_rawDesc = "" +
 	"\x13available_providers\x18\t \x03(\v2\x1f.laelia.store.AgentProviderInfoR\x12availableProviders\x12;\n" +
 	"\n" +
 	"acp_config\x18\n" +
-	" \x01(\v2\x1c.laelia.store.AgentACPConfigR\tacpConfig\x1a9\n" +
+	" \x01(\v2\x1c.laelia.store.AgentACPConfigR\tacpConfig\x12%\n" +
+	"\x0eprompt_version\x18\v \x01(\tR\rpromptVersion\x12U\n" +
+	"\x15pending_prompt_notice\x18\f \x01(\v2!.laelia.store.PendingPromptNoticeR\x13pendingPromptNotice\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe1\x04\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"u\n" +
+	"\x13PendingPromptNotice\x12\x1d\n" +
+	"\n" +
+	"notice_key\x18\x01 \x01(\tR\tnoticeKey\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12%\n" +
+	"\x0eprompt_version\x18\x03 \x01(\tR\rpromptVersion\"\xe1\x04\n" +
 	"\x0eAgentACPConfig\x12\x1e\n" +
 	"\n" +
 	"executable\x18\x01 \x01(\tR\n" +
@@ -916,35 +1007,37 @@ func file_store_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_store_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_store_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_store_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_store_agent_proto_goTypes = []any{
 	(AgentTokenType)(0),              // 0: laelia.store.AgentTokenType
 	(AgentTokenState)(0),             // 1: laelia.store.AgentTokenState
 	(AgentStatus_ConnectionState)(0), // 2: laelia.store.AgentStatus.ConnectionState
 	(*AgentInfo)(nil),                // 3: laelia.store.AgentInfo
-	(*AgentACPConfig)(nil),           // 4: laelia.store.AgentACPConfig
-	(*AgentProviderInfo)(nil),        // 5: laelia.store.AgentProviderInfo
-	(*AgentModelOption)(nil),         // 6: laelia.store.AgentModelOption
-	(*AgentCapability)(nil),          // 7: laelia.store.AgentCapability
-	(*AgentStatus)(nil),              // 8: laelia.store.AgentStatus
-	nil,                              // 9: laelia.store.AgentInfo.LabelsEntry
-	nil,                              // 10: laelia.store.AgentACPConfig.CustomEnvEntry
-	(*timestamppb.Timestamp)(nil),    // 11: google.protobuf.Timestamp
+	(*PendingPromptNotice)(nil),      // 4: laelia.store.PendingPromptNotice
+	(*AgentACPConfig)(nil),           // 5: laelia.store.AgentACPConfig
+	(*AgentProviderInfo)(nil),        // 6: laelia.store.AgentProviderInfo
+	(*AgentModelOption)(nil),         // 7: laelia.store.AgentModelOption
+	(*AgentCapability)(nil),          // 8: laelia.store.AgentCapability
+	(*AgentStatus)(nil),              // 9: laelia.store.AgentStatus
+	nil,                              // 10: laelia.store.AgentInfo.LabelsEntry
+	nil,                              // 11: laelia.store.AgentACPConfig.CustomEnvEntry
+	(*timestamppb.Timestamp)(nil),    // 12: google.protobuf.Timestamp
 }
 var file_store_agent_proto_depIdxs = []int32{
-	9,  // 0: laelia.store.AgentInfo.labels:type_name -> laelia.store.AgentInfo.LabelsEntry
-	7,  // 1: laelia.store.AgentInfo.capability:type_name -> laelia.store.AgentCapability
-	5,  // 2: laelia.store.AgentInfo.available_providers:type_name -> laelia.store.AgentProviderInfo
-	4,  // 3: laelia.store.AgentInfo.acp_config:type_name -> laelia.store.AgentACPConfig
-	10, // 4: laelia.store.AgentACPConfig.custom_env:type_name -> laelia.store.AgentACPConfig.CustomEnvEntry
-	6,  // 5: laelia.store.AgentProviderInfo.models:type_name -> laelia.store.AgentModelOption
-	11, // 6: laelia.store.AgentProviderInfo.detected_at:type_name -> google.protobuf.Timestamp
-	2,  // 7: laelia.store.AgentStatus.state:type_name -> laelia.store.AgentStatus.ConnectionState
-	8,  // [8:8] is the sub-list for method output_type
-	8,  // [8:8] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	10, // 0: laelia.store.AgentInfo.labels:type_name -> laelia.store.AgentInfo.LabelsEntry
+	8,  // 1: laelia.store.AgentInfo.capability:type_name -> laelia.store.AgentCapability
+	6,  // 2: laelia.store.AgentInfo.available_providers:type_name -> laelia.store.AgentProviderInfo
+	5,  // 3: laelia.store.AgentInfo.acp_config:type_name -> laelia.store.AgentACPConfig
+	4,  // 4: laelia.store.AgentInfo.pending_prompt_notice:type_name -> laelia.store.PendingPromptNotice
+	11, // 5: laelia.store.AgentACPConfig.custom_env:type_name -> laelia.store.AgentACPConfig.CustomEnvEntry
+	7,  // 6: laelia.store.AgentProviderInfo.models:type_name -> laelia.store.AgentModelOption
+	12, // 7: laelia.store.AgentProviderInfo.detected_at:type_name -> google.protobuf.Timestamp
+	2,  // 8: laelia.store.AgentStatus.state:type_name -> laelia.store.AgentStatus.ConnectionState
+	9,  // [9:9] is the sub-list for method output_type
+	9,  // [9:9] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_store_agent_proto_init() }
@@ -958,7 +1051,7 @@ func file_store_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_agent_proto_rawDesc), len(file_store_agent_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

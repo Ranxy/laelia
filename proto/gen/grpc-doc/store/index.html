@@ -210,6 +210,10 @@
                   <a href="#laelia.store.AgentStatus"><span class="badge">M</span>AgentStatus</a>
                 </li>
               
+                <li>
+                  <a href="#laelia.store.PendingPromptNotice"><span class="badge">M</span>PendingPromptNotice</a>
+                </li>
+              
               
                 <li>
                   <a href="#laelia.store.AgentStatus.ConnectionState"><span class="badge">E</span>AgentStatus.ConnectionState</a>
@@ -645,7 +649,7 @@ and api_provider == &#34;custom&#34;; ignored by ACP runtimes and by known
 (deepseek/openrouter) providers. When set, it is injected into pi&#39;s
 models.json so pi knows when to auto-compact. Zero means &#34;let pi infer it&#34;. </p></td>
                 </tr>
-
+              
                 <tr>
                   <td>max_tokens</td>
                   <td><a href="#int64">int64</a></td>
@@ -655,7 +659,7 @@ provider. Only meaningful when provider == &#34;builtin-pi&#34; and
 api_provider == &#34;custom&#34;; ignored by ACP runtimes and by known
 (deepseek/openrouter) providers. Zero means &#34;let pi infer it&#34;. </p></td>
                 </tr>
-
+              
             </tbody>
           </table>
 
@@ -854,6 +858,25 @@ api_provider == &#34;custom&#34;; ignored by ACP runtimes and by known
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>prompt_version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>prompt_version is the composite &#34;&lt;static&gt;.&lt;dynamic&gt;&#34; system-prompt version
+this agent last confirmed via PromptReleaseNoticeAck. Stored in the agent
+info JSONB; used by the manager to avoid re-pushing already-confirmed
+notices. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>pending_prompt_notice</td>
+                  <td><a href="#laelia.store.PendingPromptNotice">PendingPromptNotice</a></td>
+                  <td></td>
+                  <td><p>pending_prompt_notice is a system-prompt release notice that could not be
+pushed while the agent was offline. It is re-sent on every BeginSession
+until the agent acks it. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -1036,6 +1059,44 @@ api_provider == &#34;custom&#34;; ignored by ACP runtimes and by known
               
                 <tr>
                   <td>active_session_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.PendingPromptNotice">PendingPromptNotice</h3>
+        <p>PendingPromptNotice is the storage-layer mirror of laelia.v1.PromptReleaseNotice.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>notice_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>prompt_version</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -1928,6 +1989,13 @@ This is an optional style described in the OAuth2 RFC 6749 section 2.3.1.</p></t
                   <td>available_providers</td>
                   <td><a href="#laelia.store.AgentProviderInfo">AgentProviderInfo</a></td>
                   <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>prompt_bundle_version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
                   <td><p> </p></td>
                 </tr>
               

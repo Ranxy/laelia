@@ -150,6 +150,11 @@ func (s *AgentStreamService) AgentChannel(
 		case *v1pb.AgentStreamMessage_WorkspaceReadResponse:
 			s.dispatcher.CompletePendingWorkspaceRead(m.WorkspaceReadResponse)
 
+		case *v1pb.AgentStreamMessage_PromptReleaseNoticeAck:
+			if err := s.dispatcher.HandlePromptReleaseNoticeAck(ctx, agent.ID, m.PromptReleaseNoticeAck); err != nil {
+				slog.Error("failed to handle prompt release notice ack", "error", err)
+			}
+
 		default:
 			slog.Warn("unknown agent stream message type")
 		}

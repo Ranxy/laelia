@@ -453,7 +453,7 @@ func TestRunSessionExecutesRuntime(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "TestAgent", "", nil)
+		cs.runSession(ctx, stream, "drain-1", "TestAgent", "", nil, "", nil)
 		close(done)
 	}()
 
@@ -514,7 +514,7 @@ func TestRunnerCoordinatesInFlightTurnOnReload(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	go cs.runSession(ctx, stream, "drain-reload", "TestAgent", "", nil)
+	go cs.runSession(ctx, stream, "drain-reload", "TestAgent", "", nil, "", nil)
 
 	// Wait until the turn is in flight before reloading.
 	require.Eventually(t, cs.InFlight, 2*time.Second, 5*time.Millisecond, "turn must become in flight")
@@ -703,4 +703,45 @@ func TestBuildSteerNotice(t *testing.T) {
 
 	empty := buildSteerNotice(nil)
 	assert.Contains(t, empty, "new messages arrived")
+}
+
+func TestMessageRouterPromptReleaseNoticeQueuesWhenNotSteerable(t *testing.T) {
+	cs := &commandStream{}
+	router := newMessageRouter(cs)
+	stream, recorder, cleanup := newTestCommandChannel(t)
+	defer cleanup()
+
+	router.route(context.Background(), stream, &v1pb.ManagerStreamMessage{
+		Message: &v1pb.ManagerStreamMessage_PromptReleaseNotice{
+			PromptReleaseNotice: &v1pb.PromptReleaseNotice{
+				NoticeKey:     "k1",
+				Message:       "Your system prompt has been updated.",
+				PromptVersion: "static1.dyn1",
+			},
+		},
+	}, make(chan struct{}))
+
+	notice := cs.takePendingPromptNotice()
+	require.NotNil(t, notice, "non-steerable runtime must queue the notice for the next turn")
+	assert.Equal(t, "k1", notice.GetNoticeKey())
+	assert.Equal(t, "static1.dyn1", notice.GetPromptVersion())
+	// The queued path does not ack immediately; runSession acks after injecting.
+	assert.Empty(t, recorder.Messages())
+}
+
+func TestSendPromptReleaseNoticeAck(t *testing.T) {
+	stream, recorder, cleanup := newTestCommandChannel(t)
+	defer cleanup()
+
+	err := sendPromptReleaseNoticeAck(stream, &v1pb.PromptReleaseNotice{
+		NoticeKey:     "k1",
+		PromptVersion: "static1.dyn1",
+	})
+	require.NoError(t, err)
+	msgs := recorder.Messages()
+	require.Len(t, msgs, 1)
+	ack := msgs[0].GetPromptReleaseNoticeAck()
+	require.NotNil(t, ack)
+	assert.Equal(t, "k1", ack.GetNoticeKey())
+	assert.Equal(t, "static1.dyn1", ack.GetPromptVersion())
 }

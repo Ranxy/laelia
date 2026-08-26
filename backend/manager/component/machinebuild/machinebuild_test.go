@@ -53,3 +53,28 @@ func TestUpgradeAvailable(t *testing.T) {
 		})
 	}
 }
+
+func TestLatestPromptBundleVersion(t *testing.T) {
+	SetManifest([]byte(`{"version":"1.2.3","prompt_bundle_version":"abc123","targets":{}}`))
+	if got := LatestPromptBundleVersion(); got != "abc123" {
+		t.Fatalf("LatestPromptBundleVersion() = %q, want abc123", got)
+	}
+	// A manifest without prompt_bundle_version (older builds) yields "".
+	SetManifest([]byte(`{"version":"1.0.0","targets":{}}`))
+	if got := LatestPromptBundleVersion(); got != "" {
+		t.Fatalf("LatestPromptBundleVersion() = %q, want empty for manifest without field", got)
+	}
+	// No manifest set at all.
+	mu.Lock()
+	old := current
+	current = nil
+	mu.Unlock()
+	t.Cleanup(func() {
+		mu.Lock()
+		current = old
+		mu.Unlock()
+	})
+	if got := LatestPromptBundleVersion(); got != "" {
+		t.Fatalf("LatestPromptBundleVersion() = %q, want empty when no manifest", got)
+	}
+}

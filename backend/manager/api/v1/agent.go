@@ -399,6 +399,14 @@ func (s *AgentService) TransferAgentOwnership(ctx context.Context, req *connect.
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to transfer agent ownership, error: %v", err))
 	}
 
+	// Push a prompt release notice so a running agent re-anchors with the new
+	// owner on the current or next turn.
+	if s.dispatcher != nil {
+		if pushErr := s.dispatcher.PushPromptReleaseNotice(ctx, updated.ID); pushErr != nil {
+			slog.Info("best-effort prompt release notice push skipped after ownership transfer", "agent", updated.ResourceID, "error", pushErr)
+		}
+	}
+
 	out := s.convertToAgent(ctx, updated, agentReachable(s.dispatcher, updated.ID, updated.MachineID))
 	out.CanEdit = true // caller just proved edit authorization
 	return connect.NewResponse(&v1pb.TransferAgentOwnershipResponse{Agent: out}), nil

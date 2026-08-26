@@ -1882,8 +1882,13 @@ type MachineInfo struct {
 	// LLM agent providers auto-discovered by the machine app on its host.
 	// Machine-scoped: every agent hosted on this machine selects from this list.
 	AvailableProviders []*AgentProviderInfo `protobuf:"bytes,9,rep,name=available_providers,json=availableProviders,proto3" json:"available_providers,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// prompt_bundle_version is the content hash of the machine binary's embedded
+	// static prompt bundle (communication.md / agent_memory.md / reanchor.md /
+	// AgentFirstPromptBody). The manager compares it against the expected version
+	// to detect when a machine's bundled system prompt is out of date.
+	PromptBundleVersion string `protobuf:"bytes,10,opt,name=prompt_bundle_version,json=promptBundleVersion,proto3" json:"prompt_bundle_version,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *MachineInfo) Reset() {
@@ -1970,6 +1975,13 @@ func (x *MachineInfo) GetAvailableProviders() []*AgentProviderInfo {
 		return x.AvailableProviders
 	}
 	return nil
+}
+
+func (x *MachineInfo) GetPromptBundleVersion() string {
+	if x != nil {
+		return x.PromptBundleVersion
+	}
+	return ""
 }
 
 type MachineStatus struct {
@@ -3221,7 +3233,7 @@ const file_v1_machine_proto_rawDesc = "" +
 	"\x0fUpgradeProgress\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x14\n" +
 	"\x05stage\x18\x02 \x01(\tR\x05stage\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error\"\xf9\x02\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\xad\x03\n" +
 	"\vMachineInfo\x12\x1a\n" +
 	"\bhostname\x18\x02 \x01(\tR\bhostname\x12\x0e\n" +
 	"\x02os\x18\x03 \x01(\tR\x02os\x12\x12\n" +
@@ -3232,7 +3244,9 @@ const file_v1_machine_proto_rawDesc = "" +
 	"\n" +
 	"capability\x18\b \x01(\v2\x1a.laelia.v1.AgentCapabilityR\n" +
 	"capability\x12M\n" +
-	"\x13available_providers\x18\t \x03(\v2\x1c.laelia.v1.AgentProviderInfoR\x12availableProviders\x1a9\n" +
+	"\x13available_providers\x18\t \x03(\v2\x1c.laelia.v1.AgentProviderInfoR\x12availableProviders\x122\n" +
+	"\x15prompt_bundle_version\x18\n" +
+	" \x01(\tR\x13promptBundleVersion\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x94\x03\n" +

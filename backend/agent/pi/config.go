@@ -13,6 +13,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
 	"github.com/Ranxy/laelia/backend/agent/home"
+	"github.com/Ranxy/laelia/backend/agent/version"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -233,7 +234,7 @@ func agentWorkingDir(machineID, agentID string) string {
 // be restarted.
 func (c *PiConfig) LaunchFingerprint() string {
 	h := sha256.New()
-	_, _ = h.Write([]byte(c.APIProvider + "\x00" + c.Model + "\x00" + c.APIKey + "\x00" + c.BaseURL + "\x00" + c.PiBinaryPath + "\x00" + strconv.FormatInt(c.ContextWindow, 10) + "\x00" + strconv.FormatInt(c.MaxTokens, 10)))
+	_, _ = h.Write([]byte(c.APIProvider + "\x00" + c.Model + "\x00" + c.APIKey + "\x00" + c.BaseURL + "\x00" + c.PiBinaryPath + "\x00" + strconv.FormatInt(c.ContextWindow, 10) + "\x00" + strconv.FormatInt(c.MaxTokens, 10) + version.PromptBundleVersion + "\x00" + c.PersonaPrompt))
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 

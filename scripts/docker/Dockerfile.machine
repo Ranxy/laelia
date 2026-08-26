@@ -23,7 +23,8 @@ RUN apk add --no-cache curl bash
 # release-tagged machine build then embeds.
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 RUN ./scripts/build-pi.sh
-RUN CGO_ENABLED=0 go build -tags release -ldflags "-w -s -X github.com/Ranxy/laelia/backend/agent/version.Version=${VERSION} -X github.com/Ranxy/laelia/backend/agent/version.GitCommit=${GIT_COMMIT} -X github.com/Ranxy/laelia/backend/agent/version.BuildTime=${BUILD_TIME}" -p=16 \
+RUN PROMPT_HASH="$({ sha256sum backend/agent/executor/prompt/*.md; sha256sum backend/agent/executor/prompt.go; } | sha256sum | cut -c1-16)" \
+	&& CGO_ENABLED=0 go build -tags release -ldflags "-w -s -X github.com/Ranxy/laelia/backend/agent/version.Version=${VERSION} -X github.com/Ranxy/laelia/backend/agent/version.GitCommit=${GIT_COMMIT} -X github.com/Ranxy/laelia/backend/agent/version.BuildTime=${BUILD_TIME} -X github.com/Ranxy/laelia/backend/agent/version.PromptBundleVersion=${PROMPT_HASH}" -p=16 \
 	-o /out/laelia-machine ./backend/agent/bin/agent/main.go
 
 FROM node:24.12.0-slim AS machine
