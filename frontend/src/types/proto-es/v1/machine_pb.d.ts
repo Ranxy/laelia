@@ -1171,6 +1171,14 @@ export declare type ManagerMachineStreamMessage = Message<"laelia.v1.ManagerMach
      */
     value: DiscoverModels;
     case: "discoverModels";
+  } | {
+    /**
+     * force cold restart of one agent
+     *
+     * @generated from field: laelia.v1.RestartAgent restart_agent = 12;
+     */
+    value: RestartAgent;
+    case: "restartAgent";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1211,6 +1219,26 @@ export declare type RemoveAgent = Message<"laelia.v1.RemoveAgent"> & {
  * Use `create(RemoveAgentSchema)` to create a new message.
  */
 export declare const RemoveAgentSchema: GenMessage<RemoveAgent>;
+
+/**
+ * RestartAgent tells the machine to force a cold restart of one agent: it
+ * clears the agent's persisted LLM session state and restarts its long-lived
+ * runtime so the next turn starts from a fresh cold start.
+ *
+ * @generated from message laelia.v1.RestartAgent
+ */
+export declare type RestartAgent = Message<"laelia.v1.RestartAgent"> & {
+  /**
+   * @generated from field: string agent_name = 1;
+   */
+  agentName: string;
+};
+
+/**
+ * Describes the message laelia.v1.RestartAgent.
+ * Use `create(RestartAgentSchema)` to create a new message.
+ */
+export declare const RestartAgentSchema: GenMessage<RestartAgent>;
 
 /**
  * DeleteAgentWorkspace tells the machine to tear down an agent's runner and

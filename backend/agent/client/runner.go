@@ -311,6 +311,39 @@ func (r *agentRunner) coordinateInFlightTurn() {
 	}
 }
 
+// coldRestart force-cold-restarts this agent's LLM session: it cancels any
+// in-flight turn, clears the persisted session state files (acp-session.json /
+// pi-session.json), and restarts the long-lived runtime so the next turn
+// starts from a fresh cold start (re-sends the init prompt). The runner and
+// AgentChannel stay alive; only the LLM conversation context is dropped.
+func (r *agentRunner) coldRestart() {
+	// 1. Cancel any in-flight turn and wait (bounded) so the restart never
+	// races the dying turn's session access.
+	r.coordinateInFlightTurn()
+
+	// 2. Clear persisted LLM session state so the next turn cold-starts.
+	executor.ClearSessionState(home.Join(r.machine.machineID, r.agentID, "acp-session.json"))
+	executor.ClearSessionState(home.Join(r.machine.machineID, r.agentID, "pi-session.json"))
+
+	// 3. Restart the long-lived runtime so in-memory warm state is also dropped.
+	r.mu.Lock()
+	piCfg := r.piConfig
+	r.mu.Unlock()
+	if piCfg != nil {
+		// A fresh Session starts lazily on the next turn; because the pi-session
+		// file is gone, resumeOrCapture cold-starts instead of resuming.
+		r.restartPiSession(piCfg)
+	}
+	r.stopThreadSession()
+
+	// 4. Wake the drain loop so pending work is picked up immediately with a
+	// fresh session.
+	if cs := r.currentCommandStream(); cs != nil {
+		cs.wake()
+	}
+	slog.Info("cold restarted agent", "agent", r.agentName)
+}
+
 // buildRuntimeForAgent is the per-turn runtime branch point, overriding the
 // commandStream's default ACP-only builder. A pi agent gets a per-turn
 // PiExecutor over the shared long-lived pi session; every other agent gets the
@@ -546,6 +579,21 @@ func (c *MachineClient) stopRunner(agentName string) {
 	if ok {
 		r.stop()
 	}
+}
+
+// coldRestartAgent force-cold-restarts one agent's runner: it clears the
+// agent's persisted LLM session state and restarts its long-lived runtime so
+// the next turn starts from a fresh cold start. Missing runner is a no-op.
+func (c *MachineClient) coldRestartAgent(agentName string) {
+	agentID := bareAgentID(agentName)
+	c.runnersMu.Lock()
+	r, ok := c.runners[agentID]
+	c.runnersMu.Unlock()
+	if !ok {
+		slog.Warn("cold restart for unknown agent runner; ignoring", "agent", agentName)
+		return
+	}
+	r.coldRestart()
 }
 
 // teardownRunners stops every live runner. Called on disconnect / reconnect so

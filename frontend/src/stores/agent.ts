@@ -17,6 +17,7 @@ import {
   ListPiModelsRequestSchema,
   RefreshAgentModelsRequestSchema,
   RefreshAgentProvidersRequestSchema,
+  RestartAgentRequestSchema,
   RevokeAgentTokenRequestSchema,
   RotateAgentTokenRequestSchema,
   StartAgentRequestSchema,
@@ -170,6 +171,12 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
         a.name === name ? { ...a, enabled: true } : a
       ),
     }));
+  },
+
+  async restartAgent(name: string) {
+    await agentServiceClient.restartAgent(
+      create(RestartAgentRequestSchema, { name })
+    );
   },
 
   async rotateAgentToken(name: string, reason?: string) {

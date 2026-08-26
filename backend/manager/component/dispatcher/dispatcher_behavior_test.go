@@ -100,6 +100,7 @@ func TestDispatcher_SendMethodsReturnErrorWhenOffline(t *testing.T) {
 	require.Error(t, d.SendDiscoverProviders(2, "req"))
 	require.Error(t, d.SendWorkspaceListRequest(2, "req", "/", false))
 	require.Error(t, d.SendMachineWorkspaceScan(1, "req"))
+	require.Error(t, d.SendRestartAgent(1, "a1"))
 }
 
 func TestDispatcher_MachineSendMethods(t *testing.T) {
@@ -119,6 +120,7 @@ func TestDispatcher_MachineSendMethods(t *testing.T) {
 	require.NoError(t, d.SendAgentConfigUpdate(1, "a1", nil))
 	require.NoError(t, d.SendRemoveAgent(1, "a1"))
 	require.NoError(t, d.SendReloadAgentAssignment(1, &v1pb.ReloadAgentAssignment{}))
+	require.NoError(t, d.SendRestartAgent(1, "a1"))
 	require.NoError(t, d.SendDiscoverProvidersToMachine(1, "req-m"))
 	require.NoError(t, d.SendPongToMachine(1))
 	require.NoError(t, d.SendUpgradeRequest(1, &v1pb.UpgradeRequest{}))
@@ -126,11 +128,11 @@ func TestDispatcher_MachineSendMethods(t *testing.T) {
 	require.NoError(t, d.SendDiscoverModelsToMachine(1, "codex", map[string]string{"CODEX_HOME": "/tmp/cx"}, "req-models"))
 
 	mu.Lock()
-	require.Len(t, received, 9)
+	require.Len(t, received, 10)
 	mu.Unlock()
 
 	// The DiscoverModels message must carry the provider + env overlay.
-	dm := received[8].GetDiscoverModels()
+	dm := received[9].GetDiscoverModels()
 	require.NotNil(t, dm)
 	require.Equal(t, "req-models", dm.GetRequestId())
 	require.Equal(t, "codex", dm.GetProvider())

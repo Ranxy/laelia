@@ -562,3 +562,22 @@ func (s *AgentService) StartAgent(ctx context.Context, req *connect.Request[v1pb
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
+
+// RestartAgent force-cold-restarts an agent: it ends the agent's current LLM
+// session and clears its persisted session state so the next turn starts from
+// a fresh cold start (re-sends the init prompt). The agent stays enabled and
+// connected. Authorized in the handler for the agent's owner or a holder of
+// laelia.agents.edit.
+func (s *AgentService) RestartAgent(ctx context.Context, req *connect.Request[v1pb.RestartAgentRequest]) (*connect.Response[emptypb.Empty], error) {
+	agent, err := s.resolveEditableAgent(ctx, req.Msg.Name, "restart")
+	if err != nil {
+		return nil, err
+	}
+	if s.dispatcher == nil || !s.dispatcher.IsAgentConnected(agent.ID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent is not connected; cannot cold restart"))
+	}
+	if err := s.dispatcher.SendRestartAgent(agent.MachineID, common.FormatAgentUID(agent.ResourceID)); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Wrap(err, "failed to request agent cold restart"))
+	}
+	return connect.NewResponse(&emptypb.Empty{}), nil
+}

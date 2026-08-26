@@ -175,6 +175,7 @@ function seedStore(overrides?: {
     transferAgentOwnership: mock.transferAgentOwnership,
     stopAgent: vi.fn(),
     startAgent: vi.fn(),
+    restartAgent: vi.fn(),
     deleteAgent: vi.fn(),
   } as never);
 }
@@ -823,5 +824,29 @@ describe("AgentProfilePage", () => {
         expect.objectContaining({ type: "error", description: "nope" })
       );
     });
+  });
+
+  it("force-cold-restarts the agent through the confirm dialog", async () => {
+    const restartAgent = vi.fn().mockResolvedValue(undefined);
+    useAppStore.setState({ restartAgent } as never);
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "common.restart" })
+    );
+    expect(
+      await screen.findByText("agent.restart-agent-confirm-title")
+    ).toBeInTheDocument();
+    const confirmButtons = screen.getAllByRole("button", {
+      name: "common.restart",
+    });
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(restartAgent).toHaveBeenCalledWith("agents/a1");
+    });
+    expect(toastMock.add).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "success" })
+    );
   });
 });

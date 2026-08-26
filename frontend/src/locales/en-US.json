@@ -143,6 +143,9 @@
       "section-add-to-channel": "Channel access",
       "section-identity": "Identity & Status"
     },
+    "restart-agent-confirm-description": "This will end {{title}}'s current LLM session and force a cold restart. The agent will forget its current conversation context and start fresh on the next task. This cannot be undone.",
+    "restart-agent-confirm-title": "Force cold restart?",
+    "restarted-toast": "Agent cold restarted",
     "runtime-config": "Runtime config",
     "started-toast": "Agent started",
     "status-error": "Error",
@@ -520,6 +523,7 @@
     "password": "Password",
     "profile": "Profile",
     "remove": "Remove",
+    "restart": "Restart",
     "retry": "Retry",
     "save": "Save",
     "saving": "Saving...",

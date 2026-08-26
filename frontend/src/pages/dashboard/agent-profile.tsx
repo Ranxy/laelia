@@ -3,6 +3,7 @@ import {
   Loader2,
   Pencil,
   Play,
+  RotateCcw,
   Square,
   Trash2,
   Upload,
@@ -237,6 +238,9 @@ export function AgentProfilePage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [restartOpen, setRestartOpen] = useState(false);
+  const [restartBusy, setRestartBusy] = useState(false);
+  const [restartError, setRestartError] = useState("");
 
   async function handleStop() {
     setStopBusy(true);
@@ -269,6 +273,23 @@ export function AgentProfilePage() {
         type: "error",
         description: err instanceof Error ? err.message : String(err),
       });
+    }
+  }
+
+  async function handleRestart() {
+    setRestartBusy(true);
+    setRestartError("");
+    try {
+      await useAppStore.getState().restartAgent(agentName);
+      setRestartOpen(false);
+      toastManager.add({
+        type: "success",
+        title: t("agent.restarted-toast"),
+      });
+    } catch (err) {
+      setRestartError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRestartBusy(false);
     }
   }
 
@@ -1277,6 +1298,18 @@ export function AgentProfilePage() {
                   <Button
                     variant="outline"
                     size="md"
+                    className="w-full justify-center"
+                    onClick={() => {
+                      setRestartError("");
+                      setRestartOpen(true);
+                    }}
+                  >
+                    <RotateCcw className="size-4" />
+                    {t("common.restart")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="md"
                     className="w-full justify-center border-error/30 bg-error/10 text-error hover:bg-error/15"
                     onClick={() => {
                       setDeleteError("");
@@ -2071,6 +2104,38 @@ export function AgentProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Restart-agent confirm */}
+      <AlertDialog
+        open={restartOpen}
+        onOpenChange={(next) => !next && setRestartOpen(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogTitle>
+            {t("agent.restart-agent-confirm-title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("agent.restart-agent-confirm-description", {
+              title: agent.title,
+            })}
+          </AlertDialogDescription>
+          {restartError && <Alert variant="error" description={restartError} />}
+          <AlertDialogFooter>
+            <AlertDialogClose>
+              <Button variant="outline" disabled={restartBusy}>
+                {t("common.cancel")}
+              </Button>
+            </AlertDialogClose>
+            <Button
+              variant="destructive"
+              disabled={restartBusy}
+              onClick={handleRestart}
+            >
+              {restartBusy ? t("common.saving") : t("common.restart")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Stop-agent confirm */}
       <AlertDialog

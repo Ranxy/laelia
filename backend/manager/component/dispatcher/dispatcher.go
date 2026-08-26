@@ -341,6 +341,17 @@ func (d *Dispatcher) SendRemoveAgent(machineID int, agentName string) error {
 	})
 }
 
+// SendRestartAgent asks the machine to force a cold restart of one agent:
+// clear its persisted LLM session state and restart its long-lived runtime so
+// the next turn starts from a fresh cold start.
+func (d *Dispatcher) SendRestartAgent(machineID int, agentName string) error {
+	return d.sendToMachine(machineID, &v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_RestartAgent{
+			RestartAgent: &v1pb.RestartAgent{AgentName: agentName},
+		},
+	})
+}
+
 // SendReloadAgentAssignment re-syncs a single agent's full assignment (used
 // after a display-name or config change to re-establish a runner).
 func (d *Dispatcher) SendReloadAgentAssignment(machineID int, reload *v1pb.ReloadAgentAssignment) error {

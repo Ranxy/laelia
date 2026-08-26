@@ -1,10 +1,13 @@
 package client
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/home"
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
@@ -97,5 +100,41 @@ func TestCustomThreadProviderAdapter(t *testing.T) {
 	exe, args := p.ThreadCommand("/work")
 	if exe != "my-agent" || len(args) != 1 || args[0] != "serve" {
 		t.Fatalf("ThreadCommand: got (%q, %v)", exe, args)
+	}
+}
+
+// TestAgentRunnerColdRestartClearsSessionState verifies that a cold restart
+// removes the persisted ACP and pi session state files so the next turn
+// starts from a fresh cold start.
+func TestAgentRunnerColdRestartClearsSessionState(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv(home.EnvDir, dir)
+	machineID := "machine-1"
+	agentID := "agent-1"
+
+	acpPath := home.Join(machineID, agentID, "acp-session.json")
+	piPath := home.Join(machineID, agentID, "pi-session.json")
+	if err := os.MkdirAll(filepath.Dir(acpPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(acpPath, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(piPath, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	r := &agentRunner{
+		machine:   &MachineClient{machineID: machineID},
+		agentName: "agents/agent-1",
+		agentID:   agentID,
+	}
+	r.coldRestart()
+
+	if _, err := os.Stat(acpPath); !os.IsNotExist(err) {
+		t.Fatalf("acp session file should be removed, err=%v", err)
+	}
+	if _, err := os.Stat(piPath); !os.IsNotExist(err) {
+		t.Fatalf("pi session file should be removed, err=%v", err)
 	}
 }

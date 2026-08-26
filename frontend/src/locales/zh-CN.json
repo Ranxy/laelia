@@ -143,6 +143,9 @@
       "section-add-to-channel": "频道访问",
       "section-identity": "身份与状态"
     },
+    "restart-agent-confirm-description": "这将结束 {{title}} 当前的 LLM 会话并强制冷启动。Agent 会忘记当前对话上下文，并在下一个任务中从头开始。此操作不可撤销。",
+    "restart-agent-confirm-title": "强制冷启动？",
+    "restarted-toast": "Agent 已强制冷启动",
     "runtime-config": "运行配置",
     "started-toast": "Agent 已启动",
     "status-error": "错误",
@@ -520,6 +523,7 @@
     "password": "密码",
     "profile": "个人资料",
     "remove": "移除",
+    "restart": "强制冷启动",
     "retry": "重试",
     "save": "保存",
     "saving": "保存中...",

@@ -263,6 +263,10 @@ export interface AgentSlice {
   stopAgent: (name: string) => Promise<void>;
   // startAgent resumes a stopped agent so it processes messages again.
   startAgent: (name: string) => Promise<void>;
+  // restartAgent force-cold-restarts an agent: it ends the agent's current
+  // LLM session and clears its persisted session state so the next turn
+  // starts from a fresh cold start.
+  restartAgent: (name: string) => Promise<void>;
   rotateAgentToken: (
     name: string,
     reason?: string

@@ -528,6 +528,7 @@ message ManagerMachineStreamMessage {
     DeleteAgentWorkspace delete_agent_workspace = 8; // stop the runner and delete an agent's workspace directory
     UpgradeRequest upgrade_request = 9; // self-upgrade to the manager's embedded binary
     DiscoverModels discover_models = 11; // probe one provider's models with an env overlay
+    RestartAgent restart_agent = 12; // force cold restart of one agent
   }
 }
 
@@ -536,6 +537,13 @@ message MachineReady {
 }
 
 message RemoveAgent {
+  string agent_name = 1;
+}
+
+// RestartAgent tells the machine to force a cold restart of one agent: it
+// clears the agent's persisted LLM session state and restarts its long-lived
+// runtime so the next turn starts from a fresh cold start.
+message RestartAgent {
   string agent_name = 1;
 }
 

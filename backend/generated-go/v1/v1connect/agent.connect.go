@@ -54,6 +54,9 @@ const (
 	AgentServiceStopAgentProcedure = "/laelia.v1.AgentService/StopAgent"
 	// AgentServiceStartAgentProcedure is the fully-qualified name of the AgentService's StartAgent RPC.
 	AgentServiceStartAgentProcedure = "/laelia.v1.AgentService/StartAgent"
+	// AgentServiceRestartAgentProcedure is the fully-qualified name of the AgentService's RestartAgent
+	// RPC.
+	AgentServiceRestartAgentProcedure = "/laelia.v1.AgentService/RestartAgent"
 	// AgentServiceRotateAgentTokenProcedure is the fully-qualified name of the AgentService's
 	// RotateAgentToken RPC.
 	AgentServiceRotateAgentTokenProcedure = "/laelia.v1.AgentService/RotateAgentToken"
@@ -149,6 +152,12 @@ type AgentServiceClient interface {
 	// agent is already enabled. Authorized in the handler for the agent's owner
 	// or a holder of laelia.agents.edit.
 	StartAgent(context.Context, *connect.Request[v1.StartAgentRequest]) (*connect.Response[emptypb.Empty], error)
+	// RestartAgent force-cold-restarts an agent: it ends the agent's current
+	// LLM session and clears its persisted session state so the next turn
+	// starts from a fresh cold start (re-sends the init prompt). The agent
+	// stays enabled and connected. Authorized in the handler for the agent's
+	// owner or a holder of laelia.agents.edit.
+	RestartAgent(context.Context, *connect.Request[v1.RestartAgentRequest]) (*connect.Response[emptypb.Empty], error)
 	// Token rotation: generate a new bootstrap token, old token invalid after
 	// grace period. Authorized in the handler for the agent's owner or a holder
 	// of laelia.agents.edit on the agent; no permission annotation so the owner
@@ -287,6 +296,12 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(agentServiceMethods.ByName("StartAgent")),
 			connect.WithClientOptions(opts...),
 		),
+		restartAgent: connect.NewClient[v1.RestartAgentRequest, emptypb.Empty](
+			httpClient,
+			baseURL+AgentServiceRestartAgentProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("RestartAgent")),
+			connect.WithClientOptions(opts...),
+		),
 		rotateAgentToken: connect.NewClient[v1.RotateAgentTokenRequest, v1.RotateAgentTokenResponse](
 			httpClient,
 			baseURL+AgentServiceRotateAgentTokenProcedure,
@@ -414,6 +429,7 @@ type agentServiceClient struct {
 	deleteAgent            *connect.Client[v1.DeleteAgentRequest, emptypb.Empty]
 	stopAgent              *connect.Client[v1.StopAgentRequest, emptypb.Empty]
 	startAgent             *connect.Client[v1.StartAgentRequest, emptypb.Empty]
+	restartAgent           *connect.Client[v1.RestartAgentRequest, emptypb.Empty]
 	rotateAgentToken       *connect.Client[v1.RotateAgentTokenRequest, v1.RotateAgentTokenResponse]
 	revokeAgentToken       *connect.Client[v1.RevokeAgentTokenRequest, v1.RevokeAgentTokenResponse]
 	forceDisconnectAgent   *connect.Client[v1.ForceDisconnectAgentRequest, emptypb.Empty]
@@ -473,6 +489,11 @@ func (c *agentServiceClient) StopAgent(ctx context.Context, req *connect.Request
 // StartAgent calls laelia.v1.AgentService.StartAgent.
 func (c *agentServiceClient) StartAgent(ctx context.Context, req *connect.Request[v1.StartAgentRequest]) (*connect.Response[emptypb.Empty], error) {
 	return c.startAgent.CallUnary(ctx, req)
+}
+
+// RestartAgent calls laelia.v1.AgentService.RestartAgent.
+func (c *agentServiceClient) RestartAgent(ctx context.Context, req *connect.Request[v1.RestartAgentRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.restartAgent.CallUnary(ctx, req)
 }
 
 // RotateAgentToken calls laelia.v1.AgentService.RotateAgentToken.
@@ -607,6 +628,12 @@ type AgentServiceHandler interface {
 	// agent is already enabled. Authorized in the handler for the agent's owner
 	// or a holder of laelia.agents.edit.
 	StartAgent(context.Context, *connect.Request[v1.StartAgentRequest]) (*connect.Response[emptypb.Empty], error)
+	// RestartAgent force-cold-restarts an agent: it ends the agent's current
+	// LLM session and clears its persisted session state so the next turn
+	// starts from a fresh cold start (re-sends the init prompt). The agent
+	// stays enabled and connected. Authorized in the handler for the agent's
+	// owner or a holder of laelia.agents.edit.
+	RestartAgent(context.Context, *connect.Request[v1.RestartAgentRequest]) (*connect.Response[emptypb.Empty], error)
 	// Token rotation: generate a new bootstrap token, old token invalid after
 	// grace period. Authorized in the handler for the agent's owner or a holder
 	// of laelia.agents.edit on the agent; no permission annotation so the owner
@@ -741,6 +768,12 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(agentServiceMethods.ByName("StartAgent")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentServiceRestartAgentHandler := connect.NewUnaryHandler(
+		AgentServiceRestartAgentProcedure,
+		svc.RestartAgent,
+		connect.WithSchema(agentServiceMethods.ByName("RestartAgent")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentServiceRotateAgentTokenHandler := connect.NewUnaryHandler(
 		AgentServiceRotateAgentTokenProcedure,
 		svc.RotateAgentToken,
@@ -873,6 +906,8 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 			agentServiceStopAgentHandler.ServeHTTP(w, r)
 		case AgentServiceStartAgentProcedure:
 			agentServiceStartAgentHandler.ServeHTTP(w, r)
+		case AgentServiceRestartAgentProcedure:
+			agentServiceRestartAgentHandler.ServeHTTP(w, r)
 		case AgentServiceRotateAgentTokenProcedure:
 			agentServiceRotateAgentTokenHandler.ServeHTTP(w, r)
 		case AgentServiceRevokeAgentTokenProcedure:
@@ -950,6 +985,10 @@ func (UnimplementedAgentServiceHandler) StopAgent(context.Context, *connect.Requ
 
 func (UnimplementedAgentServiceHandler) StartAgent(context.Context, *connect.Request[v1.StartAgentRequest]) (*connect.Response[emptypb.Empty], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.StartAgent is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) RestartAgent(context.Context, *connect.Request[v1.RestartAgentRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.RestartAgent is not implemented"))
 }
 
 func (UnimplementedAgentServiceHandler) RotateAgentToken(context.Context, *connect.Request[v1.RotateAgentTokenRequest]) (*connect.Response[v1.RotateAgentTokenResponse], error) {

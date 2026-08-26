@@ -85,6 +85,16 @@ service AgentService {
     option (laelia.v1.audit) = true;
   }
 
+  // RestartAgent force-cold-restarts an agent: it ends the agent's current
+  // LLM session and clears its persisted session state so the next turn
+  // starts from a fresh cold start (re-sends the init prompt). The agent
+  // stays enabled and connected. Authorized in the handler for the agent's
+  // owner or a holder of laelia.agents.edit.
+  rpc RestartAgent(RestartAgentRequest) returns (google.protobuf.Empty) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
   // Token rotation: generate a new bootstrap token, old token invalid after
   // grace period. Authorized in the handler for the agent's owner or a holder
   // of laelia.agents.edit on the agent; no permission annotation so the owner
@@ -440,6 +450,13 @@ message StopAgentRequest {
 }
 
 message StartAgentRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+}
+
+message RestartAgentRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "laelia/Agent"}

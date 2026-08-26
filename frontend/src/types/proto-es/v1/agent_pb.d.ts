@@ -723,6 +723,22 @@ export declare type StartAgentRequest = Message<"laelia.v1.StartAgentRequest"> &
 export declare const StartAgentRequestSchema: GenMessage<StartAgentRequest>;
 
 /**
+ * @generated from message laelia.v1.RestartAgentRequest
+ */
+export declare type RestartAgentRequest = Message<"laelia.v1.RestartAgentRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.RestartAgentRequest.
+ * Use `create(RestartAgentRequestSchema)` to create a new message.
+ */
+export declare const RestartAgentRequestSchema: GenMessage<RestartAgentRequest>;
+
+/**
  * @generated from message laelia.v1.UpdateAgentACPConfigRequest
  */
 export declare type UpdateAgentACPConfigRequest = Message<"laelia.v1.UpdateAgentACPConfigRequest"> & {
@@ -2155,6 +2171,20 @@ export declare const AgentService: GenService<{
   startAgent: {
     methodKind: "unary";
     input: typeof StartAgentRequestSchema;
+    output: typeof EmptySchema;
+  },
+  /**
+   * RestartAgent force-cold-restarts an agent: it ends the agent's current
+   * LLM session and clears its persisted session state so the next turn
+   * starts from a fresh cold start (re-sends the init prompt). The agent
+   * stays enabled and connected. Authorized in the handler for the agent's
+   * owner or a holder of laelia.agents.edit.
+   *
+   * @generated from rpc laelia.v1.AgentService.RestartAgent
+   */
+  restartAgent: {
+    methodKind: "unary";
+    input: typeof RestartAgentRequestSchema;
     output: typeof EmptySchema;
   },
   /**
