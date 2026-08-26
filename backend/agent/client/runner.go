@@ -69,6 +69,10 @@ func (r *agentRunner) buildAcpConfig(assignment *v1pb.AgentAssignment) *executor
 	return cfg
 }
 
+// userPiDetectTimeout bounds the local user-pi version probe. A slow or hung
+// `pi` on PATH must not stall agent config application.
+const userPiDetectTimeout = 5 * time.Second
+
 // buildPiConfig resolves the server-owned AgentACPConfig into a pi config +
 // creates the per-agent working dir. Returns nil if the assignment is not a
 // configured pi agent (provider != builtin-pi/user-pi, unknown api_provider,
@@ -81,7 +85,9 @@ func (r *agentRunner) buildPiConfig(assignment *v1pb.AgentAssignment) *pi.PiConf
 			slog.Warn("user pi provider not registered; agent stays inert", "agent", r.agentName)
 			return nil
 		}
-		info, present, err := p.Detect(context.Background())
+		detectCtx, cancel := context.WithTimeout(context.Background(), userPiDetectTimeout)
+		defer cancel()
+		info, present, err := p.Detect(detectCtx)
 		if err != nil || !present || info == nil {
 			slog.Warn("user pi not detected; agent stays inert", "agent", r.agentName, "error", err)
 			return nil

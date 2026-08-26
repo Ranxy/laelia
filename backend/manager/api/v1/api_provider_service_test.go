@@ -7,6 +7,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
 	"github.com/Ranxy/laelia/backend/agent/pi"
+	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -471,5 +472,29 @@ func TestValidateAPIProviderBaseCustom(t *testing.T) {
 		Title:        "My Custom",
 	}); err == nil {
 		t.Fatal("custom provider without base_url should be rejected")
+	}
+}
+
+// TestValidateAgentACPConfigUserPiGlobalProviderRequiresMachine verifies that a
+// user-installed pi using a global provider is still rejected when the owning
+// machine has probed and pi is absent or version-incompatible.
+func TestValidateAgentACPConfigUserPiGlobalProviderRequiresMachine(t *testing.T) {
+	cfg := &v1pb.AgentACPConfig{
+		Provider:            pi.UserPiProvider,
+		GlobalProvider:      "apiProviders/abc",
+		GlobalProviderEntry: "apiProviders/abc/entries/1",
+	}
+
+	if err := validateAgentACPConfig(cfg, nil); err != nil {
+		t.Fatalf("machine not probed yet should pass: %v", err)
+	}
+	if err := validateAgentACPConfig(cfg, []*storepb.AgentProviderInfo{{ProviderId: "pi", Compatible: true}}); err != nil {
+		t.Fatalf("compatible pi on machine should pass: %v", err)
+	}
+	if err := validateAgentACPConfig(cfg, []*storepb.AgentProviderInfo{{ProviderId: "opencode", Compatible: true}}); err == nil {
+		t.Fatal("expected unavailable user pi to be rejected")
+	}
+	if err := validateAgentACPConfig(cfg, []*storepb.AgentProviderInfo{{ProviderId: "pi", Compatible: false, IncompatibilityReason: "requires pi >= 0.82.1"}}); err == nil {
+		t.Fatal("expected incompatible user pi to be rejected")
 	}
 }

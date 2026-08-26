@@ -498,6 +498,20 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders 
 	// model (or a global provider); user-installed pi additionally supports
 	// pi's own model/auth mode where laelia does not manage a key.
 	if pi.IsPiProvider(cfg.Provider) {
+		// User-installed pi must actually be installed on the owning machine and
+		// satisfy the minimum version when the machine has already probed. This
+		// applies regardless of auth mode (own/self/global).
+		if cfg.Provider == pi.UserPiProvider && len(machineAvailableProviders) > 0 {
+			if !providerAvailable(cfg.Provider, machineAvailableProviders) {
+				return errors.Errorf("acp_config.provider %q is not available on the owning machine (available: %s)",
+					cfg.Provider, availableProviderIDs(machineAvailableProviders))
+			}
+			for _, p := range machineAvailableProviders {
+				if p.ProviderId == cfg.Provider && !p.Compatible {
+					return errors.Errorf("acp_config.provider %q is not compatible: %s", cfg.Provider, p.IncompatibilityReason)
+				}
+			}
+		}
 		// A global-provider reference replaces the inline api_provider/api_key
 		// (the model resolves from the referenced entry). Both fields must be
 		// set and consistent; access to the provider is checked by the handler.
@@ -517,19 +531,6 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders 
 				return errors.Errorf("acp_config.global_provider_entry %q does not belong to global_provider %q", cfg.GlobalProviderEntry, cfg.GlobalProvider)
 			}
 			return nil
-		}
-		// User-installed pi must actually be installed on the owning machine and
-		// satisfy the minimum version when the machine has already probed.
-		if cfg.Provider == pi.UserPiProvider && len(machineAvailableProviders) > 0 {
-			if !providerAvailable(cfg.Provider, machineAvailableProviders) {
-				return errors.Errorf("acp_config.provider %q is not available on the owning machine (available: %s)",
-					cfg.Provider, availableProviderIDs(machineAvailableProviders))
-			}
-			for _, p := range machineAvailableProviders {
-				if p.ProviderId == cfg.Provider && !p.Compatible {
-					return errors.Errorf("acp_config.provider %q is not compatible: %s", cfg.Provider, p.IncompatibilityReason)
-				}
-			}
 		}
 		// User-installed pi may use pi's own model/auth: no api_provider and no
 		// global provider means laelia does not manage the key.
