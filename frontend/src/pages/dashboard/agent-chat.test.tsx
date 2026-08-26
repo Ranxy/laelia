@@ -91,8 +91,8 @@ describe("agent-chat", () => {
     expect(await screen.findByText("DM with Alice")).toBeInTheDocument();
     expect(screen.getByText("General")).toBeInTheDocument();
     expect(screen.getByText("Agent DM")).toBeInTheDocument();
-    // Channel rows show the member count; agent-DM rows show the label.
-    expect(screen.getByText("channel.members:3")).toBeInTheDocument();
+    // Channel rows no longer show the member count; agent-DM rows show the label.
+    expect(screen.queryByText("channel.members:3")).not.toBeInTheDocument();
     expect(screen.getByText("agent.chat-agent-dm-row")).toBeInTheDocument();
   });
 

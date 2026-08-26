@@ -71,11 +71,6 @@ export function AgentChatPage() {
                   <p className={cn("text-sm truncate font-medium text-main")}>
                     {conv.title || conv.name}
                   </p>
-                  {!isDm && !isAgentDm && (
-                    <p className="text-xs text-control-placeholder mt-0.5">
-                      {t("channel.members", { count: conv.memberCount ?? 0 })}
-                    </p>
-                  )}
                   {isAgentDm && (
                     <p className="text-xs text-control-placeholder mt-0.5">
                       {t("agent.chat-agent-dm-row")}

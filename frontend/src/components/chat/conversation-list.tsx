@@ -379,7 +379,6 @@ export function ConversationList() {
               peer={conv.peer}
               pinned={conv.pinned ?? false}
               muted={conv.muted ?? false}
-              memberCount={conv.memberCount}
               isDirect={isDm || isUserDm}
               active={active}
               unread={unread}
@@ -479,7 +478,6 @@ const ConversationRow = memo(function ConversationRow({
   peer,
   pinned,
   muted,
-  memberCount,
   isDirect,
   active,
   unread,
@@ -500,7 +498,6 @@ const ConversationRow = memo(function ConversationRow({
   peer?: string;
   pinned: boolean;
   muted: boolean;
-  memberCount: number;
   isDirect: boolean;
   active: boolean;
   unread: number;
@@ -658,11 +655,6 @@ const ConversationRow = memo(function ConversationRow({
             >
               {title}
             </p>
-            {!isDirect && (
-              <span className="shrink-0 text-xs text-control-placeholder">
-                {t("channel.members", { count: memberCount })}
-              </span>
-            )}
             {lastMessageAtMs !== undefined && (
               <span className="ml-auto shrink-0 pl-1 text-xs text-control-placeholder">
                 {formatConversationListTime(lastMessageAtMs)}

@@ -259,6 +259,26 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const members =
     useAppStore((s) => s.channelMembersByConv[conversationName]) ??
     EMPTY_MEMBERS;
+  // Channel member breakdown shown in the header after the title: humans are
+  // memberType 1, agents are memberType 2. Zero-count groups are omitted so a
+  // channel without agents doesn't render "0 agents".
+  const humanMemberCount = members.filter((m) => m.memberType === 1).length;
+  const agentMemberCount = members.filter((m) => m.memberType === 2).length;
+  const memberSummary =
+    humanMemberCount > 0 && agentMemberCount > 0
+      ? t("channel.members-summary", {
+          humans: humanMemberCount,
+          agents: agentMemberCount,
+        })
+      : humanMemberCount > 0
+        ? t("channel.members-summary-humans", {
+            humans: humanMemberCount,
+          })
+        : agentMemberCount > 0
+          ? t("channel.members-summary-agents", {
+              agents: agentMemberCount,
+            })
+          : null;
   const activities =
     useAppStore((s) => s.agentActivities[conversationName]) ?? EMPTY_ACTIVITIES;
   const jumpTarget = useAppStore(
@@ -1518,6 +1538,11 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
           <h2 className="text-sm font-semibold text-main truncate">
             {channel?.title ?? channelId ?? ""}
           </h2>
+          {!isDm && !isAgentDm && !isUserDm && memberSummary && (
+            <span className="shrink-0 text-xs text-control-placeholder">
+              {memberSummary}
+            </span>
+          )}
           <AgentStatusBar activities={activities} />
         </div>
         <Button

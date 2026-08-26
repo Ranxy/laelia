@@ -94,12 +94,13 @@ describe("ConversationList last-message preview", () => {
     mock.channels = [];
   });
 
-  it("renders the member count inline after the channel name", () => {
+  it("does not render a member count after the channel name", () => {
     mock.channels = [channel()];
     render(<ConversationList />);
     expect(screen.getByText("Design")).toBeInTheDocument();
-    expect(screen.getByText("channel.members:3")).toBeInTheDocument();
-    // The hardcoded English member label is gone (only the i18n key remains).
+    // Member counts were removed from the chat list so long channel names can
+    // use the full row width.
+    expect(screen.queryByText("channel.members:3")).not.toBeInTheDocument();
     expect(screen.queryByText("3 members")).not.toBeInTheDocument();
     expect(screen.queryByText("3 member")).not.toBeInTheDocument();
   });
