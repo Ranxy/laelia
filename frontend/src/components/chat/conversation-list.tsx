@@ -1,5 +1,15 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
-import { Hash, Loader2, Pin, PinOff, Plus, Search, X } from "lucide-react";
+import {
+  Bell,
+  BellOff,
+  Hash,
+  Loader2,
+  Pin,
+  PinOff,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -42,6 +52,7 @@ export function ConversationList() {
   const createChannel = useAppStore((s) => s.createChannel);
   const setConversationPinned = useAppStore((s) => s.setConversationPinned);
   const setConversationClosed = useAppStore((s) => s.setConversationClosed);
+  const setConversationMuted = useAppStore((s) => s.setConversationMuted);
   // The viewer's own handle tags their messages in the last-message preview
   // ("You: ..."); last_message_principal_id carries the sender handle.
   const myPrincipalId = useAppStore((s) => s.currentUser?.handle);
@@ -120,6 +131,13 @@ export function ConversationList() {
     [setConversationClosed, t]
   );
 
+  const handleToggleMute = useCallback(
+    (id: string, muted: boolean) => {
+      void setConversationMuted(id, muted);
+    },
+    [setConversationMuted]
+  );
+
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
       {/* Header */}
@@ -196,6 +214,7 @@ export function ConversationList() {
               title={conv.title || conv.name}
               peer={conv.peer}
               pinned={conv.pinned ?? false}
+              muted={conv.muted ?? false}
               memberCount={conv.memberCount}
               isDirect={isDm || isUserDm}
               active={active}
@@ -214,6 +233,7 @@ export function ConversationList() {
               onOpen={handleOpen}
               onTogglePin={handleTogglePin}
               onClose={handleClose}
+              onToggleMute={handleToggleMute}
             />
           );
         })}
@@ -294,6 +314,7 @@ const ConversationRow = memo(function ConversationRow({
   title,
   peer,
   pinned,
+  muted,
   memberCount,
   isDirect,
   active,
@@ -305,6 +326,7 @@ const ConversationRow = memo(function ConversationRow({
   onOpen,
   onTogglePin,
   onClose,
+  onToggleMute,
 }: {
   id: string;
   title: string;
@@ -313,6 +335,7 @@ const ConversationRow = memo(function ConversationRow({
   // prefix. Undefined for channels (no peer), which keep the Hash icon below.
   peer?: string;
   pinned: boolean;
+  muted: boolean;
   memberCount: number;
   isDirect: boolean;
   active: boolean;
@@ -328,6 +351,7 @@ const ConversationRow = memo(function ConversationRow({
   onOpen: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
   onClose: (id: string) => void;
+  onToggleMute: (id: string, muted: boolean) => void;
 }) {
   const { t } = useTranslation();
   const avatarName = peer ? `${peer}/avatar` : undefined;
@@ -392,6 +416,11 @@ const ConversationRow = memo(function ConversationRow({
     onClose(id);
     setOffset(0);
   }, [onClose, id]);
+
+  const handleMuteClick = useCallback(() => {
+    onToggleMute(id, !muted);
+    setOffset(0);
+  }, [onToggleMute, id, muted]);
 
   const isDesktop = useIsDesktop();
 
@@ -492,6 +521,12 @@ const ConversationRow = memo(function ConversationRow({
         {/* The pinned indicator is mobile-only: on desktop the always-visible
             pin/unpin button in the row's corner already conveys the state, so
             showing both would render a pin and an unpin icon side by side. */}
+        {muted && (
+          <BellOff
+            className="size-3.5 shrink-0 text-control-light"
+            aria-hidden
+          />
+        )}
         {pinned && (
           <Pin
             className="size-3.5 shrink-0 text-accent lg:hidden"
@@ -555,6 +590,14 @@ const ConversationRow = memo(function ConversationRow({
               <Pin className="size-4" />
             )}
             {t(pinned ? "channel.unpin" : "channel.pin")}
+          </ContextMenuItem>
+          <ContextMenuItem onClick={handleMuteClick}>
+            {muted ? (
+              <BellOff className="size-4" />
+            ) : (
+              <Bell className="size-4" />
+            )}
+            {t(muted ? "channel.unmute" : "channel.mute")}
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onClick={handleCloseClick}>

@@ -103,6 +103,9 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 		// members-page roster can badge channels hidden from the left rail
 		// (only populated when include_closed was requested).
 		convV1.Closed = uc.Closed
+		// muted is the requesting user's per-conversation mute state, so the
+		// left rail can render a muted indicator.
+		convV1.Muted = uc.Muted
 		// last_message preview: the newest main-channel message joined by the
 		// list query. The sender principal id is only meaningful for USER
 		// senders (the store already empties it otherwise) so the frontend can
@@ -429,6 +432,11 @@ func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1
 			slog.Warn("failed to read conversation closed", "conversationID", conv.ID, "error", err)
 		} else {
 			resp.Closed = c
+		}
+		if m, err := s.store.GetConversationMuted(ctx, conv.ID, viewerUserID); err != nil {
+			slog.Warn("failed to read conversation muted", "conversationID", conv.ID, "error", err)
+		} else {
+			resp.Muted = m
 		}
 	}
 	return connect.NewResponse(resp), nil

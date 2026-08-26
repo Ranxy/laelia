@@ -275,6 +275,27 @@ func (s *CommandService) SetConversationClosed(ctx context.Context, req *connect
 	return connect.NewResponse(&v1pb.SetConversationClosedResponse{}), nil
 }
 
+func (s *CommandService) SetConversationMuted(ctx context.Context, req *connect.Request[v1pb.SetConversationMutedRequest]) (*connect.Response[v1pb.SetConversationMutedResponse], error) {
+	convID, err := parseConversationID(req.Msg.Conversation)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
+	}
+	user, ok := GetUserFromContext(ctx)
+	if !ok || user == nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("SetConversationMuted is for authenticated users"))
+	}
+	// SetConversationMuted updates the caller's own membership row; a missing
+	// row (non-member) returns ErrConversationMemberNotFound, which doubles as
+	// the membership gate so only members can mute.
+	if err := s.store.SetConversationMuted(ctx, convID, user.ID, req.Msg.Muted); err != nil {
+		if errors.Is(err, store.ErrConversationMemberNotFound) {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("must be a member to mute a conversation"))
+		}
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to set conversation muted"))
+	}
+	return connect.NewResponse(&v1pb.SetConversationMutedResponse{}), nil
+}
+
 func resolveMemberDisplayName(ctx context.Context, s *store.Store, memberType int32, memberID string) string {
 	if memberType == store.MemberTypeUser {
 		user, err := s.GetUserByHandle(ctx, memberID)

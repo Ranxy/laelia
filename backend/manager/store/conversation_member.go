@@ -377,6 +377,88 @@ func (s *Store) GetConversationClosed(ctx context.Context, convID uuid.UUID, pri
 	return closed, nil
 }
 
+// SetConversationMuted sets or clears the requesting user's per-conversation
+// mute state. muted_at is stamped on mute and cleared to NULL on unmute.
+// Returns ErrConversationMemberNotFound when the user is not a member. Mute
+// state is per-user UI metadata, stored in conversation_member_meta — it is not
+// authorization data.
+func (s *Store) SetConversationMuted(ctx context.Context, convID uuid.UUID, principalID int, muted bool) error {
+	memberID, err := s.userMemberHandle(ctx, s.GetDB(), principalID)
+	if err != nil {
+		return err
+	}
+	var mutedAt any
+	if muted {
+		mutedAt = time.Now()
+	}
+	res, err := s.GetDB().ExecContext(ctx, `
+UPDATE conversation_member_meta SET muted = $4, muted_at = $5
+WHERE conversation_id = $1 AND member_type = $2 AND member_id = $3
+`, convID, MemberTypeUser, memberID, muted, mutedAt)
+	if err != nil {
+		return errors.Wrapf(err, "failed to set conversation muted")
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return errors.Wrapf(err, "failed to read conversation muted update result")
+	}
+	if n == 0 {
+		return ErrConversationMemberNotFound
+	}
+	return nil
+}
+
+// GetConversationMuted returns the requesting user's per-conversation mute
+// state. A missing membership row yields false (not a member / not muted).
+func (s *Store) GetConversationMuted(ctx context.Context, convID uuid.UUID, principalID int) (bool, error) {
+	memberID, err := s.userMemberHandle(ctx, s.GetDB(), principalID)
+	if err != nil {
+		return false, err
+	}
+	var muted bool
+	err = s.GetDB().QueryRowContext(ctx, `
+SELECT muted FROM conversation_member_meta
+WHERE conversation_id = $1 AND member_type = $2 AND member_id = $3
+`, convID, MemberTypeUser, memberID).Scan(&muted)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, errors.Wrapf(err, "failed to get conversation muted")
+	}
+	return muted, nil
+}
+
+// ListMutedConversationUserIDs returns the principal ids of user members who
+// have muted the given conversation. Used by activity generation so a muted
+// conversation does not create activity/Web Push rows for those users (except
+// when they are @mentioned, which bypasses mute).
+func (s *Store) ListMutedConversationUserIDs(ctx context.Context, convID uuid.UUID) (map[int]bool, error) {
+	rows, err := s.GetDB().QueryContext(ctx, `
+SELECT p.id
+FROM conversation_member_meta cm
+JOIN principal p ON p.handle = cm.member_id
+WHERE cm.conversation_id = $1 AND cm.member_type = $2 AND cm.muted = true
+`, convID, MemberTypeUser)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list muted conversation user ids")
+	}
+	defer rows.Close()
+
+	muted := make(map[int]bool)
+	for rows.Next() {
+		var uid int
+		if err := rows.Scan(&uid); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan muted conversation user id")
+		}
+		muted[uid] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate muted conversation user ids")
+	}
+	return muted, nil
+}
+
 // TransferChannelOwnership atomically hands channel ownership from the old
 // owner (a user) to a new owner: it updates the denormalized
 // conversation.owner_id to the new owner's principal id, demotes the old owner

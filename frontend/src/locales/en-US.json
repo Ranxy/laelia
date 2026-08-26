@@ -291,6 +291,7 @@
     "member-type-user": "User",
     "members": "{{count}} members",
     "members-heading": "Members ({{count}})",
+    "mute": "Mute channel",
     "name-placeholder": "Channel name",
     "no-results": "No results",
     "owner": "Owner: {{name}}",
@@ -300,6 +301,7 @@
     "role-member": "Member",
     "role-owner": "Owner",
     "selected-count": "{{count}} selected",
+    "unmute": "Unmute channel",
     "unpin": "Unpin"
   },
   "channelFiles": {

@@ -184,6 +184,17 @@ func (s *Store) ListActivities(ctx context.Context, principalID int, categoryFil
 		args = append(args, mask)
 		idx++
 	}
+	// Hide non-mention activity from conversations the user has muted. A direct
+	// @mention still bypasses mute, so MENTION rows stay visible.
+	handle, err := s.userMemberHandle(ctx, s.GetDB(), principalID)
+	if err != nil {
+		return nil, "", errors.Wrapf(err, "failed to resolve activity viewer handle")
+	}
+	where += " AND NOT EXISTS (SELECT 1 FROM conversation_member_meta cm" +
+		" WHERE cm.conversation_id = a.conversation_id AND cm.member_type = $" + itoa(idx) +
+		" AND cm.member_id = $" + itoa(idx+1) + " AND cm.muted = true AND (a.categories & " + itoa(int(ActivityCategoryMention)) + ") = 0)"
+	args = append(args, MemberTypeUser, handle)
+	idx += 2
 	args = append(args, pageSize, offset)
 	query := `SELECT ` + activityColumns + `
 		` + activityFromJoin + `
@@ -609,6 +620,27 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 	// agent sender is never in the user sets.
 	if msg.SenderType == SenderTypeUser {
 		excludeSenderFromActivity(mentionCats, threadCats, msg.PrincipalID)
+	}
+
+	// Muted members are silenced for this conversation: drop every non-mention
+	// category so no activity row or Web Push is produced for them. A direct
+	// @mention still bypasses mute, so MENTION is preserved. DIRECT (plain DM
+	// messages) is suppressed unless the user is actually @mentioned.
+	if muted, err := s.ListMutedConversationUserIDs(ctx, msg.ConversationID); err != nil {
+		slog.Warn("failed to list muted conversation user ids",
+			"conversationID", msg.ConversationID, "messageID", msg.ID, "error", err)
+	} else {
+		for uid := range muted {
+			if cats, ok := mentionCats[uid]; ok {
+				cats &^= ActivityCategoryDirect
+				if cats == 0 {
+					delete(mentionCats, uid)
+				} else {
+					mentionCats[uid] = cats
+				}
+			}
+			delete(threadCats, uid)
+		}
 	}
 
 	// effectiveRoot is the thread this message belongs to, for folding and for the

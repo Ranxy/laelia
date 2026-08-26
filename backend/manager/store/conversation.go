@@ -549,6 +549,10 @@ type UserConversation struct {
 	// roster can badge channels the user closed and the list API can include
 	// them on request.
 	Closed bool
+	// Muted is the requesting user's per-conversation mute state
+	// (conversation_member_meta.muted), surfaced so the left rail can render a
+	// muted indicator without an extra per-row lookup.
+	Muted bool
 	// IsMember reports whether the requesting agent is a direct member of the
 	// conversation (vs only readable via owner-follow). Populated by
 	// ListAccessibleChannels.
@@ -581,7 +585,7 @@ const listUserConversationsWithUnreadSQL = `
 		           AND m.room_version > COALESCE(ucc.read_version, c.version)
 		           AND NOT (m.sender_type = 1 AND m.principal_id = $3)
 		       ), 0),
-		       cm.pinned, cm.pinned_at, cm.closed,
+		       cm.pinned, cm.pinned_at, cm.closed, cm.muted,
 		       lm.content, lm.attachments, lm.created_at, lm.sender_name, lm.sender_principal_id
 		FROM conversation c
 		JOIN conversation_member_meta cm ON cm.conversation_id = c.id
@@ -646,7 +650,7 @@ func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID
 		if err := rows.Scan(
 			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version, &conv.Archived, &conv.ArchivedAt,
 			&uc.UnreadCount,
-			&uc.Pinned, &uc.PinnedAt, &uc.Closed,
+			&uc.Pinned, &uc.PinnedAt, &uc.Closed, &uc.Muted,
 			&lmContent, &lmAttachments, &lmCreatedAt, &lmSender, &lmPrincipalID,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan user conversation")

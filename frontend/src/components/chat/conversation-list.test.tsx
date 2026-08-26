@@ -16,6 +16,7 @@ const mock = vi.hoisted(() => ({
   currentUser: { name: "users/ran-user-1", handle: "ran-user-1" },
   setConversationPinned: vi.fn(),
   setConversationClosed: vi.fn(),
+  setConversationMuted: vi.fn(),
   toastAdd: vi.fn(),
   useIsDesktop: vi.fn(() => true),
 }));
@@ -29,6 +30,7 @@ vi.mock("@/stores", () => ({
       createChannel: async () => {},
       setConversationPinned: mock.setConversationPinned,
       setConversationClosed: mock.setConversationClosed,
+      setConversationMuted: mock.setConversationMuted,
       currentUser: mock.currentUser,
     }),
 }));
@@ -184,6 +186,7 @@ describe("ConversationList close and context menu", () => {
     mock.channels = [];
     mock.setConversationClosed.mockClear();
     mock.setConversationPinned.mockClear();
+    mock.setConversationMuted.mockClear();
     mock.toastAdd.mockClear();
     mock.useIsDesktop.mockReturnValue(true);
   });
@@ -224,6 +227,14 @@ describe("ConversationList close and context menu", () => {
     fireEvent.contextMenu(screen.getByText("Design"));
     fireEvent.click(screen.getByText("channel.pin"));
     expect(mock.setConversationPinned).toHaveBeenCalledWith("ch1", true);
+  });
+
+  it("mutes and unmutes from the desktop context menu", () => {
+    mock.channels = [channel()];
+    render(<ConversationList />);
+    fireEvent.contextMenu(screen.getByText("Design"));
+    fireEvent.click(screen.getByText("channel.mute"));
+    expect(mock.setConversationMuted).toHaveBeenCalledWith("ch1", true);
   });
 
   it("shows both swipe actions on mobile and closes on the close tap", () => {

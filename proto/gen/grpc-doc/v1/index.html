@@ -429,6 +429,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.RestartAgentRequest"><span class="badge">M</span>RestartAgentRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.RevokeAgentTokenRequest"><span class="badge">M</span>RevokeAgentTokenRequest</a>
                 </li>
               
@@ -1379,6 +1383,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.SetConversationMutedRequest"><span class="badge">M</span>SetConversationMutedRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SetConversationMutedResponse"><span class="badge">M</span>SetConversationMutedResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.SetConversationPinnedRequest"><span class="badge">M</span>SetConversationPinnedRequest</a>
                 </li>
               
@@ -1995,6 +2007,10 @@
               
                 <li>
                   <a href="#laelia.v1.RemoveAgent"><span class="badge">M</span>RemoveAgent</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RestartAgent"><span class="badge">M</span>RestartAgent</a>
                 </li>
               
                 <li>
@@ -4783,6 +4799,30 @@ the list to agents bound to that machine. Empty lists all agents. </p></td>
 
         
       
+        <h3 id="laelia.v1.RestartAgentRequest">RestartAgentRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.RevokeAgentTokenRequest">RevokeAgentTokenRequest</h3>
         <p></p>
 
@@ -5379,6 +5419,17 @@ in the handler for the agent&#39;s owner or a holder of laelia.agents.edit.</p><
 it resumes processing session messages. No-op (still succeeds) if the
 agent is already enabled. Authorized in the handler for the agent&#39;s owner
 or a holder of laelia.agents.edit.</p></td>
+              </tr>
+            
+              <tr>
+                <td>RestartAgent</td>
+                <td><a href="#laelia.v1.RestartAgentRequest">RestartAgentRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p>RestartAgent force-cold-restarts an agent: it ends the agent&#39;s current
+LLM session and clears its persisted session state so the next turn
+starts from a fresh cold start (re-sends the init prompt). The agent
+stays enabled and connected. Authorized in the handler for the agent&#39;s
+owner or a holder of laelia.agents.edit.</p></td>
               </tr>
             
               <tr>
@@ -10217,6 +10268,18 @@ viewer; unset for non-user callers. Lets the channel detail page show
                 </tr>
               
                 <tr>
+                  <td>muted</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>muted is the requesting user&#39;s per-conversation mute state
+(conversation_member_meta.muted). A muted conversation does not generate
+activity-feed items or Web Push notifications for the user, except when the
+user is @mentioned directly. Unread counts and the left-rail row are
+unaffected. Per-user: each viewer has their own mute state. Populated by
+ListChannels and GetChannel for a user viewer. </p></td>
+                </tr>
+              
+                <tr>
                   <td>archived</td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
@@ -13801,6 +13864,44 @@ TODO. Only valid for top-level messages (thread_root must be empty). </p></td>
 
         
       
+        <h3 id="laelia.v1.SetConversationMutedRequest">SetConversationMutedRequest</h3>
+        <p>SetConversationMuted sets or clears the requesting user's per-conversation</p><p>mute state. Muting a channel or DM suppresses the user's activity-feed items</p><p>and Web Push notifications for new messages in that conversation, except when</p><p>the user is @mentioned directly (a mention still notifies). Unread counts and</p><p>the left-rail row are unaffected. Per-user state</p><p>(conversation_member_meta.muted/muted_at); only the caller's own mute state</p><p>is affected.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>muted</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SetConversationMutedResponse">SetConversationMutedResponse</h3>
+        <p></p>
+
+        
+
+        
+      
         <h3 id="laelia.v1.SetConversationPinnedRequest">SetConversationPinnedRequest</h3>
         <p>SetConversationPinned sets or clears the requesting user's per-conversation</p><p>pin. Pinning a channel or DM keeps it at the top of the user's left-rail</p><p>list independent of last message time. Per-user state</p><p>(conversation_member.pinned/pinned_at); only the caller's own pin is</p><p>affected.</p>
 
@@ -15813,6 +15914,13 @@ from the auth context.</p></td>
                 <td>SetConversationClosed</td>
                 <td><a href="#laelia.v1.SetConversationClosedRequest">SetConversationClosedRequest</a></td>
                 <td><a href="#laelia.v1.SetConversationClosedResponse">SetConversationClosedResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>SetConversationMuted</td>
+                <td><a href="#laelia.v1.SetConversationMutedRequest">SetConversationMutedRequest</a></td>
+                <td><a href="#laelia.v1.SetConversationMutedResponse">SetConversationMutedResponse</a></td>
                 <td><p></p></td>
               </tr>
             
@@ -19464,6 +19572,13 @@ Machine.upgrade_available for the list view&#39;s upgrade badge. </p></td>
                   <td><p>probe one provider&#39;s models with an env overlay </p></td>
                 </tr>
               
+                <tr>
+                  <td>restart_agent</td>
+                  <td><a href="#laelia.v1.RestartAgent">RestartAgent</a></td>
+                  <td></td>
+                  <td><p>force cold restart of one agent </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -19735,6 +19850,30 @@ Machine.upgrade_available for the list view&#39;s upgrade badge. </p></td>
       
         <h3 id="laelia.v1.RemoveAgent">RemoveAgent</h3>
         <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RestartAgent">RestartAgent</h3>
+        <p>RestartAgent tells the machine to force a cold restart of one agent: it</p><p>clears the agent's persisted LLM session state and restarts its long-lived</p><p>runtime so the next turn starts from a fresh cold start.</p>
 
         
           <table class="field-table">

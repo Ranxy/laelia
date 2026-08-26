@@ -60,6 +60,9 @@ func TestListUserConversationsWithUnreadSQL(t *testing.T) {
 	if !strings.Contains(listUserConversationsWithUnreadSQL, "NOT (m.sender_type = 1 AND m.principal_id = $3)") {
 		t.Fatal("unread count must exclude the user's own messages: a sender's own message (including an in-channel @self mention) must never surface as an unread badge, regardless of cursor timing")
 	}
+	if !strings.Contains(listUserConversationsWithUnreadSQL, "cm.muted") {
+		t.Fatal("list must surface the per-user mute state so the left rail can render a muted indicator")
+	}
 }
 
 func TestAttachmentListPreview(t *testing.T) {

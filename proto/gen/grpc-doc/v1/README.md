@@ -67,6 +67,7 @@
     - [RefreshAgentProvidersResponse](#laelia-v1-RefreshAgentProvidersResponse)
     - [RefreshAgentTokenRequest](#laelia-v1-RefreshAgentTokenRequest)
     - [RefreshAgentTokenResponse](#laelia-v1-RefreshAgentTokenResponse)
+    - [RestartAgentRequest](#laelia-v1-RestartAgentRequest)
     - [RevokeAgentTokenRequest](#laelia-v1-RevokeAgentTokenRequest)
     - [RevokeAgentTokenResponse](#laelia-v1-RevokeAgentTokenResponse)
     - [RotateAgentTokenRequest](#laelia-v1-RotateAgentTokenRequest)
@@ -309,6 +310,8 @@
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
     - [SetConversationClosedRequest](#laelia-v1-SetConversationClosedRequest)
     - [SetConversationClosedResponse](#laelia-v1-SetConversationClosedResponse)
+    - [SetConversationMutedRequest](#laelia-v1-SetConversationMutedRequest)
+    - [SetConversationMutedResponse](#laelia-v1-SetConversationMutedResponse)
     - [SetConversationPinnedRequest](#laelia-v1-SetConversationPinnedRequest)
     - [SetConversationPinnedResponse](#laelia-v1-SetConversationPinnedResponse)
     - [SteerCommandRequest](#laelia-v1-SteerCommandRequest)
@@ -470,6 +473,7 @@
     - [RefreshMachineTokenResponse](#laelia-v1-RefreshMachineTokenResponse)
     - [ReloadAgentAssignment](#laelia-v1-ReloadAgentAssignment)
     - [RemoveAgent](#laelia-v1-RemoveAgent)
+    - [RestartAgent](#laelia-v1-RestartAgent)
     - [RevokeMachineTokenRequest](#laelia-v1-RevokeMachineTokenRequest)
     - [RevokeMachineTokenResponse](#laelia-v1-RevokeMachineTokenResponse)
     - [TransferMachineOwnershipRequest](#laelia-v1-TransferMachineOwnershipRequest)
@@ -1559,6 +1563,21 @@ the env overlay are taken from acp_config; everything else is ignored.
 
 
 
+<a name="laelia-v1-RestartAgentRequest"></a>
+
+### RestartAgentRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-RevokeAgentTokenRequest"></a>
 
 ### RevokeAgentTokenRequest
@@ -1825,6 +1844,7 @@ ReadAgentWorkspaceFile RPC.
 | DeleteAgent | [DeleteAgentRequest](#laelia-v1-DeleteAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | DeleteAgent soft-deletes an agent. Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit on the agent; no permission annotation so the owner short-circuit can run. |
 | StopAgent | [StopAgentRequest](#laelia-v1-StopAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | StopAgent stops an agent: its machine runner is torn down and it no longer processes session messages or runs an LLM agent until StartAgent. The agent row is preserved (not deleted) and remains visible. Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit. |
 | StartAgent | [StartAgentRequest](#laelia-v1-StartAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | StartAgent resumes a stopped agent: its machine runner is re-spawned and it resumes processing session messages. No-op (still succeeds) if the agent is already enabled. Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit. |
+| RestartAgent | [RestartAgentRequest](#laelia-v1-RestartAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | RestartAgent force-cold-restarts an agent: it ends the agent&#39;s current LLM session and clears its persisted session state so the next turn starts from a fresh cold start (re-sends the init prompt). The agent stays enabled and connected. Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit. |
 | RotateAgentToken | [RotateAgentTokenRequest](#laelia-v1-RotateAgentTokenRequest) | [RotateAgentTokenResponse](#laelia-v1-RotateAgentTokenResponse) | Token rotation: generate a new bootstrap token, old token invalid after grace period. Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit on the agent; no permission annotation so the owner short-circuit can run. |
 | RevokeAgentToken | [RevokeAgentTokenRequest](#laelia-v1-RevokeAgentTokenRequest) | [RevokeAgentTokenResponse](#laelia-v1-RevokeAgentTokenResponse) | Token revocation: revoke all tokens for the agent. Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit on the agent; no permission annotation so the owner short-circuit can run. |
 | ForceDisconnectAgent | [ForceDisconnectAgentRequest](#laelia-v1-ForceDisconnectAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Force-disconnects an agent connection. Authorized in the handler for the agent&#39;s owner or a holder of laelia.agents.edit on the agent; no permission annotation so the owner short-circuit can run. |
@@ -3764,6 +3784,7 @@ window. usage_ratio is used/size.
 | last_message_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | last_message_at is the send time of last_message. Unset when the conversation has no main-channel messages yet. |
 | closed | [bool](#bool) |  | closed is the requesting user&#39;s per-conversation close state (conversation_member_meta.closed). A closed conversation is hidden from the user&#39;s left-rail list; the first new main-channel message (thread replies excluded) clears the flag, so it reappears automatically. Per-user: each viewer has their own close state. Populated by GetChannel for a user viewer; ListChannels only returns closed conversations when the caller asks with include_closed. |
 | joined_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | joined_at is the time the requesting user joined this conversation (conversation_member_meta.joined_at). Populated by GetChannel for a user viewer; unset for non-user callers. Lets the channel detail page show &#34;joined at&#34; without an extra member lookup. |
+| muted | [bool](#bool) |  | muted is the requesting user&#39;s per-conversation mute state (conversation_member_meta.muted). A muted conversation does not generate activity-feed items or Web Push notifications for the user, except when the user is @mentioned directly. Unread counts and the left-rail row are unaffected. Per-user: each viewer has their own mute state. Populated by ListChannels and GetChannel for a user viewer. |
 | archived | [bool](#bool) |  | archived is the conversation-level archive state (conversation.archived), set by the channel owner via ArchiveChannel/UnarchiveChannel. An archived channel: is hidden from the members-page channels roster, is not returned to agents by ListChannelsForAgent, and rejects new messages (SendMessage / PostMessage) from all members. It stays in a user&#39;s left-rail chat list until the user closes it, and its messages remain searchable via SearchChatHistory. Populated by ListChannels/GetChannel/ListChannelsForAgent. |
 
 
@@ -5546,6 +5567,38 @@ close state is affected.
 
 
 
+<a name="laelia-v1-SetConversationMutedRequest"></a>
+
+### SetConversationMutedRequest
+SetConversationMuted sets or clears the requesting user&#39;s per-conversation
+mute state. Muting a channel or DM suppresses the user&#39;s activity-feed items
+and Web Push notifications for new messages in that conversation, except when
+the user is @mentioned directly (a mention still notifies). Unread counts and
+the left-rail row are unaffected. Per-user state
+(conversation_member_meta.muted/muted_at); only the caller&#39;s own mute state
+is affected.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| muted | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SetConversationMutedResponse"></a>
+
+### SetConversationMutedResponse
+
+
+
+
+
+
+
 <a name="laelia-v1-SetConversationPinnedRequest"></a>
 
 ### SetConversationPinnedRequest
@@ -6313,6 +6366,7 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | MarkConversationRead | [MarkConversationReadRequest](#laelia-v1-MarkConversationReadRequest) | [MarkConversationReadResponse](#laelia-v1-MarkConversationReadResponse) |  |
 | SetConversationPinned | [SetConversationPinnedRequest](#laelia-v1-SetConversationPinnedRequest) | [SetConversationPinnedResponse](#laelia-v1-SetConversationPinnedResponse) |  |
 | SetConversationClosed | [SetConversationClosedRequest](#laelia-v1-SetConversationClosedRequest) | [SetConversationClosedResponse](#laelia-v1-SetConversationClosedResponse) |  |
+| SetConversationMuted | [SetConversationMutedRequest](#laelia-v1-SetConversationMutedRequest) | [SetConversationMutedResponse](#laelia-v1-SetConversationMutedResponse) |  |
 | UploadFile | [UploadFileRequest](#laelia-v1-UploadFileRequest) | [File](#laelia-v1-File) | UploadFile stores data in S3 and persists a file row. Intended for the agent daemon (browser uploads go through the Echo multipart route); bytes travel over Connect-JSON, and avoiding a /v1/files/{id} REST entry keeps it from colliding with the browser download route. |
 | DownloadFile | [DownloadFileRequest](#laelia-v1-DownloadFileRequest) | [DownloadFileResponse](#laelia-v1-DownloadFileResponse) | DownloadFile fetches a file&#39;s bytes from S3. The caller must be a member of the file&#39;s conversation. Used by the agent daemon; browser downloads go through the Echo route. |
 | ListFiles | [ListFilesRequest](#laelia-v1-ListFilesRequest) | [ListFilesResponse](#laelia-v1-ListFilesResponse) | ListFiles returns the files attached to a conversation. The caller must be a member. |
@@ -7935,6 +7989,7 @@ MachineWorkspaceSummary is one agent workspace directory&#39;s usage summary.
 | delete_agent_workspace | [DeleteAgentWorkspace](#laelia-v1-DeleteAgentWorkspace) |  | stop the runner and delete an agent&#39;s workspace directory |
 | upgrade_request | [UpgradeRequest](#laelia-v1-UpgradeRequest) |  | self-upgrade to the manager&#39;s embedded binary |
 | discover_models | [DiscoverModels](#laelia-v1-DiscoverModels) |  | probe one provider&#39;s models with an env overlay |
+| restart_agent | [RestartAgent](#laelia-v1-RestartAgent) |  | force cold restart of one agent |
 
 
 
@@ -8079,6 +8134,23 @@ after a config or display-name change, or to re-establish a runner).
 
 ### RemoveAgent
 
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RestartAgent"></a>
+
+### RestartAgent
+RestartAgent tells the machine to force a cold restart of one agent: it
+clears the agent&#39;s persisted LLM session state and restarts its long-lived
+runtime so the next turn starts from a fresh cold start.
 
 
 | Field | Type | Label | Description |

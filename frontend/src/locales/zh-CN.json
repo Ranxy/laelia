@@ -291,6 +291,7 @@
     "member-type-user": "用户",
     "members": "{{count}} 个成员",
     "members-heading": "成员 ({{count}})",
+    "mute": "静音频道",
     "name-placeholder": "频道名称",
     "no-results": "无结果",
     "owner": "所有者:{{name}}",
@@ -300,6 +301,7 @@
     "role-member": "成员",
     "role-owner": "所有者",
     "selected-count": "已选 {{count}} 个",
+    "unmute": "取消静音",
     "unpin": "取消置顶"
   },
   "channelFiles": {

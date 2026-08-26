@@ -21,6 +21,7 @@ import {
   RemoveChannelMemberRequestSchema,
   SendMessageRequestSchema,
   SetConversationClosedRequestSchema,
+  SetConversationMutedRequestSchema,
   SetConversationPinnedRequestSchema,
   UnarchiveChannelRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
@@ -266,6 +267,28 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
     }
   },
 
+  async setConversationMuted(conversationId, muted) {
+    const conversation = `conversations/${conversationId}`;
+    // Optimistically flip the flag so the left rail updates instantly. Mute
+    // does not reorder or hide the row; unread counts stay intact.
+    set((s) => ({
+      channels: s.channels.map((c) =>
+        c.name === conversation ? { ...c, muted } : c
+      ),
+      myChannels: s.myChannels.map((c) =>
+        c.name === conversation ? { ...c, muted } : c
+      ),
+    }));
+    try {
+      await commandServiceClient.setConversationMuted(
+        create(SetConversationMutedRequestSchema, { conversation, muted })
+      );
+    } catch {
+      // reconcile from the server on failure
+      void get().fetchChannels();
+    }
+  },
+
   async setChannelArchived(conversationId, archived) {
     const conversation = `conversations/${conversationId}`;
     try {
@@ -286,9 +309,7 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
         // archive and restore it (via a refetch for correct position) on reopen.
         myChannels: archived
           ? s.myChannels.filter((c) => c.name !== conversation)
-          : s.myChannels.map((c) =>
-              c.name === conversation ? updated : c
-            ),
+          : s.myChannels.map((c) => (c.name === conversation ? updated : c)),
       }));
     } catch {
       void get().fetchChannels();

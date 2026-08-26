@@ -574,6 +574,13 @@ message Conversation {
   // viewer; unset for non-user callers. Lets the channel detail page show
   // "joined at" without an extra member lookup.
   google.protobuf.Timestamp joined_at = 20;
+  // muted is the requesting user's per-conversation mute state
+  // (conversation_member_meta.muted). A muted conversation does not generate
+  // activity-feed items or Web Push notifications for the user, except when the
+  // user is @mentioned directly. Unread counts and the left-rail row are
+  // unaffected. Per-user: each viewer has their own mute state. Populated by
+  // ListChannels and GetChannel for a user viewer.
+  bool muted = 21;
   // archived is the conversation-level archive state (conversation.archived),
   // set by the channel owner via ArchiveChannel/UnarchiveChannel. An archived
   // channel: is hidden from the members-page channels roster, is not returned
@@ -1532,6 +1539,23 @@ message SetConversationClosedRequest {
 
 message SetConversationClosedResponse {}
 
+// SetConversationMuted sets or clears the requesting user's per-conversation
+// mute state. Muting a channel or DM suppresses the user's activity-feed items
+// and Web Push notifications for new messages in that conversation, except when
+// the user is @mentioned directly (a mention still notifies). Unread counts and
+// the left-rail row are unaffected. Per-user state
+// (conversation_member_meta.muted/muted_at); only the caller's own mute state
+// is affected.
+message SetConversationMutedRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+  bool muted = 2;
+}
+
+message SetConversationMutedResponse {}
+
 // ActivityCategory flags which kind of conversation event an Activity item
 // represents. A single Activity row may carry several categories OR-ed together
 // (a task-thread reply that @mentions a user is both TASK and MENTION). The
@@ -2031,6 +2055,11 @@ service CommandService {
   }
 
   rpc SetConversationClosed(SetConversationClosedRequest) returns (SetConversationClosedResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
+  }
+
+  rpc SetConversationMuted(SetConversationMutedRequest) returns (SetConversationMutedResponse) {
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }

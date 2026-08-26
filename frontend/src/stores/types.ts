@@ -517,6 +517,15 @@ export interface ChannelSlice {
     conversationId: string,
     closed: boolean
   ) => Promise<void>;
+  // Mute or unmute a conversation for the current user. Muting suppresses the
+  // user's activity-feed items and Web Push notifications for new messages in
+  // the conversation, except when the user is @mentioned directly. Unread
+  // counts and the left-rail row are unaffected. Optimistically flips the
+  // local flag; refetches on error.
+  setConversationMuted: (
+    conversationId: string,
+    muted: boolean
+  ) => Promise<void>;
   // Archive or unarchive a channel (owner-only). Archiving hides the channel
   // from the members-page roster and freezes it (no new messages); it stays in
   // the left-rail chat list until the user closes it, and its messages remain

@@ -461,6 +461,8 @@ CREATE TABLE conversation_member_meta (
     pinned_at TIMESTAMPTZ,
     closed BOOLEAN NOT NULL DEFAULT FALSE,
     closed_at TIMESTAMPTZ,
+    muted BOOLEAN NOT NULL DEFAULT FALSE,
+    muted_at TIMESTAMPTZ,
     PRIMARY KEY (conversation_id, member_type, member_id)
 );
 

@@ -222,6 +222,9 @@ const (
 	// CommandServiceSetConversationClosedProcedure is the fully-qualified name of the CommandService's
 	// SetConversationClosed RPC.
 	CommandServiceSetConversationClosedProcedure = "/laelia.v1.CommandService/SetConversationClosed"
+	// CommandServiceSetConversationMutedProcedure is the fully-qualified name of the CommandService's
+	// SetConversationMuted RPC.
+	CommandServiceSetConversationMutedProcedure = "/laelia.v1.CommandService/SetConversationMuted"
 	// CommandServiceUploadFileProcedure is the fully-qualified name of the CommandService's UploadFile
 	// RPC.
 	CommandServiceUploadFileProcedure = "/laelia.v1.CommandService/UploadFile"
@@ -421,6 +424,7 @@ type CommandServiceClient interface {
 	MarkConversationRead(context.Context, *connect.Request[v1.MarkConversationReadRequest]) (*connect.Response[v1.MarkConversationReadResponse], error)
 	SetConversationPinned(context.Context, *connect.Request[v1.SetConversationPinnedRequest]) (*connect.Response[v1.SetConversationPinnedResponse], error)
 	SetConversationClosed(context.Context, *connect.Request[v1.SetConversationClosedRequest]) (*connect.Response[v1.SetConversationClosedResponse], error)
+	SetConversationMuted(context.Context, *connect.Request[v1.SetConversationMutedRequest]) (*connect.Response[v1.SetConversationMutedResponse], error)
 	// UploadFile stores data in S3 and persists a file row. Intended for the
 	// agent daemon (browser uploads go through the Echo multipart route); bytes
 	// travel over Connect-JSON, and avoiding a /v1/files/{id} REST entry keeps it
@@ -826,6 +830,12 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("SetConversationClosed")),
 			connect.WithClientOptions(opts...),
 		),
+		setConversationMuted: connect.NewClient[v1.SetConversationMutedRequest, v1.SetConversationMutedResponse](
+			httpClient,
+			baseURL+CommandServiceSetConversationMutedProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("SetConversationMuted")),
+			connect.WithClientOptions(opts...),
+		),
 		uploadFile: connect.NewClient[v1.UploadFileRequest, v1.File](
 			httpClient,
 			baseURL+CommandServiceUploadFileProcedure,
@@ -923,6 +933,7 @@ type commandServiceClient struct {
 	markConversationRead      *connect.Client[v1.MarkConversationReadRequest, v1.MarkConversationReadResponse]
 	setConversationPinned     *connect.Client[v1.SetConversationPinnedRequest, v1.SetConversationPinnedResponse]
 	setConversationClosed     *connect.Client[v1.SetConversationClosedRequest, v1.SetConversationClosedResponse]
+	setConversationMuted      *connect.Client[v1.SetConversationMutedRequest, v1.SetConversationMutedResponse]
 	uploadFile                *connect.Client[v1.UploadFileRequest, v1.File]
 	downloadFile              *connect.Client[v1.DownloadFileRequest, v1.DownloadFileResponse]
 	listFiles                 *connect.Client[v1.ListFilesRequest, v1.ListFilesResponse]
@@ -1240,6 +1251,11 @@ func (c *commandServiceClient) SetConversationClosed(ctx context.Context, req *c
 	return c.setConversationClosed.CallUnary(ctx, req)
 }
 
+// SetConversationMuted calls laelia.v1.CommandService.SetConversationMuted.
+func (c *commandServiceClient) SetConversationMuted(ctx context.Context, req *connect.Request[v1.SetConversationMutedRequest]) (*connect.Response[v1.SetConversationMutedResponse], error) {
+	return c.setConversationMuted.CallUnary(ctx, req)
+}
+
 // UploadFile calls laelia.v1.CommandService.UploadFile.
 func (c *commandServiceClient) UploadFile(ctx context.Context, req *connect.Request[v1.UploadFileRequest]) (*connect.Response[v1.File], error) {
 	return c.uploadFile.CallUnary(ctx, req)
@@ -1444,6 +1460,7 @@ type CommandServiceHandler interface {
 	MarkConversationRead(context.Context, *connect.Request[v1.MarkConversationReadRequest]) (*connect.Response[v1.MarkConversationReadResponse], error)
 	SetConversationPinned(context.Context, *connect.Request[v1.SetConversationPinnedRequest]) (*connect.Response[v1.SetConversationPinnedResponse], error)
 	SetConversationClosed(context.Context, *connect.Request[v1.SetConversationClosedRequest]) (*connect.Response[v1.SetConversationClosedResponse], error)
+	SetConversationMuted(context.Context, *connect.Request[v1.SetConversationMutedRequest]) (*connect.Response[v1.SetConversationMutedResponse], error)
 	// UploadFile stores data in S3 and persists a file row. Intended for the
 	// agent daemon (browser uploads go through the Echo multipart route); bytes
 	// travel over Connect-JSON, and avoiding a /v1/files/{id} REST entry keeps it
@@ -1845,6 +1862,12 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("SetConversationClosed")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceSetConversationMutedHandler := connect.NewUnaryHandler(
+		CommandServiceSetConversationMutedProcedure,
+		svc.SetConversationMuted,
+		connect.WithSchema(commandServiceMethods.ByName("SetConversationMuted")),
+		connect.WithHandlerOptions(opts...),
+	)
 	commandServiceUploadFileHandler := connect.NewUnaryHandler(
 		CommandServiceUploadFileProcedure,
 		svc.UploadFile,
@@ -2001,6 +2024,8 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceSetConversationPinnedHandler.ServeHTTP(w, r)
 		case CommandServiceSetConversationClosedProcedure:
 			commandServiceSetConversationClosedHandler.ServeHTTP(w, r)
+		case CommandServiceSetConversationMutedProcedure:
+			commandServiceSetConversationMutedHandler.ServeHTTP(w, r)
 		case CommandServiceUploadFileProcedure:
 			commandServiceUploadFileHandler.ServeHTTP(w, r)
 		case CommandServiceDownloadFileProcedure:
@@ -2266,6 +2291,10 @@ func (UnimplementedCommandServiceHandler) SetConversationPinned(context.Context,
 
 func (UnimplementedCommandServiceHandler) SetConversationClosed(context.Context, *connect.Request[v1.SetConversationClosedRequest]) (*connect.Response[v1.SetConversationClosedResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.SetConversationClosed is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) SetConversationMuted(context.Context, *connect.Request[v1.SetConversationMutedRequest]) (*connect.Response[v1.SetConversationMutedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.SetConversationMuted is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) UploadFile(context.Context, *connect.Request[v1.UploadFileRequest]) (*connect.Response[v1.File], error) {

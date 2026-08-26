@@ -1572,6 +1572,18 @@ export declare type Conversation = Message<"laelia.v1.Conversation"> & {
   joinedAt?: Timestamp | undefined;
 
   /**
+   * muted is the requesting user's per-conversation mute state
+   * (conversation_member_meta.muted). A muted conversation does not generate
+   * activity-feed items or Web Push notifications for the user, except when the
+   * user is @mentioned directly. Unread counts and the left-rail row are
+   * unaffected. Per-user: each viewer has their own mute state. Populated by
+   * ListChannels and GetChannel for a user viewer.
+   *
+   * @generated from field: bool muted = 21;
+   */
+  muted: boolean;
+
+  /**
    * archived is the conversation-level archive state (conversation.archived),
    * set by the channel owner via ArchiveChannel/UnarchiveChannel. An archived
    * channel: is hidden from the members-page channels roster, is not returned
@@ -4248,6 +4260,47 @@ export declare type SetConversationClosedResponse = Message<"laelia.v1.SetConver
 export declare const SetConversationClosedResponseSchema: GenMessage<SetConversationClosedResponse>;
 
 /**
+ * SetConversationMuted sets or clears the requesting user's per-conversation
+ * mute state. Muting a channel or DM suppresses the user's activity-feed items
+ * and Web Push notifications for new messages in that conversation, except when
+ * the user is @mentioned directly (a mention still notifies). Unread counts and
+ * the left-rail row are unaffected. Per-user state
+ * (conversation_member_meta.muted/muted_at); only the caller's own mute state
+ * is affected.
+ *
+ * @generated from message laelia.v1.SetConversationMutedRequest
+ */
+export declare type SetConversationMutedRequest = Message<"laelia.v1.SetConversationMutedRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: bool muted = 2;
+   */
+  muted: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.SetConversationMutedRequest.
+ * Use `create(SetConversationMutedRequestSchema)` to create a new message.
+ */
+export declare const SetConversationMutedRequestSchema: GenMessage<SetConversationMutedRequest>;
+
+/**
+ * @generated from message laelia.v1.SetConversationMutedResponse
+ */
+export declare type SetConversationMutedResponse = Message<"laelia.v1.SetConversationMutedResponse"> & {
+};
+
+/**
+ * Describes the message laelia.v1.SetConversationMutedResponse.
+ * Use `create(SetConversationMutedResponseSchema)` to create a new message.
+ */
+export declare const SetConversationMutedResponseSchema: GenMessage<SetConversationMutedResponse>;
+
+/**
  * Activity is one item in a user's per-user activity feed. Each item corresponds
  * to a single chat_message relevant to the user, tagged with the category(ies)
  * that made it relevant. The message itself is the source of truth for
@@ -6581,6 +6634,14 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof SetConversationClosedRequestSchema;
     output: typeof SetConversationClosedResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.SetConversationMuted
+   */
+  setConversationMuted: {
+    methodKind: "unary";
+    input: typeof SetConversationMutedRequestSchema;
+    output: typeof SetConversationMutedResponseSchema;
   },
   /**
    * UploadFile stores data in S3 and persists a file row. Intended for the
