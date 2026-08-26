@@ -64,3 +64,17 @@ func TestPiVersionAtLeast(t *testing.T) {
 	assert.False(t, piVersionAtLeast("0.82.0", "0.82.1"))
 	assert.False(t, piVersionAtLeast("garbage", "0.82.1"))
 }
+
+func TestPiProviderProbeModelsTable(t *testing.T) {
+	dir := t.TempDir()
+	writeFakeExecutable(t, dir, "pi", `printf "provider model context max-out thinking images\ndeepseek deepseek-v4-flash 1M 384K yes no\ndeepseek deepseek-v4-pro 1M 384K yes no\n"`)
+	t.Setenv("PATH", dir)
+	p := &PiProvider{}
+	models, _, err := p.ProbeModels(context.Background(), "")
+	require.NoError(t, err)
+	require.Len(t, models, 2)
+	assert.Equal(t, "deepseek/deepseek-v4-flash", models[0].Value)
+	assert.Equal(t, "deepseek-v4-flash", models[0].Name)
+	assert.Equal(t, "deepseek/deepseek-v4-pro", models[1].Value)
+	assert.Equal(t, "deepseek-v4-pro", models[1].Name)
+}

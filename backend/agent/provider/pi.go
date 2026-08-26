@@ -85,6 +85,20 @@ func (*PiProvider) ProbeModels(ctx context.Context, _ string) ([]ModelOption, bo
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
+		fields := strings.Fields(line)
+		// pi --list-models can emit a table with a header row like
+		// "provider model context max-out thinking images" followed by rows
+		// like "deepseek deepseek-v4-flash 1M 384K yes no". Skip the header and
+		// turn each row into a "provider/model" id. Plain single-token output
+		// (e.g. "anthropic/claude-sonnet-4-5") is kept as-is.
+		if strings.EqualFold(fields[0], "provider") {
+			continue
+		}
+		if len(fields) >= 2 {
+			value := fields[0] + "/" + fields[1]
+			models = append(models, ModelOption{Value: value, Name: fields[1]})
+			continue
+		}
 		models = append(models, ModelOption{Value: line, Name: line})
 	}
 	if err := sc.Err(); err != nil {
