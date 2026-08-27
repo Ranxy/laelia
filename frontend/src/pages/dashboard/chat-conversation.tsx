@@ -60,6 +60,7 @@ import {
 } from "@/composables/useMentionTargets";
 import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
+import { filesFromClipboard } from "@/lib/clipboard-file";
 import { MAX_UPLOAD_BYTES, uploadFileToConversation } from "@/lib/file-upload";
 import { isImageAttachment } from "@/lib/image-file";
 import "@/lib/markdown";
@@ -1754,6 +1755,17 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                       e.preventDefault();
                       if (e.dataTransfer.files.length > 0)
                         handleFiles(e.dataTransfer.files);
+                    }}
+                    onPaste={(e) => {
+                      // Pasting a clipboard image (screenshot, copied image)
+                      // uploads it like a picked file. Only preventDefault
+                      // when real files were found, so text paste keeps
+                      // inserting into the textarea.
+                      const files = filesFromClipboard(e.clipboardData);
+                      if (files.length > 0) {
+                        e.preventDefault();
+                        handleFiles(files);
+                      }
                     }}
                   >
                     {(pendingAttachments.length > 0 || uploads.length > 0) && (

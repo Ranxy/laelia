@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { create } from "@bufbuild/protobuf";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-i18next", () => ({
@@ -71,9 +72,16 @@ vi.mock("@/lib/use-is-desktop", () => ({
   useIsDesktop: mockUseIsDesktop,
 }));
 
+const mockUpload = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/file-upload", () => ({
+  MAX_UPLOAD_BYTES: 512 * 1024 * 1024,
+  uploadFileToConversation: mockUpload,
+}));
+
 import { useAppStore } from "@/stores";
 import type { ChatMessageUI } from "@/stores/types";
-import { TaskStatus } from "@/types/proto-es/v1/command_pb";
+import type { Attachment } from "@/types/proto-es/v1/command_pb";
+import { AttachmentSchema, TaskStatus } from "@/types/proto-es/v1/command_pb";
 import { ThreadPanel } from "./thread-panel";
 
 const ROOT_NAME = "conversations/c1/messages/m1";
@@ -250,5 +258,86 @@ describe("ThreadPanel task controls", () => {
     expect(req.message).toBe(ROOT_NAME);
     expect(req.memberType).toBe(1);
     expect(req.memberId).toBe("ran-user-1");
+  });
+});
+
+describe("ThreadPanel composer paste", () => {
+  beforeEach(() => {
+    useAppStore.getState().reset();
+    mockUseIsDesktop.mockReturnValue(true);
+    mockUpload.mockClear();
+    mockClient.listChannelMembers.mockResolvedValue({ members: [] });
+    mockClient.listTasks.mockResolvedValue({ tasks: [], nextPageToken: "" });
+    mockClient.listTaskCounts.mockResolvedValue({
+      todoCount: 0,
+      inProgressCount: 0,
+      inReviewCount: 0,
+      doneCount: 0,
+    });
+    mockAgentTeamClient.listAgentTeams.mockResolvedValue({ agentTeams: [] });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.innerHTML = "";
+  });
+
+  // jsdom has no DataTransfer; a paste event only needs the items list the
+  // composers read (kind/type/getAsFile).
+  function paste(clipboardData: unknown): boolean {
+    const textarea = screen.getByPlaceholderText("chat.thread-placeholder");
+    return fireEvent.paste(textarea, { clipboardData });
+  }
+
+  it("uploads a pasted clipboard image like a picked file", async () => {
+    const file = new File(["png"], "image.png", { type: "image/png" });
+    const att: Attachment = create(AttachmentSchema, {
+      id: "f1",
+      name: "image.png",
+      mimeType: "image/png",
+      sizeBytes: 3n,
+    });
+    mockUpload.mockResolvedValue(att);
+    renderPanel(plainRoot());
+
+    const notCancelled = paste({
+      items: [
+        {
+          kind: "string",
+          type: "text/plain",
+          getAsFile: () => null,
+        },
+        {
+          kind: "file",
+          type: "image/png",
+          getAsFile: () => file,
+        },
+      ],
+    });
+
+    // preventDefault stops the browser from inserting the image URL as text.
+    expect(notCancelled).toBe(false);
+    await waitFor(() => expect(mockUpload).toHaveBeenCalledTimes(1));
+    const options = mockUpload.mock.calls[0][0];
+    expect(options.conversation).toBe("conversations/c1");
+    expect(options.originalName).toBe("image.png");
+    expect(options.mimeType).toBe("image/png");
+    expect(options.file).toBe(file);
+  });
+
+  it("keeps text-only paste untouched", () => {
+    renderPanel(plainRoot());
+    const notCancelled = paste({
+      items: [{ kind: "string", type: "text/plain", getAsFile: () => null }],
+    });
+    expect(notCancelled).toBe(true);
+    expect(mockUpload).not.toHaveBeenCalled();
+    expect(
+      (
+        screen.getByPlaceholderText(
+          "chat.thread-placeholder"
+        ) as HTMLTextAreaElement
+      ).value
+    ).toBe("");
   });
 });
