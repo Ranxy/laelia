@@ -11,6 +11,10 @@ const buttonVariants = cva(
         default: "bg-accent text-accent-text hover:bg-accent-hover",
         outline:
           "border border-control-border bg-transparent hover:bg-control-bg text-control",
+        // Destructive entry points that open a confirm dialog: same shape as
+        // `outline` but error-tinted (matches the Badge/Alert error styling).
+        "destructive-outline":
+          "border border-error/40 bg-transparent text-error hover:bg-error/5 hover:text-error",
         ghost: "hover:bg-control-bg text-control",
         destructive: "bg-error text-white hover:bg-error-hover",
         link: "text-accent underline-offset-4 hover:underline",

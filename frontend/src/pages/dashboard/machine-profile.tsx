@@ -1,20 +1,13 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
-import {
-  Check,
-  Copy,
-  Loader2,
-  Plus,
-  Shield,
-  User as UserIcon,
-  X,
-} from "lucide-react";
+import { Loader2, Plus, Shield, User as UserIcon, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { KeyValueEnvEditor } from "@/components/agent/key-value-env-editor";
 import { StringListEditor } from "@/components/agent/string-list-editor";
 import { ConnectionBadge } from "@/components/connection-badge";
+import { CopyableCommand } from "@/components/copyable-command";
 import { MachineConnectionBadge } from "@/components/machine-connection-badge";
 import { MemberPicker } from "@/components/member-picker";
 import {
@@ -104,6 +97,11 @@ import {
 // policy to grant creating agents on that machine. Only this role's bindings
 // are surfaced on the machine profile's Access card.
 const AGENT_CREATOR_ROLE = "roles/machineAgentCreator";
+
+// TOKEN_ACTION_BTN sizes the Token & Connection action buttons: large
+// full-width touch targets on phones, the compact sm row on sm+.
+const TOKEN_ACTION_BTN =
+  "h-9 w-full px-3 text-sm leading-5 sm:h-7 sm:w-auto sm:px-2 sm:text-xs sm:leading-4";
 
 export function MachineProfilePage() {
   const { t } = useTranslation();
@@ -994,57 +992,33 @@ export function MachineProfilePage() {
                             <p className="text-sm text-control-light">
                               {t("machine.profile.offline-install-hint")}
                             </p>
-                            <div className="flex items-center gap-2">
-                              <code className="flex-1 rounded bg-white border border-control-border px-3 py-2 font-mono text-xs break-all text-black dark:bg-zinc-900 dark:text-white">
-                                {installCommand}
-                              </code>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => void handleCopyInstall()}
-                              >
-                                {installCopied ? (
-                                  <Check className="size-4 text-success" />
-                                ) : (
-                                  <Copy className="size-4" />
-                                )}
-                                {installCopied
-                                  ? t("common.copied")
-                                  : t("common.copy")}
-                              </Button>
-                            </div>
+                            <CopyableCommand
+                              command={installCommand}
+                              copied={installCopied}
+                              onCopy={() => void handleCopyInstall()}
+                            />
                           </div>
                         )}
                         <div className="flex flex-col gap-2">
                           <p className="text-sm text-control-light">
                             {t("machine.profile.offline-command-hint")}
                           </p>
-                          <div className="flex items-center gap-2">
-                            <code className="flex-1 rounded bg-white border border-control-border px-3 py-2 font-mono text-xs break-all text-black dark:bg-zinc-900 dark:text-white">
-                              {setupCommand}
-                            </code>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => void handleCopySetup()}
-                            >
-                              {setupCopied ? (
-                                <Check className="size-4 text-success" />
-                              ) : (
-                                <Copy className="size-4" />
-                              )}
-                              {setupCopied
-                                ? t("common.copied")
-                                : t("common.copy")}
-                            </Button>
-                          </div>
+                          <CopyableCommand
+                            command={setupCommand}
+                            copied={setupCopied}
+                            onCopy={() => void handleCopySetup()}
+                          />
                         </div>
                       </div>
                     )}
-                    <div className="flex flex-wrap items-center gap-2">
+                    {/* Management actions. On touch layouts the buttons stack
+                        full-width (large, well-separated targets) with the two
+                        destructive ones error-tinted; from sm up they share one
+                        compact row. */}
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="destructive-outline"
+                        className={TOKEN_ACTION_BTN}
                         onClick={() => {
                           setActionError("");
                           setRevokeOpen(true);
@@ -1053,8 +1027,8 @@ export function MachineProfilePage() {
                         {t("machine.revoke-token")}
                       </Button>
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="destructive-outline"
+                        className={TOKEN_ACTION_BTN}
                         onClick={() => {
                           setActionError("");
                           setForceOpen(true);
@@ -1064,7 +1038,7 @@ export function MachineProfilePage() {
                       </Button>
                       <Button
                         variant="outline"
-                        size="sm"
+                        className={TOKEN_ACTION_BTN}
                         onClick={openTransferPicker}
                       >
                         {t("machine.transfer-owner")}

@@ -1,7 +1,13 @@
 import { Plus, Trash } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Outlet, useNavigate, useParams } from "react-router-dom";
+import {
+  matchPath,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { MachineConnectionBadge } from "@/components/machine-connection-badge";
 import { Alert } from "@/components/ui/alert";
 import {
@@ -24,6 +30,13 @@ export function MachinesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { machineId: selectedMachineId } = useParams<{ machineId: string }>();
+  const location = useLocation();
+  // The create-machine route has no :machineId param, but its page (install +
+  // setup commands) renders in the same detail pane as a selected machine and
+  // must count as an open detail, or the pane stays hidden on touch layouts.
+  const detailOpen =
+    Boolean(selectedMachineId) ||
+    matchPath("/machines/new", location.pathname) != null;
   const fetchMachines = useAppStore((s) => s.fetchMachines);
   const machines = useAppStore((s) => s.machines);
   const loading = useAppStore((s) => s.machinesLoading);
@@ -112,7 +125,7 @@ export function MachinesPage() {
       <aside
         className={cn(
           "shrink-0 flex-col border-r border-control-border overflow-hidden",
-          selectedMachineId ? "hidden lg:flex lg:w-56" : "flex w-full lg:w-56"
+          detailOpen ? "hidden lg:flex lg:w-56" : "flex w-full lg:w-56"
         )}
       >
         <div className="hidden lg:flex items-center justify-between gap-2 border-b border-control-border px-3 py-3 shrink-0">
@@ -243,7 +256,7 @@ export function MachinesPage() {
       <div
         className={cn(
           "min-w-0 flex-1 overflow-hidden",
-          !selectedMachineId && "hidden lg:block"
+          !detailOpen && "hidden lg:block"
         )}
       >
         <Outlet />

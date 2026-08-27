@@ -1,12 +1,12 @@
 import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { OfflineBanner } from "@/components/offline-banner";
 import {
   isAuthPath,
   isPublicPath,
   resolveAuthRedirect,
 } from "@/router/auth-redirect";
 import { useAppStore } from "@/stores";
-import { OfflineBanner } from "@/components/offline-banner";
 
 export function RootLayout() {
   const location = useLocation();

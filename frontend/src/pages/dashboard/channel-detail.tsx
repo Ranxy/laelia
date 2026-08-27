@@ -1,10 +1,17 @@
-import { ArrowLeft, Archive, ArchiveRestore, Hash, Loader2, MessageSquare, Users } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  ArrowLeft,
+  Hash,
+  Loader2,
+  MessageSquare,
+  Users,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChannelMembersPanel } from "@/components/chat/channel-members-panel";
 import { EmptyState, LoadingState } from "@/components/chat/states";
-import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -13,6 +20,7 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import { commandServiceClient } from "@/connect";
 import { useAppStore } from "@/stores";
 import type { Conversation } from "@/types/proto-es/v1/command_pb";

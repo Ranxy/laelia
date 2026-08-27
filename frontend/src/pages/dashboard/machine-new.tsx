@@ -1,7 +1,8 @@
-import { Check, Copy, Loader2, Monitor, X } from "lucide-react";
+import { Loader2, Monitor, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { CopyableCommand } from "@/components/copyable-command";
 import { Card, Field } from "@/components/profile-common";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -165,23 +166,11 @@ export function MachineNewPage() {
                 </Button>
               ))}
             </div>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 rounded bg-white border border-control-border px-3 py-2 font-mono text-xs break-all text-black dark:bg-zinc-900 dark:text-white">
-                {installCommand}
-              </code>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void handleCopyInstall()}
-              >
-                {installCopied ? (
-                  <Check className="size-4 text-success" />
-                ) : (
-                  <Copy className="size-4" />
-                )}
-                {installCopied ? t("common.copied") : t("common.copy")}
-              </Button>
-            </div>
+            <CopyableCommand
+              command={installCommand}
+              copied={installCopied}
+              onCopy={() => void handleCopyInstall()}
+            />
           </div>
         </Card>
 
@@ -190,23 +179,11 @@ export function MachineNewPage() {
             <p className="text-sm text-control-light">
               {t("machine.new.command-hint")}
             </p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 rounded bg-white border border-control-border px-3 py-2 font-mono text-xs break-all text-black dark:bg-zinc-900 dark:text-white">
-                {command}
-              </code>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void handleCopy()}
-              >
-                {copied ? (
-                  <Check className="size-4 text-success" />
-                ) : (
-                  <Copy className="size-4" />
-                )}
-                {copied ? t("common.copied") : t("common.copy")}
-              </Button>
-            </div>
+            <CopyableCommand
+              command={command}
+              copied={copied}
+              onCopy={() => void handleCopy()}
+            />
           </div>
         </Card>
 
