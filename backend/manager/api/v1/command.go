@@ -19,6 +19,7 @@ import (
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
+	"github.com/Ranxy/laelia/backend/manager/component/presence"
 	"github.com/Ranxy/laelia/backend/manager/component/roomhub"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -31,10 +32,11 @@ type CommandService struct {
 	s3clientManager *s3client.Client
 	iam             *iam.Manager
 	roomhub         *roomhub.Hub
+	presence        *presence.Registry
 }
 
-func NewCommandService(s *store.Store, d *dispatcher.Dispatcher, s3clientManager *s3client.Client, iamManager *iam.Manager, hub *roomhub.Hub) *CommandService {
-	return &CommandService{store: s, dispatcher: d, s3clientManager: s3clientManager, iam: iamManager, roomhub: hub}
+func NewCommandService(s *store.Store, d *dispatcher.Dispatcher, s3clientManager *s3client.Client, iamManager *iam.Manager, hub *roomhub.Hub, presenceRegistry *presence.Registry) *CommandService {
+	return &CommandService{store: s, dispatcher: d, s3clientManager: s3clientManager, iam: iamManager, roomhub: hub, presence: presenceRegistry}
 }
 
 func (s *CommandService) ListCommands(ctx context.Context, req *connect.Request[v1pb.ListCommandsRequest]) (*connect.Response[v1pb.ListCommandsResponse], error) {

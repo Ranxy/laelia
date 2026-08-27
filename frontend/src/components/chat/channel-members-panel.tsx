@@ -13,6 +13,7 @@ import {
   avatarNameForUserId,
   useAvatar,
 } from "@/lib/avatar-cache";
+import { isAgentOnline } from "@/lib/presence";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { ChannelMember } from "@/types/proto-es/v1/command_pb";
@@ -95,6 +96,18 @@ export function ChannelMembersPanel({
   const addChannelMember = useAppStore((s) => s.addChannelMember);
   const addChannelGroup = useAppStore((s) => s.addChannelGroup);
   const removeChannelMember = useAppStore((s) => s.removeChannelMember);
+  // Presence inputs for the roster rows' green badge, same sources as the
+  // chat list: agents from the roster's connection state, humans from the
+  // presence heartbeat slice (refreshed by the dashboard heartbeat tick).
+  const agents = useAppStore((s) => s.agents);
+  const onlineUsers = useAppStore((s) => s.onlineUsers);
+  const onlineAgentNames = useMemo(() => {
+    const online = new Set<string>();
+    for (const a of agents) {
+      if (isAgentOnline(a)) online.add(a.name);
+    }
+    return online;
+  }, [agents]);
 
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [addMemberType, setAddMemberType] = useState<AddMemberType>(2); // default AGENT
@@ -271,6 +284,11 @@ export function ChannelMembersPanel({
             <ChannelMemberRow
               key={`${m.memberType}-${m.memberId}`}
               member={m}
+              online={
+                m.memberType === 2
+                  ? onlineAgentNames.has(`agents/${m.memberId}`)
+                  : onlineUsers[`users/${m.memberId}`] === true
+              }
               removable={!membershipFixed && canManage && m.memberRole !== 1}
               onRemove={() => handleRemoveMember(m.memberType, m.memberId)}
             />
@@ -481,12 +499,16 @@ export function ChannelMembersPanel({
 // ChannelMemberRow is one roster row: real avatar (uploaded image or pixel
 // identicon, same as the members directory), name, and a fixed-width type
 // label so the role badge and join time line up across user/agent rows.
+// `online` drives the avatar's green presence badge — undefined/false render
+// no badge, mirroring the chat list rows.
 function ChannelMemberRow({
   member,
+  online,
   removable,
   onRemove,
 }: {
   member: ChannelMember;
+  online?: boolean;
   removable: boolean;
   onRemove: () => void;
 }) {
@@ -499,7 +521,11 @@ function ChannelMemberRow({
 
   return (
     <div className="flex items-center gap-3 rounded-xs border border-control-border bg-background p-3 transition-colors hover:bg-control-bg/60">
-      <Avatar seed={member.memberId || member.displayName} src={avatarSrc} />
+      <Avatar
+        seed={member.memberId || member.displayName}
+        src={avatarSrc}
+        online={online}
+      />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-main truncate">
           {member.displayName || member.memberId}

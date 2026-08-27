@@ -217,3 +217,36 @@ describe("MembersPage channels roster", () => {
     expect(screen.queryByText("Design")).toBeNull();
   });
 });
+
+describe("MembersPage presence badge", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+    useAppStore.setState({ onlineUsers: {} });
+  });
+
+  it("shows Online/Offline string badges for humans like the agents page", () => {
+    useAppStore.setState({ onlineUsers: { "users/1": true } });
+    renderPage();
+
+    // Alice (users/1) heartbeated recently → Online badge; Bob has no
+    // heartbeat → Offline badge. The row-level "User" label is replaced by
+    // the presence badge, mirroring the agents' ConnectionBadge.
+    expect(screen.getByText("chat.presence-online")).toBeTruthy();
+    expect(screen.getByText("chat.presence-offline")).toBeTruthy();
+  });
+
+  it("leaves agent rows on the connection badge, not the presence one", () => {
+    useAppStore.setState({
+      onlineUsers: { "users/1": true, "agents/beta": true },
+    });
+    renderPage();
+
+    // The beta agent is ONLINE, but agent rows use the ConnectionBadge
+    // (connection state), never the human presence map — so only Alice's
+    // row carries the presence badge.
+    expect(screen.getAllByText("chat.presence-online")).toHaveLength(1);
+
+    // And both agent rows render the mocked ConnectionBadge stub.
+    expect(screen.getAllByTestId("conn")).toHaveLength(2);
+  });
+});

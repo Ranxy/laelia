@@ -18,6 +18,7 @@ import { createThreadSlice } from "./thread";
 import { createUserSlice } from "./user";
 import { createImagePreviewSlice } from "./image-preview";
 import { createPreviewSlice } from "./preview";
+import { createPresenceSlice } from "./presence";
 
 // ---------------------------------------------------------------------------
 // Swipe-back preview: store freeze
@@ -75,6 +76,7 @@ export const useAppStore = create<AppStoreState>()((...args) => {
     ...createUserSlice(...wrappedArgs),
     ...createPreviewSlice(...wrappedArgs),
     ...createImagePreviewSlice(...wrappedArgs),
+    ...createPresenceSlice(...wrappedArgs),
     reset: () => {
       // Stop every watcher interval before wiping state so orphaned timers can't
       // keep polling (and re-writing) the freshly reset store. getInitialState()

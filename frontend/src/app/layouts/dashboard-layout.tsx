@@ -15,6 +15,7 @@ import {
 import { MobileHeader } from "@/components/mobile-header";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { DesktopSidebar } from "@/components/sidebar";
+import { usePresenceHeartbeat } from "@/composables/use-presence-heartbeat";
 import { toastManager } from "@/lib/toast";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { reconcilePushSubscription, suppressRoute } from "@/lib/web-push";
@@ -90,6 +91,10 @@ export function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const location = useLocation();
   const navigate = useNavigate();
+  // Presence heartbeat: marks the signed-in user online every 30s and
+  // refreshes the agent roster, so the chat page's green online badges stay
+  // current. App-wide (not chat-route-scoped) on purpose — see the hook.
+  usePresenceHeartbeat();
   // Mobile swipe-back: drag from the left edge to go back one level (thread
   // panel first, then the route's backTo target). Inert on desktop.
   const { rootRef, currentPageRef, previewPath } = useSwipeBack();

@@ -33,6 +33,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAvatar } from "@/lib/avatar-cache";
 import { formatConversationListTime } from "@/lib/command-status";
+import { isAgentOnline } from "@/lib/presence";
 import { toastManager } from "@/lib/toast";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
@@ -96,6 +97,11 @@ export function ConversationList() {
   // The viewer's own handle tags their messages in the last-message preview
   // ("You: ..."); last_message_principal_id carries the sender handle.
   const myPrincipalId = useAppStore((s) => s.currentUser?.handle);
+  // Presence inputs for the DM rows' green badge: agents online come from the
+  // agent roster's connection state, humans from the presence heartbeat slice.
+  // Both are refreshed by ChatLayout's 30s tick.
+  const agents = useAppStore((s) => s.agents);
+  const onlineUsers = useAppStore((s) => s.onlineUsers);
   const isDesktop = useIsDesktop();
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -145,6 +151,16 @@ export function ConversationList() {
   );
 
   const activeFilter = CHAT_FILTERS.find((f) => f.value === filter);
+
+  // Resource names of currently-online agents, for the agent-DM rows' badge.
+  // Recomputed only when the roster changes, not on every store update.
+  const onlineAgentNames = useMemo(() => {
+    const online = new Set<string>();
+    for (const a of agents) {
+      if (isAgentOnline(a)) online.add(a.name);
+    }
+    return online;
+  }, [agents]);
 
   // No mount fetch here: ChatLayout (the only host of this list) owns the
   // listChannels fetch + 5s poll, so fetching again here duplicated the request
@@ -372,12 +388,23 @@ export function ConversationList() {
           const isUserDm = conv.type === CONVERSATION_TYPE_USER_DM;
           const active = id === conversationId;
           const unread = unreadByConv[conv.name] ?? 0;
+          // Online state of the DM peer (the badge's data): agent DMs read the
+          // agent roster, user DMs read the presence heartbeat map. Channels
+          // and peers with no data yet stay undefined (no badge).
+          const peerOnline = isDm
+            ? conv.peer
+              ? onlineAgentNames.has(conv.peer)
+              : undefined
+            : isUserDm && conv.peer
+              ? (onlineUsers[conv.peer] ?? undefined)
+              : undefined;
           return (
             <ConversationRow
               key={conv.name}
               id={id}
               title={conv.title || conv.name}
               peer={conv.peer}
+              peerOnline={peerOnline}
               pinned={conv.pinned ?? false}
               muted={conv.muted ?? false}
               isDirect={isDm || isUserDm}
@@ -478,6 +505,7 @@ const ConversationRow = memo(function ConversationRow({
   id,
   title,
   peer,
+  peerOnline,
   pinned,
   muted,
   isDirect,
@@ -499,6 +527,10 @@ const ConversationRow = memo(function ConversationRow({
   // appending "/avatar" yields the avatar resource name the cache dispatches by
   // prefix. Undefined for channels (no peer), which keep the Hash icon below.
   peer?: string;
+  // peerOnline drives the DM avatar's green presence badge. Undefined (or
+  // false) renders no badge: offline peers stay plain. A primitive so the
+  // memoized row only re-renders when this row's own badge changes.
+  peerOnline?: boolean;
   pinned: boolean;
   muted: boolean;
   isDirect: boolean;
@@ -640,7 +672,7 @@ const ConversationRow = memo(function ConversationRow({
         )}
       >
         {isDirect ? (
-          <Avatar src={avatarSrc} seed={peerId || title} />
+          <Avatar src={avatarSrc} seed={peerId || title} online={peerOnline} />
         ) : (
           <div
             className={cn(

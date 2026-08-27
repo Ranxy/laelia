@@ -26,6 +26,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
 import { AgentBadge } from "@/components/chat/agent-badge";
+import { Avatar } from "@/components/chat/avatar";
 import { ChannelFilesPanel } from "@/components/chat/channel-files-panel";
 import { ChannelMembersPanel } from "@/components/chat/channel-members-panel";
 import { ChannelSearchPanel } from "@/components/chat/channel-search-panel";
@@ -62,6 +63,8 @@ import { getCaretCoordinates } from "@/lib/caret-position";
 import { MAX_UPLOAD_BYTES, uploadFileToConversation } from "@/lib/file-upload";
 import { isImageAttachment } from "@/lib/image-file";
 import "@/lib/markdown";
+import { useAvatar } from "@/lib/avatar-cache";
+import { peerPresenceOnline } from "@/lib/presence";
 import { toastManager } from "@/lib/toast";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
@@ -231,6 +234,11 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // takes effect on the next render without a reload.
   const enterToSend = currentUser?.chatPreferences?.enterToSend ?? true;
   const fetchAgents = useAppStore((s) => s.fetchAgents);
+  // DM-peer presence inputs for the header badge, same sources as the left
+  // rail: agents from the roster's connection state, humans from the presence
+  // heartbeat slice. Both are refreshed by ChatLayout's 30s tick.
+  const agents = useAppStore((s) => s.agents);
+  const onlineUsers = useAppStore((s) => s.onlineUsers);
   const openThread = useAppStore((s) => s.openThread);
   const closeThread = useAppStore((s) => s.closeThread);
   const activeThreadRoot = useAppStore((s) => s.activeThreadRoot);
@@ -434,6 +442,20 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const membershipFixed = isDm || isAgentDm || isUserDm;
   const isOwner =
     channel && currentUser ? channel.ownerId === currentUser.handle : false;
+
+  // DM header avatar: replace the generic Bot/User glyph with the peer's real
+  // avatar whenever the peer is resolvable (Conversation.peer), plus the same
+  // green presence badge as the left-rail rows. Channels keep the Hash icon.
+  const peer = channel?.peer;
+  const peerAvatarName = peer ? `${peer}/avatar` : undefined;
+  const peerAvatarSrc = useAvatar(peerAvatarName);
+  const peerId = peer ? (peer.split("/").pop() ?? "") : "";
+  const peerOnline = peerPresenceOnline(
+    peer,
+    isDm || isAgentDm,
+    agents,
+    onlineUsers
+  );
 
   // Fetch conversation metadata when the open conversation is absent from the
   // user's left-rail `channels` (notably agent-DMs, which ListChannels excludes
@@ -1519,22 +1541,31 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     <div className="relative flex h-full flex-col overflow-hidden">
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3 border-b border-control-border px-4 py-3">
-        <div
-          className={cn(
-            "flex size-8 items-center justify-center rounded-lg",
-            isDm || isAgentDm || isUserDm
-              ? "bg-accent/10 text-accent"
-              : "bg-control-bg text-control"
-          )}
-        >
-          {isUserDm ? (
-            <User className="size-4" />
-          ) : isDm || isAgentDm ? (
-            <Bot className="size-4" />
-          ) : (
-            <Hash className="size-4" />
-          )}
-        </div>
+        {peer && (isDm || isAgentDm || isUserDm) ? (
+          <Avatar
+            src={peerAvatarSrc}
+            seed={peerId || (channel?.title ?? "")}
+            online={peerOnline}
+            title={peerOnline ? t("chat.presence-online") : undefined}
+          />
+        ) : (
+          <div
+            className={cn(
+              "flex size-8 items-center justify-center rounded-lg",
+              isDm || isAgentDm || isUserDm
+                ? "bg-accent/10 text-accent"
+                : "bg-control-bg text-control"
+            )}
+          >
+            {isUserDm ? (
+              <User className="size-4" />
+            ) : isDm || isAgentDm ? (
+              <Bot className="size-4" />
+            ) : (
+              <Hash className="size-4" />
+            )}
+          </div>
+        )}
         <div className="min-w-0 flex-1 flex items-center gap-3">
           <h2 className="text-sm font-semibold text-main truncate">
             {channel?.title ?? channelId ?? ""}

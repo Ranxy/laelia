@@ -292,6 +292,7 @@
     - [Pong](#laelia-v1-Pong)
     - [PostMessageRequest](#laelia-v1-PostMessageRequest)
     - [PostMessageResponse](#laelia-v1-PostMessageResponse)
+    - [Presence](#laelia-v1-Presence)
     - [PromptReleaseNotice](#laelia-v1-PromptReleaseNotice)
     - [PromptReleaseNoticeAck](#laelia-v1-PromptReleaseNoticeAck)
     - [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered)
@@ -316,6 +317,8 @@
     - [SetConversationPinnedResponse](#laelia-v1-SetConversationPinnedResponse)
     - [SteerCommandRequest](#laelia-v1-SteerCommandRequest)
     - [SteerMessage](#laelia-v1-SteerMessage)
+    - [SyncPresenceRequest](#laelia-v1-SyncPresenceRequest)
+    - [SyncPresenceResponse](#laelia-v1-SyncPresenceResponse)
     - [TaskInfo](#laelia-v1-TaskInfo)
     - [TeamContext](#laelia-v1-TeamContext)
     - [TextDeltaPayload](#laelia-v1-TextDeltaPayload)
@@ -5231,6 +5234,22 @@ is never populated here.
 
 
 
+<a name="laelia-v1-Presence"></a>
+
+### Presence
+Presence is one queried principal&#39;s online state.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | name is the queried principal&#39;s resource name, as requested. |
+| online | [bool](#bool) |  | online is true while the principal is currently online. |
+
+
+
+
+
+
 <a name="laelia-v1-PromptReleaseNotice"></a>
 
 ### PromptReleaseNotice
@@ -5659,6 +5678,37 @@ mid-turn steering ignores it.
 | ----- | ---- | ----- | ----------- |
 | command_id | [string](#string) |  |  |
 | text | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SyncPresenceRequest"></a>
+
+### SyncPresenceRequest
+SyncPresenceRequest asks for the online state of a batch of principals. The
+calling principal&#39;s own presence heartbeat is recorded before answering.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| names | [string](#string) | repeated | names are the principals to query (&#34;users/&lt;handle&gt;&#34; or &#34;agents/&lt;id&gt;&#34;). Duplicates are collapsed; the list is capped at 200 entries. Agents are accepted but always answered offline (agent presence comes from the agent connection state, not from presence heartbeats). |
+
+
+
+
+
+
+<a name="laelia-v1-SyncPresenceResponse"></a>
+
+### SyncPresenceResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| presences | [Presence](#laelia-v1-Presence) | repeated | presences carries one entry per requested name. |
 
 
 
@@ -6374,6 +6424,7 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | ListFiles | [ListFilesRequest](#laelia-v1-ListFilesRequest) | [ListFilesResponse](#laelia-v1-ListFilesResponse) | ListFiles returns the files attached to a conversation. The caller must be a member. |
 | ListActivities | [ListActivitiesRequest](#laelia-v1-ListActivitiesRequest) | [ListActivitiesResponse](#laelia-v1-ListActivitiesResponse) | ListActivities returns the authenticated user&#39;s activity feed: chat messages relevant to them, tagged with category flags (mention/task/reminder/thread). The caller&#39;s own id is the implicit filter; default read_state_filter is UNREAD. |
 | MarkActivityDone | [MarkActivityDoneRequest](#laelia-v1-MarkActivityDoneRequest) | [MarkActivityDoneResponse](#laelia-v1-MarkActivityDoneResponse) | MarkActivityDone marks a single activity item DONE for the authenticated user, hiding it from All and Unread. The caller&#39;s own id must own the row. |
+| SyncPresence | [SyncPresenceRequest](#laelia-v1-SyncPresenceRequest) | [SyncPresenceResponse](#laelia-v1-SyncPresenceResponse) | SyncPresence records the calling principal&#39;s presence heartbeat and returns the current online state of the requested principals. Any authenticated principal (user or agent) may call it. The caller&#39;s own presence is updated as a side effect; a caller can only query other principals&#39; presence, never report it. Human presence is a sliding window: a user is online while its last heartbeat is within the manager&#39;s presence TTL. Agent presence is NOT answered here (agents are always answered offline) — AgentService.ListAgents status.state is the authoritative agent connection signal. |
 
  
 

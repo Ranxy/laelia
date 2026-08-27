@@ -20,6 +20,7 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/component/mailer"
+	"github.com/Ranxy/laelia/backend/manager/component/presence"
 	"github.com/Ranxy/laelia/backend/manager/component/roomhub"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
@@ -62,7 +63,11 @@ func configureV1Routers(
 	userService := apiv1.NewUserService(stores, profile, stateCfg, iamManager, s3clientmanager, mailerSender)
 	authService := apiv1.NewAuthService(stores, secret, profile, stateCfg, mailerSender)
 	agentService := apiv1.NewAgentService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager, s3clientmanager)
-	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager, iamManager, hub)
+	// Chat presence: an in-process registry of the last web heartbeat per
+	// user, consulted by the chat page's online badge. Single-process only,
+	// like the roomhub it sits beside.
+	presenceRegistry := presence.New()
+	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager, iamManager, hub, presenceRegistry)
 	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)
 	machineService := apiv1.NewMachineService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager)
 	deviceService := apiv1.NewDeviceService(deviceStore, stores, secret, profile, iamManager)

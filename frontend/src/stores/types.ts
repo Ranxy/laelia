@@ -649,6 +649,17 @@ export interface ImagePreviewSlice {
   closeImagePreview: () => void;
 }
 
+// PresenceSlice owns the chat page's human online state, keyed by the user's
+// resource name ("users/<handle>"). Populated by the 30s SyncPresence
+// heartbeat tick in ChatLayout; agents are not tracked here (their online
+// signal is the agents slice's connection state).
+export interface PresenceSlice {
+  onlineUsers: Record<string, boolean>;
+  // syncPresence records the signed-in user's heartbeat and refreshes the
+  // online state of the given DM peers. Non-"users/" names are ignored.
+  syncPresence: (names: string[]) => Promise<void>;
+}
+
 // TaskSlice owns the channel task board panel: per-conversation task listings
 // (cached as ChatMessageUI so they reuse MessageRow's task badge), panel open
 // state, and the convert-message-to-task mutation. Tasks live in the same
@@ -871,7 +882,8 @@ export type AppStoreState = AuthSlice &
   UserSlice &
   SettingSlice &
   PreviewSlice &
-  ImagePreviewSlice & {
+  ImagePreviewSlice &
+  PresenceSlice & {
     // reset restores every slice to its pristine initial state (clearing
     // watcher intervals first) so a logout can never leak one principal's
     // cached data to the next user signing in on the same tab.

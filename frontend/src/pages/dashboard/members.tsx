@@ -5,6 +5,7 @@ import { Outlet, useMatch, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Alert } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import {
@@ -353,6 +354,11 @@ function MemberRow({
     ? avatarNameForAgentId(resourceId)
     : avatarNameForUserId(resourceId);
   const avatarSrc = useAvatar(avatarName);
+  // Human presence reads the heartbeat map (refreshed by the dashboard
+  // heartbeat tick); agent presence rides the ConnectionBadge like the
+  // Agents page. Both surfaces render the same "Online"/"Offline" strings.
+  const onlineUsers = useAppStore((s) => s.onlineUsers);
+  const userOnline = !isAgent && onlineUsers[member.name] === true;
 
   function open() {
     navigate(
@@ -392,10 +398,10 @@ function MemberRow({
           state={member.connectionState}
           enabled={member.enabled}
         />
+      ) : userOnline ? (
+        <Badge variant="success">{t("chat.presence-online")}</Badge>
       ) : (
-        <span className="text-xs text-control-light">
-          {t("members.kind-user")}
-        </span>
+        <Badge variant="secondary">{t("chat.presence-offline")}</Badge>
       )}
     </button>
   );

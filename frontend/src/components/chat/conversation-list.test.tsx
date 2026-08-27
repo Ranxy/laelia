@@ -19,6 +19,10 @@ const mock = vi.hoisted(() => ({
   channels: [] as Array<Record<string, unknown>>,
   currentUser: { name: "users/ran-user-1", handle: "ran-user-1" },
   unreadByConv: {} as Record<string, number>,
+  // Presence inputs: the agent roster (with connection state) and the human
+  // presence heartbeat map, both read by the DM rows' green badge.
+  agents: [] as Array<Record<string, unknown>>,
+  onlineUsers: {} as Record<string, boolean>,
   setConversationPinned: vi.fn(),
   setConversationClosed: vi.fn(),
   setConversationMuted: vi.fn(),
@@ -37,6 +41,8 @@ vi.mock("@/stores", () => ({
       setConversationClosed: mock.setConversationClosed,
       setConversationMuted: mock.setConversationMuted,
       currentUser: mock.currentUser,
+      agents: mock.agents,
+      onlineUsers: mock.onlineUsers,
     }),
 }));
 
@@ -70,6 +76,8 @@ beforeEach(() => {
   localStorage.clear();
   mock.unreadByConv = {};
   mock.channels = [];
+  mock.agents = [];
+  mock.onlineUsers = {};
   mock.useIsDesktop.mockReturnValue(true);
 });
 
@@ -504,5 +512,77 @@ describe("ConversationList agent badge", () => {
 
     // The mocked t returns keys, so the badge text is the chat.agent key.
     expect(screen.getAllByText("chat.agent")).toHaveLength(1);
+  });
+});
+
+describe("ConversationList presence badge", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+    mock.channels = [];
+    mock.agents = [];
+    mock.onlineUsers = {};
+  });
+
+  it("badges an online agent DM peer and not an offline one", () => {
+    mock.agents = [
+      { name: "agents/online-agent", status: { state: 1 } }, // ONLINE
+      { name: "agents/offline-agent", status: { state: 2 } }, // OFFLINE
+      { name: "agents/stopped-agent", status: { state: 5 } }, // STOPPED
+    ];
+    mock.channels = [
+      channel({
+        name: "conversations/ch1",
+        title: "Online Agent",
+        type: 1,
+        peer: "agents/online-agent",
+      }),
+      channel({
+        name: "conversations/ch2",
+        title: "Offline Agent",
+        type: 1,
+        peer: "agents/offline-agent",
+      }),
+      channel({
+        name: "conversations/ch3",
+        title: "Stopped Agent",
+        type: 1,
+        peer: "agents/stopped-agent",
+      }),
+    ];
+    render(<ConversationList />);
+
+    // Exactly one green dot: the ONLINE agent's row.
+    expect(screen.getAllByTestId("presence-badge")).toHaveLength(1);
+  });
+
+  it("badges an online human DM peer from the presence heartbeat map", () => {
+    mock.onlineUsers = { "users/alice": true, "users/bob": false };
+    mock.channels = [
+      channel({
+        name: "conversations/ch1",
+        title: "Alice",
+        type: 4,
+        peer: "users/alice",
+      }),
+      channel({
+        name: "conversations/ch2",
+        title: "Bob",
+        type: 4,
+        peer: "users/bob",
+      }),
+    ];
+    render(<ConversationList />);
+
+    expect(screen.getAllByTestId("presence-badge")).toHaveLength(1);
+  });
+
+  it("never badges channel rows", () => {
+    mock.onlineUsers = { "users/alice": true };
+    mock.channels = [
+      channel({ name: "conversations/ch1", title: "Design", type: 2 }),
+    ];
+    render(<ConversationList />);
+
+    expect(screen.queryByTestId("presence-badge")).not.toBeInTheDocument();
   });
 });

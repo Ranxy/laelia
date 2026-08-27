@@ -377,6 +377,8 @@
     "convert-to-task": "Convert to task",
     "copy-markdown": "Copy Markdown",
     "copy-markdown-error": "Couldn't copy markdown",
+    "presence-online": "Online",
+    "presence-offline": "Offline",
     "copy-markdown-success": "Markdown copied",
     "diff": "Diff",
     "empty": "Start a conversation with the agent",

@@ -378,6 +378,8 @@
     "copy-markdown": "复制 Markdown",
     "copy-markdown-error": "复制 Markdown 失败",
     "copy-markdown-success": "已复制 Markdown",
+    "presence-online": "在线",
+    "presence-offline": "离线",
     "diff": "差异",
     "empty": "开始与 Agent 对话",
     "file-too-large": "文件过大（最大 512MB）",
