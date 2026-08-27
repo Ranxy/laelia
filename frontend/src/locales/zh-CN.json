@@ -288,6 +288,7 @@
     "member-id-label": "成员 ID",
     "member-id-placeholder": "用户 ID 或 Agent ID",
     "member-joined": "已加入",
+    "member-open-details": "查看 {{name}} 的资料",
     "member-type-agent": "Agent",
     "member-type-group": "用户组",
     "member-type-label": "成员类型",

@@ -288,6 +288,7 @@
     "member-id-label": "Member ID",
     "member-id-placeholder": "User ID or Agent ID",
     "member-joined": "Already a member",
+    "member-open-details": "View {{name}}'s profile",
     "member-type-agent": "Agent",
     "member-type-group": "Group",
     "member-type-label": "Member type",

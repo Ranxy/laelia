@@ -116,14 +116,16 @@ describe("ChannelDetailPage", () => {
     expect(screen.getAllByText("channel.joined-at").length).toBeGreaterThan(0);
   });
 
-  it("lists members with role badges and join dates", async () => {
+  it("lists members with role badges", async () => {
     renderPage();
 
     expect(await screen.findByText("Alice")).toBeTruthy();
     expect(screen.getByText("channel.role-owner")).toBeTruthy();
     expect(screen.getByText("channel.role-admin")).toBeTruthy();
     expect(screen.getByText("channel.role-member")).toBeTruthy();
-    expect(screen.getAllByText("channel.joined-at")).toHaveLength(4);
+    // Member rows are compact (no join dates); only the channel metadata
+    // card still shows the channel's own joined-at.
+    expect(screen.getAllByText("channel.joined-at")).toHaveLength(1);
   });
 
   it("shows the Message action for a live channel too", async () => {

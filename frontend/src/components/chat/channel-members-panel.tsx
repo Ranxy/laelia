@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Avatar } from "@/components/chat/avatar";
 import { MemberPicker } from "@/components/chat/member-picker";
+import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
 import { LoadingState } from "@/components/chat/states";
+import { ConnectionBadge } from "@/components/connection-badge";
 import { MemberPicker as IamMemberPicker } from "@/components/member-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +18,7 @@ import {
 import { isAgentOnline } from "@/lib/presence";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
+import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
 import type { ChannelMember } from "@/types/proto-es/v1/command_pb";
 import { State } from "@/types/proto-es/v1/common_pb";
 import type { Group } from "@/types/proto-es/v1/group_service_pb";
@@ -28,15 +31,6 @@ type AddMemberType = 1 | 2 | 3;
 // unloaded conversation doesn't mint a new array each run (which would defeat
 // zustand's Object.is equality and re-render on every store change).
 const EMPTY_MEMBERS: ChannelMember[] = [];
-
-function memberTypeLabel(
-  t: (key: string) => string,
-  memberType: number
-): string {
-  return memberType === 2
-    ? t("channel.member-type-agent")
-    : t("channel.member-type-user");
-}
 
 // roleLabel maps the IAM-derived chat role ints (1=Owner, 2=Member, 3=Admin)
 // to the UI badges shared by the chat members sheet and the channel detail page.
@@ -74,11 +68,14 @@ export interface ChannelMembersPanelProps {
   membershipFixed: boolean;
 }
 
-// ChannelMembersPanel renders a conversation's member roster with role badges
-// and (for channel owners) the add/remove controls. It is shared by the chat
+// ChannelMembersPanel renders a conversation's member roster as compact
+// single-line rows (avatar + name + role badge) that open the member detail
+// sheet on click — the same popup as clicking a sender's avatar in chat —
+// plus (for channel owners) the add/remove controls. It is shared by the chat
 // page's members Sheet and the channel detail page; the surrounding shell
 // (Sheet vs inline section) is the caller's choice. It owns the add-member
-// flow (user/agent picker and group snapshot) so both surfaces stay in sync.
+// flow (user/agent picker and group snapshot) and the member detail sheet so
+// both surfaces stay in sync.
 export function ChannelMembersPanel({
   conversationId,
   canManage,
@@ -108,10 +105,26 @@ export function ChannelMembersPanel({
     }
     return online;
   }, [agents]);
+  // Agent roster keyed by resource id so agent rows can render the same
+  // connection badge (Online/Offline/Error/Stopped) as the members directory.
+  const agentsById = useMemo(() => {
+    const byId = new Map<string, AgentSummary>();
+    for (const a of agents) {
+      byId.set(a.name.replace(/^agents\//, ""), a);
+    }
+    return byId;
+  }, [agents]);
 
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [addMemberType, setAddMemberType] = useState<AddMemberType>(2); // default AGENT
   const [addMemberIds, setAddMemberIds] = useState<string[]>([]);
+  // Member whose detail sheet is open (same popup as clicking a sender's
+  // avatar in chat). null = closed.
+  const [detailMember, setDetailMember] = useState<{
+    type: "user" | "agent";
+    id: string;
+    name: string;
+  } | null>(null);
   const [selectedGroupName, setSelectedGroupName] = useState("");
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupUsers, setGroupUsers] = useState<Map<string, UserMessage>>(
@@ -279,7 +292,7 @@ export function ChannelMembersPanel({
     <div className="flex flex-col gap-0">
       {membersLoading && <LoadingState />}
       {!membersLoading && (
-        <div className="flex flex-col gap-2">
+        <div className="divide-y divide-control-border/50">
           {members.map((m) => (
             <ChannelMemberRow
               key={`${m.memberType}-${m.memberId}`}
@@ -289,8 +302,18 @@ export function ChannelMembersPanel({
                   ? onlineAgentNames.has(`agents/${m.memberId}`)
                   : onlineUsers[`users/${m.memberId}`] === true
               }
-              removable={!membershipFixed && canManage && m.memberRole !== 1}
+              agent={
+                m.memberType === 2 ? agentsById.get(m.memberId) : undefined
+              }
+              removeColumn={!membershipFixed && canManage}
               onRemove={() => handleRemoveMember(m.memberType, m.memberId)}
+              onOpen={() =>
+                setDetailMember({
+                  type: m.memberType === 2 ? "agent" : "user",
+                  id: m.memberId,
+                  name: m.displayName || m.memberId,
+                })
+              }
             />
           ))}
         </div>
@@ -492,25 +515,47 @@ export function ChannelMembersPanel({
           )}
         </div>
       )}
+
+      {/* Member detail popup — the same sheet as clicking a sender's avatar
+          in chat, so both surfaces stay in sync. Stacks above this panel's
+          surrounding sheet (chat drawer) via the shared overlay layer. */}
+      <MentionDetailSheet
+        open={detailMember !== null}
+        type={detailMember?.type ?? "user"}
+        id={detailMember?.id ?? ""}
+        name={detailMember?.name ?? ""}
+        onClose={() => setDetailMember(null)}
+      />
     </div>
   );
 }
 
-// ChannelMemberRow is one roster row: real avatar (uploaded image or pixel
-// identicon, same as the members directory), name, and a fixed-width type
-// label so the role badge and join time line up across user/agent rows.
-// `online` drives the avatar's green presence badge — undefined/false render
-// no badge, mirroring the chat list rows.
+// ChannelMemberRow is one compact roster row: avatar (with green presence
+// badge when online), truncated name, a role badge and — for agents — the
+// same connection badge as the members directory, placed before the role
+// badge so the fixed-width role badges align on every row. The whole row
+// opens the member detail sheet, like clicking a sender's avatar in chat.
+// When the roster shows the remove column (channel owners), every row
+// reserves the trailing slot so the owner row's badges stay aligned too.
 function ChannelMemberRow({
   member,
   online,
-  removable,
+  agent,
+  removeColumn,
   onRemove,
+  onOpen,
 }: {
   member: ChannelMember;
   online?: boolean;
-  removable: boolean;
+  // Roster record for agent members; drives the connection badge. Humans
+  // (and agents missing from the roster) pass undefined and show Offline.
+  agent?: AgentSummary;
+  // True when the roster renders the remove column at all (channel owners
+  // managing a non-DM roster). The owner's own row reserves the slot with a
+  // placeholder instead of the button.
+  removeColumn: boolean;
   onRemove: () => void;
+  onOpen: () => void;
 }) {
   const { t } = useTranslation();
   const isAgent = member.memberType === 2;
@@ -518,59 +563,63 @@ function ChannelMemberRow({
     ? avatarNameForAgentId(member.memberId)
     : avatarNameForUserId(member.memberId);
   const avatarSrc = useAvatar(avatarName);
+  const displayName = member.displayName || member.memberId;
+  // Owners cannot be removed from their own channel.
+  const removable = removeColumn && member.memberRole !== 1;
 
   return (
-    <div className="flex items-center gap-3 rounded-xs border border-control-border bg-background p-3 transition-colors hover:bg-control-bg/60">
-      <Avatar
-        seed={member.memberId || member.displayName}
-        src={avatarSrc}
-        online={online}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-main truncate">
-          {member.displayName || member.memberId}
-        </p>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="w-10 shrink-0 text-xs text-control-light">
-            {memberTypeLabel(t, member.memberType)}
+    <div className="flex items-center gap-1 rounded-xs pr-1 transition-colors hover:bg-control-bg/60">
+      <button
+        type="button"
+        onClick={onOpen}
+        title={t("channel.member-open-details", { name: displayName })}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1.5 text-left"
+      >
+        <Avatar
+          seed={member.memberId || member.displayName}
+          src={avatarSrc}
+          online={online}
+          size={7}
+        />
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-main">
+          {displayName}
+        </span>
+        {isAgent && (
+          <span className="shrink-0">
+            <ConnectionBadge
+              state={agent?.status?.state}
+              enabled={agent?.enabled}
+            />
           </span>
-          <Badge
-            variant={roleBadgeVariant(member.memberRole)}
-            className="w-16 shrink-0 justify-center text-xs"
-          >
-            {roleLabel(t, member.memberRole)}
-          </Badge>
-          {member.joinedAt && (
-            <span className="text-xs text-control-placeholder">
-              {t("channel.joined-at", {
-                date: new Date(
-                  Number(member.joinedAt.seconds) * 1000
-                ).toLocaleDateString(),
-              })}
-            </span>
-          )}
-        </div>
-        {isAgent && member.description && (
-          <p className="mt-1 truncate text-xs text-control-light">
-            {member.description}
-          </p>
         )}
-      </div>
-      {/* DMs have fixed membership (user + agent); only channel owners can
-          remove members. */}
-      {removable && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onRemove}
-          aria-label={t("common.delete")}
-          className={cn(
-            "size-7 p-0 text-control-placeholder hover:text-error hover:bg-error/10"
-          )}
+        {/* Fixed width so owner/admin/member badges line up across rows,
+            regardless of whether the row carries a connection badge. */}
+        <Badge
+          variant={roleBadgeVariant(member.memberRole)}
+          className="w-16 shrink-0 justify-center text-xs"
         >
-          <Trash2 className="size-3.5" />
-        </Button>
-      )}
+          {roleLabel(t, member.memberRole)}
+        </Badge>
+      </button>
+      {/* DMs have fixed membership (user + agent); only channel owners can
+          remove members. The placeholder keeps rows without the button aligned
+          with the ones that have it. */}
+      {removeColumn &&
+        (removable ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRemove}
+            aria-label={t("common.delete")}
+            className={cn(
+              "size-7 shrink-0 p-0 text-control-placeholder hover:text-error hover:bg-error/10"
+            )}
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        ) : (
+          <span className="size-7 shrink-0" aria-hidden="true" />
+        ))}
     </div>
   );
 }
