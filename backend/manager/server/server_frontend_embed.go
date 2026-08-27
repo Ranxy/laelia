@@ -23,7 +23,14 @@ func init() {
 	mime.AddExtensionType(".webmanifest", "application/manifest+json")
 }
 
-//go:embed dist
+// The all: prefix is required: a bare "dist" pattern silently excludes files
+// whose names begin with '_' or '.', which drops Vite's
+// __vite-optional-peer-dep_*.js chunks (optional peer deps of markstream-react)
+// from the embedded FS. Their 404s are listed in the service worker's precache
+// manifest, fail the SW install, and leave navigator.serviceWorker.ready — and
+// the notifications toggle — pending forever.
+//
+//go:embed all:dist
 var embeddedFrontend embed.FS
 
 // frontendStaticSkipper keeps API, health, and hashed-asset paths out of the
