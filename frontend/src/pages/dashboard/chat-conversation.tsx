@@ -30,6 +30,7 @@ import { Avatar } from "@/components/chat/avatar";
 import { ChannelFilesPanel } from "@/components/chat/channel-files-panel";
 import { ChannelMembersPanel } from "@/components/chat/channel-members-panel";
 import { ChannelSearchPanel } from "@/components/chat/channel-search-panel";
+import { ChatDrawerSheet } from "@/components/chat/chat-drawer-sheet";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
 import { MentionPopup } from "@/components/chat/mention-popup";
@@ -43,13 +44,7 @@ import { EmptyState, LoadingState } from "@/components/chat/states";
 import { TasksPanel } from "@/components/chat/tasks-panel";
 import { ThreadPanel } from "@/components/chat/thread-panel";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetBody,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { SheetBody, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { detectMention } from "@/composables/useMentionDetect";
 import {
@@ -2070,67 +2065,52 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
       </div>
 
       {/* Channel Search Sheet */}
-      <Sheet
-        open={searchOpen}
-        onOpenChange={(open) => !open && setSearchOpen(false)}
-      >
-        <SheetContent width="medium">
-          <SheetBody className="flex flex-col gap-0 overflow-hidden p-0">
-            {channelId && (
-              <ChannelSearchPanel
-                channelId={channelId}
-                channelTitle={channel?.title ?? channelId ?? ""}
-                onClose={() => setSearchOpen(false)}
-                onJumpToMessage={handleSearchJump}
-              />
-            )}
-          </SheetBody>
-        </SheetContent>
-      </Sheet>
+      <ChatDrawerSheet open={searchOpen} onClose={() => setSearchOpen(false)}>
+        <SheetBody className="flex flex-col gap-0 overflow-hidden p-0">
+          {channelId && (
+            <ChannelSearchPanel
+              channelId={channelId}
+              channelTitle={channel?.title ?? channelId ?? ""}
+              onClose={() => setSearchOpen(false)}
+              onJumpToMessage={handleSearchJump}
+            />
+          )}
+        </SheetBody>
+      </ChatDrawerSheet>
 
       {/* Files Sheet */}
-      <Sheet
-        open={filesOpen}
-        onOpenChange={(open) => !open && setFilesOpen(false)}
-      >
-        <SheetContent width="medium">
-          <SheetBody className="flex flex-col gap-0 overflow-hidden p-0">
-            {channelId && (
-              <ChannelFilesPanel
-                channelId={channelId}
-                channelTitle={channel?.title ?? channelId ?? ""}
-                onClose={() => setFilesOpen(false)}
-                onPreviewAttachment={handlePreviewAttachment}
-                onPreviewImage={handlePreviewImage}
-                onJumpToMessage={handleJumpToMessage}
-              />
-            )}
-          </SheetBody>
-        </SheetContent>
-      </Sheet>
+      <ChatDrawerSheet open={filesOpen} onClose={() => setFilesOpen(false)}>
+        <SheetBody className="flex flex-col gap-0 overflow-hidden p-0">
+          {channelId && (
+            <ChannelFilesPanel
+              channelId={channelId}
+              channelTitle={channel?.title ?? channelId ?? ""}
+              onClose={() => setFilesOpen(false)}
+              onPreviewAttachment={handlePreviewAttachment}
+              onPreviewImage={handlePreviewImage}
+              onJumpToMessage={handleJumpToMessage}
+            />
+          )}
+        </SheetBody>
+      </ChatDrawerSheet>
 
       {/* Members Sheet */}
-      <Sheet
-        open={membersOpen}
-        onOpenChange={(open) => !open && setMembersOpen(false)}
-      >
-        <SheetContent width="medium">
-          <SheetHeader>
-            <SheetTitle>
-              {t("channel.members", { count: members.length })}
-            </SheetTitle>
-          </SheetHeader>
-          <SheetBody className="flex flex-col gap-0">
-            {channelId && (
-              <ChannelMembersPanel
-                conversationId={channelId}
-                canManage={isOwner}
-                membershipFixed={membershipFixed}
-              />
-            )}
-          </SheetBody>
-        </SheetContent>
-      </Sheet>
+      <ChatDrawerSheet open={membersOpen} onClose={() => setMembersOpen(false)}>
+        <SheetHeader>
+          <SheetTitle>
+            {t("channel.members", { count: members.length })}
+          </SheetTitle>
+        </SheetHeader>
+        <SheetBody className="flex flex-col gap-0">
+          {channelId && (
+            <ChannelMembersPanel
+              conversationId={channelId}
+              canManage={isOwner}
+              membershipFixed={membershipFixed}
+            />
+          )}
+        </SheetBody>
+      </ChatDrawerSheet>
 
       <MentionDetailSheet
         open={detailMention !== null}
