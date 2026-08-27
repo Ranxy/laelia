@@ -8,9 +8,12 @@ on:
 permissions:
   contents: write
 
+env:
+  VERSION: ${{ github.ref_name }}
+
 jobs:
   build:
-    name: Build and upload manager binaries
+    name: Build and upload release assets
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -34,19 +37,58 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Build frontend and embedded machine binaries
-        run: VERSION="${GITHUB_REF_NAME}" RELEASE=true scripts/build_laelia.sh build
+        run: RELEASE=true scripts/build_laelia.sh build
 
-      - name: Cross-compile manager binaries
+      - name: Cross-compile full manager binaries
         run: |
           set -euo pipefail
           mv build/laelia build/laelia-linux-amd64
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags "embed_frontend embed_machine release" -ldflags "-w -s" -p=16 -o build/laelia-windows-amd64.exe ./backend/manager/bin/server/main.go
           GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -tags "embed_frontend embed_machine release" -ldflags "-w -s" -p=16 -o build/laelia-darwin-arm64 ./backend/manager/bin/server/main.go
 
+      - name: Cross-compile frontend-only manager binaries
+        run: |
+          set -euo pipefail
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags "embed_frontend release" -ldflags "-w -s" -p=16 -o build/laelia-linux-amd64-frontend-only ./backend/manager/bin/server/main.go
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags "embed_frontend release" -ldflags "-w -s" -p=16 -o build/laelia-windows-amd64-frontend-only.exe ./backend/manager/bin/server/main.go
+          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -tags "embed_frontend release" -ldflags "-w -s" -p=16 -o build/laelia-darwin-arm64-frontend-only ./backend/manager/bin/server/main.go
+
+      - name: Build standalone machine binaries (with pi)
+        run: scripts/build-embedded-machines.sh build/machine-pi
+
+      - name: Build standalone machine binaries (without pi)
+        run: EMBED_PI=false scripts/build-embedded-machines.sh build/machine-no-pi
+
       - name: Generate checksums
         run: |
+          set -euo pipefail
           cd build
-          sha256sum laelia-linux-amd64 laelia-windows-amd64.exe laelia-darwin-arm64 > SHA256SUMS
+          sha256sum \
+            laelia-linux-amd64 \
+            laelia-windows-amd64.exe \
+            laelia-darwin-arm64 \
+            laelia-linux-amd64-frontend-only \
+            laelia-windows-amd64-frontend-only.exe \
+            laelia-darwin-arm64-frontend-only \
+            > SHA256SUMS
+          (cd machine-pi && sha256sum \
+            laelia-machine-linux-x64 \
+            laelia-machine-linux-x64.gz \
+            laelia-machine-windows-x64.exe \
+            laelia-machine-windows-x64.exe.gz \
+            laelia-machine-darwin-arm64 \
+            laelia-machine-darwin-arm64.gz \
+            manifest.json \
+            >> ../SHA256SUMS)
+          (cd machine-no-pi && sha256sum \
+            laelia-machine-linux-x64-no-pi \
+            laelia-machine-linux-x64-no-pi.gz \
+            laelia-machine-windows-x64-no-pi.exe \
+            laelia-machine-windows-x64-no-pi.exe.gz \
+            laelia-machine-darwin-arm64-no-pi \
+            laelia-machine-darwin-arm64-no-pi.gz \
+            manifest.json \
+            >> ../SHA256SUMS)
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
@@ -55,4 +97,21 @@ jobs:
             build/laelia-linux-amd64
             build/laelia-windows-amd64.exe
             build/laelia-darwin-arm64
+            build/laelia-linux-amd64-frontend-only
+            build/laelia-windows-amd64-frontend-only.exe
+            build/laelia-darwin-arm64-frontend-only
+            build/machine-pi/laelia-machine-linux-x64
+            build/machine-pi/laelia-machine-linux-x64.gz
+            build/machine-pi/laelia-machine-windows-x64.exe
+            build/machine-pi/laelia-machine-windows-x64.exe.gz
+            build/machine-pi/laelia-machine-darwin-arm64
+            build/machine-pi/laelia-machine-darwin-arm64.gz
+            build/machine-pi/manifest.json
+            build/machine-no-pi/laelia-machine-linux-x64-no-pi
+            build/machine-no-pi/laelia-machine-linux-x64-no-pi.gz
+            build/machine-no-pi/laelia-machine-windows-x64-no-pi.exe
+            build/machine-no-pi/laelia-machine-windows-x64-no-pi.exe.gz
+            build/machine-no-pi/laelia-machine-darwin-arm64-no-pi
+            build/machine-no-pi/laelia-machine-darwin-arm64-no-pi.gz
+            build/machine-no-pi/manifest.json
             build/SHA256SUMS

@@ -46,6 +46,22 @@ curl.exe -fsSL -o laelia.exe https://github.com/Ranxy/laelia/releases/latest/dow
 
 预编译二进制与 `scripts/build_laelia.sh` 产出的自包含 Manager 一致：内嵌前端和各平台 machine 二进制，并同样提供 `/machine/install.sh`、`/machine/install.ps1` 和 `/machine/manifest.json` 端点，可以直接从它安装 machine 宿主机。
 
+#### 可选的 Release 资产
+
+针对特殊用途，Release 还会发布：
+
+- **只内嵌前端的 Manager**（不内嵌 machine 二进制）：
+  `laelia-linux-amd64-frontend-only`、`laelia-windows-amd64-frontend-only.exe`、
+  `laelia-darwin-arm64-frontend-only`。它们提供 UI/API，但不提供 `/machine/*` 安装端点。
+- **内嵌 pi 的独立 machine 二进制**：
+  `laelia-machine-linux-x64`、`laelia-machine-windows-x64.exe`、
+  `laelia-machine-darwin-arm64`（以及 `.gz` 和 `manifest.json`）。
+- **不内嵌 pi 的独立 machine 二进制**（builtin-pi 不可用，但用户自行安装的 pi 仍可用）：
+  `laelia-machine-linux-x64-no-pi`、`laelia-machine-windows-x64-no-pi.exe`、
+  `laelia-machine-darwin-arm64-no-pi`（以及 `.gz` 和 `manifest.json`）。
+
+以上完全集成的 Manager 仍然是默认和推荐选项。
+
 ### 1b. 构建 Manager Docker 镜像
 
 ```bash

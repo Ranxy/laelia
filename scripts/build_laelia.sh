@@ -108,7 +108,7 @@ if [[ "${RELEASE}" == "true" ]]; then
   BUILD_TAGS="${BUILD_TAGS} release"
 fi
 if [[ "${EMBED_MACHINE}" == "true" ]]; then
-  scripts/build-embedded-machines.sh "${EMBED_DIR}"
+  EMBED_PI=true scripts/build-embedded-machines.sh "${EMBED_DIR}"
   BUILD_TAGS="${BUILD_TAGS} embed_machine"
 fi
 

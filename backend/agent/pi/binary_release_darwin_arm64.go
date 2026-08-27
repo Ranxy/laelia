@@ -1,4 +1,4 @@
-//go:build release && darwin && arm64
+//go:build release && !no_embed_pi && darwin && arm64
 
 package pi
 

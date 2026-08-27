@@ -1,4 +1,4 @@
-//go:build release
+//go:build release && !no_embed_pi
 
 package pi
 

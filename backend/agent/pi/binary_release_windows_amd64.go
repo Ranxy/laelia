@@ -1,4 +1,4 @@
-//go:build release && windows && amd64
+//go:build release && !no_embed_pi && windows && amd64
 
 package pi
 

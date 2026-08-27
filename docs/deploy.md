@@ -63,6 +63,24 @@ binaries, and serves the same `/machine/install.sh`, `/machine/install.ps1`,
 and `/machine/manifest.json` endpoints, so machine hosts can be installed
 directly from it.
 
+#### Optional release assets
+
+For special use cases, the release also publishes:
+
+- **Frontend-only managers** (no embedded machine binaries):
+  `laelia-linux-amd64-frontend-only`, `laelia-windows-amd64-frontend-only.exe`,
+  `laelia-darwin-arm64-frontend-only`. These serve the UI/API but do not
+  provide the `/machine/*` install endpoints.
+- **Standalone machine binaries with pi**:
+  `laelia-machine-linux-x64`, `laelia-machine-windows-x64.exe`,
+  `laelia-machine-darwin-arm64` (plus `.gz` and `manifest.json`).
+- **Standalone machine binaries without pi** (builtin-pi unavailable; a
+  user-installed pi on PATH still works):
+  `laelia-machine-linux-x64-no-pi`, `laelia-machine-windows-x64-no-pi.exe`,
+  `laelia-machine-darwin-arm64-no-pi` (plus `.gz` and `manifest.json`).
+
+The fully integrated managers above remain the default and recommended option.
+
 ### 1b. Build the manager Docker image
 
 ```bash
