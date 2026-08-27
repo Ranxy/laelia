@@ -25,6 +25,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
+import { AgentBadge } from "@/components/chat/agent-badge";
 import { ChannelFilesPanel } from "@/components/chat/channel-files-panel";
 import { ChannelMembersPanel } from "@/components/chat/channel-members-panel";
 import { ChannelSearchPanel } from "@/components/chat/channel-search-panel";
@@ -1538,6 +1539,9 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
           <h2 className="text-sm font-semibold text-main truncate">
             {channel?.title ?? channelId ?? ""}
           </h2>
+          {/* Agent DMs (user↔agent and the admin-viewed agent↔agent DM) mark
+              the title with the same AgentBadge as the left-rail rows. */}
+          {(isDm || isAgentDm) && <AgentBadge />}
           {!isDm && !isAgentDm && !isUserDm && memberSummary && (
             <span className="shrink-0 text-xs text-control-placeholder">
               {memberSummary}

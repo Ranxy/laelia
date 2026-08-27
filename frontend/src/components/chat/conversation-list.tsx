@@ -14,6 +14,7 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
+import { AgentBadge } from "@/components/chat/agent-badge";
 import { Avatar } from "@/components/chat/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -380,6 +381,7 @@ export function ConversationList() {
               pinned={conv.pinned ?? false}
               muted={conv.muted ?? false}
               isDirect={isDm || isUserDm}
+              isAgentDm={isDm}
               active={active}
               unread={unread}
               lastMessage={conv.lastMessage}
@@ -479,6 +481,7 @@ const ConversationRow = memo(function ConversationRow({
   pinned,
   muted,
   isDirect,
+  isAgentDm,
   active,
   unread,
   lastMessage,
@@ -499,6 +502,9 @@ const ConversationRow = memo(function ConversationRow({
   pinned: boolean;
   muted: boolean;
   isDirect: boolean;
+  // True for a user↔agent DM (type 1); marks the row title with the shared
+  // AgentBadge so users can tell the peer is an agent at a glance.
+  isAgentDm: boolean;
   active: boolean;
   unread: number;
   // last-message preview from ListChannels: single-line truncated content,
@@ -655,6 +661,7 @@ const ConversationRow = memo(function ConversationRow({
             >
               {title}
             </p>
+            {isAgentDm && <AgentBadge />}
             {lastMessageAtMs !== undefined && (
               <span className="ml-auto shrink-0 pl-1 text-xs text-control-placeholder">
                 {formatConversationListTime(lastMessageAtMs)}

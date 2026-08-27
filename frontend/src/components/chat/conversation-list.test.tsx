@@ -477,3 +477,32 @@ describe("ConversationList close and context menu", () => {
     expect(screen.queryByText("chat.close")).not.toBeInTheDocument();
   });
 });
+
+describe("ConversationList agent badge", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+    mock.channels = [];
+  });
+
+  it("marks agent DM rows with the agent badge and leaves other rows unmarked", () => {
+    mock.channels = [
+      channel({ name: "conversations/ch1", title: "Design", type: 2 }),
+      channel({
+        name: "conversations/ch2",
+        title: "My Agent",
+        type: 1,
+        peer: "agents/agent-1",
+      }),
+      channel({
+        name: "conversations/ch3",
+        title: "Alice",
+        type: 4,
+        peer: "users/alice",
+      }),
+    ];
+    render(<ConversationList />);
+
+    // The mocked t returns keys, so the badge text is the chat.agent key.
+    expect(screen.getAllByText("chat.agent")).toHaveLength(1);
+  });
+});
