@@ -2,6 +2,7 @@ package chattools
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -13,16 +14,24 @@ import (
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
 
-// fakeBatchClient implements only the three CommandServiceClient methods
-// BuildTurnBatch calls (ListChannelUpdates, GetChannel, ListConversationMessages)
-// by embedding the interface and overriding those three; the rest stay nil and
-// are never reached.
+// fakeBatchClient implements only the CommandServiceClient methods
+// BuildTurnBatch calls (ListDueReminders, ListChannelUpdates, GetChannel,
+// ListConversationMessages) by embedding the interface and overriding those
+// four; the rest stay nil and are never reached.
 type fakeBatchClient struct {
 	v1connect.CommandServiceClient
-	updates  []*v1pb.ChannelUpdate
-	channels map[string]*v1pb.Conversation
-	messages map[string][]*v1pb.ChatMessage
-	err      error // injected error for any call
+	updates   []*v1pb.ChannelUpdate
+	channels  map[string]*v1pb.Conversation
+	messages  map[string][]*v1pb.ChatMessage
+	reminders []*v1pb.Reminder
+	err       error // injected error for any call
+}
+
+func (f *fakeBatchClient) ListDueReminders(_ context.Context, _ *connect.Request[v1pb.ListDueRemindersRequest]) (*connect.Response[v1pb.ListDueRemindersResponse], error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return connect.NewResponse(&v1pb.ListDueRemindersResponse{Reminders: f.reminders}), nil
 }
 
 func (f *fakeBatchClient) ListChannelUpdates(_ context.Context, _ *connect.Request[v1pb.ListChannelUpdatesRequest]) (*connect.Response[v1pb.ListChannelUpdatesResponse], error) {
@@ -89,16 +98,69 @@ func mkMsg(name, content, sender string, st v1pb.SenderType) *v1pb.ChatMessage {
 	}
 }
 
-// TestBuildTurnBatch_EmptyReturnsReminderNudge guards the warm-reminder path: a
-// turn opened for a due reminder (no unread channel) must return a non-empty
-// nudge so a resumed turn still runs `reminder list-due` (the init prompt's
-// step 0 is only sent once, at cold start).
-func TestBuildTurnBatch_EmptyReturnsReminderNudge(t *testing.T) {
-	out, err := BuildTurnBatch(context.Background(), batchDeps(&fakeBatchClient{}))
+func mkReminder(name, task string) *v1pb.Reminder {
+	return &v1pb.Reminder{
+		Name:        name,
+		Status:      v1pb.ReminderStatus_REMINDER_STATUS_DUE,
+		TaskContent: task,
+		FireAt:      timestamppb.Now(),
+		Tz:          "UTC",
+	}
+}
+
+// TestBuildTurnBatch_ReminderOnlyWakeRendersReminders guards the reminder-wake
+// path: a turn opened for a due reminder (no unread channel) must render the
+// due reminders directly into the batch — the init prompt's step 0 is only
+// sent once, at cold start, so warm turns rely on the batch alone.
+func TestBuildTurnBatch_ReminderOnlyWakeRendersReminders(t *testing.T) {
+	c := &fakeBatchClient{reminders: []*v1pb.Reminder{mkReminder("reminders/abc-123", "Summarize GitHub commits")}}
+	out, err := BuildTurnBatch(context.Background(), batchDeps(c))
 	require.NoError(t, err)
 	assert.NotEmpty(t, out)
-	assert.Contains(t, out, reminderNudge)
 	assert.Contains(t, out, "No new channel messages")
+	assert.Contains(t, out, "Due reminders:")
+	assert.Contains(t, out, "reminders/abc-123")
+	assert.Contains(t, out, "Summarize GitHub commits")
+	assert.Contains(t, out, "reminder complete <name>")
+}
+
+// TestBuildTurnBatch_MessageOnlyWakeHasNoReminderText guards the no-polling
+// invariant: a turn woken by channel messages (no due reminder) must carry NO
+// reminder instruction at all — the agent must not be told (or prompted) to
+// check for reminders when the system did not fire one.
+func TestBuildTurnBatch_MessageOnlyWakeHasNoReminderText(t *testing.T) {
+	const conv = "conversations/c1"
+	c := &fakeBatchClient{
+		updates:  []*v1pb.ChannelUpdate{{Conversation: conv, NewMessageCount: 1, ProcessedVersion: 0, CurrentVersion: 1}},
+		channels: map[string]*v1pb.Conversation{conv: {Name: conv, Type: 2, Title: "c1"}},
+		messages: map[string][]*v1pb.ChatMessage{conv: {mkMsg(conv+"/messages/1", "hi", "u", v1pb.SenderType_SENDER_TYPE_USER)}},
+	}
+
+	out, err := BuildTurnBatch(context.Background(), batchDeps(c))
+	require.NoError(t, err)
+	assert.Contains(t, out, "New messages received:")
+	assert.NotContains(t, out, "reminder", "a message-driven turn must not mention reminders at all")
+}
+
+// TestBuildTurnBatch_RemindersRenderBeforeMessages guards the ordering: when a
+// turn has both due reminders and unread messages, the reminders section comes
+// first (init prompt step 0 handles them before the message batch).
+func TestBuildTurnBatch_RemindersRenderBeforeMessages(t *testing.T) {
+	const conv = "conversations/c1"
+	c := &fakeBatchClient{
+		updates:   []*v1pb.ChannelUpdate{{Conversation: conv, NewMessageCount: 1, ProcessedVersion: 0, CurrentVersion: 1}},
+		channels:  map[string]*v1pb.Conversation{conv: {Name: conv, Type: 2, Title: "c1"}},
+		messages:  map[string][]*v1pb.ChatMessage{conv: {mkMsg(conv+"/messages/1", "hi", "u", v1pb.SenderType_SENDER_TYPE_USER)}},
+		reminders: []*v1pb.Reminder{mkReminder("reminders/abc-123", "Summarize GitHub commits")},
+	}
+
+	out, err := BuildTurnBatch(context.Background(), batchDeps(c))
+	require.NoError(t, err)
+	assert.Contains(t, out, "Due reminders:")
+	assert.Contains(t, out, "New messages received:")
+	assert.Less(t, strings.Index(out, "Due reminders:"), strings.Index(out, "New messages received:"),
+		"the reminders section must precede the message batch")
+	assert.Contains(t, out, "Handle every due reminder first")
 }
 
 // TestBuildTurnBatch_RendersTargetAndSender verifies the [target=... msg=...
@@ -135,7 +197,7 @@ func TestBuildTurnBatch_RendersTargetAndSender(t *testing.T) {
 	// agent can act without a `message check` round-trip.
 	assert.Contains(t, out, "dm:@alice (your processed_version=0): 1 new")
 	assert.Contains(t, out, "'#image' (your processed_version=0): 1 new")
-	assert.Contains(t, out, reminderNudge)
+	assert.NotContains(t, out, "reminder")
 }
 
 // TestBuildTurnBatch_ChannelBoundSummarizesOverflow guards the no-silent-drop

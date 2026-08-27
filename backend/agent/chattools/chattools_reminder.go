@@ -212,11 +212,12 @@ func ListReminders(ctx context.Context, d Deps, in ListRemindersInput) (string, 
 	return text, nil
 }
 
-// ListDueReminders returns the DUE reminders owned by the calling agent, for
-// the autonomous drain loop. Run this at step 0 of the cold-start init prompt
-// (warm/resumed turns are nudged to run it by a line appended to the turn
-// batch instead), and process each due reminder by doing its work and calling
-// `reminder complete` (or `reminder fail`).
+// ListDueReminders returns the DUE reminders owned by the calling agent. The
+// drain loop normally never calls this: the manager lists the agent's due
+// reminders directly in the turn-opening batch (see turn_batch.go) and wakes
+// the agent only when one is due. This handler backs the `reminder list-due`
+// CLI command, kept for manual checks; process each due reminder by doing its
+// work and calling `reminder complete` (or `reminder fail`).
 func ListDueReminders(ctx context.Context, d Deps, _ ListDueRemindersInput) (string, error) {
 	resp, err := d.Client.ListDueReminders(ctx, connect.NewRequest(&v1pb.ListDueRemindersRequest{}))
 	if err != nil {

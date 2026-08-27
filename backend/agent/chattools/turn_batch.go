@@ -3,6 +3,7 @@ package chattools
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -36,7 +37,14 @@ const (
 // for channels beyond the batch, which are listed below as unread with the same
 // cursor so they can be read directly too. Returns "" when there is no unread
 // work (the caller should not have opened a turn, but this keeps it harmless).
+//
+// Due reminders are part of the wake reason and are rendered into the batch
+// directly (see reminderSection): the agent sees scheduled work without
+// polling `reminder list-due`, and a message-driven turn carries no reminder
+// instruction at all.
 func BuildTurnBatch(ctx context.Context, d Deps) (string, error) {
+	reminderBlock := reminderSection(ctx, d)
+
 	updatesResp, err := d.Client.ListChannelUpdates(ctx, connect.NewRequest(&v1pb.ListChannelUpdatesRequest{}))
 	if err != nil {
 		return "", wrapManagerError(err)
@@ -44,10 +52,14 @@ func BuildTurnBatch(ctx context.Context, d Deps) (string, error) {
 	updates := updatesResp.Msg.GetUpdates()
 	if len(updates) == 0 {
 		// A turn may be opened for a due reminder even when no channel has
-		// unread messages. Return a non-empty reminder nudge so a warm turn
-		// still prompts the agent to run `reminder list-due` (the init prompt's
-		// step 0 is only sent once, at cold start, so warm turns need this).
-		return "No new channel messages this turn.\n\n" + reminderNudge, nil
+		// unread messages; the reminder block is then the whole point of the
+		// turn. With neither, the BeginSession gate should have kept the agent
+		// idle — this only happens when state changed between the gate and this
+		// build, so return a harmless no-work text the agent can end on.
+		if reminderBlock == "" {
+			return "No new messages or due reminders this turn.", nil
+		}
+		return "No new channel messages this turn.\n\n" + reminderBlock, nil
 	}
 
 	// Per-channel blocks (header + preview lines) for the shown channels, plus a
@@ -84,6 +96,13 @@ func BuildTurnBatch(ctx context.Context, d Deps) (string, error) {
 	}
 
 	var b strings.Builder
+	if reminderBlock != "" {
+		// Due reminders come first: the init prompt's step 0 handles them
+		// before the message batch. When empty, no reminder text appears —
+		// nothing is scheduled, so there is nothing to check.
+		_, _ = b.WriteString(reminderBlock)
+		_, _ = b.WriteString("\nHandle every due reminder first (step 0 of your init prompt), then the message batch below.\n\n")
+	}
 	_, _ = b.WriteString("New messages received:\n\n")
 	_, _ = b.WriteString(strings.Join(blocks, "\n\n"))
 	_, _ = b.WriteString("\n\nRespond as appropriate. Complete all your work before stopping.\n")
@@ -93,15 +112,33 @@ func BuildTurnBatch(ctx context.Context, d Deps) (string, error) {
 		_, _ = b.WriteString(strings.Join(overflow, "\n"))
 		_, _ = b.WriteString("\n\nUse `message check` or `message read` at a natural breakpoint if you choose to inspect those targets.\n")
 	}
-	_, _ = b.WriteString("\n" + reminderNudge)
 	return b.String(), nil
 }
 
-// reminderNudge is appended to every turn prompt so a warm (resumed) turn —
-// which does not re-receive the init prompt's step 0 — still checks for due
-// reminders. Cold turns carry it too (redundant with the init procedure, but
-// harmless and keeps the two paths consistent).
-const reminderNudge = "Before ending your turn, also run `laelia-machine reminder list-due` and handle any due scheduled reminders."
+// reminderSection renders the DUE reminders owned by the calling agent for the
+// turn batch, or "" when there are none. The batch is the only place the agent
+// learns about scheduled work: the manager wakes the agent — and lists the
+// reminders here — only when one is actually due, so a turn never needs to
+// poll `reminder list-due` itself. A query failure degrades to no section: the
+// reminder stays DUE, so the drain loop's next BeginSession (whose gate still
+// reports it) re-opens a turn and retries.
+func reminderSection(ctx context.Context, d Deps) string {
+	resp, err := d.Client.ListDueReminders(ctx, connect.NewRequest(&v1pb.ListDueRemindersRequest{}))
+	if err != nil {
+		slog.Warn("failed to list due reminders for turn batch", "error", err)
+		return ""
+	}
+	if len(resp.Msg.GetReminders()) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	_, _ = b.WriteString("Due reminders:\n")
+	for _, r := range resp.Msg.GetReminders() {
+		_, _ = b.WriteString(formatReminderLine(r))
+	}
+	_, _ = b.WriteString("\nFor each due reminder: do the work, then run `laelia-machine reminder complete <name> --result \"...\"` (or `reminder fail <name> --error \"...\"`).\n")
+	return b.String()
+}
 
 // latestChannelMessages fetches the latest turnBatchMaxMessages new messages
 // for one channel (those with room_version > the agent's processed_version).
