@@ -1,10 +1,14 @@
 package workspace
 
 import (
+	"bytes"
 	"encoding/base64"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 )
 
 // ReadResult is a file preview. Error carries a user-facing refusal reason
@@ -19,8 +23,12 @@ type ReadResult struct {
 	Error    string
 }
 
-// Read previews one file inside root, mirroring raft: text extensions (or
-// extension-less files) up to 1MB as utf-8, images up to 5MB as base64, other
+// textSniffBytes is how much of a file the text probe reads, matching git's
+// binary-detection window.
+const textSniffBytes = 8000
+
+// Read previews one file inside root: text files (by known extension or
+// content sniffing) up to 1MB as utf-8, images up to 5MB as base64, other
 // binaries metadata-only. Never-visible and secret paths are refused.
 func Read(root, path string) (ReadResult, error) {
 	resolved, rootReal, err := resolveInRoot(root, path)
@@ -46,16 +54,6 @@ func Read(root, path string) (ReadResult, error) {
 	}
 
 	ext := strings.ToLower(filepath.Ext(resolved))
-	if textExtensions[ext] || ext == "" {
-		if info.Size() > textFileMaxBytes {
-			return ReadResult{Error: "file too large to preview"}, nil
-		}
-		content, err := os.ReadFile(resolved)
-		if err != nil {
-			return ReadResult{}, err
-		}
-		return ReadResult{Content: string(content), Binary: false, Size: info.Size(), Encoding: "utf-8"}, nil
-	}
 	if mime := imageMimeByExt[ext]; mime != "" {
 		if info.Size() > imagePreviewMaxBytes {
 			return ReadResult{Binary: true, Size: info.Size(), MimeType: mime, Error: "image too large to preview"}, nil
@@ -72,5 +70,47 @@ func Read(root, path string) (ReadResult, error) {
 			Encoding: "base64",
 		}, nil
 	}
-	return ReadResult{Binary: true, Size: info.Size()}, nil
+
+	// Known text extensions are trusted; anything else (unknown suffixes like
+	// .go or .tsbuildinfo, extension-less names) is decided by content sniffing
+	// so text files are previewed regardless of their name.
+	isText := textExtensions[ext]
+	if !isText {
+		isText, err = looksLikeTextFile(resolved)
+		if err != nil {
+			return ReadResult{}, err
+		}
+	}
+	if !isText {
+		return ReadResult{Binary: true, Size: info.Size()}, nil
+	}
+	if info.Size() > textFileMaxBytes {
+		return ReadResult{Error: "file too large to preview"}, nil
+	}
+	content, err := os.ReadFile(resolved)
+	if err != nil {
+		return ReadResult{}, err
+	}
+	return ReadResult{Content: string(content), Binary: false, Size: info.Size(), Encoding: "utf-8"}, nil
+}
+
+// looksLikeTextFile reports whether the leading bytes of path look like text:
+// no NUL byte and valid UTF-8. Binary formats almost always contain NULs
+// early, so this mirrors git's binary heuristic.
+func looksLikeTextFile(path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	buf := make([]byte, textSniffBytes)
+	n, err := io.ReadFull(f, buf)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return false, err
+	}
+	buf = buf[:n]
+	if bytes.IndexByte(buf, 0) >= 0 {
+		return false, nil
+	}
+	return utf8.Valid(buf), nil
 }

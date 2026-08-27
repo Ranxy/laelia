@@ -54,15 +54,49 @@ func TestReadImage(t *testing.T) {
 	}
 }
 
+// TestReadTextByUnknownExtension covers text files whose suffix is not in
+// textExtensions: they must be previewed via content sniffing, not hidden as
+// binary metadata.
+func TestReadTextByUnknownExtension(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, root, "abc.go", "package main")
+	mustWrite(t, root, "go.mod", "module example.com/m")
+	mustWrite(t, root, "tsconfig.tsbuildinfo", `{"file":[]}`)
+
+	for _, name := range []string{"abc.go", "go.mod", "tsconfig.tsbuildinfo"} {
+		res, err := Read(root, name)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if res.Binary || res.Encoding != "utf-8" || res.Content == "" {
+			t.Fatalf("%s: expected text preview, got %+v", name, res)
+		}
+	}
+}
+
+func TestReadBinaryByUnknownExtension(t *testing.T) {
+	root := t.TempDir()
+	mustWriteBytes(t, root, "data.bin", []byte{0x00, 0x01, 0x02, 'x'})
+	mustWriteBytes(t, root, "blob", []byte{0x89, 0x50, 0x00, 0x0d})
+
+	res, err := Read(root, "blob")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Binary || res.Content != "" || res.Encoding != "" || res.Size != 4 {
+		t.Fatalf("unexpected result %+v", res)
+	}
+}
+
 func TestReadBinaryMetadataOnly(t *testing.T) {
 	root := t.TempDir()
-	mustWrite(t, root, "data.bin", "binary")
+	mustWriteBytes(t, root, "data.bin", []byte("bin\x00ary"))
 
 	res, err := Read(root, "data.bin")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !res.Binary || res.Content != "" || res.Encoding != "" || res.Size != 6 {
+	if !res.Binary || res.Content != "" || res.Encoding != "" || res.Size != 7 {
 		t.Fatalf("unexpected result %+v", res)
 	}
 }
