@@ -302,6 +302,11 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
 
   const isStreaming = msg.streaming;
   const displayContent = isStreaming ? streamingContent : msg.content;
+  // A file-only message (attachment with no text) still needs its bubble: the
+  // attachments render inside it, so hiding an empty-content bubble would hide
+  // the files from every viewer except the sender (whose bubble is always
+  // visible via the isOwnUser branch below).
+  const hasAttachments = (msg.attachments?.length ?? 0) > 0;
   const events = isStreaming ? streamingEvents : (msg.events ?? EMPTY_EVENTS);
 
   const toolCallPairs = useMemo(() => pairToolCallEvents(events), [events]);
@@ -591,7 +596,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
             // agents' sit on the left (top-left corner sharp).
             isOwnUser
               ? "bg-control-bg/60 text-main rounded-tr-sm px-4 py-2.5 max-w-[80%]"
-              : displayContent || isStreaming
+              : displayContent || isStreaming || hasAttachments
                 ? "bg-control-bg/60 text-main rounded-tl-sm px-4 py-3 max-w-[80%]"
                 : "hidden"
           )}
