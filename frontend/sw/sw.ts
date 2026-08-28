@@ -1,8 +1,9 @@
 /// <reference lib="webworker" />
 import {
+  addRoute,
   cleanupOutdatedCaches,
   createHandlerBoundToURL,
-  precacheAndRoute,
+  precache,
 } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst } from "workbox-strategies";
@@ -27,9 +28,33 @@ declare const self: ServiceWorkerGlobalScope;
 // Push payload shape (store.pushPayload):
 //   { title, body, conversation, messageId, category, route }
 
-// Workbox injects the list of precached URLs here at build time and wires up
-// cache-first serving for those static assets plus cleanup of outdated caches.
-precacheAndRoute(self.__WB_MANIFEST);
+// Route-ordering is load-bearing here: Workbox matches routes in registration
+// order (first match wins), and PrecacheRoute maps navigations to "/" onto the
+// precached "/index.html" (its directoryIndex default). Letting it register
+// first — what precacheAndRoute() does — would serve "/" cache-first from the
+// precache, pinning every PWA launch to the installed SW's build and hiding
+// deploys until a successful (all-or-nothing) SW install. So:
+//   1. precache()   — fills the precache cache via install/activate listeners,
+//                     no routes yet (createHandlerBoundToURL below resolves its
+//                     cache key against this list at startup, so it must run
+//                     before the catch handler is built);
+//   2. navigation route — claims ALL navigations network-first (fresh deploys
+//                     win immediately; the precached shell is only the offline
+//                     fallback via the catch handler);
+//   3. addRoute()   — the precache route, which then only serves hashed assets
+//                     that the navigation route did not already match.
+precache(self.__WB_MANIFEST);
+
+const navigationRoute = new NavigationRoute(
+  new NetworkFirst({
+    cacheName: "laelia-navigations",
+    networkTimeoutSeconds: 10,
+  })
+);
+navigationRoute.setCatchHandler(createHandlerBoundToURL("/index.html"));
+registerRoute(navigationRoute);
+
+addRoute();
 cleanupOutdatedCaches();
 
 // The route the page is currently viewing, or null. Pushes for this route are
@@ -45,23 +70,6 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
-
-// SPA navigation (deep links and the root route): prefer the network so new
-// deploys are picked up, and when offline fall back to the PRECACHED app shell.
-// Workbox stores the hashed /index.html in its own precache cache (keyed with a
-// revision query), so we must not read a hand-rolled "laelia-app-shell" cache —
-// that cache is never populated and always misses. createHandlerBoundToURL
-// reads the actual precache entry. API / dynamic endpoints (/v1, /api, ...)
-// are never matched by any Workbox route here, so they always go to the
-// network untouched.
-const navigationRoute = new NavigationRoute(
-  new NetworkFirst({
-    cacheName: "laelia-navigations",
-    networkTimeoutSeconds: 10,
-  })
-);
-navigationRoute.setCatchHandler(createHandlerBoundToURL("/index.html"));
-registerRoute(navigationRoute);
 
 self.addEventListener("message", (event) => {
   const data = event.data;

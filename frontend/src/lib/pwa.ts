@@ -13,8 +13,44 @@ export function registerServiceWorker(): void {
   if (!("serviceWorker" in navigator)) return;
   if (!import.meta.env.PROD) return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register(SW_URL).catch(() => {
-      // Best-effort: a failed registration must never break the app.
+    navigator.serviceWorker
+      .register(SW_URL)
+      .then((reg) => {
+        watchForUpdates(reg);
+      })
+      .catch(() => {
+        // Best-effort: a failed registration must never break the app.
+      });
+  });
+}
+
+// watchForUpdates closes the auto-update loop on the page side. sw.ts calls
+// skipWaiting() + clients.claim(), so a freshly installed SW activates at once
+// and fires `controllerchange` on every page it takes over. When the page
+// already had a controller that is a version swap: the running app is the OLD
+// build and its precache entries are being purged (lazy chunks would 404), so
+// reload once into the new version — the reload navigation is network-first,
+// so it lands on the fresh deploy. The very first claim (a page that was never
+// controlled) is not an update and must not reload, or first-time visitors
+// would get a pointless second load.
+function watchForUpdates(reg: ServiceWorkerRegistration): void {
+  let hadController = navigator.serviceWorker.controller !== null;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController) {
+      hadController = true;
+      return;
+    }
+    window.location.reload();
+  });
+
+  // Boot-time register() already triggers an update check; long-lived tabs get
+  // one extra nudge each time the tab becomes visible so a session spanning a
+  // deploy still converges to the new version. The browser throttles repeated
+  // checks, so this stays cheap.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    reg.update().catch(() => {
+      // Best-effort; the next navigation retries anyway.
     });
   });
 }
