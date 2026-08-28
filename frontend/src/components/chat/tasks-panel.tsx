@@ -5,6 +5,7 @@ import { EmptyState, LoadingState } from "@/components/chat/states";
 import { TaskStatusBadge } from "@/components/chat/task-status-badge";
 import { Button } from "@/components/ui/button";
 import { taskStatusShort } from "@/lib/task-status";
+import { useHistorySentinel } from "@/lib/use-history-sentinel";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -40,7 +41,12 @@ export function TasksPanel({
   onOpenTask,
 }: TasksPanelProps) {
   const { t } = useTranslation();
+  const isDesktop = useIsDesktop();
   const convName = `conversations/${channelId}`;
+  // On real iOS/iPadOS browsers the system edge-swipe owns edge touches (see
+  // platform-edge-swipe.ts): the history sentinel turns it (and the back
+  // button) into a board dismissal instead of leaving the page.
+  useHistorySentinel(true, onClose);
 
   const tasks = useAppStore((s) => s.tasksByConv[convName] ?? EMPTY_TASKS);
   const loading = useAppStore((s) => s.tasksLoading[convName] ?? false);
@@ -78,7 +84,24 @@ export function TasksPanel({
   };
 
   return (
-    <aside className="flex w-[420px] shrink-0 flex-col border-l border-control-border">
+    <aside
+      className={cn(
+        // Mobile: full-screen overlay (mirrors ThreadPanel) so the board is
+        // fully visible and closable; desktop: the 420px right dock.
+        "fixed inset-0 z-panel flex w-full flex-col bg-background pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))]",
+        "lg:static lg:inset-auto lg:w-[420px] lg:shrink-0 lg:border-l lg:border-control-border lg:pt-0 lg:pb-0"
+      )}
+      style={
+        isDesktop
+          ? undefined
+          : {
+              // The swipe-back gesture drives the mobile full-screen panel
+              // via CSS variables set on the layout root (see use-swipe-back).
+              transform: "translateX(var(--swipe-offset, 0px))",
+              transition: "var(--swipe-transition, none)",
+            }
+      }
+    >
       <div className="flex shrink-0 items-center gap-2 border-b border-control-border px-3 py-2.5">
         <ListChecks className="size-4 text-control-placeholder" />
         <div className="min-w-0 flex-1">

@@ -7,11 +7,19 @@ const mock = vi.hoisted(() => ({
   routeName: null as string | null,
   activeThreadRoot: null as string | null,
   closeThread: vi.fn(),
+  tasksPanelOpen: {} as Record<string, boolean>,
+  closeTasksPanel: vi.fn(),
   location: { pathname: "/test" },
+  // Simulates a real iOS/iPadOS browser whose system edge-swipe recognizer
+  // owns left-edge touches (see platform-edge-swipe.ts).
+  platformOwnsEdgeSwipe: vi.fn(() => false),
 }));
 
 vi.mock("@/lib/use-is-desktop", () => ({
   useIsDesktop: mock.useIsDesktop,
+}));
+vi.mock("@/lib/platform-edge-swipe", () => ({
+  platformOwnsEdgeSwipe: mock.platformOwnsEdgeSwipe,
 }));
 vi.mock("react-router-dom", () => ({
   useNavigate: () => mock.navigate,
@@ -25,6 +33,8 @@ vi.mock("@/stores", () => ({
     selector({
       closeThread: mock.closeThread,
       activeThreadRoot: mock.activeThreadRoot,
+      tasksPanelOpen: mock.tasksPanelOpen,
+      closeTasksPanel: mock.closeTasksPanel,
     }),
   setSuppressLoadingFlags: vi.fn(),
 }));
@@ -79,17 +89,25 @@ describe("useSwipeBack", () => {
     mock.useIsDesktop.mockReturnValue(false);
     mock.navigate.mockReset();
     mock.closeThread.mockReset();
+    mock.platformOwnsEdgeSwipe.mockReturnValue(false);
     mock.routeName = "chat.detail";
     mock.activeThreadRoot = null;
+    mock.tasksPanelOpen = {};
+    mock.closeTasksPanel.mockReset();
     Object.defineProperty(window, "innerWidth", {
       value: 375,
       configurable: true,
     });
+    // Simulate a session with an in-app previous entry (React Router's data
+    // router records the position in history.state.idx) — the condition under
+    // which a real browser's system edge-swipe has something to navigate to.
+    window.history.replaceState({ idx: 1 }, "");
     vi.useFakeTimers();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    window.history.replaceState(null, "");
     document.body.innerHTML = "";
   });
 
@@ -232,5 +250,133 @@ describe("useSwipeBack", () => {
     });
     expect(mock.navigate).not.toHaveBeenCalled();
     expect(screen.queryByTestId("preview")).toBeNull();
+  });
+
+  it("yields bezel-originated touches to the OS edge swipe (route mode)", () => {
+    render(<Harness />);
+    const page = screen.getByTestId("page");
+    act(() => {
+      // A bezel-originated touch reports its first position at the viewport
+      // edge; the browser's system edge-swipe owns it on real devices.
+      window.dispatchEvent(touch("touchstart", [{ clientX: 1, clientY: 100 }]));
+      window.dispatchEvent(
+        touch("touchmove", [{ clientX: 200, clientY: 110 }])
+      );
+      window.dispatchEvent(touch("touchend", [{ clientX: 200, clientY: 110 }]));
+    });
+    expect(page.style.transform).toBe("");
+    expect(screen.queryByTestId("preview")).toBeNull();
+    expect(mock.navigate).not.toHaveBeenCalled();
+  });
+
+  it("keeps the full edge zone when the browser has no previous entry", () => {
+    // Deep link: no history to swipe back to, so the platform gesture has
+    // nothing to do and the synthetic gesture owns the bezel too.
+    window.history.replaceState({ idx: 0 }, "");
+    render(<Harness />);
+    const page = screen.getByTestId("page");
+    act(() => {
+      window.dispatchEvent(touch("touchstart", [{ clientX: 1, clientY: 100 }]));
+      window.dispatchEvent(
+        touch("touchmove", [{ clientX: 200, clientY: 110 }])
+      );
+    });
+    expect(screen.getByTestId("preview").textContent).toBe("/");
+    expect(page.style.transform).toBe("translateX(187.5px)");
+  });
+
+  it("resets instantly when the touch is cancelled mid-drag", () => {
+    render(<Harness />);
+    const page = screen.getByTestId("page");
+    act(() => {
+      window.dispatchEvent(
+        touch("touchstart", [{ clientX: 10, clientY: 100 }])
+      );
+      window.dispatchEvent(
+        touch("touchmove", [{ clientX: 200, clientY: 110 }])
+      );
+      window.dispatchEvent(
+        touch("touchcancel", [{ clientX: 200, clientY: 110 }])
+      );
+    });
+    // No spring-back animation: a touchcancel usually means a system gesture
+    // claimed the touch, and our layers must not animate under its transition.
+    expect(page.style.transform).toBe("");
+    expect(screen.queryByTestId("preview")).toBeNull();
+  });
+
+  it("yields route-level swipes entirely on browsers whose system gesture owns the edge", () => {
+    // Real iOS/iPadOS browsers: the system edge-swipe recognizer's zone covers
+    // the whole edge area, so ANY synthetic route gesture there stacks the
+    // browser's own transition snapshot underneath our layers (the three-layer
+    // artifact). Route back is delegated to the platform.
+    mock.platformOwnsEdgeSwipe.mockReturnValue(true);
+    render(<Harness />);
+    const page = screen.getByTestId("page");
+    act(() => swipeFromEdge(200));
+    expect(page.style.transform).toBe("");
+    expect(screen.queryByTestId("preview")).toBeNull();
+    expect(mock.navigate).not.toHaveBeenCalled();
+  });
+
+  it("yields thread swipes on browsers whose system gesture owns the edge", () => {
+    // On real iOS/iPadOS browsers the system edge-swipe owns the touch; the
+    // thread panel dismisses through its history sentinel
+    // (useHistorySentinel in ThreadPanel) instead of this synthetic gesture,
+    // which would stack the browser's back-transition snapshot underneath it.
+    mock.platformOwnsEdgeSwipe.mockReturnValue(true);
+    mock.activeThreadRoot = "conversations/c1/messages/m1";
+    render(<Harness />);
+    const shell = screen.getByTestId("shell");
+    act(() => swipeFromEdge(200));
+    expect(shell.style.getPropertyValue("--swipe-offset")).toBe("");
+    expect(mock.closeThread).not.toHaveBeenCalled();
+    expect(mock.navigate).not.toHaveBeenCalled();
+  });
+
+  it("drives the tasks board panel like the thread panel", () => {
+    // The tasks board is the other full-screen panel overlay sharing the
+    // --swipe-offset mechanism; its commit closes the board, not the thread.
+    mock.tasksPanelOpen = { "conversations/c1": true };
+    render(<Harness />);
+    const shell = screen.getByTestId("shell");
+    act(() => swipeFromEdge(200));
+    expect(shell.style.getPropertyValue("--swipe-offset")).toBe("375px");
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(mock.closeTasksPanel).toHaveBeenCalledWith("conversations/c1");
+    expect(mock.closeThread).not.toHaveBeenCalled();
+    expect(mock.navigate).not.toHaveBeenCalled();
+  });
+
+  it("yields tasks-board swipes on browsers whose system gesture owns the edge", () => {
+    mock.platformOwnsEdgeSwipe.mockReturnValue(true);
+    mock.tasksPanelOpen = { "conversations/c1": true };
+    render(<Harness />);
+    const shell = screen.getByTestId("shell");
+    act(() => swipeFromEdge(200));
+    expect(shell.style.getPropertyValue("--swipe-offset")).toBe("");
+    expect(mock.closeTasksPanel).not.toHaveBeenCalled();
+    expect(mock.closeThread).not.toHaveBeenCalled();
+  });
+
+  it("keeps route-level swipes on platform-owned-edge browsers without history", () => {
+    // Deep link on a real device: the system edge swipe has no previous entry
+    // to navigate to, so it cannot engage and the synthetic gesture runs.
+    mock.platformOwnsEdgeSwipe.mockReturnValue(true);
+    window.history.replaceState({ idx: 0 }, "");
+    render(<Harness />);
+    const page = screen.getByTestId("page");
+    act(() => {
+      window.dispatchEvent(
+        touch("touchstart", [{ clientX: 10, clientY: 100 }])
+      );
+      window.dispatchEvent(
+        touch("touchmove", [{ clientX: 200, clientY: 110 }])
+      );
+    });
+    expect(screen.getByTestId("preview").textContent).toBe("/");
+    expect(page.style.transform).toBe("translateX(187.5px)");
   });
 });

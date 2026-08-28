@@ -53,6 +53,7 @@ import { MAX_UPLOAD_BYTES, uploadFileToConversation } from "@/lib/file-upload";
 import { isImageAttachment } from "@/lib/image-file";
 import { taskStatusLabel } from "@/lib/task-status";
 import { toastManager } from "@/lib/toast";
+import { useHistorySentinel } from "@/lib/use-history-sentinel";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -230,6 +231,10 @@ export function ThreadPanel({
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
   const conversationName = `conversations/${channelId}`;
+  // On real iOS/iPadOS browsers the system edge-swipe owns edge touches (see
+  // platform-edge-swipe.ts): the history sentinel turns it (and the back
+  // button) into a thread dismissal instead of leaving the page.
+  useHistorySentinel(true, onClose);
   const asideClass = fluid
     ? "flex h-full w-full flex-col"
     : "fixed inset-0 z-panel flex w-full flex-col bg-background pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:static lg:inset-auto lg:w-[420px] lg:shrink-0 lg:border-l lg:border-control-border lg:pt-0 lg:pb-0";

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ROUTE_INFO } from "@/router/route-info";
 import { useCurrentRoute } from "@/router/use-current-route";
 import { setSuppressLoadingFlags, useAppStore } from "@/stores";
+import { platformOwnsEdgeSwipe } from "./platform-edge-swipe";
 import { useIsDesktop } from "./use-is-desktop";
 
 // iOS-style interactive back gesture for mobile: drag from the left edge of
@@ -12,9 +13,18 @@ import { useIsDesktop } from "./use-is-desktop";
 // out and commits the navigation. The level stack is:
 //   thread panel (full-screen overlay) -> current route -> its backTo target.
 // The gesture is inert on desktop, on top-level tab routes (nothing to go
-// back to), and over layer overlays (sheets/dialogs/previews dismiss on
-// their own).
+// back to), over layer overlays (sheets/dialogs/previews dismiss on their
+// own), and for route-level back on real iOS/iPadOS browsers whose system
+// edge-swipe recognizer owns those touches (see platform-edge-swipe.ts).
 const EDGE_SIZE = 24; // px from the left edge where the gesture may start
+// Touches that BEGIN on the device bezel report their first position at the
+// viewport edge (clientX ≈ 0-2px). On Android, gesture navigation claims those
+// touches below the browser, and on any browser with a previous history entry
+// a bezel-originated rightward pan is the system back gesture — running the
+// synthetic gesture on it would race the platform transition (see
+// platform-edge-swipe.ts for the full artifact description). Bezel touches are
+// therefore yielded whenever the browser has somewhere to swipe back to.
+const BEZEL_GUARD = 3;
 const DIRECTION_LOCK = 10; // px of movement before the gesture is decided
 const MAX_DRAG_RATIO = 0.5; // the page may slide up to half the viewport
 const TRIGGER_RATIO = 0.25; // release past 25% of the viewport commits
@@ -54,6 +64,16 @@ export function useSwipeBack(): SwipeBackState {
   const location = useLocation();
   const closeThread = useAppStore((s) => s.closeThread);
   const activeThreadRoot = useAppStore((s) => s.activeThreadRoot);
+  // The tasks board panel is the other full-screen overlay driven by this
+  // gesture (mode "thread" below): its close action needs the conversation
+  // whose board is open.
+  const openTasksConv = useAppStore((s) => {
+    for (const [conv, open] of Object.entries(s.tasksPanelOpen)) {
+      if (open) return conv;
+    }
+    return null;
+  });
+  const closeTasksPanel = useAppStore((s) => s.closeTasksPanel);
   const currentRoute = useCurrentRoute();
 
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -71,6 +91,8 @@ export function useSwipeBack(): SwipeBackState {
     : null;
   const threadActiveRef = useRef(false);
   threadActiveRef.current = activeThreadRoot != null;
+  const tasksPanelConvRef = useRef<string | null>(null);
+  tasksPanelConvRef.current = openTasksConv;
 
   const setRoot = useCallback((el: HTMLDivElement | null) => {
     rootRef.current = el;
@@ -132,10 +154,40 @@ export function useSwipeBack(): SwipeBackState {
       cancelled = false;
       maxDrag = window.innerWidth * MAX_DRAG_RATIO;
       clearTimers();
-      if (threadActiveRef.current) {
+      if (
+        (threadActiveRef.current || tasksPanelConvRef.current != null) &&
+        !platformOwnsEdgeSwipe()
+      ) {
+        // Full-screen panel overlays (thread panel, tasks board) driven via
+        // the --swipe-offset CSS variables. On real iOS/iPadOS browsers the
+        // system edge-swipe owns the touch (see platform-edge-swipe.ts); both
+        // panels dismiss through their history sentinels there
+        // (useHistorySentinel) instead of this synthetic gesture, which would
+        // stack the browser's back-transition snapshot underneath them.
         mode = "thread";
         root.style.setProperty("--swipe-transition", "none");
       } else if (backTargetRef.current) {
+        // Only race the platform edge swipe when it cannot engage. On real
+        // iOS/iPadOS browsers the system recognizer's zone covers the whole
+        // edge area (not just the bezel), so ANY synthetic route gesture
+        // there stacks the browser's own back-transition snapshot underneath
+        // our layers — the three-layer artifact. Route-level back is
+        // delegated to the platform there; its native transition reveals the
+        // same destination (the previous history entry == backTo in the
+        // standard flows). The same yield applies to bezel-originated touches
+        // elsewhere (Android gesture nav claims them below the browser). When
+        // the browser has no previous entry at all (fresh deep link,
+        // history.state.idx === 0) the platform gesture has nothing to do and
+        // the synthetic gesture keeps the full edge zone.
+        const historyIdx =
+          (window.history.state as { idx?: number } | null)?.idx ?? 0;
+        if (
+          historyIdx > 0 &&
+          (platformOwnsEdgeSwipe() || touch.clientX <= BEZEL_GUARD)
+        ) {
+          cancelled = true;
+          return;
+        }
         mode = "route";
         setSuppressLoadingFlags(true);
         setPreviewPath(backTargetRef.current);
@@ -214,7 +266,13 @@ export function useSwipeBack(): SwipeBackState {
         root.style.setProperty("--swipe-offset", `${commit ? width : 0}px`);
         timers.push(
           window.setTimeout(() => {
-            if (commit) closeThread();
+            if (commit) {
+              if (threadActiveRef.current) {
+                closeThread();
+              } else if (tasksPanelConvRef.current) {
+                closeTasksPanel(tasksPanelConvRef.current);
+              }
+            }
             reset();
           }, ms + 50)
         );
@@ -234,11 +292,10 @@ export function useSwipeBack(): SwipeBackState {
     };
 
     const onTouchCancel = () => {
-      if (!dragging) {
-        if (mode) reset();
-        return;
-      }
-      finish(false);
+      // A touchcancel typically means a system gesture (e.g. the iOS edge
+      // swipe) claimed the touch mid-drag: reset instantly instead of
+      // animating a spring-back underneath the browser's own transition.
+      reset();
     };
 
     window.addEventListener("touchstart", onTouchStart, { passive: true });
@@ -252,7 +309,7 @@ export function useSwipeBack(): SwipeBackState {
       window.removeEventListener("touchcancel", onTouchCancel);
       clearTimers();
     };
-  }, [isDesktop, navigate, closeThread]);
+  }, [isDesktop, navigate, closeThread, closeTasksPanel]);
 
   // When a route-level commit is pending, wait for the data router to finish
   // the navigation (location changes) before clearing the transform and

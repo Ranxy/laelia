@@ -21,6 +21,13 @@ interface UseSwipeToCloseSheetOptions {
   onClose: () => void;
   popup: HTMLDivElement | null;
   overlay: HTMLDivElement | null;
+  // Set false where the browser's own system edge-swipe owns edge touches
+  // (real iOS/iPadOS browsers — see platform-edge-swipe.ts): running this
+  // synthetic gesture on the same touch stacks the browser's back-transition
+  // snapshot underneath the sheet (the three-layer artifact). Callers that
+  // yield must dismiss the sheet through history instead (see
+  // ChatDrawerSheet's sentinel).
+  enabled?: boolean;
 }
 
 export function useSwipeToCloseSheet({
@@ -28,13 +35,14 @@ export function useSwipeToCloseSheet({
   onClose,
   popup,
   overlay,
+  enabled = true,
 }: UseSwipeToCloseSheetOptions) {
   const isDesktop = useIsDesktop();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
   useEffect(() => {
-    if (isDesktop || !open || !popup || !overlay) return;
+    if (isDesktop || enabled === false || !open || !popup || !overlay) return;
 
     let startX = 0;
     let startY = 0;
@@ -185,5 +193,5 @@ export function useSwipeToCloseSheet({
       window.removeEventListener("touchcancel", onTouchCancel);
       clearTimers();
     };
-  }, [isDesktop, open, popup, overlay]);
+  }, [enabled, isDesktop, open, popup, overlay]);
 }
