@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -61,22 +62,16 @@ func GenerateKeys() (privateKey, publicKey string, err error) {
 	return webpush.GenerateVAPIDKeys()
 }
 
-// defaultVAPIDSubject is used when the stored subject is empty. A valid mailto:
-// or https: URL is required by RFC 8292; some push services (notably APNs)
-// reject requests without one.
-const defaultVAPIDSubject = "mailto:laelia@localhost"
-
 // NewSender builds a Web Push sender from the stored VAPID keypair and subject.
 // When either key is empty the returned sender is disabled (Enabled() == false)
-// but still usable as a no-op store.WebPushSender. An empty subject falls back
-// to defaultVAPIDSubject so a partially-stored config never sends malformed
-// auth. The outbound proxy is not configured here; it is reconciled from the
-// setting table on each SendToUser so an admin can change it at runtime.
+// but still usable as a no-op store.WebPushSender. The subject is normalized to
+// a value push services accept (see NormalizeSubject) and converted to the
+// subscriber form webpush-go expects; see vapidSubscriber. The outbound proxy
+// is not configured here; it is reconciled from the setting table on each
+// SendToUser so an admin can change it at runtime.
 func NewSender(publicKey, privateKey, subject string, st *store.Store) *Sender {
 	enabled := publicKey != "" && privateKey != ""
-	if subject == "" {
-		subject = defaultVAPIDSubject
-	}
+	subject = vapidSubscriber(NormalizeSubject(subject, ""))
 	return &Sender{
 		publicKey:  publicKey,
 		privateKey: privateKey,
@@ -246,6 +241,11 @@ func (s *Sender) send(ctx context.Context, sub *store.WebPushSubscription, paylo
 		return
 	}
 	defer resp.Body.Close()
+	// Push services return a JSON body explaining the failure (Apple:
+	// {"reason":"BadJwtToken"} | "ExpiredProviderToken" | "Forbidden" | ...),
+	// which is the only way to tell an invalid VAPID JWT apart from, say, a
+	// proxy stripping the Authorization header. Keep a snippet for the log.
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 	_, _ = io.Copy(io.Discard, resp.Body)
 
 	switch resp.StatusCode {
@@ -258,6 +258,7 @@ func (s *Sender) send(ctx context.Context, sub *store.WebPushSubscription, paylo
 		}
 	default:
 		slog.Warn("web push send returned non-2xx",
-			"principalID", sub.PrincipalID, "endpoint", sub.Endpoint, "status", resp.StatusCode)
+			"principalID", sub.PrincipalID, "endpoint", sub.Endpoint,
+			"status", resp.StatusCode, "body", strings.TrimSpace(string(body)))
 	}
 }

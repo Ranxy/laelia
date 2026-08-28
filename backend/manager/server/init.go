@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -131,32 +130,35 @@ func (s *Server) initializeSetting(ctx context.Context) error {
 	return s.initWebPushSetting(ctx)
 }
 
-// initWebPushSetting ensures a VAPID keypair exists in the setting table. When
-// the public or private key is missing it generates a fresh keypair and stores
-// it; otherwise the existing keypair is left untouched. The subject defaults to
-// the workspace ExternalURL when it is an http(s) URL, else a stable mailto:.
+// initWebPushSetting ensures a VAPID keypair and a valid subject exist in the
+// setting table. Keys are generated only when missing — rotating them
+// invalidates every existing push subscription. The subject is normalized via
+// webpush.NormalizeSubject and persisted whenever it changes, which repairs
+// deployments still carrying the legacy "mailto:laelia@localhost" default:
+// Apple's web push service rejects that form with 403 BadJwtToken, breaking
+// every iOS/Safari push while Chrome/Firefox keep working.
 func (s *Server) initWebPushSetting(ctx context.Context) error {
 	cfg, err := s.store.GetWebPushSetting(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to read web push setting")
 	}
-	if cfg.GetPublicKey() != "" && cfg.GetPrivateKey() != "" {
+
+	subject := webpush.NormalizeSubject(cfg.GetSubject(), s.profile.ExternalURL)
+	generated := false
+	if cfg.GetPublicKey() == "" || cfg.GetPrivateKey() == "" {
+		privateKey, publicKey, genErr := webpush.GenerateKeys()
+		if genErr != nil {
+			return errors.Wrap(genErr, "failed to generate VAPID keys")
+		}
+		cfg.PublicKey = publicKey
+		cfg.PrivateKey = privateKey
+		generated = true
+	}
+	if !generated && subject == cfg.GetSubject() {
 		return nil
 	}
-
-	privateKey, publicKey, err := webpush.GenerateKeys()
-	if err != nil {
-		return errors.Wrap(err, "failed to generate VAPID keys")
-	}
-	subject := s.profile.ExternalURL
-	if !strings.HasPrefix(subject, "http://") && !strings.HasPrefix(subject, "https://") {
-		subject = "mailto:laelia@localhost"
-	}
-	if _, err := s.store.UpsertWebPushSetting(ctx, &models.WebPushSetting{
-		PublicKey:  publicKey,
-		PrivateKey: privateKey,
-		Subject:    subject,
-	}); err != nil {
+	cfg.Subject = subject
+	if _, err := s.store.UpsertWebPushSetting(ctx, cfg); err != nil {
 		return errors.Wrap(err, "failed to persist VAPID keys")
 	}
 	return nil
