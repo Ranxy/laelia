@@ -38,7 +38,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { useDebugConfig, useLogout } from "@/components/user-menu";
+import {
+  useBuildInfo,
+  useDebugConfig,
+  useLogout,
+} from "@/components/user-menu";
 import { LOCALES, setLocale } from "@/lib/i18n";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
@@ -172,6 +176,7 @@ export function SettingsMenuPage() {
   const navigate = useNavigate();
   const items = useSettingsMenuItems();
   const currentUser = useAppStore((s) => s.currentUser);
+  const buildInfo = useBuildInfo();
   const {
     isAdmin,
     enabled: debugEnabled,
@@ -227,6 +232,17 @@ export function SettingsMenuPage() {
               {currentUser?.email}
             </div>
           </div>
+          {buildInfo && (
+            <p className="truncate px-3 text-xs text-control-placeholder">
+              {[
+                buildInfo.version,
+                buildInfo.git_commit?.slice(0, 8),
+                buildInfo.build_time,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
           <div className="flex items-center gap-3 rounded-md px-3 py-3 text-sm font-medium text-main">
             <Languages className="size-5 shrink-0 text-control" />
             <span className="flex-1 truncate">{t("common.language")}</span>

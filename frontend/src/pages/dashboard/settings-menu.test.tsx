@@ -4,11 +4,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores";
 import { SettingsIndex, SettingsMenuPage } from "./settings-menu";
 
+interface BuildInfo {
+  version: string;
+  git_commit: string;
+  build_time: string;
+}
+
 const mock = vi.hoisted(() => ({
   debugToggle: vi.fn(),
   signOut: vi.fn(),
   setLocale: vi.fn(),
   isDesktop: false,
+  buildInfo: null as BuildInfo | null,
 }));
 
 vi.mock("@/components/user-menu", () => ({
@@ -19,6 +26,7 @@ vi.mock("@/components/user-menu", () => ({
     toggle: mock.debugToggle,
   }),
   useLogout: () => mock.signOut,
+  useBuildInfo: () => mock.buildInfo,
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -78,6 +86,7 @@ beforeEach(() => {
   mock.signOut.mockReset();
   mock.setLocale.mockReset();
   mock.isDesktop = false;
+  mock.buildInfo = null;
 });
 
 describe("settings-menu", () => {
@@ -149,6 +158,29 @@ describe("settings-menu", () => {
 
     expect(screen.getByText("Admin")).toBeInTheDocument();
     expect(screen.getByText("admin@example.com")).toBeInTheDocument();
+  });
+
+  it("renders the build info line between the account and language rows", () => {
+    mock.buildInfo = {
+      version: "1.2.3",
+      git_commit: "abcdef1234567890",
+      build_time: "2025-01-01 12:00:00",
+    };
+
+    renderPage();
+
+    const account = screen.getByText("admin@example.com");
+    const line = screen.getByText("1.2.3 · abcdef12 · 2025-01-01 12:00:00");
+    const language = screen.getByText("common.language");
+    const following = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(account.compareDocumentPosition(line) & following).toBeTruthy();
+    expect(line.compareDocumentPosition(language) & following).toBeTruthy();
+  });
+
+  it("hides the build info line when it is unavailable", () => {
+    renderPage();
+
+    expect(screen.queryByText(/·/)).not.toBeInTheDocument();
   });
 
   it("switches the locale from the language select", () => {

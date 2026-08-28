@@ -75,19 +75,10 @@ interface BuildInfo {
   build_time: string;
 }
 
-export function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
-  const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
-  const currentUser = useAppStore((s) => s.currentUser);
-  const [open, setOpen] = useState(false);
+// Build info (version/commit/time) from /api/version, shared by the sidebar
+// user menu (desktop) and the settings account section (mobile).
+export function useBuildInfo() {
   const [buildInfo, setBuildInfo] = useState<BuildInfo | null>(null);
-  const {
-    isAdmin,
-    enabled: debugEnabled,
-    loaded: debugLoaded,
-    toggle: handleDebugToggle,
-  } = useDebugConfig();
-  const signOut = useLogout();
 
   useEffect(() => {
     const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -96,6 +87,23 @@ export function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
       .then((data: BuildInfo | null) => setBuildInfo(data))
       .catch(() => {});
   }, []);
+
+  return buildInfo;
+}
+
+export function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const currentUser = useAppStore((s) => s.currentUser);
+  const [open, setOpen] = useState(false);
+  const buildInfo = useBuildInfo();
+  const {
+    isAdmin,
+    enabled: debugEnabled,
+    loaded: debugLoaded,
+    toggle: handleDebugToggle,
+  } = useDebugConfig();
+  const signOut = useLogout();
 
   async function handleLogout() {
     setOpen(false);
