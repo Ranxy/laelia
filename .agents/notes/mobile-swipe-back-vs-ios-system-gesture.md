@@ -2,7 +2,7 @@
 
 - 日期:2026-02(本轮会话)
 - 影响面:聊天模块全部移动端浮层 + 路由级返回手势
-- 状态:已实现并通过模拟器/单元测试验证;真机验证由使用者完成(路由级返回、抽屉关闭已确认正常)
+- 状态:已完成并经真机验证通过(iOS 浏览器 + PWA standalone;使用者确认无问题)
 
 ## 一、问题
 
@@ -13,11 +13,12 @@
 
 桌面浏览器的移动端模拟里一切正常:上层是当前页/浮层,下方是返回目标。**但在真机(iPhone 的 Safari 和 Edge)上出现"三层"结构**:被拖动的当前页(顶)、返回目标首页(中)、又一层返回目标首页(底)。
 
-演进过程(三次报告):
+演进过程(四次报告):
 
 1. 路由级返回(聊天 → 首页)出现三层;
 2. 第一版"贴边守卫"(仅让渡 clientX ≤ 3px 的触摸)后,**时好时坏**——证明系统识别器的识别区深入视口内部,远超 3px;
-3. 路由级让渡修复后,抽屉关闭又出现同样的三层——覆盖层需要不同机制。
+3. 路由级让渡修复后,抽屉关闭又出现同样的三层——覆盖层需要不同机制;
+4. 浮层哨兵修复后,**iOS PWA(主屏 standalone)仍出现三层**——推翻了「standalone 模式没有系统手势」的假设(见 3.6 坑 5)。
 
 ## 二、根本原因
 
@@ -51,12 +52,12 @@
 platformOwnsEdgeSwipe():
   navigator.vendor === "Apple Computer, Inc."   // WebKit 引擎;Blink 恒为 "Google Inc."
   && navigator.maxTouchPoints >= 2              // 排除桌面 Mac Safari(无触摸屏)
-  && !(navigator.standalone || display-mode: standalone)  // PWA standalone 无系统手势
 ```
 
-- 真实 iOS/iPadOS 浏览器(Safari + WKWebView 系 Edge/Chrome 等)→ true;
+- 真实 iOS/iPadOS **浏览器与主屏 PWA(standalone)一视同仁**:现代 iOS 在 standalone 模式同样运行 ViewGestureController(实测 PWA 内复现三层,见 3.6 坑 5);
 - **DevTools 模拟无法伪造**:引擎不变,`vendor` 保持 "Google Inc." → 模拟器保留应用手势作为开发/测试台;
-- jsdom 也报告 Apple vendor(WebKit 规范实现),但 `maxTouchPoints` 为 undefined → `?? 0` 守卫使其回落到 inert(此坑曾让测试环境误判,见 3.6)。
+- jsdom 也报告 Apple vendor(WebKit 规范实现),但 `maxTouchPoints` 为 undefined → `?? 0` 守卫使其回落到 inert(此坑曾让测试环境误判,见 3.6 坑 1);
+- 语义由 `platform-edge-swipe.test.ts` 锁定(Blink → false、无触点 → false、Apple+多点触控 → true、standalone 不再排除)。
 
 ### 3.2 路由级返回:整段让渡(`use-swipe-back.ts`)
 
@@ -78,7 +79,7 @@ thread 面板与任务看板是全屏面板(非 Sheet)。`use-swipe-back.ts` 的
 
 ### 3.5 各表面行为矩阵
 
-| 表面 | 真实 iOS 浏览器 | 模拟器 / Android(视口内)/ PWA standalone |
+| 表面 | 真实 iOS(浏览器 + PWA standalone) | 模拟器 / Android(视口内) |
 | --- | --- | --- |
 | 路由级返回(聊天 → 首页) | 系统原生返回(让渡) | 合成手势(平移 + 目标预览) |
 | 抽屉 ×3(`ChatDrawerSheet`) | 系统滑动 + 哨兵关闭 | 合成手势(平移 + 遮罩淡出)+ 哨兵(返回键也可关闭) |
@@ -97,12 +98,14 @@ thread 面板与任务看板是全屏面板(非 Sheet)。`use-swipe-back.ts` 的
 2. **`useSwipeBack` 的 mock store 缺字段**:hook 新增 `tasksPanelOpen`/`closeTasksPanel` 读取后,测试的 store stub 必须同步补齐,否则 `Object.entries(undefined)` 抛错。
 3. **fake timers 与 `findBy*` 死锁**:`vi.useFakeTimers()` 要放在 `await screen.findByText(...)` 之后,否则 waitFor 的轮询定时器永不推进。
 4. **jsdom 的 history.back()**:真实遍历异步且不可靠,测试统一 spy `history.back` + `vi.advanceTimersByTime` 断言,不做真实遍历。
+5. **「standalone PWA 没有系统手势」是过时假设**:早期 iOS 确实如此(2014 年的 SO 报告),但现代 iOS 在主屏 Web App 里同样运行 ViewGestureController——实测 PWA 内复现三层即为证据。第一版平台检测把 standalone 排除在让渡之外,导致 PWA 内继续出现三层;已移除该排除项。教训:对平台行为的假设要用真机实测校准,而不是沿用旧资料。
 
 ## 四、涉及文件
 
 | 文件 | 职责 |
 | --- | --- |
 | `frontend/src/lib/platform-edge-swipe.ts` | 平台检测(新增) |
+| `frontend/src/lib/platform-edge-swipe.test.ts` | 检测语义锁定(新增) |
 | `frontend/src/lib/use-history-sentinel.ts` | 哨兵 hook:token 化、堆叠归属、StrictMode 安全(新增) |
 | `frontend/src/lib/use-swipe-back.ts` | 路由让渡 + bezel 守卫 + thread/tasks 面板模式 + touchcancel 瞬时复位 |
 | `frontend/src/lib/use-swipe-to-close-sheet.ts` | Sheet 合成手势增加 `enabled` 选项 |
@@ -122,8 +125,9 @@ thread 面板与任务看板是全屏面板(非 Sheet)。`use-swipe-back.ts` 的
 
 ## 六、真机验证清单
 
-- [ ] 聊天页 → 边缘滑回首页:单一原生转场,无中间层;
-- [ ] 抽屉(thread/任务看板同理)打开 → 边缘滑动:浮层滑出露出聊天页,松手关闭且**留在聊天页**;
+- [ ] **浏览器(Safari/Edge)**:聊天页 → 边缘滑回首页:单一原生转场,无中间层;
+- [ ] **浏览器**:抽屉打开 → 边缘滑动:浮层滑出露出聊天页,松手关闭且**留在聊天页**;
+- [ ] **PWA(主屏打开)**:重复以上两项——route 让渡与哨兵对 standalone 同样生效;
 - [ ] 提前松手:浮层/页面回弹,不导航;
 - [ ] 抽屉内点开成员详情 → 一次滑动关详情、再一次关抽屉;
 - [ ] 看板 → 点进任务 thread → 滑动关 thread(注意:其后可能有一次"空滑",见遗留 2);

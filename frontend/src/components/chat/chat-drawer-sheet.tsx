@@ -16,7 +16,7 @@ interface ChatDrawerSheetProps {
 // swipe-to-close behavior:
 //
 // - On browsers without a system edge-swipe (desktop devtools emulation,
-//   Android in-page touches, home-screen PWAs) the drawer follows the finger
+//   Android in-page touches) the drawer follows the finger
 //   from the left edge while the scrim fades to reveal the page underneath
 //   (see use-swipe-to-close-sheet) — the same feel as the thread panel.
 // - On real iOS/iPadOS browsers the system edge-swipe recognizer owns those
