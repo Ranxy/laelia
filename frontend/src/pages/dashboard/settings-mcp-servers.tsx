@@ -528,7 +528,7 @@ export function SettingsMcpServersPage() {
               </Button>
             </AlertDialogClose>
             <Button variant="destructive" disabled={deleting} onClick={remove}>
-              {deleting ? t("common.saving") : t("common.delete")}
+              {deleting ? t("common.deleting") : t("common.delete")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -617,7 +617,7 @@ function McpServerTable({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-danger"
+                      className="text-error"
                       onClick={() => onDelete(server)}
                       aria-label={t("common.delete")}
                     >
@@ -755,7 +755,7 @@ function McpServerSheet({
             <div className="flex flex-col gap-2">
               {form.headers.map((h, i) => (
                 <div
-                  key={`${h.name}-${i}`}
+                  key={i}
                   className="flex flex-col gap-1.5 border border-control-border rounded-xs p-2"
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -772,7 +772,7 @@ function McpServerSheet({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-danger"
+                      className="text-error"
                       onClick={() => removeHeader(i)}
                       aria-label={t("common.delete")}
                     >
@@ -842,7 +842,7 @@ function McpServerSheet({
                           {memberLabel(m, users, groups)}
                           <button
                             type="button"
-                            className="text-control-placeholder hover:text-danger"
+                            className="text-control-placeholder hover:text-error"
                             onClick={() =>
                               onFormChange({
                                 ...form,

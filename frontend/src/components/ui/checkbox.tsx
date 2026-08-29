@@ -18,7 +18,7 @@ const ICON_SIZE: Record<CheckboxSize, string> = {
 interface CheckboxProps
   extends Omit<
     React.ComponentProps<typeof BaseCheckbox.Root>,
-    "checked" | "onCheckedChange" | "className" | "children"
+    "checked" | "onCheckedChange" | "className" | "children" | "onClick"
   > {
   checked: boolean | "indeterminate";
   onCheckedChange?: (checked: boolean) => void;
@@ -29,7 +29,6 @@ interface CheckboxProps
 function Checkbox({
   checked,
   onCheckedChange,
-  onClick,
   size = "md",
   className,
   ...rootProps
@@ -37,7 +36,7 @@ function Checkbox({
   const baseChecked = checked === "indeterminate" ? false : checked;
   const indeterminate = checked === "indeterminate";
 
-  const root = (
+  return (
     <BaseCheckbox.Root
       {...rootProps}
       checked={baseChecked}
@@ -61,7 +60,7 @@ function Checkbox({
         "data-disabled:data-[checked]:bg-control-light data-disabled:data-[checked]:border-control-light",
         "data-disabled:data-[indeterminate]:bg-control-light data-disabled:data-[indeterminate]:border-control-light",
         "data-disabled:not-data-[checked]:not-data-[indeterminate]:opacity-50",
-        !onClick && className
+        className
       )}
     >
       <BaseCheckbox.Indicator className="flex items-center justify-center text-background">
@@ -72,17 +71,6 @@ function Checkbox({
         )}
       </BaseCheckbox.Indicator>
     </BaseCheckbox.Root>
-  );
-
-  if (!onClick) return root;
-
-  return (
-    <span
-      className={cn("inline-flex align-middle", className)}
-      onClick={onClick}
-    >
-      {root}
-    </span>
   );
 }
 

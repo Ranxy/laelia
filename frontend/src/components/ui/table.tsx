@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
-import type { ComponentPropsWithoutRef } from "react";
+import { type ComponentPropsWithoutRef, useRef } from "react";
 import { ColumnResizeHandle } from "@/components/ui/column-resize-handle";
 import { cn } from "@/lib/utils";
 
@@ -81,8 +81,14 @@ function TableHead({
   resizable,
   onResizeStart,
   onClick,
+  onMouseDown,
   ...props
 }: TableHeadProps) {
+  // A resize drag ends with the browser synthesizing a click on (or bubbling
+  // through) this header; suppress the sort toggle for it. The flag reads as
+  // "a resize is pending its trailing click" and is re-armed by the next real
+  // press on the header.
+  const resizeJustEnded = useRef(false);
   return (
     <th
       className={cn(
@@ -91,9 +97,16 @@ function TableHead({
         resizable && "relative",
         className
       )}
+      onMouseDown={(e) => {
+        // A genuine press anywhere on the header re-arms sorting.
+        resizeJustEnded.current = false;
+        onMouseDown?.(e);
+      }}
       onClick={(e) => {
         onClick?.(e);
-        if (sortable) onSort?.();
+        const justResized = resizeJustEnded.current;
+        resizeJustEnded.current = false;
+        if (sortable && !e.defaultPrevented && !justResized) onSort?.();
       }}
       {...props}
     >
@@ -106,7 +119,15 @@ function TableHead({
         children
       )}
       {resizable && onResizeStart && (
-        <ColumnResizeHandle onMouseDown={onResizeStart} />
+        <ColumnResizeHandle
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => {
+            resizeJustEnded.current = true;
+            e.stopPropagation();
+            onResizeStart?.(e);
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
       )}
     </th>
   );

@@ -432,7 +432,7 @@ export function SettingsGroupsPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-danger"
+                            className="text-error"
                             onClick={() => {
                               setDeleteTarget(group);
                               setDeleteOpen(true);
@@ -526,7 +526,7 @@ export function SettingsGroupsPage() {
               </Button>
             </AlertDialogClose>
             <Button variant="destructive" disabled={deleting} onClick={remove}>
-              {deleting ? t("common.saving") : t("common.delete")}
+              {deleting ? t("common.deleting") : t("common.delete")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

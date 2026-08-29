@@ -34,7 +34,15 @@ vi.mock("@/connect", () => ({
 }));
 
 vi.mock("@/components/chat/message-row", () => ({
-  MessageRow: () => <div data-testid="message-row" />,
+  // Renders the resolver output for a fixed handle so tests can assert that
+  // mentionLabel is forwarded to (and resolves on) each rendered row.
+  MessageRow: ({
+    mentionLabel,
+  }: {
+    mentionLabel?: (handle: string) => string | undefined;
+  }) => (
+    <div data-testid="message-row">{mentionLabel?.("@alice") ?? "@alice"}</div>
+  ),
   rowStreamingProps: () => ({ streamingContent: "", streamingEvents: [] }),
   EMPTY_EVENTS: [],
 }));
@@ -60,9 +68,16 @@ vi.mock("@/composables/useMentionDetect", () => ({
   detectMention: () => null,
 }));
 
+// Configurable mention-label resolver so tests can inject one (defaults to
+// "always undefined", matching the pre-fix fallback-to-handle rendering).
+const mockMentionLabelResolver = vi.hoisted(() => ({
+  fn: undefined as ((handle: string) => string | undefined) | undefined,
+}));
+
 vi.mock("@/composables/useMentionTargets", () => ({
   useMentionTargets: () => [],
-  useMentionLabelResolver: () => () => undefined,
+  useMentionLabelResolver: () =>
+    mockMentionLabelResolver.fn ?? (() => undefined),
   targetToMention: (t: unknown) => t,
 }));
 
@@ -339,5 +354,61 @@ describe("ThreadPanel composer paste", () => {
         ) as HTMLTextAreaElement
       ).value
     ).toBe("");
+  });
+});
+
+describe("ThreadPanel mention labels", () => {
+  beforeEach(() => {
+    useAppStore.getState().reset();
+    mockUseIsDesktop.mockReturnValue(true);
+    mockClient.listChannelMembers.mockResolvedValue({ members: [] });
+    mockClient.listTasks.mockResolvedValue({ tasks: [], nextPageToken: "" });
+    mockClient.listTaskCounts.mockResolvedValue({
+      todoCount: 0,
+      inProgressCount: 0,
+      inReviewCount: 0,
+      doneCount: 0,
+    });
+    mockAgentTeamClient.listAgentTeams.mockResolvedValue({ agentTeams: [] });
+  });
+
+  afterEach(() => {
+    mockMentionLabelResolver.fn = undefined;
+    vi.restoreAllMocks();
+    document.body.innerHTML = "";
+  });
+
+  it("resolves mention labels on the root row and reply rows", () => {
+    mockMentionLabelResolver.fn = (handle) =>
+      handle === "@alice" ? "Alice" : undefined;
+    const reply: ChatMessageUI = {
+      id: "conversations/c1/messages/m2",
+      role: "user",
+      content: "reply mentioning @alice",
+      timestamp: new Date(0),
+    };
+    useAppStore.setState({
+      threadByRoot: {
+        [ROOT_NAME]: {
+          messages: [plainRoot(), reply],
+          currentVersion: 1n,
+          loading: false,
+        },
+      },
+    });
+    render(
+      <ThreadPanel
+        channelId="c1"
+        channelTitle="C1"
+        rootMessageId={ROOT_NAME}
+        onClose={() => {}}
+      />
+    );
+    const rows = screen.getAllByTestId("message-row");
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row).toHaveTextContent("Alice");
+      expect(row).not.toHaveTextContent("@alice");
+    }
   });
 });

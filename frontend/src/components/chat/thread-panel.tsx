@@ -90,6 +90,7 @@ const ThreadReplies = memo(function ThreadReplies({
   onPreviewImage,
   debugMode,
   currentPrincipalId,
+  mentionLabel,
   onSenderClick,
   onCopyMarkdown,
   onConvertToTask,
@@ -145,6 +146,7 @@ const ThreadReplies = memo(function ThreadReplies({
               streamingEvents={rowProps.streamingEvents}
               onViewDetails={onViewDetails}
               onSenderClick={onSenderClick}
+              mentionLabel={mentionLabel}
               MentionBadge={MentionBadge}
               markdownCustomId="thread-chat"
               onPreviewAttachment={onPreviewAttachment}
@@ -1183,7 +1185,6 @@ function ThreadHeader({
         .then((res) => setTeams(res.agentTeams ?? []))
         .catch(() => setTeams([]));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManageTask, channelId]);
 
   const handleStatusChange = async (value: string | null) => {

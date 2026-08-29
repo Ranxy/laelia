@@ -157,21 +157,15 @@ describe("Checkbox", () => {
     unmount();
   });
 
-  test("onClick prop is forwarded", () => {
-    const onClick = vi.fn();
+  test("className always applies to the checkbox root (no wrapper branch)", () => {
     const { container, unmount } = renderIntoContainer(
       createElement(Checkbox, {
         checked: false,
-        onClick,
         "aria-label": "cb",
+        className: "mt-2",
       })
     );
-    act(() => {
-      getCheckbox(container).dispatchEvent(
-        new MouseEvent("click", { bubbles: true })
-      );
-    });
-    expect(onClick).toHaveBeenCalled();
+    expect(getCheckbox(container).className).toContain("mt-2");
     unmount();
   });
 });

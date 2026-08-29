@@ -555,7 +555,7 @@ export function SettingsIdentityProvidersPage() {
           <AlertDialogFooter>
             <AlertDialogClose>{t("common.cancel")}</AlertDialogClose>
             <Button variant="destructive" onClick={remove} disabled={deleting}>
-              {deleting ? "…" : t("common.delete")}
+              {deleting ? t("common.deleting") : t("common.delete")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

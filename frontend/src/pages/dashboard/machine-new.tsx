@@ -39,6 +39,9 @@ export function MachineNewPage() {
   // pageOpenTime anchors "new": only machines created after this page opened
   // and by the current user count as the machine being set up right now.
   const pageOpenTime = useRef(Date.now());
+  // Machines the user explicitly rejected ("not mine"); a ref keeps the
+  // detection effect from reviving a dismissed candidate on its next run.
+  const dismissedRef = useRef<Set<string>>(new Set());
   const [installOS, setInstallOS] = useState<MachineInstallOS>(() =>
     detectInstallOS()
   );
@@ -77,6 +80,7 @@ export function MachineNewPage() {
     if (candidate || !currentUser) return;
     const fresh = machines.find(
       (m) =>
+        !dismissedRef.current.has(m.name) &&
         m.createdBy === currentUser.name &&
         m.createdAt &&
         Number(m.createdAt.seconds) * 1000 > pageOpenTime.current
@@ -227,11 +231,12 @@ export function MachineNewPage() {
                   }}
                 />
               </div>
-              {error && <p className="text-xs text-danger">{error}</p>}
+              {error && <p className="text-xs text-error">{error}</p>}
               <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
                   onClick={() => {
+                    if (candidate) dismissedRef.current.add(candidate.name);
                     setCandidate(undefined);
                     setCandidateInfo(null);
                   }}

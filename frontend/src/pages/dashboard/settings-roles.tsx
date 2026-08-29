@@ -629,7 +629,7 @@ export function SettingsRolesPage() {
               disabled={deleting}
               onClick={handleConfirmDelete}
             >
-              {deleting ? t("common.saving") : t("common.delete")}
+              {deleting ? t("common.deleting") : t("common.delete")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

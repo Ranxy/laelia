@@ -389,7 +389,7 @@ export function SettingsApiProvidersPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-danger"
+                        className="text-error"
                         onClick={() => {
                           setDeleteTarget(p);
                           setDeleteOpen(true);
@@ -463,7 +463,7 @@ export function SettingsApiProvidersPage() {
               </Button>
             </AlertDialogClose>
             <Button variant="destructive" disabled={deleting} onClick={remove}>
-              {deleting ? t("common.saving") : t("common.delete")}
+              {deleting ? t("common.deleting") : t("common.delete")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -503,6 +503,18 @@ function ProviderSheet({
   const [models, setModels] = useState<PiModel[]>([]);
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState("");
+
+  // The component stays mounted across open/close (only the Sheet's portal
+  // children unmount), so reset per-open fetch state to avoid leaking a
+  // previous provider's API key/model list into the next open sheet.
+  useEffect(() => {
+    if (open) {
+      setFetchKey("");
+      setModels([]);
+      setFetching(false);
+      setFetchError("");
+    }
+  }, [open]);
 
   const usedMembers = useMemo(() => new Set(form.members), [form.members]);
   const addedModels = useMemo(
@@ -665,7 +677,7 @@ function ProviderSheet({
                   </Button>
                 </div>
                 {fetchError && (
-                  <p className="text-xs text-danger">{fetchError}</p>
+                  <p className="text-xs text-error">{fetchError}</p>
                 )}
                 {models.length > 0 && (
                   <div className="max-h-40 overflow-y-auto flex flex-col gap-1">
@@ -704,7 +716,7 @@ function ProviderSheet({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-danger"
+                            className="text-error"
                             onClick={() => removeEntry(i)}
                             aria-label={t("common.delete")}
                           >
@@ -767,7 +779,7 @@ function ProviderSheet({
                         {memberLabel(m, users, groups)}
                         <button
                           type="button"
-                          className="text-control-placeholder hover:text-danger"
+                          className="text-control-placeholder hover:text-error"
                           onClick={() =>
                             onFormChange({
                               ...form,
