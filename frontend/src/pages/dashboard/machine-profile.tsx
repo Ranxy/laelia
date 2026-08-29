@@ -74,6 +74,7 @@ import {
 } from "@/lib/machine-token";
 import { toastManager } from "@/lib/toast";
 import { useIsDesktop } from "@/lib/use-is-desktop";
+import { usePolling } from "@/lib/use-polling";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import {
@@ -358,16 +359,15 @@ export function MachineProfilePage() {
   // Poll the machine while an upgrade runs: the machine briefly goes offline
   // and reconnects on the new version, so the page keeps refetching until the
   // stage reaches a terminal value or the reported version catches up.
-  useEffect(() => {
-    if (!upgradeInProgress) return;
-    const id = setInterval(() => {
-      void (async () => {
-        const next = await getMachine(machineName);
-        if (next) setMachine(next);
-      })();
-    }, 3000);
-    return () => clearInterval(id);
-  }, [upgradeInProgress, getMachine, machineName]);
+  // Gated via enabled: only polls while an upgrade is in flight.
+  usePolling(
+    async () => {
+      const next = await getMachine(machineName);
+      if (next) setMachine(next);
+    },
+    3000,
+    { enabled: upgradeInProgress }
+  );
 
   if (!machine) {
     return (

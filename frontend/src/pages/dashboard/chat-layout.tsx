@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Outlet, useParams } from "react-router-dom";
 import { ConversationList } from "@/components/chat/conversation-list";
+import { usePolling } from "@/lib/use-polling";
 import { useAppStore } from "@/stores";
 
 // Left-rail list refresh cadence. The right pane long-polls the open
@@ -12,18 +13,12 @@ const LIST_POLL_INTERVAL_MS = 5000;
 
 export function ChatLayout() {
   const fetchChannels = useAppStore((s) => s.fetchChannels);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { conversationId } = useParams<{ conversationId: string }>();
 
   useEffect(() => {
     fetchChannels();
-    timerRef.current = setInterval(() => {
-      fetchChannels();
-    }, LIST_POLL_INTERVAL_MS);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
   }, [fetchChannels]);
+  usePolling(fetchChannels, LIST_POLL_INTERVAL_MS);
 
   return (
     <div className="flex h-full w-full overflow-hidden">

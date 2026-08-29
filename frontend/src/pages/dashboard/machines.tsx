@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { settingServiceClient } from "@/connect";
 import { describeError } from "@/lib/connect-errors";
+import { usePolling } from "@/lib/use-polling";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
@@ -93,15 +94,14 @@ export function MachinesPage() {
   // Machine connection-state transitions are not time-critical; 10s (was 3s)
   // still flips the list to "online" promptly once the machine app connects
   // while keeping the poll traffic during an outage at ~6 req/min instead of
-  // ~20.
-  useEffect(() => {
-    if (!anyNonOnline) return;
-    const id = setInterval(
-      () => fetchMachines({ pageSize: 100 }, { silent: true }),
-      10000
-    );
-    return () => clearInterval(id);
-  }, [anyNonOnline, fetchMachines]);
+  // ~20. Gated via enabled: only polls while any machine is offline.
+  usePolling(
+    () => {
+      void fetchMachines({ pageSize: 100 }, { silent: true });
+    },
+    10000,
+    { enabled: anyNonOnline }
+  );
 
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
