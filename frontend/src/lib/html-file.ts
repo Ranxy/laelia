@@ -17,14 +17,6 @@ export function isHtmlAttachment(att: Attachment): boolean {
   return HTML_NAME_RE.test(att.name ?? "");
 }
 
-// isHtmlPreviewable is true only when the file is HTML AND within the
-// in-browser preview size limit. Oversized HTML still offers download.
-export function isHtmlPreviewable(att: Attachment): boolean {
-  return (
-    isHtmlAttachment(att) && (att.sizeBytes ?? 0n) <= MAX_HTML_PREVIEW_BYTES
-  );
-}
-
 export const MAX_HTML_QUOTE_CHARS = 500;
 export const MAX_HTML_ANCHOR_LABEL_CHARS = 60;
 

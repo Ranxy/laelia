@@ -46,7 +46,7 @@ function SheetOverlay({
 
 // ---- Content (Portal + Overlay + Popup) ----
 // Width tiers codify our resource-edit drawer conventions:
-//   narrow   (384px) — single-field pickers, short forms
+//   medium   (640px) — simple drawers, pickers, light forms
 //   standard (704px) — 3-6 field forms, permission transfer lists
 //   wide     (832px) — forms with CEL builders, nested tables, multi-tab layouts
 // Do not inline ad-hoc widths on SheetContent — add a tier here if a new
@@ -61,18 +61,9 @@ const sheetContentVariants = cva(
   {
     variants: {
       width: {
-        narrow: "w-[24rem]",
-        panel: "w-[31.25rem]",
         medium: "w-[40rem]",
         standard: "w-[44rem]",
         wide: "w-[52rem]",
-        large: "w-[64rem]",
-        xlarge: "w-[70rem]",
-        // Maximized editor surfaces (e.g. plan-detail schema editor). Leaves
-        // a ~5vw strip on the left as a visual anchor; clicking the strip
-        // closes the sheet like any other scrim click.
-        huge: "w-[95vw]",
-        workspace: "w-[calc(100vw-8rem)] lg:w-240 max-w-[calc(100vw-8rem)]",
       },
     },
     defaultVariants: {

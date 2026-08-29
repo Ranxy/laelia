@@ -1,6 +1,14 @@
-import { getManagerURL } from "./agent-token";
-
 export type MachineInstallOS = "linux" | "macos" | "windows";
+
+// getManagerURL returns the base URL agents/machines should connect back to,
+// derived from the Vite API base or the current origin. Trailing slashes are
+// stripped so the assembled install/setup commands are valid.
+function getManagerURL(): string {
+  return (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(
+    /\/+$/,
+    ""
+  );
+}
 
 // machineInstallOSFromInfo maps the OS string reported by a machine (Go's
 // runtime.GOOS: "linux", "darwin", "windows") to the install-command OS used

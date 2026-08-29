@@ -16,15 +16,6 @@ export function isMarkdownAttachment(att: Attachment): boolean {
   return MARKDOWN_NAME_RE.test(att.name ?? "");
 }
 
-// isMarkdownPreviewable is true only when the file is markdown AND within the
-// in-browser preview size limit. Oversized markdown still offers download.
-export function isMarkdownPreviewable(att: Attachment): boolean {
-  return (
-    isMarkdownAttachment(att) &&
-    (att.sizeBytes ?? 0n) <= MAX_MARKDOWN_PREVIEW_BYTES
-  );
-}
-
 // slugify turns heading text into a URL-safe id fragment. Empty results fall
 // back to "section" so we always produce a usable id.
 export function slugify(text: string): string {

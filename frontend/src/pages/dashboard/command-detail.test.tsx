@@ -50,7 +50,7 @@ vi.mock("markstream-react", () => ({
 
 // markstream splits text across nested spans, which defeats getByText; stub
 // the summary renderer so assertions read the content directly.
-vi.mock("@/components/command-terminal", () => ({
+vi.mock("@/lib/markdown", () => ({
   FinalSummary: ({ content }: { content: string }) => (
     <div data-testid="final-summary">{content}</div>
   ),

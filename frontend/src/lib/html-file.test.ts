@@ -4,8 +4,6 @@ import {
   buildHtmlPreviewDoc,
   htmlAnchorForSelection,
   isHtmlAttachment,
-  isHtmlPreviewable,
-  MAX_HTML_PREVIEW_BYTES,
   parseHtmlAnchor,
 } from "@/lib/html-file";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
@@ -41,24 +39,6 @@ describe("isHtmlAttachment", () => {
     expect(
       isHtmlAttachment(att({ name: "file", mimeType: "text/plain" }))
     ).toBe(false);
-  });
-});
-
-describe("isHtmlPreviewable", () => {
-  it("TestIsHtmlPreviewable_SizeGuard: rejects files over the 10 MiB limit", () => {
-    expect(isHtmlPreviewable(att({ name: "a.html", sizeBytes: 0n }))).toBe(
-      true
-    );
-    expect(isHtmlPreviewable(att({ name: "a.html", sizeBytes: 1024n }))).toBe(
-      true
-    );
-    const at = MAX_HTML_PREVIEW_BYTES;
-    expect(isHtmlPreviewable(att({ name: "a.html", sizeBytes: at }))).toBe(
-      true
-    );
-    expect(isHtmlPreviewable(att({ name: "a.html", sizeBytes: at + 1n }))).toBe(
-      false
-    );
   });
 });
 

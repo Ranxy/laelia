@@ -111,4 +111,4 @@ function Alert({
 }
 
 export type { AlertProps };
-export { Alert, alertVariants };
+export { Alert };

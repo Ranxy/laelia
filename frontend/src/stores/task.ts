@@ -2,7 +2,6 @@ import { create } from "@bufbuild/protobuf";
 import { commandServiceClient } from "@/connect";
 import {
   AssignTaskRequestSchema,
-  CloseTaskRequestSchema,
   ConvertMessageToTaskRequestSchema,
   ListTaskCountsRequestSchema,
   ListTasksRequestSchema,
@@ -143,7 +142,7 @@ export const createTaskSlice: AppSliceCreator<TaskSlice> = (set, get) => ({
 
   // patchTaskThreadAndRefresh patches the open thread's root with the
   // authoritative task message returned by a task mutation, then reloads the
-  // board + counts. Shared by updateTaskStatus / assignTask / closeTask.
+  // board + counts. Shared by updateTaskStatus / assignTask.
   async patchTaskThreadAndRefresh(conversationId, rootMessageId, res) {
     const ui = res?.message ? toUiMessage(res.message) : null;
     if (ui) {
@@ -189,20 +188,6 @@ export const createTaskSlice: AppSliceCreator<TaskSlice> = (set, get) => ({
     try {
       const res = await commandServiceClient.assignTask(
         create(AssignTaskRequestSchema, { message, memberType, memberId })
-      );
-      await get().patchTaskThreadAndRefresh(conversationId, rootMessageId, res);
-    } catch (err) {
-      // The UI toasts the failure; keep the stale thread/board cache intact.
-      throw err;
-    }
-  },
-
-  async closeTask(conversationId, rootMessageId) {
-    const rootId = rootMessageId.split("/").pop() ?? rootMessageId;
-    const message = `conversations/${conversationId}/messages/${rootId}`;
-    try {
-      const res = await commandServiceClient.closeTask(
-        create(CloseTaskRequestSchema, { message })
       );
       await get().patchTaskThreadAndRefresh(conversationId, rootMessageId, res);
     } catch (err) {

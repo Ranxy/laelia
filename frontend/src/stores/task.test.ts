@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AssignTaskRequestSchema,
   ChatMessageSchema,
-  CloseTaskRequestSchema,
   TaskInfoSchema,
   TaskStatus,
   UpdateTaskStatusRequestSchema,
@@ -12,9 +11,8 @@ import {
 import { toUiMessage } from "./chat-helpers";
 import { useAppStore } from "./index";
 
-// --- mock @/connect so closeTask talks to a controllable client ---
+// --- mock @/connect so the task store talks to a controllable client ---
 const mock = vi.hoisted(() => ({
-  closeTask: vi.fn(),
   updateTaskStatus: vi.fn(),
   assignTask: vi.fn(),
   listTasks: vi.fn(),
@@ -23,7 +21,6 @@ const mock = vi.hoisted(() => ({
 
 vi.mock("@/connect", () => ({
   commandServiceClient: {
-    closeTask: mock.closeTask,
     updateTaskStatus: mock.updateTaskStatus,
     assignTask: mock.assignTask,
     listTasks: mock.listTasks,
@@ -72,68 +69,6 @@ beforeEach(() => {
     inProgressCount: 0,
     inReviewCount: 0,
     doneCount: 1,
-  });
-});
-
-describe("task store closeTask", () => {
-  it("marks the task DONE via the RPC and patches the open thread root", async () => {
-    mock.closeTask.mockResolvedValue({
-      message: taskMessage(TaskStatus.DONE, "root"),
-    });
-
-    await useAppStore
-      .getState()
-      .closeTask("c1", "conversations/c1/messages/m1");
-
-    expect(mock.closeTask).toHaveBeenCalledTimes(1);
-    const req = mock.closeTask.mock.calls[0][0];
-    expect(req.message).toBe("conversations/c1/messages/m1");
-
-    const root =
-      useAppStore.getState().threadByRoot["conversations/c1/messages/m1"]
-        .messages[0];
-    expect(root.task?.status).toBe(TaskStatus.DONE);
-
-    // Board + counts refresh after a close, like convertMessageToTask.
-    expect(mock.listTasks).toHaveBeenCalled();
-    expect(mock.listTaskCounts).toHaveBeenCalled();
-  });
-
-  it("throws on failure and leaves the thread untouched", async () => {
-    mock.closeTask.mockRejectedValue(new Error("boom"));
-
-    await expect(useAppStore.getState().closeTask("c1", "m1")).rejects.toThrow(
-      "boom"
-    );
-
-    const root =
-      useAppStore.getState().threadByRoot["conversations/c1/messages/m1"]
-        .messages[0];
-    expect(root.task?.status).toBe(TaskStatus.IN_PROGRESS);
-    expect(mock.listTasks).not.toHaveBeenCalled();
-  });
-
-  it("normalizes a bare root id (detail-page shape) to a resource name", async () => {
-    mock.closeTask.mockResolvedValue({});
-
-    await useAppStore.getState().closeTask("c1", "m1");
-
-    expect(mock.closeTask.mock.calls[0][0].message).toBe(
-      "conversations/c1/messages/m1"
-    );
-  });
-
-  it("sends the resource name shape the RPC expects", async () => {
-    mock.closeTask.mockResolvedValue({});
-    const expected = create(CloseTaskRequestSchema, {
-      message: "conversations/c1/messages/m1",
-    });
-
-    await useAppStore
-      .getState()
-      .closeTask("c1", "conversations/c1/messages/m1");
-
-    expect(mock.closeTask.mock.calls[0][0]).toEqual(expected);
   });
 });
 

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { CommandStatusBadge } from "@/components/command-status-badge";
-import { FinalSummary } from "@/components/command-terminal";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -28,6 +27,7 @@ import {
   formatDuration,
   formatTimestamp,
 } from "@/lib/command-status";
+import { FinalSummary } from "@/lib/markdown";
 import { useAppStore } from "@/stores";
 import type { Command } from "@/types/proto-es/v1/command_pb";
 import { CommandStatus } from "@/types/proto-es/v1/command_pb";

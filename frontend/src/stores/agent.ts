@@ -3,7 +3,6 @@ import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 import { agentServiceClient } from "@/connect";
 import type {
   AgentModelOption,
-  AgentProviderInfo,
   AgentSummary,
   PiModel,
 } from "@/types/proto-es/v1/agent_pb";
@@ -16,7 +15,6 @@ import {
   DeleteAgentRequestSchema,
   ListPiModelsRequestSchema,
   RefreshAgentModelsRequestSchema,
-  RefreshAgentProvidersRequestSchema,
   RestartAgentRequestSchema,
   RevokeAgentTokenRequestSchema,
   RotateAgentTokenRequestSchema,
@@ -225,16 +223,6 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
         reason: reason ?? "",
       })
     );
-  },
-
-  async refreshAgentProviders(name: string): Promise<AgentProviderInfo[]> {
-    const res = await agentServiceClient.refreshAgentProviders(
-      create(RefreshAgentProvidersRequestSchema, { name })
-    );
-    // The caller (agent-profile) re-fetches GetAgent so the new
-    // available_providers surface in the editor; this slice no longer holds a
-    // cached agent to refresh.
-    return res.providers;
   },
 
   async listPiModels(

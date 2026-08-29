@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pairToolCallEvents } from "@/components/chat/message-row";
+import { pairToolCallEvents } from "@/lib/tool-call-events";
 import {
   type CommandEvent,
   CommandEventType,

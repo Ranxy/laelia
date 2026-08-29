@@ -82,13 +82,6 @@ describe("Avatar", () => {
     });
     expect(container?.querySelector("svg")).not.toBeNull();
   });
-
-  it("falls back to the label initial when no seed is given", () => {
-    act(() => {
-      root!.render(<Avatar seed="" label="agent" />);
-    });
-    expect(container?.textContent).toBe("A");
-  });
 });
 
 describe("formatTime", () => {

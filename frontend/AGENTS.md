@@ -20,14 +20,14 @@ React UI components live in `src/components/ui/` and follow shadcn-style pattern
 - **Use `gap-*` not `space-x-*` / `space-y-*`** — always use `flex gap-*` or `grid gap-*` for spacing between children
 - **Use `size-*` for equal dimensions** — `size-4` not `w-4 h-4`
 - **Use `truncate` shorthand** — not `overflow-hidden text-ellipsis whitespace-nowrap`
-- **Use `cn()` for conditional classes** — import from `@/react/lib/utils`, don't write manual template literal ternaries
+- **Use `cn()` for conditional classes** — import from `@/lib/utils`, don't write manual template literal ternaries
 - **No manual `dark:` overrides** — use semantic tokens that handle theming
 - **Overlay layering policy** — React overlays use three semantic families: `overlay`, `agent`, and `critical`.
   - Standard app overlays mount into `overlay`.
   - The shared primitives in `src/components/ui/` are the `overlay` entry points; they are not for agent-owned or critical surfaces.
-  - `AgentWindow`, the minimized launcher, and other agent-owned overlays mount into `agent` and stay above normal app overlays.
+  - Agent-owned overlays (agent workspace windows, launcher-like surfaces) mount into `agent` and stay above normal app overlays.
   - Forced session-expired / re-login UI mounts into `critical` and is the only layer allowed above and disabling the agent.
-  - `critical` is reserved for auth/session recovery surfaces such as `SessionExpiredSurface`; do not introduce new feature-level critical overlays without an explicit policy change.
+  - `critical` is reserved for auth/session recovery surfaces; do not introduce new feature-level critical overlays without an explicit policy change.
   - Each family has a dedicated portal root; use `getLayerRoot(<family>)` to choose the family root, and use `LAYER_SURFACE_CLASS` / `LAYER_BACKDROP_CLASS` from `src/components/ui/layer.ts` for shared intra-family stacking where appropriate.
   - Children inherit the owning family. If a parent mounts into `agent` or `critical`, its descendants must not remount into a lower family.
   - Raw global `z-index` values are forbidden in React feature code for cross-surface stacking. Local component-internal `z-index` remains allowed when it only affects internal composition.
@@ -41,7 +41,7 @@ React UI components live in `src/components/ui/` and follow shadcn-style pattern
 - **Dialog vs Sheet** — use `<Sheet>` (right-side drawer, in `src/components/ui/sheet.tsx`) for **creating or editing a resource**. Use `<Dialog>` for **confirmations, single-field prompts, critical interrupts, and read-only result displays**. The dividing line is whether the user is filling out a form with multiple fields — drawers keep the parent list/table visible behind a scrim and scale to multi-section forms, while dialogs are for short blocking interactions. `AlertDialog` is the right pick for destructive confirms that need an explicit acknowledgment.
 - **Dialog sizing contract** — `DialogContent` and `AlertDialogContent` are padded (`p-6`) by default; don't add inner padding wrappers, and override with `p-*` on the content element when needed. `DialogContent` defaults to a wide content size (`max-w-[max(48rem,55vw)]`); pass `max-w-*` (and `w-*` if needed) for smaller dialogs. Keep component defaults free of responsive variants like `2xl:max-w-*` — tailwind-merge can't replace them with a caller's unprefixed utility, so they silently win on wide screens.
 - **Sheet width tiers** — `<SheetContent>` accepts a `width` variant. Pick the tier that matches the form complexity; don't inline ad-hoc widths. Add a new tier to `sheet.tsx` only if a genuinely new size is needed.
-  - `narrow` (384px) — single-field pickers, short 2–3 field forms, environment/project selection, read-only display sheets
+  - `medium` (640px) — simple drawers, single-field pickers, environment/project selection, read-only display sheets
   - `standard` (704px, default) — 3–6 field forms, permission transfer lists, typical create/edit resources (role, user, group, service account, workload identity, request role)
   - `wide` (832px) — forms with CEL expression builders, nested tables, multi-tab layouts, multi-step wizards (custom approval rule, data export wizard)
 - **Edit sheets must populate from props reliably** — when a Sheet is always-mounted via `<Sheet open={open}>` (the standard pattern), `useState` initializers only run on first mount, which means switching the entity being edited (e.g. clicking Edit on a different row) won't repopulate fields. Use the **outer wrapper + inner form + stable-entity ref + key** pattern. The ref freezes the last-open entity so the inner form stays visually stable through the Sheet's close animation (which is ~200ms), while the `key` forces a fresh mount when a new entity is opened. Example from `CreateUserSheet`:

@@ -4,8 +4,6 @@ import {
   anchorForSelection,
   buildOutline,
   isMarkdownAttachment,
-  isMarkdownPreviewable,
-  MAX_MARKDOWN_PREVIEW_BYTES,
   slugify,
 } from "@/lib/markdown-file";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
@@ -39,24 +37,6 @@ describe("isMarkdownAttachment", () => {
     ).toBe(true);
     expect(
       isMarkdownAttachment(att({ name: "file", mimeType: "text/plain" }))
-    ).toBe(false);
-  });
-});
-
-describe("isMarkdownPreviewable", () => {
-  it("TestIsMarkdownPreviewable_SizeGuard: rejects files over the 10 MiB limit", () => {
-    expect(isMarkdownPreviewable(att({ name: "a.md", sizeBytes: 0n }))).toBe(
-      true
-    );
-    expect(isMarkdownPreviewable(att({ name: "a.md", sizeBytes: 1024n }))).toBe(
-      true
-    );
-    const at = MAX_MARKDOWN_PREVIEW_BYTES;
-    expect(isMarkdownPreviewable(att({ name: "a.md", sizeBytes: at }))).toBe(
-      true
-    );
-    expect(
-      isMarkdownPreviewable(att({ name: "a.md", sizeBytes: at + 1n }))
     ).toBe(false);
   });
 });

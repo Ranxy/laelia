@@ -184,7 +184,6 @@ export function useAvatar(name: string | undefined | null): string | null {
     };
     // epochValue forces a refetch after invalidateAvatar even when `name` is
     // unchanged (the resource name is stable across re-uploads).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, epochValue]);
 
   return url;

@@ -1,4 +1,8 @@
-import { MarkdownCodeBlockNode, setCustomComponents } from "markstream-react";
+import MarkdownRender, {
+  MarkdownCodeBlockNode,
+  setCustomComponents,
+} from "markstream-react";
+import { cn } from "@/lib/utils";
 
 // Centralizes the markstream-react custom component registry so both chat pages
 // share the exact same registration. Calling setCustomComponents at module
@@ -93,5 +97,28 @@ function registerMarkdownComponents(): void {
 // applied exactly once. Markstream's registry is global per app instance, so a
 // single registration covers every <MarkdownRender> consumer.
 registerMarkdownComponents();
+
+// FinalSummary renders a finished command's final summary markdown. Used by
+// the command list / detail pages; wrapped in `markstream-chat` so it shares
+// the chat rendering styles.
+export function FinalSummary({
+  content,
+  className,
+}: {
+  content: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("markstream-chat", className)}>
+      <MarkdownRender
+        customId="command-summary"
+        content={content}
+        final
+        smoothStreaming={false}
+        fade
+      />
+    </div>
+  );
+}
 
 export {};

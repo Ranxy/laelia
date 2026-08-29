@@ -31,24 +31,3 @@ export const reminderStatusToI18nKey: Record<number, string> = {
   [ReminderStatus.MISSED]: "reminders.status-missed",
   [ReminderStatus.FAILED]: "reminders.status-failed",
 };
-
-// reminderStatusShort returns the short inline-badge label for a status (e.g.
-// "DUE", "MISSED").
-export function reminderStatusShort(status: number): string {
-  switch (status) {
-    case ReminderStatus.PENDING:
-      return "PENDING";
-    case ReminderStatus.DUE:
-      return "DUE";
-    case ReminderStatus.COMPLETED:
-      return "COMPLETED";
-    case ReminderStatus.CANCELLED:
-      return "CANCELLED";
-    case ReminderStatus.MISSED:
-      return "MISSED";
-    case ReminderStatus.FAILED:
-      return "FAILED";
-    default:
-      return "";
-  }
-}

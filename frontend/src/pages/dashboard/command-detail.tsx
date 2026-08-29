@@ -10,12 +10,12 @@ import {
 import { CommandEventTimelineOverview } from "@/components/command-events/command-event-timeline-overview";
 import { CommandEventToolbar } from "@/components/command-events/command-event-toolbar";
 import { CommandStatusBadge } from "@/components/command-status-badge";
-import { FinalSummary } from "@/components/command-terminal";
 import { TokenUsageCard } from "@/components/token-usage-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
 import { formatDuration, formatTimestamp } from "@/lib/command-status";
+import { FinalSummary } from "@/lib/markdown";
 import { pairToolCallEvents, type ToolCallPair } from "@/lib/tool-call-events";
 import { useAppStore } from "@/stores";
 import type {

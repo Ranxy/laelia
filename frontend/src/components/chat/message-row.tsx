@@ -41,6 +41,7 @@ import {
   isMarkdownAttachment,
   MAX_MARKDOWN_PREVIEW_BYTES,
 } from "@/lib/markdown-file";
+import { pairToolCallEvents } from "@/lib/tool-call-events";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { isOwnUserMessage } from "@/stores/chat-helpers";
@@ -80,12 +81,6 @@ export function rowStreamingProps(
       : (msg.events ?? EMPTY_EVENTS),
   };
 }
-
-// Re-exported from the shared util so existing imports (incl. tests) keep
-// working while command-detail and chat share a single implementation.
-import { pairToolCallEvents } from "@/lib/tool-call-events";
-
-export { pairToolCallEvents };
 
 // MemoMarkdown isolates the markstream/LazyMarkdown subtree so it only
 // re-renders (and re-parses markdown) when the content or streaming state

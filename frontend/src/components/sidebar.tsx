@@ -11,10 +11,8 @@ import {
   Users,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { RouterLink } from "@/components/router-link";
-import { getLayerRoot, LAYER_SURFACE_CLASS } from "@/components/ui/layer";
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 import {
@@ -455,60 +453,5 @@ export function DesktopSidebar({
         <UserMenu collapsed={collapsed} />
       </div>
     </aside>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Mobile sidebar overlay (portaled into overlay layer root)
-// ---------------------------------------------------------------------------
-
-export function MobileSidebar({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-
-  return createPortal(
-    <div
-      className={cn(
-        "fixed inset-0 lg:hidden",
-        LAYER_SURFACE_CLASS,
-        open ? "" : "pointer-events-none"
-      )}
-    >
-      <button
-        type="button"
-        aria-label={t("common.close")}
-        className={cn(
-          "absolute inset-0 bg-overlay/50 transition-opacity",
-          open ? "opacity-100" : "opacity-0"
-        )}
-        onClick={onClose}
-      />
-      <div
-        className={cn(
-          "absolute inset-y-0 left-0 w-60 bg-background shadow-lg transition-transform",
-          open ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-control-border px-4">
-          <button
-            type="button"
-            className="rounded-md p-1 text-control hover:bg-link-hover"
-            onClick={onClose}
-          >
-            <Menu className="size-4" />
-          </button>
-          <span className="text-sm font-semibold text-main">Laelia AI</span>
-        </div>
-        <div className="flex-1 overflow-y-auto py-2">
-          <SidebarNav collapsed={false} />
-        </div>
-      </div>
-    </div>,
-    getLayerRoot("overlay")
   );
 }

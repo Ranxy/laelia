@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import type { MentionTarget } from "./useMentionTargets";
 
 export interface MentionState {
@@ -40,15 +39,4 @@ export function detectMention(
   }
 
   return { active: true, query, startIndex: atIndex, matched };
-}
-
-export function useMentionDetect(
-  text: string,
-  cursorPos: number,
-  targets: MentionTarget[]
-): MentionState | null {
-  return useMemo(
-    () => detectMention(text, cursorPos, targets),
-    [text, cursorPos, targets]
-  );
 }

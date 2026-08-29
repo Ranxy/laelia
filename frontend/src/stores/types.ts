@@ -297,7 +297,6 @@ export interface AgentSlice {
     newOwner: string,
     reason?: string
   ) => Promise<TransferAgentOwnershipResponse>;
-  refreshAgentProviders: (name: string) => Promise<AgentProviderInfo[]>;
   // listPiModels proxies an LLM API provider's model-listing API through the
   // manager (CORS + key hygiene). Fetched dynamically so the model list is never
   // hardcoded. apiKey is required for deepseek and custom; ignored for
@@ -721,12 +720,9 @@ export interface TaskSlice {
     memberType: number,
     memberId: string
   ) => Promise<void>;
-  // closeTask marks a task DONE (terminal) from the UI. Kept for the agent
-  // tool path; the UI now uses updateTaskStatus(DONE) instead.
-  closeTask: (conversationId: string, rootMessageId: string) => Promise<void>;
   // patchTaskThreadAndRefresh patches the open thread's root with the
   // authoritative task message returned by a task mutation, then reloads the
-  // board + counts. Shared by updateTaskStatus / assignTask / closeTask.
+  // board + counts. Shared by updateTaskStatus / assignTask.
   patchTaskThreadAndRefresh: (
     conversationId: string,
     rootMessageId: string,

@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 // - Otherwise render a deterministic pixel identicon seeded by `seed` (a stable
 //   user/agent id). This is the zero-bandwidth default avatar.
 //
-// `label`/`accent` are accepted for backwards compatibility with call sites that
-// haven't been migrated yet; they only affect the legacy letter fallback path.
+// `accent` is accepted for backwards compatibility with call sites that
+// haven't been migrated yet; it only affects the legacy fallback styling.
 //
 // `online` renders the standard chat-app presence badge: a green dot pinned to
 // the avatar's bottom-right corner (ringed by the background color so it reads
@@ -21,7 +21,6 @@ import { cn } from "@/lib/utils";
 export function Avatar({
   src,
   seed,
-  label,
   accent,
   size = 8,
   online,
@@ -29,7 +28,6 @@ export function Avatar({
 }: {
   src?: string | null;
   seed: string;
-  label?: string;
   accent?: boolean;
   size?: 6 | 7 | 8 | 10 | 12 | 14 | 16;
   online?: boolean;
@@ -40,9 +38,8 @@ export function Avatar({
   const showImage = src && !imgFailed;
   const sizeClass = `size-${size}`;
   const core = showImage ? (
-    // eslint-disable-next-line jsx-a11y/img-redundant-alt -- alt is empty so
-    // screen readers skip the decorative avatar; the adjacent header carries
-    // the sender's name.
+    // alt is empty so screen readers skip the decorative avatar; the adjacent
+    // header carries the sender's name.
     <img
       src={src}
       alt=""
@@ -57,11 +54,7 @@ export function Avatar({
         accent ? "bg-accent text-accent-foreground" : "bg-transparent"
       )}
     >
-      {seed ? (
-        <PixelAvatar seed={seed} size={size * 4} />
-      ) : (
-        <span>{(label ?? "?").charAt(0).toUpperCase()}</span>
-      )}
+      {seed ? <PixelAvatar seed={seed} size={size * 4} /> : <span>?</span>}
     </div>
   );
 
