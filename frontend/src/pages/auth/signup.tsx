@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { settingServiceClient } from "@/connect";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
 
 type PasswordCheck = {
@@ -137,14 +138,7 @@ export function SignUpPage() {
         navigate("/", { replace: true });
       }
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("auth.sign-up.failed"),
-        description:
-          err instanceof Error
-            ? err.message
-            : t("auth.sign-up.failed-description"),
-      });
+      void showErrorToast(err, t("auth.sign-up.failed"));
     } finally {
       setLoading(false);
     }
@@ -159,11 +153,7 @@ export function SignUpPage() {
         title: t("auth.sign-up.resend-sent"),
       });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("auth.sign-up.resend-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("auth.sign-up.resend-failed"));
     } finally {
       setResending(false);
     }

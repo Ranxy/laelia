@@ -63,7 +63,9 @@ import {
   useAvatar,
 } from "@/lib/avatar-cache";
 import { agentResourceName, formatTimestamp } from "@/lib/command-status";
+import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
 import type { AgentACPConfigInput } from "@/stores/types";
@@ -75,7 +77,6 @@ import {
   type PiModel,
 } from "@/types/proto-es/v1/agent_pb";
 import { agentLifecycle, lifecycleLabel } from "./agents";
-
 export function AgentProfilePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -255,7 +256,7 @@ export function AgentProfilePage() {
         title: t("agent.stopped-toast"),
       });
     } catch (err) {
-      setStopError(err instanceof Error ? err.message : String(err));
+      setStopError(describeError(err));
     } finally {
       setStopBusy(false);
     }
@@ -272,7 +273,7 @@ export function AgentProfilePage() {
     } catch (err) {
       toastManager.add({
         type: "error",
-        description: err instanceof Error ? err.message : String(err),
+        description: describeError(err),
       });
     }
   }
@@ -288,7 +289,7 @@ export function AgentProfilePage() {
         title: t("agent.restarted-toast"),
       });
     } catch (err) {
-      setRestartError(err instanceof Error ? err.message : String(err));
+      setRestartError(describeError(err));
     } finally {
       setRestartBusy(false);
     }
@@ -306,7 +307,7 @@ export function AgentProfilePage() {
       });
       navigate("/members/agents");
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : String(err));
+      setDeleteError(describeError(err));
     } finally {
       setDeleteBusy(false);
     }
@@ -584,11 +585,7 @@ export function AgentProfilePage() {
         }
       } catch (err) {
         setSaveStatus("error");
-        toastManager.add({
-          type: "error",
-          title: t("agent.acp-config-save-failed"),
-          description: err instanceof Error ? err.message : String(err),
-        });
+        void showErrorToast(err, t("agent.acp-config-save-failed"));
       }
     });
   }
@@ -630,10 +627,7 @@ export function AgentProfilePage() {
         .refreshAgentModels(agentName, buildFromDraft(configRef.current, ""));
       setRefreshedModels(models);
     } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : t("agent.acp-config-models-refresh-failed");
+      const msg = describeError(err);
       setModelsRefreshError(msg);
       setRefreshedModels(null);
       toastManager.add({
@@ -671,10 +665,7 @@ export function AgentProfilePage() {
       piModelsCacheRef.current.set(cacheKey, models);
       setPiModels(models);
     } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : t("agent.acp-config-pi-models-refresh-failed");
+      const msg = describeError(err);
       setPiModelsError(msg);
       toastManager.add({
         type: "error",
@@ -774,11 +765,7 @@ export function AgentProfilePage() {
       fetchAgents({ pageSize: 100 }, { silent: true });
       setDescriptionEditing(false);
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("agent.profile.description-save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("agent.profile.description-save-failed"));
     } finally {
       setSavingDescription(false);
     }
@@ -794,11 +781,7 @@ export function AgentProfilePage() {
       setAgent(await getAgent(agentName));
       fetchAgents({ pageSize: 100 }, { silent: true });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("agent.allow-add-to-channel-save-error"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("agent.allow-add-to-channel-save-error"));
     } finally {
       setAllowAddSaving(false);
     }
@@ -813,11 +796,7 @@ export function AgentProfilePage() {
       await updateAgent(agentName, { followOwnerPermissions: next });
       setAgent(await getAgent(agentName));
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("agent.follow-owner-permissions-save-error"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("agent.follow-owner-permissions-save-error"));
     } finally {
       setFollowOwnerSaving(false);
     }
@@ -832,11 +811,10 @@ export function AgentProfilePage() {
       await updateAgent(agentName, { canManageChannelMembers: next });
       setAgent(await getAgent(agentName));
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("agent.can-manage-channel-members-save-error"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(
+        err,
+        t("agent.can-manage-channel-members-save-error")
+      );
     } finally {
       setCanManageMembersSaving(false);
     }
@@ -878,12 +856,8 @@ export function AgentProfilePage() {
         title: t("agent.transfer-owner-success"),
       });
     } catch (err) {
-      setTransferError(err instanceof Error ? err.message : String(err));
-      toastManager.add({
-        type: "error",
-        title: t("agent.transfer-owner-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      setTransferError(describeError(err));
+      void showErrorToast(err, t("agent.transfer-owner-failed"));
     } finally {
       setTransferBusy(false);
     }

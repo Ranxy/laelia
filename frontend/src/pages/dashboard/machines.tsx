@@ -21,11 +21,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { settingServiceClient } from "@/connect";
+import { describeError } from "@/lib/connect-errors";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
 import { MachineStatus_ConnectionState } from "@/types/proto-es/v1/machine_pb";
-
 export function MachinesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -113,7 +113,7 @@ export function MachinesPage() {
       setDeleteTarget(null);
       load();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
+      setActionError(describeError(err));
     } finally {
       setDeleting(false);
     }

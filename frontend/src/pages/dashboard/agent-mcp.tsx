@@ -6,6 +6,7 @@ import { Card } from "@/components/profile-common";
 import { Button } from "@/components/ui/button";
 import { agentResourceName } from "@/lib/command-status";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
 import { type McpServer, McpServerScope } from "@/types/proto-es/v1/mcp_pb";
@@ -101,11 +102,7 @@ export function AgentMcpPage() {
         title: t("agent.mcp-saved"),
       });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("agent.mcp-save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("agent.mcp-save-failed"));
     } finally {
       setMcpSaving(false);
     }

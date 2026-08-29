@@ -47,6 +47,7 @@ import {
 } from "@/connect";
 import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useHasPermission } from "@/stores/permissions";
 import type { PiModel } from "@/types/proto-es/v1/agent_pb";
 import type { ApiProvider } from "@/types/proto-es/v1/api_provider_service_pb";
@@ -156,11 +157,7 @@ export function SettingsApiProvidersPage() {
       setUsers(userRes.users ?? []);
       setGroups(groupRes.groups ?? []);
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.api-providers.load-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.api-providers.load-failed"));
     } finally {
       setLoading(false);
     }
@@ -222,11 +219,7 @@ export function SettingsApiProvidersPage() {
       setCreateForm(emptyForm());
       load();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.api-providers.create-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.api-providers.create-failed"));
     } finally {
       setCreating(false);
     }
@@ -296,11 +289,7 @@ export function SettingsApiProvidersPage() {
       setEditTarget(null);
       load();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.api-providers.update-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.api-providers.update-failed"));
     } finally {
       setSaving(false);
     }
@@ -321,11 +310,7 @@ export function SettingsApiProvidersPage() {
       setDeleteTarget(null);
       load();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.api-providers.delete-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.api-providers.delete-failed"));
     } finally {
       setDeleting(false);
     }

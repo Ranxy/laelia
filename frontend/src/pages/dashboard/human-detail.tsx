@@ -27,6 +27,7 @@ import {
 import { avatarNameForAgentId, useAvatar } from "@/lib/avatar-cache";
 import { resizeImageFile } from "@/lib/image-resize";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
 import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
@@ -36,7 +37,6 @@ import {
   DeleteAvatarRequestSchema,
   UploadAvatarRequestSchema,
 } from "@/types/proto-es/v1/user_service_pb";
-
 // HumanDetailPage is the right-pane profile for a human member, opened from
 // the Members directory. It reuses the existing design system and data paths:
 // the User comes from the drained `users` roster (no per-page GetUser), the
@@ -271,11 +271,7 @@ export function HumanDetailPage() {
         title: t("members.human.description-saved"),
       });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("members.human.description-save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("members.human.description-save-failed"));
     } finally {
       setSavingDescription(false);
     }

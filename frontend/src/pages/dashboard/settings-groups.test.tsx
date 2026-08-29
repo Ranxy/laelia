@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describeError } from "@/lib/connect-errors";
 import { useAppStore } from "@/stores";
 import { State } from "@/types/proto-es/v1/common_pb";
 import {
@@ -41,8 +42,7 @@ const toastMock = vi.hoisted(() => ({ add: vi.fn() }));
 vi.mock("@/lib/toast", () => ({ toastManager: toastMock }));
 
 vi.mock("@/lib/connect-errors", () => ({
-  describeError: (err: unknown) =>
-    err instanceof Error ? err.message : String(err),
+  describeError: (err: unknown) => describeError(err),
 }));
 
 function group(overrides?: Partial<Group>): Group {

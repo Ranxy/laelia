@@ -7,10 +7,10 @@ import { Input } from "@/components/ui/input";
 import { identityProviderServiceClient, settingServiceClient } from "@/connect";
 import { startOAuthLogin } from "@/lib/oauth";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
 import type { IdentityProvider } from "@/types/proto-es/v1/idp_service_pb";
 import { IdentityProviderType } from "@/types/proto-es/v1/idp_service_pb";
-
 export function SignInPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -70,14 +70,7 @@ export function SignInPage() {
       await login(email, password);
       navigate(redirectTo, { replace: true });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("auth.sign-in.failed"),
-        description:
-          err instanceof Error
-            ? err.message
-            : t("auth.sign-in.failed-description"),
-      });
+      void showErrorToast(err, t("auth.sign-in.failed"));
     } finally {
       setLoading(false);
     }

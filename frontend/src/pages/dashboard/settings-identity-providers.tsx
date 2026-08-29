@@ -33,8 +33,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { identityProviderServiceClient } from "@/connect";
-import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useHasPermission } from "@/stores/permissions";
 import type { IdentityProvider } from "@/types/proto-es/v1/idp_service_pb";
 import { IdentityProviderType } from "@/types/proto-es/v1/idp_service_pb";
@@ -128,11 +128,7 @@ export function SettingsIdentityProvidersPage() {
       const res = await identityProviderServiceClient.listIdentityProviders({});
       setProviders(res.identityProviders ?? []);
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.identity-providers.load-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.identity-providers.load-failed"));
     } finally {
       setLoading(false);
     }
@@ -217,11 +213,7 @@ export function SettingsIdentityProvidersPage() {
       setCreateForm(emptyForm());
       load();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.identity-providers.create-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.identity-providers.create-failed"));
     } finally {
       setCreating(false);
     }
@@ -254,11 +246,7 @@ export function SettingsIdentityProvidersPage() {
       setEditTarget(null);
       load();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.identity-providers.save-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.identity-providers.save-failed"));
     } finally {
       setSaving(false);
     }
@@ -279,11 +267,7 @@ export function SettingsIdentityProvidersPage() {
       setDeleteTarget(null);
       load();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.identity-providers.delete-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.identity-providers.delete-failed"));
     } finally {
       setDeleting(false);
     }

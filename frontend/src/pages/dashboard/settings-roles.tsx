@@ -47,6 +47,7 @@ import {
   permissionLabel,
 } from "@/lib/permissions";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useHasPermission } from "@/stores/permissions";
 import { type Role } from "@/types/proto-es/v1/role_service_pb";
 
@@ -105,11 +106,7 @@ export function SettingsRolesPage() {
       const res = await roleServiceClient.listRoles({});
       setRoles(res.roles ?? []);
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.roles.load-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.roles.load-failed"));
     } finally {
       setLoading(false);
     }
@@ -207,7 +204,7 @@ export function SettingsRolesPage() {
       resetCreate();
       load();
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : String(err));
+      setCreateError(describeError(err));
     } finally {
       setCreating(false);
     }
@@ -243,7 +240,7 @@ export function SettingsRolesPage() {
       setEditTarget(null);
       load();
     } catch (err) {
-      setEditError(err instanceof Error ? err.message : String(err));
+      setEditError(describeError(err));
     } finally {
       setSaving(false);
     }
@@ -259,11 +256,7 @@ export function SettingsRolesPage() {
       setDeleteTarget(null);
       load();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.roles.delete-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.roles.delete-failed"));
     } finally {
       setDeleting(false);
     }

@@ -207,7 +207,6 @@
       "back-to-signin": "返回登录",
       "failed": "登录失败",
       "invalid-state": "登录请求无效或已过期，请重试。",
-      "login-failed": "使用提供商登录失败。",
       "signing-in": "正在登录…"
     },
     "oauth-login": {
@@ -224,7 +223,6 @@
       "continue-with": "使用 {{provider}} 继续",
       "email-placeholder": "you@example.com",
       "failed": "登录失败",
-      "failed-description": "请检查您的登录凭据。",
       "new-user": "还没有账户？",
       "oauth-invalid": "该提供商未正确配置，无法用于登录。",
       "or": "或",
@@ -237,7 +235,6 @@
       "email-placeholder": "you@example.com",
       "existing-user": "已有账户？",
       "failed": "注册失败",
-      "failed-description": "请重试。",
       "name-placeholder": "张三",
       "password-confirm": "确认密码",
       "password-hint": "至少 8 个字符，包含字母和数字。",
@@ -636,7 +633,6 @@
     "force-disconnect": "强制断开",
     "force-disconnect-confirm-description": "该机器的所有会话将被终止,其上所有 Agent 正在执行的命令都将失败。机器应用可使用现有令牌重新连接。",
     "force-disconnect-confirm-title": "强制断开机器",
-    "force-disconnect-error": "断开机器失败",
     "new": {
       "command-hint": "在目标电脑的终端中运行：",
       "confirm": "确认并打开",
@@ -667,12 +663,10 @@
       "section-token": "令牌与连接"
     },
     "providers": "可用 Provider",
-    "providers-refresh-failed": "刷新 Provider 失败",
     "refresh-providers": "刷新",
     "revoke-token": "吊销令牌",
     "revoke-token-confirm-description": "该机器的所有令牌将被吊销,所有活动会话将被终止,机器将完全断开连接。要重新连接,请在宿主上运行 `laelia-machine setup` 并再次批准登录。",
     "revoke-token-confirm-title": "吊销所有令牌",
-    "revoke-token-error": "吊销令牌失败",
     "row-open-detail": "打开机器 {{title}} 详情",
     "status-error": "错误",
     "status-kicked": "已踢出",

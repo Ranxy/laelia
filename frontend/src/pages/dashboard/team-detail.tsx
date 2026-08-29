@@ -19,8 +19,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { agentServiceClient, agentTeamServiceClient } from "@/connect";
-import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
 import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
 import {
@@ -97,11 +97,7 @@ export function TeamDetailPage() {
         setForm(teamToForm(teamData));
       }
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.agentTeams.load-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.agentTeams.load-failed"));
     } finally {
       setLoading(false);
     }
@@ -252,11 +248,7 @@ export function TeamDetailPage() {
         await load();
       }
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.agentTeams.save-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.agentTeams.save-failed"));
     } finally {
       setSaving(false);
     }
@@ -273,11 +265,7 @@ export function TeamDetailPage() {
       });
       navigate(`/members/users/${userId ?? ""}`);
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.agentTeams.delete-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.agentTeams.delete-failed"));
     } finally {
       setDeleting(false);
     }

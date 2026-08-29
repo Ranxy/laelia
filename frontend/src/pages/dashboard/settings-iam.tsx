@@ -52,7 +52,9 @@ import {
   roleServiceClient,
 } from "@/connect";
 import { roleIDFromName } from "@/lib/command-status";
+import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
@@ -132,11 +134,7 @@ export function SettingsIamPage() {
       setRoles(rolesRes.roles ?? []);
       setGroups(groupsRes.groups ?? []);
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.iam.load-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.iam.load-failed"));
     } finally {
       setLoading(false);
     }
@@ -379,7 +377,7 @@ export function SettingsIamPage() {
         setRoleSheetError(t("settings.iam.etag-mismatch"));
         await load();
       } else {
-        setRoleSheetError(err instanceof Error ? err.message : String(err));
+        setRoleSheetError(describeError(err));
       }
     } finally {
       setRoleSheetSaving(false);
@@ -409,7 +407,7 @@ export function SettingsIamPage() {
         setAssignError(t("settings.iam.etag-mismatch"));
         await load();
       } else {
-        setAssignError(err instanceof Error ? err.message : String(err));
+        setAssignError(describeError(err));
       }
     } finally {
       setSaving(false);

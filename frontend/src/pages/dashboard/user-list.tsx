@@ -42,7 +42,9 @@ import {
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { formatTimestamp } from "@/lib/command-status";
+import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { buildUserFilter } from "@/lib/user-filter";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
@@ -282,7 +284,7 @@ export function UserListPage() {
       setCreateOpen(false);
       refreshBoth();
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : String(err));
+      setCreateError(describeError(err));
     } finally {
       setCreating(false);
     }
@@ -341,7 +343,7 @@ export function UserListPage() {
       setEditOpen(false);
       refreshBoth();
     } catch (err) {
-      setEditError(err instanceof Error ? err.message : String(err));
+      setEditError(describeError(err));
     } finally {
       setSaving(false);
     }
@@ -373,7 +375,7 @@ export function UserListPage() {
       setResetOpen(false);
       refreshBoth();
     } catch (err) {
-      setResetError(err instanceof Error ? err.message : String(err));
+      setResetError(describeError(err));
     } finally {
       setResetting(false);
     }
@@ -389,11 +391,7 @@ export function UserListPage() {
       setDeleteTarget(null);
       refreshBoth();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("user.delete-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("user.delete-failed"));
     } finally {
       setDeleting(false);
     }
@@ -405,11 +403,7 @@ export function UserListPage() {
       toastManager.add({ type: "success", title: t("user.restored") });
       refreshBoth();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("user.restore-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("user.restore-failed"));
     }
   }
 

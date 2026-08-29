@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
 import type { WorkspaceProfileSetting } from "@/types/proto-es/store/setting_pb";
 
@@ -74,11 +75,7 @@ export function SettingsGeneralPage() {
         setForm(next);
         setSaved(next);
       } catch (err) {
-        toastManager.add({
-          type: "error",
-          title: t("settings.general.load-failed"),
-          description: err instanceof Error ? err.message : String(err),
-        });
+        void showErrorToast(err, t("settings.general.load-failed"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -123,11 +120,7 @@ export function SettingsGeneralPage() {
       ]);
     } catch (err) {
       setForm((f) => ({ ...f, allowSignup: prev }));
-      toastManager.add({
-        type: "error",
-        title: t("settings.general.save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.general.save-failed"));
     } finally {
       setSavingSignup(false);
     }
@@ -143,11 +136,7 @@ export function SettingsGeneralPage() {
       ]);
     } catch (err) {
       setForm((f) => ({ ...f, enforceIdentityDomain: prev }));
-      toastManager.add({
-        type: "error",
-        title: t("settings.general.save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.general.save-failed"));
     } finally {
       setSavingDomain(false);
     }
@@ -163,11 +152,7 @@ export function SettingsGeneralPage() {
       ]);
     } catch (err) {
       setForm((f) => ({ ...f, requireEmailVerification: prev }));
-      toastManager.add({
-        type: "error",
-        title: t("settings.general.save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.general.save-failed"));
     } finally {
       setSavingEmailVerification(false);
     }
@@ -183,11 +168,7 @@ export function SettingsGeneralPage() {
       ]);
     } catch (err) {
       setForm((f) => ({ ...f, allowUserCreateMachine: prev }));
-      toastManager.add({
-        type: "error",
-        title: t("settings.general.save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.general.save-failed"));
     } finally {
       setSavingUserCreateMachine(false);
     }
@@ -204,11 +185,7 @@ export function SettingsGeneralPage() {
         title: t("settings.general.saved"),
       });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.general.save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.general.save-failed"));
     } finally {
       setSavingExternalUrl(false);
     }
@@ -225,11 +202,7 @@ export function SettingsGeneralPage() {
         title: t("settings.general.saved"),
       });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.general.save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.general.save-failed"));
     } finally {
       setSavingDomains(false);
     }

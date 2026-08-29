@@ -48,8 +48,8 @@ import {
   settingServiceClient,
   userServiceClient,
 } from "@/connect";
-import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useHasPermission } from "@/stores/permissions";
 import { type Group } from "@/types/proto-es/v1/group_service_pb";
 import {
@@ -214,11 +214,7 @@ export function SettingsMcpServersPage() {
         setGroups([]);
       }
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.mcp-servers.load-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.mcp-servers.load-failed"));
     } finally {
       setLoading(false);
     }
@@ -270,11 +266,7 @@ export function SettingsMcpServersPage() {
       setCreateOpen(false);
       void load();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.mcp-servers.create-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.mcp-servers.create-failed"));
     } finally {
       setCreating(false);
     }
@@ -307,11 +299,7 @@ export function SettingsMcpServersPage() {
       setEditTarget(null);
       void load();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.mcp-servers.update-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.mcp-servers.update-failed"));
     } finally {
       setSaving(false);
     }
@@ -332,11 +320,7 @@ export function SettingsMcpServersPage() {
       setDeleteTarget(null);
       void load();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.mcp-servers.delete-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.mcp-servers.delete-failed"));
     } finally {
       setDeleting(false);
     }

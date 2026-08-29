@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { SecretInput } from "@/components/ui/secret-input";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
 import { s3ConfigPaths } from "@/stores/setting";
 
@@ -58,11 +59,7 @@ export function SettingsStoragePage() {
           useSsl: cfg?.useSsl ?? true,
         });
       } catch (err) {
-        toastManager.add({
-          type: "error",
-          title: t("settings.s3.load-failed"),
-          description: err instanceof Error ? err.message : String(err),
-        });
+        void showErrorToast(err, t("settings.s3.load-failed"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -104,11 +101,7 @@ export function SettingsStoragePage() {
         title: t("settings.s3.saved"),
       });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.s3.save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.s3.save-failed"));
     } finally {
       setSaving(false);
     }

@@ -26,8 +26,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAvatarEditor } from "@/composables/useAvatarEditor";
 import { notificationServiceClient, userServiceClient } from "@/connect";
 import { useAvatar } from "@/lib/avatar-cache";
+import { describeError } from "@/lib/connect-errors";
 import { resizeImageFile } from "@/lib/image-resize";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import {
   disableDesktopNotifications,
   enableDesktopNotifications,
@@ -226,11 +228,7 @@ export function SettingsProfilePage() {
       await fetchCurrentUser();
       toastManager.add({ type: "success", title: t("settings.profile.saved") });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.profile.save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.profile.save-failed"));
     } finally {
       setSaving(false);
     }
@@ -271,11 +269,7 @@ export function SettingsProfilePage() {
         title: t("settings.profile.chat.saved"),
       });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.profile.chat.save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.profile.chat.save-failed"));
     } finally {
       setChatSaving(false);
     }
@@ -301,7 +295,7 @@ export function SettingsProfilePage() {
         await disableDesktopNotifications();
       }
     } catch (err) {
-      const code = err instanceof Error ? err.message : String(err);
+      const code = describeError(err);
       if (code === "denied") {
         setNotifStatus("denied");
         toastManager.add({

@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
 
 type VerifyState = "verifying" | "success" | "error";
@@ -51,11 +52,7 @@ export function VerifyEmailPage() {
         title: t("auth.verify-email.resend-sent"),
       });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("auth.verify-email.resend-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("auth.verify-email.resend-failed"));
     } finally {
       setResending(false);
     }

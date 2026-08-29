@@ -6,6 +6,7 @@ import { CopyableCommand } from "@/components/copyable-command";
 import { Card, Field } from "@/components/profile-common";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { describeError } from "@/lib/connect-errors";
 import {
   buildMachineInstallCommand,
   buildMachineSetupCommand,
@@ -130,7 +131,7 @@ export function MachineNewPage() {
       await updateMachine(candidate.name, title);
       navigate(`/machines/${candidate.name.replace(/^machines\//, "")}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(describeError(err));
       setSaving(false);
     }
   }

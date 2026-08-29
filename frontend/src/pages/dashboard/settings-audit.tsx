@@ -15,8 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { auditLogServiceClient } from "@/connect";
-import { describeError } from "@/lib/connect-errors";
-import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useHasPermission } from "@/stores/permissions";
 import { type AuditLog } from "@/types/proto-es/v1/audit_log_service_pb";
 
@@ -74,11 +73,7 @@ export function SettingsAuditPage() {
         }
         setNextPageToken(res.nextPageToken ?? "");
       } catch (err) {
-        toastManager.add({
-          type: "error",
-          title: t("settings.audit.load-failed"),
-          description: describeError(err),
-        });
+        void showErrorToast(err, t("settings.audit.load-failed"));
       } finally {
         setLoading(false);
       }
@@ -118,11 +113,7 @@ export function SettingsAuditPage() {
         `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`
       );
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.audit.export-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.audit.export-failed"));
     } finally {
       setExporting(false);
     }

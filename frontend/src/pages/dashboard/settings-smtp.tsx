@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { SecretInput } from "@/components/ui/secret-input";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
 import { smtpConfigPaths } from "@/stores/setting";
 
@@ -55,11 +56,7 @@ export function SettingsSmtpPage() {
           useTls: cfg?.useTls ?? true,
         });
       } catch (err) {
-        toastManager.add({
-          type: "error",
-          title: t("settings.smtp.load-failed"),
-          description: err instanceof Error ? err.message : String(err),
-        });
+        void showErrorToast(err, t("settings.smtp.load-failed"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -99,11 +96,7 @@ export function SettingsSmtpPage() {
         title: t("settings.smtp.saved"),
       });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.smtp.save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.smtp.save-failed"));
     } finally {
       setSaving(false);
     }

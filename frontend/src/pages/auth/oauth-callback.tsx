@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { describeError } from "@/lib/connect-errors";
 import { clearOAuthState, retrieveOAuthState } from "@/lib/oauth";
 import { useAppStore } from "@/stores";
-
 export function OAuthCallbackPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -39,11 +39,7 @@ export function OAuthCallbackPage() {
           stored.redirect && stored.redirect !== "/" ? stored.redirect : "/";
         navigate(target, { replace: true });
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : t("auth.oauth-callback.login-failed")
-        );
+        setError(describeError(err));
         setDone(true);
       }
     })();

@@ -15,8 +15,8 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
 import { llmAgentConfigPaths, userMcpConfigPaths } from "@/stores/setting";
@@ -129,11 +129,7 @@ export function SettingsAgentsPage() {
         title: t("settings.agents.saved"),
       });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.agents.save-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.agents.save-failed"));
     } finally {
       setUserMcpSaving(false);
     }
@@ -150,11 +146,7 @@ export function SettingsAgentsPage() {
       setEnabled(cfg?.allowUserSelfProvidedKeys ?? next);
       toastManager.add({ type: "success", title: t("settings.agents.saved") });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.agents.save-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.agents.save-failed"));
     } finally {
       setSaving(false);
     }

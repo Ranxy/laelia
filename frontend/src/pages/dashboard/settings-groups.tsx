@@ -48,6 +48,7 @@ import {
 import { groupServiceClient, userServiceClient } from "@/connect";
 import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useHasPermission } from "@/stores/permissions";
 import { State } from "@/types/proto-es/v1/common_pb";
 import {
@@ -133,11 +134,7 @@ export function SettingsGroupsPage() {
       // expanded (see toggleRefs) — fetching them for every group on load was
       // an N+1 burst that most pages never displayed.
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.groups.load-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.groups.load-failed"));
     } finally {
       setLoading(false);
     }
@@ -247,11 +244,7 @@ export function SettingsGroupsPage() {
       setCreateForm(emptyForm());
       load();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.groups.create-title"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.groups.create-title"));
     } finally {
       setCreating(false);
     }
@@ -322,11 +315,7 @@ export function SettingsGroupsPage() {
       setDeleteTarget(null);
       load();
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.groups.delete-failed"),
-        description: describeError(err),
-      });
+      void showErrorToast(err, t("settings.groups.delete-failed"));
     } finally {
       setDeleting(false);
     }

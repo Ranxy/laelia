@@ -1,5 +1,5 @@
 import { fromBinary } from "@bufbuild/protobuf";
-import { ConnectError } from "@connectrpc/connect";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { PermissionDeniedDetailSchema } from "@/types/proto-es/v1/common_pb";
 
 /**
@@ -47,4 +47,35 @@ export function describeError(err: unknown): string {
     if (parts.length > 0) return parts.join(" ");
   }
   return err instanceof Error ? err.message : String(err);
+}
+
+// connectErrorKind is a small taxonomy over the ConnectError codes the UI
+// reacts to. It feeds showErrorToast (title/dedupe decisions) and future
+// retryable indicators; unknown integrations map to null so callers fall
+// back to the raw description.
+export type ConnectErrorKind =
+  | "permission_denied"
+  | "unauthenticated"
+  | "not_found"
+  | "unavailable"
+  | "internal"
+  | "other";
+
+export function connectErrorKind(err: unknown): ConnectErrorKind | null {
+  if (!(err instanceof ConnectError)) return null;
+  switch (err.code) {
+    case Code.PermissionDenied:
+      return "permission_denied";
+    case Code.Unauthenticated:
+      return "unauthenticated";
+    case Code.NotFound:
+      return "not_found";
+    case Code.Unavailable:
+    case Code.DeadlineExceeded:
+      return "unavailable";
+    case Code.Internal:
+      return "internal";
+    default:
+      return null;
+  }
 }

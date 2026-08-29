@@ -12,8 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { notificationServiceClient } from "@/connect";
 import { toastManager } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast-errors";
 import { useHasPermission } from "@/stores/permissions";
-
 // The per-user desktop-notification toggle lives on /settings/profile; this
 // page keeps only the workspace-level push delivery config: the outbound
 // HTTP(S) proxy used when the server cannot reach browser push services
@@ -68,11 +68,7 @@ export function SettingsNotificationsPage() {
     try {
       await notificationServiceClient.updatePushConfig({ httpProxy: "" });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.notifications.proxy-save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.notifications.proxy-save-failed"));
       // revert the toggle so the UI reflects the still-stored proxy
       setProxyEnabled(true);
     } finally {
@@ -89,11 +85,7 @@ export function SettingsNotificationsPage() {
         title: t("settings.notifications.proxy-saved"),
       });
     } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.notifications.proxy-save-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void showErrorToast(err, t("settings.notifications.proxy-save-failed"));
     } finally {
       setProxySaving(false);
     }

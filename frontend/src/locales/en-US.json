@@ -207,7 +207,6 @@
       "back-to-signin": "Back to sign in",
       "failed": "Sign-in failed",
       "invalid-state": "The sign-in request is invalid or has expired. Please try again.",
-      "login-failed": "Sign in with the provider failed.",
       "signing-in": "Signing you in…"
     },
     "oauth-login": {
@@ -224,7 +223,6 @@
       "continue-with": "Continue with {{provider}}",
       "email-placeholder": "you@example.com",
       "failed": "Sign in failed",
-      "failed-description": "Please check your credentials.",
       "new-user": "Don't have an account?",
       "oauth-invalid": "This provider is not configured correctly for sign-in.",
       "or": "or",
@@ -237,7 +235,6 @@
       "email-placeholder": "you@example.com",
       "existing-user": "Already have an account?",
       "failed": "Registration failed",
-      "failed-description": "Please try again.",
       "name-placeholder": "foo bar",
       "password-confirm": "Confirm password",
       "password-hint": "Must be at least 8 characters with letters and numbers.",
@@ -636,7 +633,6 @@
     "force-disconnect": "Force Disconnect",
     "force-disconnect-confirm-description": "All machine sessions will be terminated and in-flight commands for every agent on this machine will fail. The machine app can reconnect with its existing token.",
     "force-disconnect-confirm-title": "Force Disconnect Machine",
-    "force-disconnect-error": "Failed to disconnect machine",
     "new": {
       "command-hint": "Open a terminal on the target computer and run:",
       "confirm": "Confirm & Open",
@@ -667,12 +663,10 @@
       "section-token": "Token & Connection"
     },
     "providers": "Available Providers",
-    "providers-refresh-failed": "Failed to refresh providers",
     "refresh-providers": "Refresh",
     "revoke-token": "Revoke Token",
     "revoke-token-confirm-description": "All tokens for this machine will be revoked and all active sessions terminated. The machine will be completely disconnected. To reconnect it, run `laelia-machine setup` on the host and approve the login again.",
     "revoke-token-confirm-title": "Revoke All Tokens",
-    "revoke-token-error": "Failed to revoke tokens",
     "row-open-detail": "Open machine {{title}} details",
     "status-error": "Error",
     "status-kicked": "Kicked",

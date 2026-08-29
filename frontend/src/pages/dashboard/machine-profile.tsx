@@ -66,6 +66,7 @@ import {
   settingServiceClient,
 } from "@/connect";
 import { formatTimestamp } from "@/lib/command-status";
+import { describeError } from "@/lib/connect-errors";
 import {
   buildMachineInstallCommand,
   buildMachineSetupCommand,
@@ -272,11 +273,7 @@ export function MachineProfilePage() {
       piModelsCacheRef.current.set(cacheKey, models);
       setPiModels(models);
     } catch (err) {
-      setAddError(
-        err instanceof Error
-          ? err.message
-          : t("agent.acp-config-pi-models-refresh-failed")
-      );
+      setAddError(describeError(err));
     } finally {
       setPiModelsLoading(false);
     }
@@ -310,7 +307,7 @@ export function MachineProfilePage() {
       });
       setAccessError("");
     } catch (err) {
-      setAccessError(err instanceof Error ? err.message : String(err));
+      setAccessError(describeError(err));
     }
   }
 
@@ -463,10 +460,7 @@ export function MachineProfilePage() {
         });
       setRefreshedModels(models);
     } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : t("agent.acp-config-models-refresh-failed");
+      const msg = describeError(err);
       setModelsRefreshError(msg);
       setRefreshedModels(null);
       toastManager.add({
@@ -518,11 +512,7 @@ export function MachineProfilePage() {
       await refreshMachineProviders(machineName);
       await reload();
     } catch (err) {
-      setRefreshError(
-        err instanceof Error
-          ? err.message
-          : t("machine.providers-refresh-failed")
-      );
+      setRefreshError(describeError(err));
     } finally {
       setRefreshing(false);
     }
@@ -538,9 +528,7 @@ export function MachineProfilePage() {
       const next = await getMachine(machineName);
       if (next) setMachine(next);
     } catch (err) {
-      setUpgradeError(
-        err instanceof Error ? err.message : t("machine.upgrade-failed")
-      );
+      setUpgradeError(describeError(err));
     } finally {
       setUpgrading(false);
     }
@@ -576,9 +564,7 @@ export function MachineProfilePage() {
       setRevokeOpen(false);
       await reload();
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : t("machine.revoke-token-error")
-      );
+      setActionError(describeError(err));
     } finally {
       setRevoking(false);
     }
@@ -611,7 +597,7 @@ export function MachineProfilePage() {
       setTransferOpen(false);
       await reload();
     } catch (err) {
-      setTransferError(err instanceof Error ? err.message : String(err));
+      setTransferError(describeError(err));
     } finally {
       setTransferBusy(false);
     }
@@ -628,9 +614,7 @@ export function MachineProfilePage() {
       await reload();
       fetchMachines({ pageSize: 100 }, { silent: true });
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : t("machine.force-disconnect-error")
-      );
+      setActionError(describeError(err));
     } finally {
       setForcing(false);
     }
@@ -729,7 +713,7 @@ export function MachineProfilePage() {
       await reload();
       fetchMachines({ pageSize: 100 }, { silent: true });
     } catch (err) {
-      setAddError(err instanceof Error ? err.message : String(err));
+      setAddError(describeError(err));
     } finally {
       setAdding(false);
     }
@@ -833,7 +817,7 @@ export function MachineProfilePage() {
         setAccessError(t("machine.access-etag-mismatch"));
         await loadPolicy();
       } else {
-        setAccessError(err instanceof Error ? err.message : String(err));
+        setAccessError(describeError(err));
       }
     } finally {
       setAccessSaving(false);
