@@ -1,5 +1,5 @@
 import { Loader2, Monitor, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
@@ -9,6 +9,25 @@ import { useAvatar } from "@/lib/avatar-cache";
 import { describeError } from "@/lib/connect-errors";
 import { useAppStore } from "@/stores";
 import { DeviceLoginStatus } from "@/types/proto-es/v1/device_pb";
+
+// Poll cadence with failure backoff: a successful tick schedules the next one
+// at POLL_BASE_MS; each consecutive failure doubles the delay, capped at
+// POLL_MAX_MS, and any success resets the streak back to the base interval.
+const POLL_BASE_MS = 3000;
+const POLL_MAX_MS = 15000;
+// Consecutive failures before the page treats the server as unreachable.
+const UNREACHABLE_AFTER_FAILURES = 3;
+
+// isTerminalStatus reports whether a device login session has reached an end
+// state: the APPROVED success view, the EXPIRED card, or the DENIED card. None
+// of them can change afterwards, so polling stops.
+function isTerminalStatus(s: DeviceLoginStatus): boolean {
+  return (
+    s === DeviceLoginStatus.APPROVED ||
+    s === DeviceLoginStatus.EXPIRED ||
+    s === DeviceLoginStatus.DENIED
+  );
+}
 
 // DeviceLoginPage is the public approval page for the OAuth2-style device
 // code flow. The machine CLI prints
@@ -41,11 +60,20 @@ export function DeviceLoginPage() {
   const [approving, setApproving] = useState(false);
   const [approved, setApproved] = useState(false);
   const [approveError, setApproveError] = useState("");
-  const [pollFailed, setPollFailed] = useState(false);
+  // Reachability bookkeeping. `consecutiveFailures` counts back-to-back poll
+  // errors (any success resets it); `everSucceeded` records whether at least
+  // one poll returned data. The full-screen unreachable card is reserved for
+  // "nothing ever loaded" (no data to lose); once device info has been shown,
+  // a flaky connection keeps the page as-is — see `stale` below.
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
+  const [everSucceeded, setEverSucceeded] = useState(false);
   const [closeBlocked, setCloseBlocked] = useState(false);
 
-  const poll = useCallback(async () => {
-    if (!userCode) return;
+  // Returns whether the poll succeeded so the loop can apply backoff. Status
+  // and device fields are only written on success: until the first successful
+  // poll, `status` stays UNSPECIFIED.
+  const poll = useCallback(async (): Promise<boolean> => {
+    if (!userCode) return false;
     try {
       const res = await deviceServiceClient.getDeviceLoginStatus({ userCode });
       setStatus(res.status);
@@ -57,20 +85,91 @@ export function DeviceLoginPage() {
       setMachineTitle(res.machineTitle);
       setMachineOwner(res.machineOwner);
       setDenialReason(res.denialReason);
-      setPollFailed(false);
+      setConsecutiveFailures(0);
+      setEverSucceeded(true);
+      return true;
     } catch {
-      setPollFailed(true);
+      return false;
     }
   }, [userCode]);
 
-  // Stop polling once the login is approved: the success view replaces the
-  // whole pending UI, so there is nothing left to refresh.
+  // Poll loop. A self-scheduling setTimeout (instead of a fixed interval) so
+  // each round can pick its own delay:
+  //   - base 3s, doubled per consecutive failure, capped at 15s, reset by any
+  //     success — a down server backs off instead of hammering getDeviceLoginStatus;
+  //   - a hidden tab pauses polling (visibilitychange): the pending timeout is
+  //     cancelled and an in-flight tick doesn't schedule a follow-up; coming
+  //     back to the foreground polls immediately.
+  // The effect keys off `running`, not the raw status: intermediate
+  // transitions (UNSPECIFIED→PENDING) keep the loop running unchanged, while
+  // terminal states and approval tear it down. The in-loop `failures` counter
+  // survives those non-terminal re-renders, so the backoff streak is only
+  // reset by an actual success.
+  const running = !approved && !isTerminalStatus(status);
   useEffect(() => {
-    if (!userCode || approved) return;
-    void poll();
-    const id = setInterval(() => void poll(), 3000);
-    return () => clearInterval(id);
-  }, [poll, userCode, approved]);
+    if (!userCode || !running) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let disposed = false;
+    let failures = 0;
+
+    const schedule = (delay: number) => {
+      timer = setTimeout(() => void tick(), delay);
+    };
+
+    const tick = async () => {
+      timer = null;
+      if (disposed || document.hidden) return;
+      const ok = await poll();
+      if (disposed) return;
+      if (ok) {
+        failures = 0;
+        setEverSucceeded(true);
+      } else {
+        failures += 1;
+      }
+      setConsecutiveFailures(failures);
+      // A tick that ended with the tab hidden doesn't schedule a follow-up;
+      // the visibilitychange listener restarts the loop on return.
+      if (document.hidden) return;
+      schedule(
+        failures === 0
+          ? POLL_BASE_MS
+          : Math.min(POLL_BASE_MS * 2 ** failures, POLL_MAX_MS)
+      );
+    };
+
+    const onVisible = () => {
+      if (document.hidden) {
+        // Pause: cancel the pending scheduled poll.
+        if (timer !== null) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        return;
+      }
+      // Resume: poll immediately, then let the loop self-schedule again.
+      void tick();
+    };
+
+    void tick();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      disposed = true;
+      if (timer !== null) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [userCode, running, poll]);
+
+  // Never-succeeded: after UNREACHABLE_AFTER_FAILURES consecutive failures
+  // with no data ever loaded, swap in the full-screen unreachable card (same
+  // semantics as before). Once data HAS been shown, don't yank the page out
+  // from under the user — keep the loaded content and overlay a light
+  // stale-data notice instead. (A-2 follow-up: replace the notice with a
+  // dedicated stale-state surface + retry affordance.)
+  const unreachable =
+    !everSucceeded && consecutiveFailures >= UNREACHABLE_AFTER_FAILURES;
+  const stale =
+    everSucceeded && consecutiveFailures >= UNREACHABLE_AFTER_FAILURES;
 
   async function handleApprove() {
     if (approving) return;
@@ -91,7 +190,10 @@ export function DeviceLoginPage() {
     const redirect = encodeURIComponent(
       window.location.pathname + window.location.search
     );
-    await logout();
+    // Logout is best-effort here: a failed call (e.g. the page is unmounting
+    // mid-flight) must not surface as an unhandled rejection or block the
+    // redirect to the sign-in page.
+    await logout().catch(() => {});
     navigate(`/auth/signin?redirect=${redirect}`, { replace: true });
   }
 
@@ -104,10 +206,28 @@ export function DeviceLoginPage() {
   // is silently blocked. Try it anyway (it works when the page was opened via
   // window.open or has a single history entry); if the tab is still alive a
   // moment later, fall back to a manual-close hint.
+  //
+  // The 500ms fallback timer is tracked in a ref and cleared on unmount so it
+  // can't fire state updates on an unmounted page.
+  const closeBlockedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  useEffect(
+    () => () => {
+      if (closeBlockedTimerRef.current !== null) {
+        clearTimeout(closeBlockedTimerRef.current);
+      }
+    },
+    []
+  );
+
   function handleClosePage() {
     setCloseBlocked(false);
     window.close();
-    window.setTimeout(() => setCloseBlocked(true), 500);
+    if (closeBlockedTimerRef.current !== null) {
+      clearTimeout(closeBlockedTimerRef.current);
+    }
+    closeBlockedTimerRef.current = setTimeout(() => setCloseBlocked(true), 500);
   }
 
   if (approved || status === DeviceLoginStatus.APPROVED) {
@@ -169,7 +289,7 @@ export function DeviceLoginPage() {
             {denialReason || t("auth.device-login.denied-hint")}
           </p>
         </div>
-      ) : pollFailed && status === DeviceLoginStatus.UNSPECIFIED ? (
+      ) : unreachable ? (
         <div className="mt-6 rounded-2xl border border-control-border bg-background p-6 text-center shadow-sm">
           <p className="text-sm text-control-light">
             {t("auth.device-login.unreachable")}
@@ -257,7 +377,7 @@ export function DeviceLoginPage() {
                     : t("auth.device-login.approve")}
                 </Button>
                 {approveError && (
-                  <p className="text-center text-xs text-danger">
+                  <p className="text-center text-xs text-error">
                     {approveError}
                   </p>
                 )}
@@ -278,6 +398,11 @@ export function DeviceLoginPage() {
               </div>
             )}
           </div>
+          {stale && (
+            <p className="border-t border-control-border bg-control-bg/40 px-6 py-2 text-center text-xs text-warning">
+              {t("auth.device-login.stale-data")}
+            </p>
+          )}
         </div>
       )}
     </div>

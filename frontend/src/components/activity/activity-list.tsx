@@ -118,13 +118,29 @@ export function ActivityList() {
   // filter/page changes recreate `load`, which re-runs this effect, reloading
   // and restarting the interval. The pagination reset lives in
   // handleFilterChange, not here, so a filter switch issues exactly one fetch.
+  //
+  // Visibility gating: while the tab is hidden the interval keeps running but
+  // each tick is a no-op, so background tabs stop issuing fetches. The
+  // visibilitychange listener mirrors use-presence-heartbeat: coming back to
+  // the foreground refetches immediately (silent) instead of waiting up to a
+  // full interval.
   useEffect(() => {
     initialLoadDone.current = false;
     load(false).then(() => {
       initialLoadDone.current = true;
     });
-    const handle = setInterval(() => load(true), POLL_INTERVAL_MS);
-    return () => clearInterval(handle);
+    const handle = setInterval(() => {
+      if (document.hidden) return;
+      load(true);
+    }, POLL_INTERVAL_MS);
+    const onVisible = () => {
+      if (!document.hidden) load(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(handle);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [load]);
 
   const handleFilterChange = (next: Filter) => {

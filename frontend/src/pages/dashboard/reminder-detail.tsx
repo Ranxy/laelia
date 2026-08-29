@@ -46,6 +46,11 @@ const COMMON_TZ = [
   "America/Sao_Paulo",
 ];
 
+// Detail-page re-fetch cadence. Terminal reminders (COMPLETED/CANCELLED/
+// FAILED) are immutable end states, so the 2s re-fetch loop is stopped once
+// the page observes a terminal status.
+const DETAIL_POLL_INTERVAL_MS = 2000;
+
 // toDatetimeLocal converts a reminder fire_at timestamp to the value a
 // <input type="datetime-local"> expects (local time, "YYYY-MM-DDTHH:MM").
 function toDatetimeLocal(ts: Reminder["fireAt"]): string {
@@ -111,11 +116,23 @@ export function ReminderDetailPage() {
     setLoading(false);
   }, [reminderId, name, getReminder]);
 
+  // Terminal reminders cannot be edited or cancelled.
+  const isTerminal =
+    reminder?.status === ReminderStatus.COMPLETED ||
+    reminder?.status === ReminderStatus.CANCELLED ||
+    reminder?.status === ReminderStatus.FAILED;
+
   useEffect(() => {
     load();
-    const handle = setInterval(load, 2000);
+    // Stop the re-fetch loop once the reminder reaches a terminal status
+    // (COMPLETED/CANCELLED/FAILED): it is immutable from here on, so polling
+    // would only burn requests. When the status is still active (or not yet
+    // loaded, `undefined` → not terminal) the loop keeps refreshing. Manual
+    // updates (edit/cancel actions) set the reminder directly.
+    if (isTerminal) return;
+    const handle = setInterval(load, DETAIL_POLL_INTERVAL_MS);
     return () => clearInterval(handle);
-  }, [load]);
+  }, [load, isTerminal]);
 
   // Open the reminder's discussion thread so ThreadPanel has messages to
   // render. ThreadPanel reads threadByRoot[rootId], which is populated by
@@ -129,12 +146,6 @@ export function ReminderDetailPage() {
     openThread(`conversations/${threadConvId}`, threadRootId);
     return () => closeThread();
   }, [threadConvId, threadRootId, openThread, closeThread]);
-
-  // Terminal reminders cannot be edited or cancelled.
-  const isTerminal =
-    reminder?.status === ReminderStatus.COMPLETED ||
-    reminder?.status === ReminderStatus.CANCELLED ||
-    reminder?.status === ReminderStatus.FAILED;
 
   const openEdit = () => {
     if (!reminder) return;

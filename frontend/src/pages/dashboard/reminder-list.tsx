@@ -28,6 +28,12 @@ type StatusFilter =
 
 const PAGE_SIZE = 50;
 
+// Background re-fetch cadence for the reminder table. 5s matches the chat
+// layout's left-rail list poll: reminder rows change at human/agent-action
+// pace, not per-message, so a slower refresh is plenty and background polls
+// stay silent (no loading-spinner flicker).
+const LIST_POLL_INTERVAL_MS = 5000;
+
 // statusFilterToValues maps a tab to the ReminderStatus values it shows. `all`
 // is an empty filter (server returns every status). The non-terminal tab
 // groups PENDING + DUE (active work).
@@ -103,7 +109,7 @@ export function ReminderListPage() {
     });
     // Background polls are silent — they don't toggle the loading flag,
     // avoiding visual flicker when the data hasn't changed.
-    const handle = setInterval(() => load(true), 2000);
+    const handle = setInterval(() => load(true), LIST_POLL_INTERVAL_MS);
     return () => clearInterval(handle);
   }, [load]);
 
