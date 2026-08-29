@@ -74,6 +74,16 @@ export interface ChatMessageUI {
   // threadReplyCount is the number of replies under this message; set on root
   // messages, 0/absent otherwise. Drives the "N replies · View thread" entry.
   threadReplyCount?: number;
+  // threadPreview holds the latest (≤3) replies of this message's thread,
+  // oldest first, synced from the ListChannelThreads poll. Set on root
+  // messages once the channel's thread summary has arrived; drives the inline
+  // thread preview under the root message in the channel list.
+  threadPreview?: ChatMessageUI[];
+  // threadNewReplyCount is the number of replies in this root's thread beyond
+  // the current user's read cursor (own replies excluded), synced from
+  // ListChannelThreads. 0/absent when the user is caught up. Drives the
+  // "N replies · M new" hint above the inline preview.
+  threadNewReplyCount?: number;
   // task is non-null when this message is a channel task (a row exists in the
   // task table for it). Populated for root messages; absent for replies and
   // non-task messages. Drives the inline "[task #N status=...]" badge.

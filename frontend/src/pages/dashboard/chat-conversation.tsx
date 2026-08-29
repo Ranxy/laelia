@@ -130,6 +130,9 @@ interface MessageListProps {
   onMentionClick: (type: string, id: string, name: string) => void;
   mentionLabel: (handle: string) => string | undefined;
   onOpenThread: (msg: ChatMessageUI) => void;
+  // Opens the thread drawer scrolled to a specific previewed reply (the inline
+  // thread preview's per-reply rows).
+  onOpenThreadAt: (rootMsg: ChatMessageUI, reply: ChatMessageUI) => void;
   onCopyMarkdown: (content: string) => void;
   onConvertToTask: (msg: ChatMessageUI) => void;
   onPreviewAttachment: (attachment: Attachment, rootMessageId: string) => void;
@@ -155,6 +158,7 @@ const MessageList = memo(function MessageList({
   onViewDetails,
   onMentionClick,
   onOpenThread,
+  onOpenThreadAt,
   onCopyMarkdown,
   onConvertToTask,
   onPreviewAttachment,
@@ -186,6 +190,7 @@ const MessageList = memo(function MessageList({
               MentionBadge={MentionBadge}
               markdownCustomId="channel-chat"
               onOpenThread={onOpenThread}
+              onOpenThreadAt={onOpenThreadAt}
               onCopyMarkdown={onCopyMarkdown}
               onConvertToTask={onConvertToTask}
               onPreviewAttachment={onPreviewAttachment}
@@ -1357,6 +1362,21 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     [channelId, conversationName, openThread, closeTasksPanel]
   );
 
+  // Inline thread preview: clicking one of the latest replies opens the thread
+  // drawer scrolled to that reply, mirroring the search-jump path. The main
+  // list stays put (the preview row is already visible).
+  const handleOpenThreadAt = useCallback(
+    (rootMsg: ChatMessageUI, reply: ChatMessageUI) => {
+      if (!channelId || rootMsg.threadRoot || !reply.threadRoot) return;
+      if (channelId) closeTasksPanel(channelId);
+      // The thread panel scrolls via data-msg-id which carries the full
+      // resource name, same as the search jump.
+      setThreadScrollToMessageId(reply.id);
+      void openThread(conversationName, rootMsg.id);
+    },
+    [channelId, conversationName, openThread, closeTasksPanel]
+  );
+
   // "Copy markdown" in the context menu: write the message's final raw markdown
   // to the clipboard and toast the outcome.
   const handleCopyMarkdown = useCallback(
@@ -1679,6 +1699,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
               onViewDetails={handleViewDetails}
               onMentionClick={handleMentionClick}
               onOpenThread={handleOpenThread}
+              onOpenThreadAt={handleOpenThreadAt}
               onCopyMarkdown={handleCopyMarkdown}
               onConvertToTask={handleConvertToTask}
               onPreviewAttachment={handlePreviewAttachment}

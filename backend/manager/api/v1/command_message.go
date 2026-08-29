@@ -354,17 +354,24 @@ func (s *CommandService) ListThreadMessages(ctx context.Context, req *connect.Re
 }
 
 // ListChannelThreads returns a summary (root id, reply count, latest reply
-// version/time) for every active thread in a conversation. The channel page
-// polls this to keep root-message reply-count badges fresh — including replies
-// that arrive while the thread panel is closed (e.g. an async agent reply),
-// which the message watcher cannot observe because ListConversationMessages
-// excludes thread replies.
+// version/time, newest replies, and a per-user unread count) for every active
+// thread in a conversation. The channel page polls this to keep root-message
+// reply-count badges fresh — including replies that arrive while the thread
+// panel is closed (e.g. an async agent reply), which the message watcher
+// cannot observe because ListConversationMessages excludes thread replies —
+// and to render the root message's inline thread preview (the 3 most recent
+// replies) plus its "M new" hint. Agent callers get fresh-replies but never an
+// unread count (that is a user-cursor concept).
 func (s *CommandService) ListChannelThreads(ctx context.Context, req *connect.Request[v1pb.ListChannelThreadsRequest]) (*connect.Response[v1pb.ListChannelThreadsResponse], error) {
 	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
-	threads, err := s.store.ListChannelThreads(ctx, convID)
+	userPrincipalID, userHandle := 0, ""
+	if user, ok := GetUserFromContext(ctx); ok {
+		userPrincipalID, userHandle = user.ID, user.Handle
+	}
+	threads, err := s.store.ListChannelThreads(ctx, convID, userPrincipalID, userHandle)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list channel threads"))
 	}
@@ -374,9 +381,13 @@ func (s *CommandService) ListChannelThreads(ctx context.Context, req *connect.Re
 			RootMessage:        t.RootMessageID.String(),
 			ReplyCount:         t.ReplyCount,
 			LatestReplyVersion: t.LatestVersion,
+			NewReplyCount:      t.NewReplyCount,
 		}
 		if !t.LatestAt.IsZero() {
 			ct.LatestReplyAt = timestamppb.New(t.LatestAt)
+		}
+		for _, msg := range t.RecentReplies {
+			ct.RecentReply = append(ct.RecentReply, storeToV1ChatMessage(msg))
 		}
 		v1threads = append(v1threads, ct)
 	}

@@ -3377,6 +3377,8 @@ conversation.
 | reply_count | [int32](#int32) |  | reply_count is the total number of replies in the thread (always ≥1). |
 | latest_reply_version | [int64](#int64) |  | latest_reply_version is the maximum room_version among the thread&#39;s replies. |
 | latest_reply_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | latest_reply_at is the created_at of the most recent reply. |
+| new_reply_count | [int32](#int32) |  | new_reply_count is the number of replies with room_version beyond the requesting user&#39;s read cursor (user_channel_cursor), excluding the user&#39;s own replies. Populated only for user callers; 0 for agent callers and users with no cursor (treated as caught up). The frontend surfaces it as the &#34;M new&#34; hint on the root message&#39;s inline thread preview. |
+| recent_reply | [ChatMessage](#laelia-v1-ChatMessage) | repeated | recent_reply is up to the 3 most recent replies in the thread, oldest first, for the root message&#39;s inline thread preview in the channel list. Full ChatMessage payloads so the preview reuses the standard message mapper (sender name, avatar handle, timestamps) and can fall back to attachment names when a reply has no text content. |
 
 
 

@@ -1909,6 +1909,28 @@ export declare type ChannelThread = Message<"laelia.v1.ChannelThread"> & {
    * @generated from field: google.protobuf.Timestamp latest_reply_at = 4;
    */
   latestReplyAt?: Timestamp | undefined;
+
+  /**
+   * new_reply_count is the number of replies with room_version beyond the
+   * requesting user's read cursor (user_channel_cursor), excluding the user's
+   * own replies. Populated only for user callers; 0 for agent callers and
+   * users with no cursor (treated as caught up). The frontend surfaces it as
+   * the "M new" hint on the root message's inline thread preview.
+   *
+   * @generated from field: int32 new_reply_count = 5;
+   */
+  newReplyCount: number;
+
+  /**
+   * recent_reply is up to the 3 most recent replies in the thread, oldest
+   * first, for the root message's inline thread preview in the channel list.
+   * Full ChatMessage payloads so the preview reuses the standard message
+   * mapper (sender name, avatar handle, timestamps) and can fall back to
+   * attachment names when a reply has no text content.
+   *
+   * @generated from field: repeated laelia.v1.ChatMessage recent_reply = 6;
+   */
+  recentReply: ChatMessage[];
 };
 
 /**

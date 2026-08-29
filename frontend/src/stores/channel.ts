@@ -639,14 +639,61 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
   },
 });
 
+// ChannelThreadSummary is the frontend-distilled ListChannelThreads entry:
+// the reply count, the per-user unread count, and the newest-replies preview
+// (already mapped to the UI shape).
+export interface ChannelThreadSummary {
+  rootMessage: string;
+  replyCount: number;
+  newReplyCount: number;
+  preview: ChatMessageUI[];
+}
+
+// applyChannelThreadSummaries merges the active-thread summaries (count,
+// unread count, newest-replies preview) into the channel message list's root
+// rows. Exported for unit testing; the per-poll bail-out keeps every unchanged
+// row at its previous reference so subscribers don't churn.
+export function applyChannelThreadSummaries(
+  prev: ChatMessageUI[],
+  threads: ChannelThreadSummary[]
+): ChatMessageUI[] {
+  const summaryById = new Map(threads.map((t) => [t.rootMessage, t]));
+  let changed = false;
+  const next = prev.map((m) => {
+    if (m.threadRoot) return m; // replies never carry the badge
+    const summary = summaryById.get(m.id);
+    const count = summary?.replyCount ?? 0;
+    const newCount = summary?.newReplyCount ?? 0;
+    const preview = summary?.preview;
+    if (
+      (m.threadReplyCount ?? 0) === count &&
+      (m.threadNewReplyCount ?? 0) === newCount &&
+      sameThreadPreview(m.threadPreview, preview)
+    ) {
+      return m;
+    }
+    changed = true;
+    return {
+      ...m,
+      threadReplyCount: count,
+      threadNewReplyCount: newCount,
+      threadPreview: preview,
+    };
+  });
+  return changed ? next : prev;
+}
+
 // refreshChannelThreadCounts fetches the channel's active-thread summaries and
 // writes each root's total reply count back into the main message list, so the
 // "N replies" badge on root messages stays fresh. The message watcher's delta
 // (above) excludes thread replies, so without this a reply that lands while the
 // thread panel is closed — e.g. an async agent reply — would never update the
-// badge. No-op when the list is empty or no root's count changed (same-reference
-// bail-out so subscribers don't churn). Failures are swallowed and retried next
-// tick; they must not abort the surrounding poll.
+// badge. The same response also carries the 3 most recent replies per thread
+// (the root message's inline preview) and the per-user unread count ("M new"),
+// attached to the same root rows. No-op when the list is empty or no root's
+// summary changed (same-reference bail-out so subscribers don't churn).
+// Failures are swallowed and retried next tick; they must not abort the
+// surrounding poll.
 async function refreshChannelThreadCounts(
   set: Parameters<AppSliceCreator<ChannelSlice>>[0],
   get: Parameters<AppSliceCreator<ChannelSlice>>[1],
@@ -655,7 +702,7 @@ async function refreshChannelThreadCounts(
 ) {
   const prev = get().chatMessages[conversationName];
   if (!prev || prev.length === 0) return;
-  let threads: { rootMessage: string; replyCount: number }[];
+  let threads: ChannelThreadSummary[];
   try {
     const res = await commandServiceClient.listChannelThreads(
       create(ListChannelThreadsRequestSchema, {
@@ -665,26 +712,40 @@ async function refreshChannelThreadCounts(
     threads = (res.threads ?? []).map((t) => ({
       rootMessage: t.rootMessage,
       replyCount: t.replyCount,
+      newReplyCount: t.newReplyCount ?? 0,
+      preview: (t.recentReply ?? []).map(toUiMessage),
     }));
   } catch {
     return; // network error — retry next tick
   }
-  const countById = new Map(threads.map((t) => [t.rootMessage, t.replyCount]));
-  let changed = false;
-  const next = prev.map((m) => {
-    if (m.threadRoot) return m; // replies never carry the badge
-    const count = countById.get(m.id) ?? 0;
-    if ((m.threadReplyCount ?? 0) === count) return m;
-    changed = true;
-    return { ...m, threadReplyCount: count };
-  });
-  if (changed) {
+  const next = applyChannelThreadSummaries(prev, threads);
+  if (next !== prev) {
     // Bail if the watcher was stopped/reset mid-flight (see the poll guard).
     if (ctrl.signal.aborted) return;
     set((state) => ({
       chatMessages: { ...state.chatMessages, [conversationName]: next },
     }));
   }
+}
+
+// sameThreadPreview compares two preview reply arrays by field identity so the
+// per-poll bail-out treats identical replies (frequently the case while a
+// thread is quiet) as unchanged. Previews are capped at 3 replies, so the
+// linear compare stays trivial.
+function sameThreadPreview(
+  a: ChatMessageUI[] | undefined,
+  b: ChatMessageUI[] | undefined
+): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every(
+    (x, i) =>
+      x.id === b[i].id &&
+      x.content === b[i].content &&
+      x.senderName === b[i].senderName &&
+      x.principalId === b[i].principalId &&
+      +x.timestamp === +b[i].timestamp
+  );
 }
 
 // refreshChannelTaskInfo re-reads the channel's task board and patches each

@@ -29,7 +29,11 @@ import { Avatar, formatTime } from "@/components/chat/avatar";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MessageRow } from "@/components/chat/message-row";
 import type { ChatMessageUI } from "@/stores/types";
-import { MentionSchema, ReactionSchema } from "@/types/proto-es/v1/command_pb";
+import {
+  AttachmentSchema,
+  MentionSchema,
+  ReactionSchema,
+} from "@/types/proto-es/v1/command_pb";
 
 // buildReaction constructs a Reaction message (which requires $typeName).
 function reaction(
@@ -343,6 +347,139 @@ describe("MessageRow sender click", () => {
       avatar!.click();
     });
     expect(onSenderClick).toHaveBeenCalledWith("agent", "agent-1", "Agent One");
+  });
+});
+
+describe("MessageRow inline thread preview", () => {
+  const previewReplies: ChatMessageUI[] = [
+    {
+      id: "conversations/c/messages/r1",
+      role: "assistant",
+      content: "first reply",
+      timestamp: new Date(0),
+      threadRoot: "conversations/c/messages/root-1",
+      senderName: "Agent",
+      agentId: "agent-1",
+    },
+    {
+      id: "conversations/c/messages/r2",
+      role: "user",
+      content: "latest reply",
+      timestamp: new Date(0),
+      threadRoot: "conversations/c/messages/root-1",
+      principalId: "alice-user-1",
+      senderName: "Alice Lee",
+    },
+  ];
+
+  function renderRow(
+    overrides: Partial<ChatMessageUI>,
+    onOpenThreadAt: (rootMsg: ChatMessageUI, reply: ChatMessageUI) => void
+  ) {
+    act(() => {
+      root!.render(
+        <MessageRow
+          msg={baseMsg({
+            id: "conversations/c/messages/root-1",
+            role: "user",
+            content: "root message",
+            threadReplyCount: 14,
+            threadNewReplyCount: 2,
+            threadPreview: previewReplies,
+            ...overrides,
+          })}
+          showAvatar
+          agentTitle="Agent"
+          streamingContent=""
+          streamingEvents={[]}
+          onViewDetails={() => {}}
+          onOpenThread={() => {}}
+          onOpenThreadAt={onOpenThreadAt}
+          markdownCustomId="chat"
+          debugMode={false}
+        />
+      );
+    });
+  }
+
+  it("renders the replies + new hints and one row per previewed reply", () => {
+    renderRow({}, () => {});
+    const text = container?.textContent ?? "";
+    expect(text).toContain("chat.thread-replies");
+    expect(text).toContain("chat.thread-new-replies");
+    expect(text).toContain("first reply");
+    expect(text).toContain("latest reply");
+    expect(text).toContain("chat.you"); // the current user's own reply label
+    expect(text).toContain("Agent"); // the agent reply's sender name
+  });
+
+  it("opens the thread at the clicked preview reply", () => {
+    const onOpenThreadAt = vi.fn();
+    renderRow({}, onOpenThreadAt);
+    const rows = Array.from(container?.querySelectorAll("button") ?? []).filter(
+      (b) => b.textContent?.includes("latest reply")
+    );
+    expect(rows).toHaveLength(1);
+    act(() => {
+      rows[0].click();
+    });
+    expect(onOpenThreadAt).toHaveBeenCalledTimes(1);
+    expect(onOpenThreadAt.mock.calls[0][1].id).toBe(previewReplies[1].id);
+  });
+
+  it("falls back to the bare count entry before previews sync", () => {
+    renderRow({ threadPreview: undefined }, () => {});
+    const text = container?.textContent ?? "";
+    expect(text).toContain("chat.thread-replies");
+    expect(text).not.toContain("first reply");
+    expect(text).not.toContain("latest reply");
+  });
+
+  it("hides the new-replies hint when the user is caught up", () => {
+    renderRow({ threadNewReplyCount: 0 }, () => {});
+    expect(container?.textContent).not.toContain("chat.thread-new-replies");
+  });
+
+  it("shows attachment names for a file-only preview reply", () => {
+    act(() => {
+      root!.render(
+        <MessageRow
+          msg={baseMsg({
+            id: "conversations/c/messages/root-1",
+            role: "user",
+            content: "root message",
+            threadReplyCount: 1,
+            threadPreview: [
+              {
+                id: "conversations/c/messages/rf",
+                role: "user",
+                content: "",
+                timestamp: new Date(0),
+                threadRoot: "conversations/c/messages/root-1",
+                attachments: [
+                  create(AttachmentSchema, {
+                    id: "a1",
+                    name: "report.pdf",
+                    mimeType: "application/pdf",
+                    sizeBytes: 10n,
+                  }),
+                ],
+              },
+            ],
+          })}
+          showAvatar
+          agentTitle="Agent"
+          streamingContent=""
+          streamingEvents={[]}
+          onViewDetails={() => {}}
+          onOpenThread={() => {}}
+          onOpenThreadAt={() => {}}
+          markdownCustomId="chat"
+          debugMode={false}
+        />
+      );
+    });
+    expect(container?.textContent).toContain("report.pdf");
   });
 });
 

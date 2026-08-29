@@ -8990,6 +8990,28 @@ replies. </p></td>
                   <td><p>latest_reply_at is the created_at of the most recent reply. </p></td>
                 </tr>
               
+                <tr>
+                  <td>new_reply_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>new_reply_count is the number of replies with room_version beyond the
+requesting user&#39;s read cursor (user_channel_cursor), excluding the user&#39;s
+own replies. Populated only for user callers; 0 for agent callers and
+users with no cursor (treated as caught up). The frontend surfaces it as
+the &#34;M new&#34; hint on the root message&#39;s inline thread preview. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>recent_reply</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td>repeated</td>
+                  <td><p>recent_reply is up to the 3 most recent replies in the thread, oldest
+first, for the root message&#39;s inline thread preview in the channel list.
+Full ChatMessage payloads so the preview reuses the standard message
+mapper (sender name, avatar handle, timestamps) and can fall back to
+attachment names when a reply has no text content. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 

@@ -496,37 +496,162 @@ type ChannelThread struct {
 	ReplyCount    int32
 	LatestVersion int64
 	LatestAt      time.Time
+	// NewReplyCount is the number of replies with room_version beyond the
+	// requesting user's read cursor, excluding the user's own replies. 0 for
+	// agent callers and users with no cursor (treated as caught up).
+	NewReplyCount int32
+	// RecentReplies is up to the 3 most recent replies in the thread, oldest
+	// first, for the channel list's inline thread preview on the root message.
+	RecentReplies []*ChatMessage
 }
 
-// ListChannelThreads returns a summary for every active thread in a
-// conversation, ordered by latest reply DESC. A "thread" here is any root
-// message that has ≥1 reply (the query groups replies by thread_root_message_id,
-// so roots with no replies do not appear). One grouped query covers the page;
-// the result is bounded by the number of threads, not the number of replies.
-func (s *Store) ListChannelThreads(ctx context.Context, conversationID uuid.UUID) ([]*ChannelThread, error) {
-	rows, err := s.GetDB().QueryContext(ctx, `
-		SELECT thread_root_message_id, count(*)::int, max(room_version), max(created_at)
+// channelThreadPreviewReplies caps the inline preview fetched per thread.
+const channelThreadPreviewReplies = 3
+
+// listChannelThreadsSQL groups the conversation's replies into per-thread
+// summaries: a "thread" is any root message that has ≥1 reply (the query
+// groups replies by thread_root_message_id, so roots with no replies do not
+// appear). One grouped query covers the page; the result is bounded by the
+// number of threads, not the number of replies.
+const listChannelThreadsSQL = `
+	SELECT thread_root_message_id, count(*)::int, max(room_version), max(created_at)
+	FROM chat_message
+	WHERE conversation_id = $1 AND thread_root_message_id IS NOT NULL
+	GROUP BY thread_root_message_id
+	ORDER BY max(room_version) DESC`
+
+// listChannelThreadPreviewsSQL fetches the newest replies of every thread in
+// one query: the CTE ranks replies per thread by room_version DESC, and the
+// outer select joins back through the chatMessageColumns projection so each
+// preview row scans via scanChatMessageRow. Rows come back oldest-first within
+// each thread, ordered by thread root, so the caller can bucket them.
+const listChannelThreadPreviewsSQL = `
+	WITH ranked AS (
+		SELECT id, row_number() OVER (
+			PARTITION BY thread_root_message_id
+			ORDER BY room_version DESC
+		) AS rn
 		FROM chat_message
 		WHERE conversation_id = $1 AND thread_root_message_id IS NOT NULL
-		GROUP BY thread_root_message_id
-		ORDER BY max(room_version) DESC
-	`, conversationID)
+	)
+	SELECT ` + chatMessageColumns + `
+	FROM chat_message cm
+	JOIN principal p ON p.id = cm.principal_id
+	LEFT JOIN agent a ON a.id = cm.sender_agent_id
+	JOIN ranked ON ranked.id = cm.id AND ranked.rn <= $2
+	ORDER BY cm.thread_root_message_id, cm.room_version ASC`
+
+// listChannelThreadNewCountsSQL counts, per thread, the replies past the user's
+// read cursor while excluding the user's own USER-sender replies. Agent replies
+// carry the conversation owner's principal, so the sender_type guard (mirroring
+// the left-rail unread query) keeps them from being misattributed as own.
+const listChannelThreadNewCountsSQL = `
+	SELECT thread_root_message_id, count(*)::int
+	FROM chat_message
+	WHERE conversation_id = $1 AND thread_root_message_id IS NOT NULL
+	  AND room_version > $2
+	  AND NOT (sender_type = 1 AND principal_id = $3)
+	GROUP BY thread_root_message_id`
+
+// ListChannelThreads returns a summary for every active thread in a
+// conversation, ordered by latest reply DESC. When userPrincipalID is > 0 (a
+// user caller), each summary also reports NewReplyCount against that user's
+// read cursor; pass 0 for agent callers (NewReplyCount stays 0). RecentReplies
+// (the newest channelThreadPreviewReplies replies per thread) is always
+// populated; preview failures are non-fatal and leave previews empty.
+func (s *Store) ListChannelThreads(ctx context.Context, conversationID uuid.UUID, userPrincipalID int, userHandle string) ([]*ChannelThread, error) {
+	rows, err := s.GetDB().QueryContext(ctx, listChannelThreadsSQL, conversationID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to list channel threads")
 	}
 	defer rows.Close()
 	var threads []*ChannelThread
+	byRoot := make(map[uuid.UUID]*ChannelThread)
 	for rows.Next() {
 		var t ChannelThread
 		if err := rows.Scan(&t.RootMessageID, &t.ReplyCount, &t.LatestVersion, &t.LatestAt); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan channel thread")
 		}
 		threads = append(threads, &t)
+		byRoot[t.RootMessageID] = &t
 	}
 	if err := rows.Err(); err != nil {
 		return nil, errors.Wrapf(err, "failed to iterate channel threads")
 	}
+
+	// Unread ("M new") counts need the caller's cursor; a user with no cursor
+	// row is caught up, so the query would count nothing — skip it entirely.
+	if userPrincipalID > 0 {
+		if readVersion, found, cursorErr := s.GetUserReadCursor(ctx, userPrincipalID, conversationID); cursorErr == nil && found {
+			newCounts, newErr := s.listChannelThreadNewCounts(ctx, conversationID, readVersion, userHandle)
+			if newErr == nil {
+				for root, count := range newCounts {
+					if t := byRoot[root]; t != nil {
+						t.NewReplyCount = count
+					}
+				}
+			}
+		}
+	}
+
+	// Recent replies ride the same response; on failure leave previews empty
+	// (the frontend falls back to the plain badge) rather than failing the
+	// whole badge refresh.
+	if previews, previewErr := s.listChannelThreadPreviews(ctx, conversationID); previewErr == nil {
+		for _, msg := range previews {
+			if msg.ThreadRootMessageID.Valid {
+				if t := byRoot[msg.ThreadRootMessageID.UUID]; t != nil {
+					t.RecentReplies = append(t.RecentReplies, msg)
+				}
+			}
+		}
+	}
 	return threads, nil
+}
+
+// listChannelThreadPreviews runs the ranked preview query and returns every
+// thread's newest (up to channelThreadPreviewReplies) replies, oldest-first.
+func (s *Store) listChannelThreadPreviews(ctx context.Context, conversationID uuid.UUID) ([]*ChatMessage, error) {
+	rows, err := s.GetDB().QueryContext(ctx, listChannelThreadPreviewsSQL, conversationID, channelThreadPreviewReplies)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list channel thread previews")
+	}
+	defer rows.Close()
+	var msgs []*ChatMessage
+	for rows.Next() {
+		msg, scanErr := scanChatMessageRow(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		msgs = append(msgs, msg)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate channel thread previews")
+	}
+	return msgs, nil
+}
+
+// listChannelThreadNewCounts maps thread root -> replies past readVersion not
+// authored by userHandle.
+func (s *Store) listChannelThreadNewCounts(ctx context.Context, conversationID uuid.UUID, readVersion int64, userHandle string) (map[uuid.UUID]int32, error) {
+	rows, err := s.GetDB().QueryContext(ctx, listChannelThreadNewCountsSQL, conversationID, readVersion, userHandle)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list channel thread new counts")
+	}
+	defer rows.Close()
+	counts := make(map[uuid.UUID]int32)
+	for rows.Next() {
+		var root uuid.UUID
+		var count int32
+		if err := rows.Scan(&root, &count); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan channel thread new count")
+		}
+		counts[root] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate channel thread new counts")
+	}
+	return counts, nil
 }
 
 func itoa(n int) string {

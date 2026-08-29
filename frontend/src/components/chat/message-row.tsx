@@ -161,6 +161,10 @@ export interface MessageRowProps {
   // thread" hover action and the reply-count entry. The message's id is the
   // thread root id the panel opens against.
   onOpenThread?: (msg: ChatMessageUI) => void;
+  // onOpenThreadAt, when provided, wires the inline thread preview's per-reply
+  // rows (root messages only): clicking one opens the thread drawer and
+  // scrolls to that reply. Receives the root message and the previewed reply.
+  onOpenThreadAt?: (rootMsg: ChatMessageUI, reply: ChatMessageUI) => void;
   // onPreviewAttachment, when provided, wires markdown attachments to the
   // full-page preview overlay. Receives the attachment and the effective
   // thread root (the message's threadRoot, or its own id when it is a root)
@@ -215,6 +219,130 @@ export interface MessageRowProps {
   contextMenuRootOnly?: boolean;
 }
 
+// ThreadPreviewRow renders one reply in a root message's inline thread
+// preview: small avatar, sender label, a single-line truncated plain-text
+// excerpt, and the time pushed to the far edge. Clicking the row opens the
+// thread drawer scrolled to this reply. Memoized with stable props so the
+// channel list's badge poll (5s) does not re-render unchanged rows.
+const ThreadPreviewRow = memo(function ThreadPreviewRow({
+  rootMsg,
+  reply,
+  onOpenThreadAt,
+  currentPrincipalId,
+}: {
+  rootMsg: ChatMessageUI;
+  reply: ChatMessageUI;
+  onOpenThreadAt: (rootMsg: ChatMessageUI, reply: ChatMessageUI) => void;
+  currentPrincipalId?: string;
+}) {
+  const { t, i18n } = useTranslation();
+  const isUser = reply.role === "user";
+  const isOwn = isOwnUserMessage(reply, currentPrincipalId);
+  const avatarSeed = isUser
+    ? reply.principalId || currentPrincipalId || ""
+    : reply.agentId || reply.senderName || "agent";
+  const avatarName = isUser
+    ? reply.principalId || currentPrincipalId
+      ? avatarNameForUserId(reply.principalId || currentPrincipalId || "")
+      : undefined
+    : reply.agentId
+      ? avatarNameForAgentId(reply.agentId)
+      : undefined;
+  const avatarSrc = useAvatar(avatarName);
+  // Sender label mirrors MessageRow's header: "You" for the current user's own
+  // messages in shared channels, the display name otherwise.
+  const senderLabel = isUser
+    ? isOwn
+      ? t("chat.you")
+      : reply.senderName || t("chat.you")
+    : reply.senderName || t("chat.agent");
+  // Single-line plain-text excerpt. Markdown renders raw here on purpose (the
+  // drawer carries the rich rendering); a file-only reply falls back to its
+  // attachment names, same rule as the left-rail channel preview.
+  const excerpt =
+    reply.content ||
+    (reply.attachments ?? [])
+      .map((a) => a.name)
+      .filter(Boolean)
+      .join(", ");
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenThreadAt(rootMsg, reply)}
+      className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-xs transition-colors hover:bg-control-bg/60 cursor-pointer"
+      aria-label={senderLabel}
+    >
+      <Avatar seed={avatarSeed} src={avatarSrc} size={6} />
+      <span className="max-w-[10rem] shrink-0 truncate font-medium text-control">
+        {senderLabel}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-control-placeholder">
+        {excerpt}
+      </span>
+      <span className="shrink-0 text-[11px] text-control-light tabular-nums">
+        {formatTime(reply.timestamp, i18n.language)}
+      </span>
+    </button>
+  );
+});
+
+// ThreadPreview renders the "N replies · M new" entry plus the latest replies
+// of that thread beneath it (Slack-style inline preview). The header keeps the
+// existing open-thread action (opens the drawer without a target reply); each
+// preview row jumps to its exact reply. The whole block only spans the message
+// body column, so it reads as part of the root message. The caller falls back
+// to the plain count entry when no preview has been synced yet.
+const ThreadPreviewBlock = memo(function ThreadPreviewBlock({
+  rootMsg,
+  replies,
+  newCount,
+  onOpenThread,
+  onOpenThreadAt,
+  currentPrincipalId,
+}: {
+  rootMsg: ChatMessageUI;
+  replies: ChatMessageUI[];
+  newCount: number;
+  onOpenThread: (msg: ChatMessageUI) => void;
+  onOpenThreadAt: (rootMsg: ChatMessageUI, reply: ChatMessageUI) => void;
+  currentPrincipalId?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    // Grouped panel: header + preview rows inside one soft card so the
+    // preview reads as a single sub-conversation attached to the root. Shares
+    // the content bubble's max-w-[80%] cap so both scale together with the
+    // window width instead of drifting apart on wide screens.
+    <div className="flex w-full max-w-[80%] flex-col gap-0.5 rounded-lg border border-control-border bg-control-bg/40 p-1">
+      <button
+        type="button"
+        onClick={() => onOpenThread(rootMsg)}
+        className="flex w-fit items-center gap-1 px-1 text-xs font-medium text-control hover:text-accent cursor-pointer transition-colors"
+      >
+        <MessageCircleReply className="size-3" />
+        <span>
+          {t("chat.thread-replies", { count: rootMsg.threadReplyCount ?? 0 })}
+        </span>
+        {newCount > 0 && (
+          <span className="text-accent">
+            {t("chat.thread-new-replies", { count: newCount })}
+          </span>
+        )}
+        <ChevronRight className="size-3 text-control-light" />
+      </button>
+      {replies.map((reply) => (
+        <ThreadPreviewRow
+          key={reply.id}
+          rootMsg={rootMsg}
+          reply={reply}
+          onOpenThreadAt={onOpenThreadAt}
+          currentPrincipalId={currentPrincipalId}
+        />
+      ))}
+    </div>
+  );
+});
+
 export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
   const {
     msg,
@@ -228,6 +356,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     MentionBadge,
     markdownCustomId,
     onOpenThread,
+    onOpenThreadAt,
     onPreviewAttachment,
     onJumpToSection,
     onPreviewImage,
@@ -766,11 +895,24 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
           </button>
         )}
 
-        {/* Thread reply count + open-thread entry (root messages only). */}
+        {/* Thread entry (root messages only): "N replies · M new" above the
+            latest replies once the channel's thread summary has synced; until
+            then fall back to the bare count button. Clicking the entry opens
+            the thread; preview rows jump to their exact reply. */}
         {onOpenThread &&
           !msg.threadRoot &&
           (msg.threadReplyCount ?? 0) > 0 &&
-          !isStreaming && (
+          !isStreaming &&
+          (msg.threadPreview?.length ? (
+            <ThreadPreviewBlock
+              rootMsg={msg}
+              replies={msg.threadPreview}
+              newCount={msg.threadNewReplyCount ?? 0}
+              onOpenThread={onOpenThread}
+              onOpenThreadAt={onOpenThreadAt ?? onOpenThread}
+              currentPrincipalId={currentPrincipalId}
+            />
+          ) : (
             <button
               type="button"
               onClick={() => onOpenThread(msg)}
@@ -781,7 +923,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                 {t("chat.thread-replies", { count: msg.threadReplyCount ?? 0 })}
               </span>
             </button>
-          )}
+          ))}
       </div>
     </div>
   );
