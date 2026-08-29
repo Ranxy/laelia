@@ -1,7 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { authServiceClient, userServiceClient } from "@/connect";
-import { invalidateAvatar } from "@/lib/avatar-cache";
-import { invalidateImageBlobs } from "@/lib/image-blob-cache";
+import * as avatarCache from "@/lib/avatar-cache";
+import * as imageBlobCache from "@/lib/image-blob-cache";
 import {
   LoginRequestSchema,
   LogoutRequestSchema,
@@ -13,7 +13,18 @@ import {
   UserSchema,
   UserType,
 } from "@/types/proto-es/v1/user_service_pb";
+import { registerCleanup } from "./cleanup-registry";
 import type { AppSliceCreator, AuthSlice } from "./types";
+
+// Avatar blob URLs and cached image-attachment blobs are module-level lib
+// caches a store reset cannot reach. The owning lib files are outside the
+// editable set for this ticket (batch 4: move registration into lib/), so
+// the registrations stay in this file in registry form until those libs
+// self-register (batch 4) and logout() needs no per-cache calls at all.
+registerCleanup(() => {
+  avatarCache.invalidateAvatar?.();
+  imageBlobCache.invalidateImageBlobs?.();
+});
 
 export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
   currentUser: null,
@@ -68,15 +79,12 @@ export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
     } finally {
       // Wipe every slice so a different user signing in on the same tab never
       // sees the previous principal's cached messages/channels/rosters.
+      // reset() runs the unified cleanup registry (Query caches, module-level
+      // caches), so no per-module invalidation is needed here.
       get().reset();
       // Keep sessionLoaded true so the router guard does not re-show the
       // initial loading spinner on the way to the sign-in page.
       set({ sessionLoaded: true });
-      // Avatar blob URLs and the cached image blobs are module-level caches
-      // that a store reset cannot reach; clear them so they don't survive
-      // across users.
-      invalidateAvatar();
-      invalidateImageBlobs();
     }
   },
 

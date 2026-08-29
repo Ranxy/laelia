@@ -2,6 +2,7 @@ import { equals } from "@bufbuild/protobuf";
 import { mcpServerServiceClient, settingServiceClient } from "@/connect";
 import { queryClient } from "@/lib/query-client";
 import { McpServerSchema } from "@/types/proto-es/v1/mcp_pb";
+import { registerCleanup } from "./cleanup-registry";
 import { sameList } from "./list-equals";
 import type { AppSliceCreator, McpServerSlice } from "./types";
 
@@ -89,3 +90,7 @@ export const createMcpServerSlice: AppSliceCreator<McpServerSlice> = (
     }
   },
 });
+
+// Audit 05 B7: registered with the unified cleanup registry so reset()/logout
+// clears this slice's Query cache without a logout-site call.
+registerCleanup(invalidateMcpServersCache);

@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { queryClient } from "@/lib/query-client";
+import { registerCleanup } from "./cleanup-registry";
 import { useAppStore } from "./index";
 
 describe("store reset", () => {
@@ -59,5 +61,52 @@ describe("store reset", () => {
 
     // Safety net in case the assertion above ever fails before clearing.
     clearInterval(badgeTimer);
+  });
+
+  it("runs registered cleanups and clears the Query cache on reset", () => {
+    const cleanup = vi.fn();
+    const unregister = registerCleanup(cleanup);
+    try {
+      // Seed Query cache entries owned by registered module cleanups
+      // (api-provider / mcp, wired in their slice files via the registry).
+      queryClient.setQueryData(["apiProviders"], {
+        apiProviders: [],
+        nextPageToken: "",
+      });
+      queryClient.setQueryData(["mcpServers"], {
+        mcpServers: [],
+        nextPageToken: "",
+      });
+      expect(queryClient.getQueryCache().getAll()).toHaveLength(2);
+
+      useAppStore.getState().reset();
+
+      expect(cleanup).toHaveBeenCalledOnce();
+      expect(queryClient.getQueryCache().getAll()).toEqual([]);
+    } finally {
+      // Temporary registration: unsubscribe so later resets don't run it.
+      unregister();
+    }
+  });
+
+  it("contains a throwing cleanup and still runs the others", () => {
+    const errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const unregisterBoom = registerCleanup(() => {
+      throw new Error("boom");
+    });
+    const after = vi.fn();
+    const unregisterAfter = registerCleanup(after);
+    try {
+      useAppStore.getState().reset();
+
+      expect(after).toHaveBeenCalledOnce();
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      unregisterBoom();
+      unregisterAfter();
+      errorSpy.mockRestore();
+    }
   });
 });

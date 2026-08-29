@@ -19,6 +19,7 @@ import { createUserSlice } from "./user";
 import { createImagePreviewSlice } from "./image-preview";
 import { createPreviewSlice } from "./preview";
 import { createPresenceSlice } from "./presence";
+import { runCleanups } from "./cleanup-registry";
 
 export const useAppStore = create<AppStoreState>()((...args) => {
   const [set, get] = args;
@@ -43,6 +44,13 @@ export const useAppStore = create<AppStoreState>()((...args) => {
     ...createImagePreviewSlice(...args),
     ...createPresenceSlice(...args),
     reset: () => {
+      // Unified cleanup registry (audit 05 B7): every module with file-scope
+      // side effects (command recency, slice Query caches, avatar/image-blob
+      // caches) registers once at its own file scope via registerCleanup(fn)
+      // in cleanup-registry.ts. A new side-effectful module only calls
+      // registerCleanup(fn) in its own file — this reset and logout's old
+      // hand-maintained checklist no longer grow.
+      runCleanups();
       // Stop every watcher interval before wiping state so orphaned timers can't
       // keep polling (and re-writing) the freshly reset store. getInitialState()
       // restores the pristine creation-time state (including the same action

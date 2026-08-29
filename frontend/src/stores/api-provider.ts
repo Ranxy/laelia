@@ -2,6 +2,7 @@ import { equals } from "@bufbuild/protobuf";
 import { apiProviderServiceClient } from "@/connect";
 import { queryClient } from "@/lib/query-client";
 import { ApiProviderSchema } from "@/types/proto-es/v1/api_provider_service_pb";
+import { registerCleanup } from "./cleanup-registry";
 import { sameList } from "./list-equals";
 import type { ApiProviderSlice, AppSliceCreator } from "./types";
 
@@ -70,3 +71,7 @@ export const createAPIProviderSlice: AppSliceCreator<ApiProviderSlice> = (
     }
   },
 });
+
+// Audit 05 B7: registered with the unified cleanup registry so reset()/logout
+// clears this slice's Query cache without a logout-site call.
+registerCleanup(invalidateApiProvidersCache);
