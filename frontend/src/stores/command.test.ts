@@ -73,3 +73,31 @@ describe("command watch streams", () => {
     expect(useAppStore.getState().activeEvents[NAME] ?? []).toHaveLength(0);
   });
 });
+
+describe("command cache bounds", () => {
+  it("releaseCommand drops the cached output/events for one command", async () => {
+    mock.watchOutputs = [{ commandId: "c", seqNo: 1 }];
+    await useAppStore.getState().watchCommand(NAME);
+    expect(useAppStore.getState().activeOutputs[NAME]).toHaveLength(1);
+
+    useAppStore.getState().releaseCommand(NAME);
+    expect(useAppStore.getState().activeOutputs[NAME]).toBeUndefined();
+    expect(useAppStore.getState().activeEvents[NAME]).toBeUndefined();
+    // Releasing an unknown command is a no-op.
+    useAppStore.getState().releaseCommand(NAME);
+  });
+
+  it("caps tracked commands via the LRU window", async () => {
+    for (let i = 0; i < 9; i++) {
+      const name = `agents/a/commands/c${i}`;
+      mock.watchOutputs = [{ commandId: "c", seqNo: 1 }];
+      await useAppStore.getState().watchCommand(name);
+    }
+    const outputs = useAppStore.getState().activeOutputs;
+    expect(Object.keys(outputs)).toHaveLength(8);
+    // The stalest tracked command was evicted; the freshest survives.
+    expect(outputs["agents/a/commands/c0"]).toBeUndefined();
+    expect(outputs["agents/a/commands/c8"]).toHaveLength(1);
+    useAppStore.setState({ activeOutputs: {}, activeEvents: {} });
+  });
+});

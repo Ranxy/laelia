@@ -403,6 +403,11 @@ export interface CommandSlice {
   // aborted by the caller or failed with an error.
   watchCommand: (name: string, signal?: AbortSignal) => Promise<boolean>;
   watchCommandEvents: (name: string, signal?: AbortSignal) => Promise<boolean>;
+  // releaseCommand drops the cached output/events for one command so a long
+  // session cannot accumulate every visited command's full stdout in memory.
+  // Command detail pages call it on unmount; the LRU cap in the slice is the
+  // wider safety net.
+  releaseCommand: (name: string) => void;
 }
 
 export interface ChatSlice {

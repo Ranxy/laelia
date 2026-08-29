@@ -15,6 +15,7 @@ const mock = vi.hoisted(() => ({
   steerCommand: vi.fn(),
   watchCommand: vi.fn(),
   watchCommandEvents: vi.fn(),
+  releaseCommand: vi.fn(),
   activeOutputs: {} as Record<string, unknown[]>,
   activeEvents: {} as Record<string, CommandEvent[]>,
 }));
@@ -26,6 +27,7 @@ vi.mock("@/stores", () => {
     steerCommand: mock.steerCommand,
     watchCommand: mock.watchCommand,
     watchCommandEvents: mock.watchCommandEvents,
+    releaseCommand: mock.releaseCommand,
     get activeOutputs() {
       return mock.activeOutputs;
     },

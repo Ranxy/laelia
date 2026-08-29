@@ -39,6 +39,7 @@ export function CommandDetailPage() {
   const steerCommand = useAppStore((s) => s.steerCommand);
   const watchCommand = useAppStore((s) => s.watchCommand);
   const watchCommandEvents = useAppStore((s) => s.watchCommandEvents);
+  const releaseCommand = useAppStore((s) => s.releaseCommand);
   const activeOutputs = useAppStore((s) => s.activeOutputs);
   const activeEvents = useAppStore((s) => s.activeEvents);
   const abortRef = useRef<AbortController | null>(null);
@@ -130,8 +131,12 @@ export function CommandDetailPage() {
 
     return () => {
       controller.abort();
+      // Release the cached stdout/events for this command: leaving the page
+      // must not pin its (potentially multi-MB) stream data in the store.
+      // Reopening refetches the command and re-watches from the stored seqNo.
+      releaseCommand(cmdName);
     };
-  }, [cmdName, watchCommand, watchCommandEvents, load]);
+  }, [cmdName, watchCommand, watchCommandEvents, releaseCommand, load]);
 
   const outputs = activeOutputs[cmdName] ?? [];
   const events = activeEvents[cmdName] ?? [];

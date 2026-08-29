@@ -15,6 +15,35 @@ const THREAD_LONG_POLL_MS = 25000;
 // Backoff between a failed long poll and the next attempt, so a network blip
 // does not turn into a tight retry loop.
 const THREAD_RETRY_DELAY_MS = 1000;
+// Bounded thread cache: each cached thread holds up to 200 messages, so an
+// unbounded map grows with every thread the user ever opened. Eviction is
+// lazy (after opening a thread / closing the panel): the just-closed thread
+// stays cached for a quick reopen, and the stalest thread beyond the cap
+// returns to "never opened" state — reopening simply reloads it.
+const MAX_CACHED_THREADS = 8;
+
+function pruneThreadCache(
+  threads: Record<
+    string,
+    { messages: ChatMessageUI[]; currentVersion: bigint; loading: boolean }
+  >,
+  activeRoot: string | null
+): Record<
+  string,
+  { messages: ChatMessageUI[]; currentVersion: bigint; loading: boolean }
+> {
+  const keys = Object.keys(threads);
+  if (keys.length <= MAX_CACHED_THREADS) return threads;
+  // JS object insertion order makes keys[] oldest-first. Drop the oldest
+  // entries over the cap, never the active thread.
+  const doomed = keys
+    .filter((k) => k !== activeRoot)
+    .slice(0, keys.length - MAX_CACHED_THREADS);
+  if (doomed.length === 0) return threads;
+  const next = { ...threads };
+  for (const k of doomed) delete next[k];
+  return next;
+}
 
 export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
   threadByRoot: {},
@@ -48,14 +77,17 @@ export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
       );
       const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map(toUiMessage);
       set((state) => ({
-        threadByRoot: {
-          ...state.threadByRoot,
-          [rootMessageId]: {
-            messages: uiMsgs,
-            currentVersion: res.currentVersion,
-            loading: false,
+        threadByRoot: pruneThreadCache(
+          {
+            ...state.threadByRoot,
+            [rootMessageId]: {
+              messages: uiMsgs,
+              currentVersion: res.currentVersion,
+              loading: false,
+            },
           },
-        },
+          rootMessageId
+        ),
       }));
       // The root (messages[0]) carries the authoritative total reply count;
       // sync it back into the main channel list so the "N replies" badge on the
@@ -64,15 +96,18 @@ export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
       syncRootReplyCount(set, get, conversation, rootMessageId, uiMsgs[0]);
     } catch {
       set((state) => ({
-        threadByRoot: {
-          ...state.threadByRoot,
-          [rootMessageId]: {
-            messages: state.threadByRoot[rootMessageId]?.messages ?? [],
-            currentVersion:
-              state.threadByRoot[rootMessageId]?.currentVersion ?? 0n,
-            loading: false,
+        threadByRoot: pruneThreadCache(
+          {
+            ...state.threadByRoot,
+            [rootMessageId]: {
+              messages: state.threadByRoot[rootMessageId]?.messages ?? [],
+              currentVersion:
+                state.threadByRoot[rootMessageId]?.currentVersion ?? 0n,
+              loading: false,
+            },
           },
-        },
+          rootMessageId
+        ),
       }));
     }
 
@@ -83,7 +118,13 @@ export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
   closeThread() {
     const root = get().activeThreadRoot;
     if (root) stopWatcher(set, get, root);
-    set({ activeThreadRoot: null, activeThreadConversation: null });
+    set((state) => ({
+      activeThreadRoot: null,
+      activeThreadConversation: null,
+      // Lazy eviction: the just-closed thread stays cached for a quick
+      // reopen; the stalest snapshots over the cap are dropped here.
+      threadByRoot: pruneThreadCache(state.threadByRoot, null),
+    }));
   },
 
   // loadThreadMessages fetches a thread's messages into threadByRoot without
@@ -104,27 +145,33 @@ export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
       );
       const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map(toUiMessage);
       set((state) => ({
-        threadByRoot: {
-          ...state.threadByRoot,
-          [rootMessageId]: {
-            messages: uiMsgs,
-            currentVersion: res.currentVersion,
-            loading: false,
+        threadByRoot: pruneThreadCache(
+          {
+            ...state.threadByRoot,
+            [rootMessageId]: {
+              messages: uiMsgs,
+              currentVersion: res.currentVersion,
+              loading: false,
+            },
           },
-        },
+          state.activeThreadRoot
+        ),
       }));
       syncRootReplyCount(set, get, conversation, rootMessageId, uiMsgs[0]);
     } catch {
       set((state) => ({
-        threadByRoot: {
-          ...state.threadByRoot,
-          [rootMessageId]: {
-            messages: state.threadByRoot[rootMessageId]?.messages ?? [],
-            currentVersion:
-              state.threadByRoot[rootMessageId]?.currentVersion ?? 0n,
-            loading: false,
+        threadByRoot: pruneThreadCache(
+          {
+            ...state.threadByRoot,
+            [rootMessageId]: {
+              messages: state.threadByRoot[rootMessageId]?.messages ?? [],
+              currentVersion:
+                state.threadByRoot[rootMessageId]?.currentVersion ?? 0n,
+              loading: false,
+            },
           },
-        },
+          state.activeThreadRoot
+        ),
       }));
     }
   },
