@@ -1,4 +1,4 @@
-import { create } from "@bufbuild/protobuf";
+import { create, equals } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { commandServiceClient } from "@/connect";
 import type {
@@ -10,6 +10,7 @@ import {
   AddChannelMemberInputSchema,
   AddChannelMemberRequestSchema,
   ArchiveChannelRequestSchema,
+  ConversationSchema,
   CreateChannelRequestSchema,
   FetchConversationActivityRequestSchema,
   ListChannelMembersRequestSchema,
@@ -26,6 +27,7 @@ import {
   UnarchiveChannelRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { appendNewMessages, fetchConversationDelta, toUiMessage } from "./chat";
+import { sameList, sameUnreadMap } from "./list-equals";
 import { sleep } from "./polling";
 import type { AppSliceCreator, ChannelSlice, ChatMessageUI } from "./types";
 
@@ -126,7 +128,18 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
       const list = res.channels ?? [];
       const unreadByConv: Record<string, number> = {};
       for (const c of list) unreadByConv[c.name] = c.unreadCount ?? 0;
-      set({ channels: list, unreadByConv, channelsLoading: false });
+      // Bail when the snapshot is unchanged so unchanged polls cause no
+      // re-render at all: ConversationList and the chat pages subscribe the
+      // whole channels array, and unreadByConv rides along on every tick.
+      const prev = get();
+      const unchanged =
+        sameList(prev.channels, list, (a, b) =>
+          equals(ConversationSchema, a, b)
+        ) && sameUnreadMap(prev.unreadByConv, unreadByConv);
+      if (!unchanged) {
+        set({ channels: list, unreadByConv });
+      }
+      set({ channelsLoading: false });
     } catch {
       set({ channelsLoading: false });
     }
@@ -145,6 +158,15 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
       // Only real channels (type 2) belong in the members-page roster; DMs are
       // re-opened by starting a chat with the peer instead.
       const list = (res.channels ?? []).filter((c) => c.type === 2);
+      const prev = get();
+      if (
+        sameList(prev.myChannels, list, (a, b) =>
+          equals(ConversationSchema, a, b)
+        )
+      ) {
+        set({ myChannelsLoading: false });
+        return;
+      }
       set({ myChannels: list, myChannelsLoading: false });
     } catch {
       set({ myChannelsLoading: false });

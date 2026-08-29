@@ -1,9 +1,12 @@
+import { equals } from "@bufbuild/protobuf";
 import { apiProviderServiceClient } from "@/connect";
+import { ApiProviderSchema } from "@/types/proto-es/v1/api_provider_service_pb";
+import { sameList } from "./list-equals";
 import type { ApiProviderSlice, AppSliceCreator } from "./types";
 
 export const createAPIProviderSlice: AppSliceCreator<ApiProviderSlice> = (
   set,
-  _get
+  get
 ) => ({
   apiProviders: [],
   apiProvidersLoading: false,
@@ -21,6 +24,16 @@ export const createAPIProviderSlice: AppSliceCreator<ApiProviderSlice> = (
         pageSize: params?.pageSize ?? 100,
         pageToken: params?.pageToken ?? "",
       });
+      // Skip the state update entirely when nothing changed, so unchanged
+      // polls cause no re-render at all.
+      if (
+        silent &&
+        sameList(get().apiProviders, res.apiProviders, (a, b) =>
+          equals(ApiProviderSchema, a, b)
+        )
+      ) {
+        return { nextPageToken: res.nextPageToken };
+      }
       set({ apiProviders: res.apiProviders, apiProvidersLoading: false });
       return { nextPageToken: res.nextPageToken };
     } catch {

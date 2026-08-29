@@ -1,4 +1,4 @@
-import { create } from "@bufbuild/protobuf";
+import { create, equals } from "@bufbuild/protobuf";
 import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 import { userServiceClient } from "@/connect";
 import { State } from "@/types/proto-es/v1/common_pb";
@@ -11,9 +11,10 @@ import {
   UserSchema,
   UserType,
 } from "@/types/proto-es/v1/user_service_pb";
+import { sameList } from "./list-equals";
 import type { AppSliceCreator, UserSlice } from "./types";
 
-export const createUserSlice: AppSliceCreator<UserSlice> = (set) => ({
+export const createUserSlice: AppSliceCreator<UserSlice> = (set, get) => ({
   users: [],
   usersLoading: false,
   deletedUsers: [],
@@ -38,10 +39,27 @@ export const createUserSlice: AppSliceCreator<UserSlice> = (set) => ({
       if (showDeleted) {
         // `show_deleted=true` returns active + deleted; the recycle bin only
         // cares about soft-deleted users, so filter down to state == DELETED.
+        const deleted = res.users.filter((u) => u.state === State.DELETED);
+        // Skip the state update entirely when nothing changed, so unchanged
+        // polls cause no re-render at all.
+        if (
+          silent &&
+          sameList(get().deletedUsers, deleted, (a, b) =>
+            equals(UserSchema, a, b)
+          )
+        ) {
+          set({ deletedUsersLoading: false });
+          return { nextPageToken: res.nextPageToken };
+        }
         set({
-          deletedUsers: res.users.filter((u) => u.state === State.DELETED),
+          deletedUsers: deleted,
           deletedUsersLoading: false,
         });
+      } else if (
+        silent &&
+        sameList(get().users, res.users, (a, b) => equals(UserSchema, a, b))
+      ) {
+        set({ usersLoading: false });
       } else {
         set({ users: res.users, usersLoading: false });
       }

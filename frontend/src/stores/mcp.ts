@@ -1,9 +1,12 @@
+import { equals } from "@bufbuild/protobuf";
 import { mcpServerServiceClient, settingServiceClient } from "@/connect";
+import { McpServerSchema } from "@/types/proto-es/v1/mcp_pb";
+import { sameList } from "./list-equals";
 import type { AppSliceCreator, McpServerSlice } from "./types";
 
 export const createMcpServerSlice: AppSliceCreator<McpServerSlice> = (
   set,
-  _get
+  get
 ) => ({
   mcpServers: [],
   mcpServersLoading: false,
@@ -29,11 +32,22 @@ export const createMcpServerSlice: AppSliceCreator<McpServerSlice> = (
       const v = cfgRes.value?.value;
       const personalEnabled =
         v?.case === "userMcpConfig" ? v.value.allowUserMcpServers : true;
+      const merged = [
+        ...(wsRes.mcpServers ?? []),
+        ...(personalEnabled ? (myRes.mcpServers ?? []) : []),
+      ];
+      // Skip the state update entirely when nothing changed, so unchanged
+      // polls cause no re-render at all.
+      if (
+        silent &&
+        sameList(get().mcpServers, merged, (a, b) =>
+          equals(McpServerSchema, a, b)
+        )
+      ) {
+        return { nextPageToken: wsRes.nextPageToken };
+      }
       set({
-        mcpServers: [
-          ...(wsRes.mcpServers ?? []),
-          ...(personalEnabled ? (myRes.mcpServers ?? []) : []),
-        ],
+        mcpServers: merged,
         mcpServersLoading: false,
       });
       return { nextPageToken: wsRes.nextPageToken };
