@@ -18,7 +18,7 @@ export function CopyableCommand({
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <code className="min-w-0 flex-1 rounded bg-white border border-control-border px-3 py-2 font-mono text-xs break-all text-black dark:bg-zinc-900 dark:text-white">
+      <code className="min-w-0 flex-1 rounded bg-control-bg border border-control-border px-3 py-2 font-mono text-xs break-all text-main">
         {command}
       </code>
       <Button

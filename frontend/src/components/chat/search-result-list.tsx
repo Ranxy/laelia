@@ -81,7 +81,7 @@ const SearchHighlight = memo(function SearchHighlight({
         part.match ? (
           <mark
             key={index}
-            className="rounded-sm bg-yellow-200 px-0.5 text-black"
+            className="rounded-sm bg-warning/30 px-0.5 text-main"
           >
             {part.text}
           </mark>

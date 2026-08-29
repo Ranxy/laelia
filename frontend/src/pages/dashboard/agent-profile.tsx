@@ -1903,7 +1903,7 @@ export function AgentProfilePage() {
                               </Button>
                             </div>
                             {piModelsError && (
-                              <p className="text-xs text-danger">
+                              <p className="text-xs text-error">
                                 {piModelsError}
                               </p>
                             )}

@@ -119,7 +119,7 @@ export function WorkspaceFilePanel({
             {t("workspace.loading")}
           </div>
         ) : !file ? null : file.error ? (
-          <p className="px-4 py-2 text-sm text-danger">{file.error}</p>
+          <p className="px-4 py-2 text-sm text-error">{file.error}</p>
         ) : file.binary && file.mimeType && file.content ? (
           <div className="flex h-full items-start justify-center p-4">
             <img

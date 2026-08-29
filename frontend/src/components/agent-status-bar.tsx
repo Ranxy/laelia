@@ -25,14 +25,14 @@ function statusColor(status: string): string {
     case "offline":
       return "text-control-placeholder";
     case "starting":
-      return "text-blue-400";
+      return "text-info";
     case "thinking":
-      return "text-violet-400";
+      return "text-accent";
     case "output":
-      return "text-emerald-400";
+      return "text-success";
     default:
-      // Tool name — amber.
-      return "text-amber-400";
+      // Tool name — warning.
+      return "text-warning";
   }
 }
 

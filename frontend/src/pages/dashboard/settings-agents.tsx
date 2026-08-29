@@ -315,7 +315,7 @@ export function SettingsAgentsPage() {
                   </div>
 
                   {bothEmpty && (
-                    <div className="text-xs text-amber-600 dark:text-amber-400">
+                    <div className="text-xs text-warning">
                       {t("settings.agents.ip-policy-empty-warning")}
                     </div>
                   )}

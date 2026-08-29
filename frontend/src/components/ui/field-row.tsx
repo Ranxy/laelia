@@ -24,7 +24,7 @@ export function FieldRow({
         className="text-xs font-semibold uppercase tracking-wide text-control"
       >
         {label}
-        {required && <span className="text-danger"> *</span>}
+        {required && <span className="text-error"> *</span>}
       </label>
       {children}
       {hint && <span className="text-xs text-control-placeholder">{hint}</span>}
