@@ -1,5 +1,9 @@
 # 03 — Dashboard 模块(pages/dashboard)深度代码审查报告
 
+> **⚙ 实施进度标注(批 3 收口后)**
+- ✅ 已完成:machine-new「不是我」失效修复(`5bc9f90`);activeOutputs/activeEvents LRU + releaseCommand(`5efb461`);reminder-detail 终态停轮 + reminder 降噪(`7eedafb`);command/reminder 列表迁移 useResourceList(竞态+token 漂移根治,`723de0e`);machine/chat-layout/machine-profile 轮询收编 usePolling(`acb701d`);3 个死 i18n key。
+- ⏳ 未完成:global-search 460 行 Combobox 轮子与双筛选栏;TwoPaneShell;B6 剩余 try/finally 补 catch;B7/B8(command/human-detail not-found);activity-list 迁移(双分页语义,记档);id 提取 29 处归一。
+
 > 审查范围:`frontend/src/pages/dashboard/` 下除 `settings-*.tsx`、`agent-profile.tsx`、`machine-profile.tsx`、`chat-conversation.tsx` 之外的全部文件。
 > 技术栈:React 19 + Zustand 5(单 store 多 slice)+ ConnectRPC(proto-es)+ Tailwind 4 + Biome;无 react-query,数据获取 = 页面 useEffect + 各页面自定义轮询。
 > 注:全文 file:line 均相对 `frontend/src/`;`app/layouts/*`、`components/activity/*` 为直接承载这些页面职责的紧邻代码,一并纳入证据。

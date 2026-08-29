@@ -1,5 +1,9 @@
 # 前端组件层深度审查报告:`components/ui/` + `components/` 根目录
 
+> **⚙ 实施进度标注(批 3 收口后)**
+- ✅ 已完成:死代码清单全部删除(tooltip/separator/command-timeline/CommandTerminal/MobileSidebar/variants 导出/Sheet 六档,`b0499db`);ModelCombobox portal 化(`75d844b`);text-danger ×13 + 裸色语义化(`4c2d37c`);TableHead 排序/resize 竞态与 Checkbox 冗余分支(`5bc9f90`)。
+- ⏳ 未完成:StatusBadge 五胞胎与 modal 壳/弹层收敛;destructive→error 与 size 词典 codemod;Avatar.sizeClass 显式映射;语义 token 收尾(dark-bg/matrix-green、copyable 之外残余);tabbar RouterLink;Separator 去留决策。
+
 > 审查范围:`frontend/src/components/ui/` 全部 29 个源文件 + 10 个测试文件(ui 源码实计 2349 行),以及 `frontend/src/components/` 根目录全部 22 个 .tsx(2078 行,含 sidebar.tsx 514 行)。所有引用结论均在全仓库 grep 验证(含 pages/、app/、lib/、components/ 子目录)。技术栈:React 19.2 / Zustand 5 / @base-ui/react 1.3 / Tailwind 4 / Biome。
 
 ---

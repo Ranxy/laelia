@@ -1,5 +1,9 @@
 # 设置类页面(settings-*.tsx)深度代码审查报告
 
+> **⚙ 实施进度标注(批 3 收口后)**
+- ✅ 已完成:P0-1/2 前半(七连修 `5bc9f90`:MCP key 失焦、`common.no-data`、`common.deleting`、删除按钮 5 处)+ ProviderSheet 重置;错误出口统一(`389ce97`:全部裸 message → describeError/showErrorToast);死 i18n key 清除。identity-providers 测试仍缺。
+- ⏳ 未完成:useResourceList 页面迁移与 CRUD 脚手架(§7 全套)、directory store(users/agents/machines 已由 Query 纵切吸收 `e7aca3a`,设置页仍直连——归 Phase 3 页面拆分阶段)、B4 editTarget 清除、B6/B7/B8。
+
 > 审查范围:`frontend/src/pages/dashboard/settings-*.tsx` 全部 14 个源文件(整文件精读,非抽样),并交叉阅读了 `components/settings-page.tsx`、`components/member-picker.tsx`、`components/profile-common.tsx`、`components/ui/{sheet,field-row,alert-dialog}.tsx`、`stores/{setting,user,mcp,api-provider,index,permissions}.ts`、`lib/{connect-errors,toast,permissions,web-push,command-status}.ts`、`connect/index.ts`、`locales/{en-US,zh-CN}.json`、router 注册与全部 14 个对应测试文件。
 > 验证手段:`pnpm type-check`(0 错误)、`pnpm biome:lint`(无告警)实际运行;i18n key 全量交叉扫描脚本;十余轮针对性 grep。技术栈前提:React 19 + Zustand 5 + ConnectRPC(proto-es)+ Tailwind 4 + Biome,无 react-query,数据获取为自定义 store + 各页自建 load。
 

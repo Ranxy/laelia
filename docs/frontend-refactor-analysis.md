@@ -6,24 +6,43 @@
 
 ---
 
+## ⚡ 实施进度总览(更新于重构执行 5 个批次后)
+
+重构已执行 **18 个提交、5 个批次**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **103 文件 / 686 用例**。各章文件头部已附加对应的"进度标注"块。
+
+| 批次 | 提交范围 | 内容 | 状态 |
+|---|---|---|---|
+| 批 0(原 Phase 0)| `999e131`~`027009f`(7 提交) | 死代码清扫(-500 行)、七连修、XSS 白名单 + Combobox portal、语义 token、轮询止血、i18n 门禁修复 | ✅ 完成 |
+| 批 1(Phase 1 第一批)| `d4774c3`~`5efb461`(3 提交) | ADR-2 落地(preview 退役 + 冻结删除)、equal-bailout(6 lists)、无界缓存 LRU | ✅ 完成 |
+| 批 2(Phase 1 第二批)| `b95c530`~`389ce97`(4 提交) | TanStack Query 铺路 + api-provider/mcp 纵切、错误分类学 + showErrorToast、useResourceList | ✅ 完成 |
+| 批 3(Phase 1 收官)| `e7aca3a`~`acb701d`(4 提交) | user/agent/machine 纵切、watch 断线重连、cleanup registry、usePolling 收敛 | ✅ 完成 |
+| 批 4+(重设计后路线) | —— | 聊天域收拢(ChatGateway)、页面拆分、UI/事件管线 | ⏳ 见 §7 重设计版 |
+
+**当前数据层状态**:Query 已纵切 5 个低风险 slice(api-provider/mcp/user/agent/machine)+ 应用级单例与 Provider;useResourceList 覆盖 command/reminder 列表页;全局 store 冻结已删除;错误出口统一;登出经注册表。**遗留大件:ChatGateway(聊天域收拢)、乐观发送下沉、流式管线决策(产品侧)**。
+
+---
+
 ## 0. 执行摘要:十项最高价值行动
 
-如果只做十件事,按"单位工作量收益"排序如下(前三项合计 3~4 天,即可消掉全部用户可见高危 bug 与约 800 行死代码):
+> 下表的"状态"列为实施 5 个批次后的核查结果(提交号见 §0.5 进度总览)。
 
-| # | 行动 | 类型 | 规模 | 详细依据 |
-|---|---|---|---|---|
-| 1 | **P0 修配包**:MCP header 输入框每键失焦(`key={name-i}`)、API Provider 编辑串数据(ProviderSheet state 残留)、machine-new「不是我」按钮失效、ThreadReplies `mentionLabel` 漏传、IAM/角色空表渲染 "No agents yet."、TableHead 排序/列宽竞态、删除按钮文案 "Saving…" | 真实 bug ×7 | 1~1.5 天 | 01 §3、03 §3、04 §3、07 §4 |
-| 2 | **死代码大扫除**(全部经 grep 验证零引用):`command-timeline.tsx`、`CommandTerminal`、`MobileSidebar`、`use-auto-scroll.ts`、`ui/tooltip.tsx`、`ui/separator.tsx`、`closeTask` action、`refreshAgentProviders`、4 个 lib 死导出、Sheet 6 个未用宽度档、3 个 variants 导出、若干死 i18n key | 死代码 | ~500 行,半天,零风险 | 07 §8、08 §2、05 §6、06 §7 |
-| 3 | **安全与门禁修复**:修复已变红的 `check-react-i18n` 门禁(补 `common.deleting`、清 3 个 unused key);`window.open(href)` 加 scheme 白名单堵 XSS 面;ModelCombobox portal 化(全库唯一 layering 政策违例 + 真实裁剪 bug) | 安全/门禁 | 1 天 | 09 §2.1、08 §4 F-S1、07 F-Bug-1 |
-| 4 | **错误处理单点化**:`connect/errors.ts` 建立错误码→i18n/重试/去重的统一映射;`showErrorToast()` 收敛全库 146 处 `toastManager.add` 与 26 处裸 `err.message`(同一文件里 describeError 与裸 message 混用) | 设计统一 | 0.5~1 天 | 06 C-04、01 D6、09 A-3 |
-| 5 | **列表获取基建**:`useResourceList`(请求序号/AbortController + initialLoading/refreshing 分离)替换 7 页设置页 + command/reminder 列表三胞胎,根治整类"旧响应覆盖新页面"竞态 | 重复+竞态 | 1~2 天 | 01 §7、03 R1/B1、05 D2 |
-| 6 | **统一发送/乐观更新管线**:抽 `useChatComposer`(channel/thread 双份 ~600 行逐行同构),9 处组件内联 `useAppStore.setState` 改为 slice action | 重复+设计 | 2~3 天 | 04 §1.1/§1.2、05 D5 |
-| 7 | **引入 TanStack Query**(已拍板 ADR-1,详见 §5.2),逐步接手"列表+分页+silent 刷新+equal 比较+失败吞掉"的手写样板;swipe-back 预览改 CSS 转场(已拍板 ADR-2)并废除全局 store 冻结 | 架构 | 2~3 周(分域) | 05 §7、06 B-01 |
-| 8 | **决定流式渲染管线去留**:`ChatMessageUI.streaming` 全库无生产者(生产代码 `rowStreamingProps` 全部传 `false`),整条 typing-dots/fade/streaming-props 链是旧 DM 架构遗产。确认产品不再要 token 流式 → 一次性拆除(MessageRow 接口面 -7 props) | 历史债务 | 0.5 天,需产品确认 | 04 §5.1 |
-| 9 | **三个巨型页面拆分**(合计 6,771 行、~100 个 useState、25 个 effect):agent-profile / machine-profile / chat-conversation 按 02 章方案拆为组件树,并顺手修掉"附件上传跨会话串台"等 4 个真实 bug | 重构+bug | 2~3 人周 | 02 全篇 |
-| 10 | **事件渲染管线统一**:合并 4 份"输出块合并算法"为 `lib/command-events-model.ts` 单一纯函数(语义已分叉,行键漂移导致 inspector 打不开),watch 流加断线重连 + chunk 合批 + LRU 上限 | 重复+性能 | 1 周 | 08 §3/§7 |
+| # | 行动 | 状态 |
+|---|---|---|
+| 1 | **P0 修配包**:MCP key 失焦、ProviderSheet 串数据、machine-new 否认、mentionLabel、no-data 文案、TableHead 竞态、删除文案(`5bc9f90`) | ✅ 完成 |
+| 2 | **死代码大扫除** ~500 行(`b0499db`) | ✅ 完成 |
+| 3 | **安全与门禁**:i18n 门禁修复(`027009f`)、`safeOpenExternal` XSS 白名单 + Combobox portal(`75d844b`) | ✅ 完成 |
+| 4 | **错误处理单点化**:`showErrorToast` + `connectErrorKind`,40+ 处裸 message 被 codemod 收敛到 `describeError`(`389ce97`) | ✅ 完成(146 处 toast 中形状规则的已收敛;动态 title 的 2 块保留 toastManager + 共享 description) |
+| 5 | **列表获取基建**:`useResourceList`(`723de0e`,command/reminder 已迁;activity-list 因双分页语义未迁);equal-bailout 六列表(`c9fe388`) | ✅ 完成(settings 7 页的脚手架迁移归入页面拆分阶段) |
+| 6 | **统一发送/乐观更新管线**(`useChatComposer`) | ⏳ 未开始 → 归入批 4 聊天域收拢 |
+| 7 | **ADR-1 引入 TanStack Query**(`b95c530`+`9c9c353`+`e7aca3a`)/ **ADR-2 preview 退役 + 冻结删除**(`d4774c3`) | 🟨 部分:5 个 slice 已纵切;聊天域 + presence/activity 收编未动 |
+| 8 | **流式管线拆除决策** | ⏳ 待产品确认(未动) |
+| 9 | **三个巨型页面拆分** | ⏳ 未开始(原计划因数据层先行而顺延,见新路线 §7) |
+| 10 | **事件渲染管线统一** | 🟨 部分:watch 断线重连(`4b7cf57`)已做;TimelineModel 归一/合批/虚拟化未动 |
+
 
 **量化总览**:全部建议落地后,预计净删 **7,000~9,000 行**(约 15~19%),修复 **约 30 个已定位 bug(其中高危 12 个)**,收敛 **6 套互不一致的轮询策略、5 种错误呈现、4 套时间格式化、3 套 size 词典**。整体规划约 **8~12 人周**,Phase 0(见 §7)一周内可完成。
+
+> 本节为**审计时点的原始分析与优先级**;执行状态以最上方"实施进度总览"与 §7 重设计版路线图为准。
 
 ---
 
@@ -196,54 +215,66 @@ src/
 
 ---
 
-## 7. 重构路线图(四阶段,每步独立可合入)
+## 7. 重构路线图(重设计版:已完成 5 批次,剩余三阶段)
 
-### Phase 0 · 快赢与止血(第 1 周,3~5 天)
-零风险纯减法 + 用户可见 bug 直修,全部不依赖架构决策:
-1. 死代码大扫除(§4b 清单,-500 行)+ 3 个死 i18n key + 修 `check-react-i18n` 红灯(补 `common.deleting`);
-2. 七连修:MCP key 失焦、ProviderSheet 重置、machine-new dismissed、mentionLabel 透传、`common.no-data` 文案、表格 TableHead 竞态、Checkbox onClick 分支删除;
-3. `safeOpenExternal` scheme 白名单 ×2 处 + ModelCombobox portal 化;
-4. `text-danger`→`text-error` codemod(13 处)、裸色 5 处改语义 token;
-5. 轮询止血:reminder-detail 终态停轮、reminder/activity 2s→5s + visibility gating(请求量 -60%);
-6. device-login 轮询治理(终态停止、退避、后台暂停)。
+> 原"四阶段"路线在执行中按依赖关系重排:数据层统一先于页面拆分完成度更高,页面拆分顺延;watch 断线重连与 ADR-2 提前完成。下列为重设计后的剩余路线。
 
-### Phase 1 · 数据层统一(第 2~4 周)
-1. `connect/errors.ts` 错误分类学 + `showErrorToast`,迁移 146 处调用(渐进,新旧并存);
-2. `useResourceList`(请求序号/Abort + initialLoading/refreshing)落地,command/reminder 列表三胞胎先迁,设置 7 页跟进;
-3. directory store(users/groups/roles 会话缓存 + invalidate);8 处 try/finally 补 catch;
-4. **引入 TanStack Query**:先 rosters/setting 纵切(三个 slice 文件消失),再 presence/activity/reminder 收编,最后聊天域 ChatGateway(双 watcher 合一、11 个定时器收敛、以现有竞态测试为行为基准);
-5. **执行 ADR-2**:退役 `use-preview-routes.tsx`(UNSAFE_RouteContext/路由树克隆,~158 行),删除 `setSuppressLoadingFlags` 全局冻结与 dashboard-layout 的 ROUTE_INFO 预载循环,swipe-back 提交阶段改普通 navigate(复核 replace 语义);乐观发送编排下沉为 slice action/useMutation(10 处组件 setState 消灭);`fetchChannels` equal-bailout 先行单点(20 行,立刻消除每 5s 全列表重渲染);
-6. 三处无界缓存 LRU 化(command activeOutputs/主动驱逐、threadByRoot、消息视窗)。
+### ✅ Phase 0 · 快赢与止血 — 已完成
+`999e131`~`027009f`:死代码清扫(§4b 全清单,-500 行)、七连修(七项用户可见 bug)、`safeOpenExternal` XSS 白名单、ModelCombobox portal 化、`text-danger`/裸色语义 token、reminder/activity 轮询降噪 + device-login 治理、i18n 门禁修复(`common.deleting` 补齐 + 6 个死键清理)。
 
-### Phase 2 · 页面与组件拆分(第 5~8 周)
-1. thread-panel 拆四件 + `useChatComposer` 收编双份管线(消 600 行);
-2. agent-profile / machine-profile 按 [02 章] 三棵组件树迁移(ACP 表单抽 `AcpConfigForm` 共享件,消 650 行复制);chat-conversation 同期,顺带补齐其测试;
-3. settings 7 页按 [01 章] 脚手架逐页迁移(groups→roles→api-providers→mcp→idp→iam),每页一 PR 测试随迁;
-4. global-search 的 460 行 Combobox 轮子换共享 `Combobox` + 双筛选栏合并;sidebar 拆三件;rail+pane/TwoPaneShell 合并 4 布局;`useEdgeDragToClose` 统一手势。
+### ✅ Phase 1 · 数据层统一 — 已完成(聊天域收拢除外)
+| 原计划项 | 落点 |
+|---|---|
+| 错误分类学 + showErrorToast | `389ce97`,40+ 处 codemod 收敛,auth 五页 + settings 全域 |
+| useResourceList 列表基建 | `723de0e`,command/reminder 已迁;设置 7 页的脚手架迁移归入页面拆分阶段 |
+| 引入 TanStack Query | `b95c530`+`9c9c353`+`e7aca3a`:api-provider/mcp/user/agent/machine 五个 slice 已纵切;**聊天域 + presence/activity/reminder 收编未动** |
+| 拆除全局 store 冻结 + ADR-2 | `d4774c3`,preview 体系整体退役 |
+| fetchChannels equal-bailout | `c9fe388`(扩展到六列表) |
+| 无界缓存 LRU | `5efb461` |
+| 统一释放注册表 | `e440ba0`(logout 手工清单归零;avatar/image-blob 的 lib 自注册归位待批 4) |
+| watch 断线重连(原列于事件管线阶段) | `4b7cf57`,提前完成 |
+| 乐观发送编排下沉 | ⏳ 未动(归入批 4 聊天域) |
 
-### Phase 3 · UI 体系与事件管线(第 9~10 周)
-1. Badge 家族(xs variant + 范型 StatusBadge)、modal 壳/弹层三连提取、size/variant naming codemod、组件 API 约定写入 AGENTS.md;
-2. `lib/command-events-model.ts` 统一 merge/pair/kind(4 份拷贝归一);ledger 虚拟化 + 输出截断 + 搜索 debounce;overview 改真实时间轴;
-3. 至 proto 团队:ToolCall 事件加 `tool_call_id`(彻底修 FIFO 错配)、ActivityState 之类枚举不再写魔数;
-4. 消息列表轻窗口化(ADR-3 第③步,在 Phase 2 拆分完成后);
-5. 补测试:38 个无测试大文件按风险排序(device-login、settings-identity-providers、machine-new 优先)。
+### ⏳ Phase 2(重设计)· 聊天域收拢(下一批,主控亲自执行)
+数据层已稳,现在把最纠缠的聊天域一次性收拢(01 章不动点为基准):
+1. **ChatGateway**:channel/thread 双 25s 长轮询 watcher 合一,5s badge interval 与长轮询同节拍(请求量 -40~60%);visibility gating 统一;以 `chat-stream/chat-history/chat` 既有竞态测试为行为基准;
+2. **乐观发送编排下沉**:`useChatComposer` 收编 channel/thread 双份 ~600 行(04 §1.1),ThreadSlice 增补 append/patch/remove 三个 action 消灭 9 处组件内联 `useAppStore.setState`(05 D5);**顺手修掉三个仍未修的真实 bug**——附件上传跨会话串台(02)、删除 @mention 后 mentionMap 残留、发送失败输入不恢复;
+3. **流式管线决策**:产品确认 token 流式不再保留 → 一次性拆除 streaming prop 链(MessageRow 接口面 -7 props);
+4. **批 4 归位**:avatar/image-blob 失效回调从 auth.ts 迁回 lib 自注册;presence/activity/reminder 的组件 interval 收编 `useQuery refetchInterval`(或 usePolling 统一);
+5. reset 中的 watcher 枚举随 ChatGateway 简化(注册表已就位)。
 
-### 贯穿全程的规则(写入 AGENTS.md 并加 lint)
-- 组件禁止直接 `useAppStore.setState`(当前 10 处)+ 禁止页面直连 `*ServiceClient`(settings 域 60 处收敛进 store/hook);
-- Biome 打开 `useExhaustiveDependencies` 等正确性规则(先修 15+ 存量黑洞),tsconfig 补 sw/vitest 覆盖;
-- 文档随代码:修正 AGENTS.md 的三处幽灵引用;Sheet/Dialog/Checkbox 决策与组件 API 约定成文。
+### ⏳ Phase 3(原 Phase 2)· 页面与组件拆分
+数据层定型后执行,避免页面迁移返工:
+1. **settings 7 页脚手架迁移**(01 章 5 步路径:.groups→roles→api-providers→mcp→idp→iam;`useResourceList`/`useCrudDialog`/`ResourceSheet` 已有 Query 底座);
+2. **thread-panel 拆四件**(ThreadReplies/Composer/TaskHeaderControls/ThreadHeader,主文件 <250 行);
+3. **agent-profile / machine-profile 三棵组件树**迁移(ACP 表单抽共享件,消 ~650 行复制;顺带补测试);
+4. global-search 460 行 Combobox 轮子换共享 Combobox + 双筛选栏合并;sidebar 拆三件;TwoPaneShell 合并 rail+pane 布局;`useEdgeDragToClose` 统一手势(MentionDetailSheet 复用 ChatDrawerSheet);
+5. 测试补齐:38 个 ≥150 行无测试文件按风险排序(chat-conversation/identity-providers/machine-new 优先)。
+
+### ⏳ Phase 4(原 Phase 3)· UI 体系与事件管线
+1. Badge 家族(xs variant + 范型 StatusBadge)、modal 壳/弹层三连提取、size/variant 命名 codemod、`Avatar.sizeClass` 显式映射、组件 API 约定写入 AGENTS.md;
+2. `lib/command-events-model.ts` 归一 merge/pair/kind(4 份拷贝→1,行键漂移根治);评论面板双胞胎合并;`FilePreviewShell` + `useHtmlPreviewBridge`;
+3. `tool_call_id` 进 proto(后端协同,需立项)、ActivityState 魔数清除;ledger/workspace 虚拟化(ADR-3 第②步)+ 消息列表轻窗口化(第③步,需流式管线决策落地后);
+4. UI 侧收尾:`toast.ts` 去 Base UI 私有接口依赖、PWA controllerchange reload 加用户可见护栏、`Separator` 去留决策(20 处 border-t 替换或删组件)。
+
+### 贯穿全程的规则(部分已落地)
+- ✅ AGENTS.md 幽灵引用修正(`b0499db`);❌ 组件直连 `useAppStore.setState` 禁令与 `*ServiceClient` 直连收敛(设置域 60 处)——待 Phase 2 页面迁移时落地并加 lint;
+- ❌ Biome `useExhaustiveDependencies` 等正确性规则未启用(15+ 存量黑洞待修);tsconfig 仍未覆盖 sw/vitest;
+- ❌ `frontend/AGENTS.md` 尚需补:组件 API 约定(批 4 后)、Sheet 档位 medium(640px) 已在 Phase 0 修正 ✓。
 
 ---
 
-## 8. 工作量与收益总账
+## 8. 工作量与收益总账(重设计版)
 
-| 阶段 | 工作量 | 直接收益 |
+| 阶段 | 状态 | 实际产出 |
 |---|---|---|
-| Phase 0 | 3~5 天 | 修掉全部高危用户可见 bug(10 个)、-500 行死代码、恢复 CI 门禁、网络请求 -60% |
-| Phase 1 | 3~4 周 | 消灭整类竞态与静默吞错;stores 4,739→~2,800 行;11 个定时器→1 gateway;删除全局 freeze |
-| Phase 2 | 3~4 周 | 三个 2000+ 页面与 thread-panel 共拆掉 ~4,000 行;settings 页 -40~50%;测试盲区收窄 |
-| Phase 3 | 2 周 | 事件管线归一(4 拷贝→1)、badge/modal 收敛(~400 行)、proto 级修复 |
-| **合计** | **约 8~12 人周** | **源码 -7,000~-9,000 行(15~19%);重复模板全部单点化;已验证 30+ bug 清零** |
+| Phase 0 快赢 | ✅ 完成(7 提交) | 七项高危 bug 清零、-500 行死代码、i18n 门禁恢复、reminder/activity/device-login 轮询治理 |
+| Phase 1 数据层 | ✅ 基本完成(批 1~3,11 提交) | Query 五 slice 纵切、ADR-2 -2 个 hack、useResourceList、错误出口单点化、缓存 LRU、注册表、watch 重连、usePolling;**剩余:聊天域 ChatGateway + 乐观编排** |
+| Phase 2 聊天域收拢(重设计) | ⏳ 下一批,~2 周(主控执行) | 双 watcher 合一、-600 行 composer 重复、三个真实 bug、流式决策落地 |
+| Phase 3 页面拆分(重排) | ⏳ 3~4 周 | settings 页 -40~50%、三棵组件树、测试盲区收窄 |
+| Phase 4 UI/事件管线 | ⏳ 2 周 | TimelineModel 4→1、badge/modal 收敛、proto 修复、轻窗口化 |
+
+**已完成部分的实际收益(截至批 3)**:四道门禁全绿的测试规模 95→103 文件 / 611→686 用例;高危 bug 十项中**七项已修**(余三项在聊天域收拢内解决);错误呈现 5 种→1 种出口 + 2 处记录在案;轮询策略收敛(可见性门控、终态停轮、重连退避);预存竞态(fetchChannels 族)与三处无界缓存根治;swipe-back 的 UNSAFE_API + 冻结 hack 全部拆除。
 
 **不建议做的**:全量自研 mini Query;把 19 个 slice 拆成 19 个独立 store;为聊天列表直接引入 react-virtuoso 全家桶(先轻窗口化);为"性能"提前上 React Compiler;在未拍板流式管线去留前迁移 MessageRow 的虚拟化。
 

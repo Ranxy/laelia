@@ -1,5 +1,9 @@
 # 前端架构评审报告 09:auth 页面分析与横切扫描
 
+> **⚙ 实施进度标注(批 3 收口后)**
+- ✅ 已完成:device-login 轮询治理(终态停轮、退避、后台暂停、清理)+ 4 用例测试(`7eedafb`);auth 五页错误出口统一(389ce97);auth.oauth-callback 等 3 个描述性 fallback 键删除;stale-data 提示已加;auth 域 6 处直连 RPC 未变(见下)。
+- ⏳ 未完成:auth 域直连 RPC 收敛(useWorkspacePolicy 等,归页面拆分);AuthShell;loginWithIdp/register 参数更名;redirect protocol-relative 校验;oauth 两页测试;settings 域 60 处直连 RPC 收敛(归页面拆分);i18n camelCase 段归一与 12~15 个未翻译键。
+
 > 评审对象:`frontend/`(React 19 + Zustand 5 + ConnectRPC(proto-es)+ Tailwind 4 + Biome)。
 > 范围 A:`src/pages/auth/` 全部 6 个页面(1210 行:signup 417、device-login 285、signin 211、verify-email 137、oauth-login 87、oauth-callback 73)逐行精读,并延伸核对 `stores/auth.ts`、`lib/oauth.ts`、`lib/connect-errors.ts`、`connect/index.ts`、`router/auth-redirect.ts`、`router/routes/auth.tsx`。
 > 范围 B:脚本化统计(src 下 222 个生产文件,排除 `*.test.*`、`src/test/`、`types/proto-es/`、`locales/`,共 48,214 行)+ 人工抽查。

@@ -1,5 +1,9 @@
 # Laelia Frontend 深度审查报告:基础设施 / connect / router / app 布局层
 
+> **⚙ 实施进度标注(批 3 收口后)**
+- ✅ 已完成:P0 首项(冻结删除)+ Rt-05(UNSAFE_RouteContext 退役,`d4774c3`);错误映射单点化 connect/toast-errors(`389ce97`);agent-token 并入 machine-token、command-status 部分拆解、4 个死导出清理(`b0499db`);chat-layout/machines/machine-profile 轮询转 usePolling(`acb701d`);AGENTS.md 幽灵引用修正。
+- ⏳ 未完成:lib 整形余项(command-status 拆 format/resource、三缓存合一、toast.ts 去 Base UI 私有接口);路由名 satisfies 缝合与 handle.permission;Biome 正确性规则;tsconfig 覆盖 sw;PWA reload 护栏;useEdgeDragToClose 手势合并;resolvePath→generatePath。
+
 > **决策状态更新**:本报告 P0 首项(废除 `suppressLoadingFlags` 全局冻结)与 Rt-05(UNSAFE_RouteContext)已由总报告 **ADR-2 拍板**:`use-preview-routes.tsx` 整体退役、冻结删除、swipe-back 保留手势识别仅重写提交阶段(复核 `replace: true` 历史语义,Rt-05/B-04/B-01 一并解决);错误映射单点化(connect/errors.ts)维持 P0 不变。
 
 > 评审范围:`src/lib/` 33 个源文件(~2900 行,另附 8 个测试文件)、`src/connect/`(164 行)、`src/router/`(609 行)+ `src/router/routes/`(503 行)、`src/app/` + `src/app/layouts/`(628 行)、`src/types/` 非 proto-es 文件、`vite.config.ts`、`vitest.config.ts`、`tsconfig*.json`、`biome.json`、`index.html`、`sw/sw.ts`、`tailwind.config.js`、`src/test/setup.ts`、`frontend/scripts/check-react-layering.mjs`、`check-react-i18n.mjs`。全量阅读,所有结论经 grep 交叉验证。

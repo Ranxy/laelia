@@ -1,5 +1,9 @@
 # 聊天模块深度代码审查报告(frontend/src/components/chat/)
 
+> **⚙ 实施进度标注(批 3 收口后)**
+- ✅ 已完成:ThreadReplies mentionLabel 透传(含回归测试,`5bc9f90`)。
+- ⏳ 未完成:useChatComposer 双份管线收编与 9 处组件内联 setState(批 4,连同三个真实 bug:上传跨会话串台/mentionMap 残留/发送失败不恢复);streaming 管线拆除(待产品确认);thread-panel 拆四件;ConversationRow 方向锁;Avatar sizeClass 显式映射;messages 轻窗口化(ADR-3)。
+
 > **决策状态更新**:本报告 §6.2 的虚拟化建议已由总报告 ADR-3 拍板——按"分片订阅 → 行级 memo → 轻窗口化"三步执行,消息列表不引入 react-virtuoso,原 P2-1(列表窗口化)按此顺序在拆分完成后执行。流式管线去留(P0-2)仍需产品确认后执行。
 
 **审查范围**:23 个源码文件,共 6698 行(thread-panel 1405 / message-row 945 / conversation-list 812 / channel-members-panel 625 / 其余 19 个文件)。已全量逐行阅读,并与 `stores/chat.ts`、`stores/chat-helpers.ts`、`stores/types.ts`、`composables/useMentionTargets.ts`、`composables/useMentionDetect.ts`、`lib/use-auto-scroll.ts`、懒加载协议方 `chat-conversation.tsx`、`lib/image-blob-cache.ts`、`lib/avatar-cache.ts`、`lib/use-swipe-to-close-sheet.ts`、`tailwind.config.js` 做了交叉验证(所有引用/死代码结论均以 grep 实证)。

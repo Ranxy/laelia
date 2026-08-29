@@ -1,5 +1,9 @@
 # 巨型单文件页面深度审查:agent-profile / machine-profile / chat-conversation
 
+> **⚙ 实施进度标注(批 3 收口后)**
+- ✅ 已完成:refreshAgentProviders 死代码清除(`b0499db`);agent-profile text-danger 语义 token(`4c2d37c`);machine 列表缓存进 Query(`e7aca3a`)。
+- ⏳ 未完成:三棵组件树拆分与 ACP 表单收编(~650 行复制);**三个真实 bug 未修**——附件上传跨会话串台、删除 @mention 后 mentionMap 残留、发送失败输入不恢复(归批 4 的 useChatComposer/ChatGateway 一并解决);activity-detail onClose 死契约。
+
 > 审查范围:`frontend/src/pages/dashboard/agent-profile.tsx`(2405 行)、`machine-profile.tsx`(2200 行)、`chat-conversation.tsx`(2166 行)。技术栈:React 19 + Zustand 5(单 store 多 slice,`src/stores/`,无 react-query)+ ConnectRPC(proto-es)+ Tailwind 4 + Biome。
 > 所有行号均已逐一核对,所有三个文件已全文阅读,结论均在仓库内 grep/验证过。
 

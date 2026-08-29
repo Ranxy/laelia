@@ -1,5 +1,9 @@
 # 前端「事件 / 预览 / 工作区」组件模块深度评审
 
+> **⚙ 实施进度标注(批 3 收口后)**
+- ✅ 已完成:整文件死代码(command-timeline/CommandTerminal/use-auto-scroll)+ isToolEvent/投机枚举/双映射清除(`b0499db`);iframe 桥 `safeOpenExternal` 白名单(`75d844b`);watch 流断线重连 + 退避 + seqNo 续传(`4b7cf57`)。
+- ⏳ 未完成:TimelineModel 归一(merge×4 份、kind 注册表);Ledger 虚拟化与输出截断;overview 真实时间轴;评论面板双胞胎;proto `tool_call_id`;workspace 树虚拟化/搜索。
+
 > 范围:`command-events/`(5 文件 1750 行)、`preview/`(6 文件 1470 行)、`agent/`(4 文件 796 行)、`activity/`(2 文件 575 行)、`workspace/`(3 文件 474 行)、`chat-events/`(3 文件 214 行),并对照 `components/chat/message-row.tsx`、`components/command-timeline.tsx`、`components/command-terminal.tsx`、`pages/dashboard/command-detail.tsx`(主消费者)、`stores/{command,preview,image-preview,activity,workspace}.ts`、`lib/{tool-call-events,html-file,command-status}.ts` 与 proto 契约 `proto/v1/v1/command.proto`。全部文件已完整阅读,未抽样;所有"无人引用"结论均经全仓 grep + git 历史验证。
 
 ---
