@@ -1,3 +1,4 @@
+import { ChevronLeft } from "lucide-react";
 import {
   lazy,
   Suspense,
@@ -6,12 +7,8 @@ import {
   useMemo,
   useState,
 } from "react";
-import {
-  matchRoutes,
-  Outlet,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { MobileHeader } from "@/components/mobile-header";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { DesktopSidebar } from "@/components/sidebar";
@@ -19,12 +16,9 @@ import { usePresenceHeartbeat } from "@/composables/use-presence-heartbeat";
 import { toastManager } from "@/lib/toast";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { reconcilePushSubscription, suppressRoute } from "@/lib/web-push";
+import { routeNameForPath } from "@/router/route-index";
 import { ROUTE_INFO } from "@/router/route-info";
-import { dashboardChildrenRoutes } from "@/router/routes/dashboard";
-import {
-  preloadPreviewRoute,
-  usePreviewRoutes,
-} from "@/router/use-preview-routes";
+import { useCurrentRoute } from "@/router/use-current-route";
 import { useAppStore } from "@/stores";
 
 // The overlays/dialog are code-split so markstream-react (and the
@@ -97,20 +91,21 @@ export function DashboardLayout() {
   usePresenceHeartbeat();
   // Mobile swipe-back: drag from the left edge to go back one level (thread
   // panel first, then the route's backTo target). Inert on desktop.
-  const { rootRef, currentPageRef, previewPath } = useSwipeBack();
-  // The back-target route rendered underneath the current page while the
-  // gesture is active, so the destination is visible during the drag.
-  const previewElement = usePreviewRoutes(dashboardChildrenRoutes, previewPath);
+  const { rootRef, currentPageRef } = useSwipeBack();
+  const currentRoute = useCurrentRoute();
+  const { t } = useTranslation();
 
-  // While previewing, the mobile header shows the destination page's title
-  // (the header visually belongs to the page underneath the drag).
-  const previewTitleKey = useMemo(() => {
-    if (!previewPath) return undefined;
-    const matches = matchRoutes(dashboardChildrenRoutes, previewPath);
-    const leaf = matches?.at(-1);
-    const name = (leaf?.route.handle as { name?: string } | undefined)?.name;
-    return name ? ROUTE_INFO[name]?.titleKey : undefined;
-  }, [previewPath]);
+  // Peek title for the static swipe-back surface: the back-target page's
+  // title resolved from route metadata (the target route is NOT mounted —
+  // see the preview-retirement decision).
+  const peekTitleKey = useMemo(() => {
+    const backTo = currentRoute.name
+      ? ROUTE_INFO[currentRoute.name]?.backTo
+      : undefined;
+    if (!backTo) return undefined;
+    const targetName = routeNameForPath(backTo);
+    return targetName ? ROUTE_INFO[targetName]?.titleKey : undefined;
+  }, [currentRoute.name]);
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => {
@@ -122,21 +117,6 @@ export function DashboardLayout() {
       }
       return next;
     });
-  }, []);
-
-  // Preload the lazy modules for every swipe-back target route at mount so
-  // the preview renders on the very first frame when a gesture starts — the
-  // module cache is already populated, cloneRouteTree sets Component
-  // synchronously, and useRoutes renders the component without waiting for a
-  // microtask/useSyncExternalStore re-render cycle.
-  useEffect(() => {
-    const backTargets = new Set<string>();
-    for (const info of Object.values(ROUTE_INFO)) {
-      if (info.backTo) backTargets.add(info.backTo);
-    }
-    for (const target of backTargets) {
-      preloadPreviewRoute(dashboardChildrenRoutes, target);
-    }
   }, []);
 
   // Web Push: on boot, refresh the server-side keys for this browser's push
@@ -187,20 +167,30 @@ export function DashboardLayout() {
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Mobile header. */}
         <div className="fixed left-0 right-0 top-0 z-chrome lg:hidden">
-          <MobileHeader previewTitleKey={previewTitleKey} />
+          <MobileHeader />
         </div>
         <main className="relative flex-1 overflow-hidden pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:pt-0 lg:pb-0">
+          {/* Static swipe-back peek surface: always mounted underneath the
+              (opaque) page, revealed only while the page slides right during
+              the gesture. Shows the back-target's title via route metadata —
+              the target route is deliberately not mounted. */}
+          <div
+            aria-hidden
+            className="absolute inset-0 z-0 flex flex-col items-center justify-center gap-2 bg-background pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:pt-0 lg:pb-0"
+          >
+            <ChevronLeft className="size-5" />
+            {peekTitleKey && (
+              <span className="max-w-full truncate px-6 text-sm text-control-light">
+                {t(peekTitleKey)}
+              </span>
+            )}
+          </div>
           <div
             ref={currentPageRef}
             className="relative z-10 h-full bg-background will-change-transform"
           >
             <Outlet />
           </div>
-          {previewPath && (
-            <div className="absolute inset-0 z-0 bg-background will-change-transform pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:pt-0 lg:pb-0">
-              <Suspense fallback={null}>{previewElement}</Suspense>
-            </div>
-          )}
         </main>
         <div className="fixed bottom-0 left-0 right-0 z-chrome lg:hidden">
           <MobileTabBar />

@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ROUTE_INFO } from "@/router/route-info";
 import { useCurrentRoute } from "@/router/use-current-route";
-import { setSuppressLoadingFlags, useAppStore } from "@/stores";
+import { useAppStore } from "@/stores";
 import { platformOwnsEdgeSwipe } from "./platform-edge-swipe";
 import { useIsDesktop } from "./use-is-desktop";
 
 // iOS-style interactive back gesture for mobile: drag from the left edge of
-// the screen to the right. The current page follows the finger and the
-// back-target route is rendered underneath (previewPath) so the destination is
-// visible while dragging; releasing past the threshold slides the current page
-// out and commits the navigation. The level stack is:
+// the screen to the right. The current page follows the finger and a static
+// peek surface underneath is revealed (the back target is NOT mounted — the
+// peek shows the destination's title only, per the preview-retirement
+// decision); releasing past the threshold slides the current page out and
+// commits the navigation. The level stack is:
 //   thread panel (full-screen overlay) -> current route -> its backTo target.
 // The gesture is inert on desktop, on top-level tab routes (nothing to go
 // back to), over layer overlays (sheets/dialogs/previews dismiss on their
@@ -53,9 +54,6 @@ export interface SwipeBackState {
   rootRef: (el: HTMLDivElement | null) => void;
   // Bind to the current page container; it is translated while dragging.
   currentPageRef: (el: HTMLDivElement | null) => void;
-  // Back-target path rendered underneath while a route-level gesture is
-  // active; null when idle (or when the gesture targets the thread panel).
-  previewPath: string | null;
 }
 
 export function useSwipeBack(): SwipeBackState {
@@ -78,10 +76,9 @@ export function useSwipeBack(): SwipeBackState {
 
   const rootRef = useRef<HTMLDivElement | null>(null);
   const pageRef = useRef<HTMLDivElement | null>(null);
-  const [previewPath, setPreviewPath] = useState<string | null>(null);
   // Set when a route-level commit's navigate() has been called; the
-  // location-change effect clears the transform + preview once the data
-  // router finishes the navigation (preventing a one-frame flash of the old
+  // location-change effect clears the transform once the data router
+  // finishes the navigation (preventing a one-frame flash of the old
   // route before the new one renders).
   const pendingResetRef = useRef(false);
 
@@ -132,8 +129,6 @@ export function useSwipeBack(): SwipeBackState {
       }
       root.style.removeProperty("--swipe-offset");
       root.style.removeProperty("--swipe-transition");
-      window.setTimeout(() => setSuppressLoadingFlags(false), 500);
-      setPreviewPath(null);
     };
 
     const onTouchStart = (e: TouchEvent) => {
@@ -189,8 +184,6 @@ export function useSwipeBack(): SwipeBackState {
           return;
         }
         mode = "route";
-        setSuppressLoadingFlags(true);
-        setPreviewPath(backTargetRef.current);
         if (pageRef.current) pageRef.current.style.transition = "none";
       } else {
         cancelled = true;
@@ -312,9 +305,9 @@ export function useSwipeBack(): SwipeBackState {
   }, [isDesktop, navigate, closeThread, closeTasksPanel]);
 
   // When a route-level commit is pending, wait for the data router to finish
-  // the navigation (location changes) before clearing the transform and
-  // unmounting the preview. This prevents a one-frame flash where the old
-  // route would be visible at translateX(0) before the new route renders.
+  // the navigation (location changes) before clearing the transform. This
+  // prevents a one-frame flash where the old route would be visible at
+  // translateX(0) before the new route renders.
   useEffect(() => {
     if (!pendingResetRef.current) return;
     pendingResetRef.current = false;
@@ -327,9 +320,7 @@ export function useSwipeBack(): SwipeBackState {
       root.style.removeProperty("--swipe-offset");
       root.style.removeProperty("--swipe-transition");
     }
-    window.setTimeout(() => setSuppressLoadingFlags(false), 500);
-    setPreviewPath(null);
   }, [location.pathname]);
 
-  return { rootRef: setRoot, currentPageRef: setPage, previewPath };
+  return { rootRef: setRoot, currentPageRef: setPage };
 }

@@ -36,19 +36,17 @@ vi.mock("@/stores", () => ({
       tasksPanelOpen: mock.tasksPanelOpen,
       closeTasksPanel: mock.closeTasksPanel,
     }),
-  setSuppressLoadingFlags: vi.fn(),
 }));
 
 import { useSwipeBack } from "./use-swipe-back";
 
 function Harness() {
-  const { rootRef, currentPageRef, previewPath } = useSwipeBack();
+  const { rootRef, currentPageRef } = useSwipeBack();
   return (
     <div ref={rootRef} data-testid="shell">
       <div ref={currentPageRef} data-testid="page">
         page
       </div>
-      {previewPath && <div data-testid="preview">{previewPath}</div>}
       <div data-bb-layer-family="overlay">
         <div data-testid="overlay-target" />
       </div>
@@ -117,7 +115,6 @@ describe("useSwipeBack", () => {
     const page = screen.getByTestId("page");
     act(() => swipeFromEdge(200));
     expect(page.style.transform).toBe("");
-    expect(screen.queryByTestId("preview")).toBeNull();
     expect(mock.navigate).not.toHaveBeenCalled();
   });
 
@@ -134,7 +131,6 @@ describe("useSwipeBack", () => {
       window.dispatchEvent(touch("touchend", [{ clientX: 300, clientY: 110 }]));
     });
     expect(page.style.transform).toBe("");
-    expect(screen.queryByTestId("preview")).toBeNull();
     expect(mock.navigate).not.toHaveBeenCalled();
   });
 
@@ -143,7 +139,6 @@ describe("useSwipeBack", () => {
     const page = screen.getByTestId("page");
     act(() => swipeFromEdge(0, 200));
     expect(page.style.transform).toBe("");
-    expect(screen.queryByTestId("preview")).toBeNull();
     expect(mock.navigate).not.toHaveBeenCalled();
   });
 
@@ -152,11 +147,10 @@ describe("useSwipeBack", () => {
     const page = screen.getByTestId("page");
     act(() => swipeFromEdge(-60));
     expect(page.style.transform).toBe("");
-    expect(screen.queryByTestId("preview")).toBeNull();
     expect(mock.navigate).not.toHaveBeenCalled();
   });
 
-  it("previews the back target under the page while dragging", () => {
+  it("keeps the page following the finger without mounting the target route", () => {
     render(<Harness />);
     const page = screen.getByTestId("page");
     act(() => {
@@ -167,9 +161,10 @@ describe("useSwipeBack", () => {
         touch("touchmove", [{ clientX: 200, clientY: 110 }])
       );
     });
-    // The destination route is rendered underneath while the page follows the
-    // finger (190px of drag, capped at half the 375px viewport).
-    expect(screen.getByTestId("preview").textContent).toBe("/");
+    // No route preview is mounted (preview-retirement decision); the current
+    // page follows the finger (190px of drag, capped at half the 375px
+    // viewport) while the static peek surface shows through underneath.
+    expect(screen.queryByTestId("preview")).toBeNull();
     expect(page.style.transform).toBe("translateX(187.5px)");
   });
 
@@ -184,13 +179,12 @@ describe("useSwipeBack", () => {
       vi.advanceTimersByTime(300);
     });
     expect(mock.navigate).toHaveBeenCalledWith("/", { replace: true });
-    // The preview stays mounted until the data router finishes the
+    // The transform stays applied until the data router finishes the
     // navigation (location changes). Simulate the location change:
     mock.location = { pathname: "/" };
     act(() => {
       rerender(<Harness />);
     });
-    expect(screen.queryByTestId("preview")).toBeNull();
     expect(page.style.transform).toBe("");
   });
 
@@ -203,7 +197,6 @@ describe("useSwipeBack", () => {
     act(() => {
       vi.advanceTimersByTime(300);
     });
-    expect(screen.queryByTestId("preview")).toBeNull();
     expect(page.style.transform).toBe("");
   });
 
@@ -215,7 +208,6 @@ describe("useSwipeBack", () => {
     // The thread panel (full-screen overlay) follows the finger via CSS
     // variables on the shell; no route preview is rendered.
     expect(shell.style.getPropertyValue("--swipe-offset")).toBe("375px");
-    expect(screen.queryByTestId("preview")).toBeNull();
     expect(mock.closeThread).not.toHaveBeenCalled();
     act(() => {
       vi.advanceTimersByTime(300);
@@ -231,7 +223,6 @@ describe("useSwipeBack", () => {
     act(() => swipeFromEdge(200));
     expect(mock.navigate).not.toHaveBeenCalled();
     expect(mock.closeThread).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("preview")).toBeNull();
   });
 
   it("ignores touches over layer overlays (sheets/dialogs/previews)", () => {
@@ -249,7 +240,6 @@ describe("useSwipeBack", () => {
       );
     });
     expect(mock.navigate).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("preview")).toBeNull();
   });
 
   it("yields bezel-originated touches to the OS edge swipe (route mode)", () => {
@@ -265,7 +255,6 @@ describe("useSwipeBack", () => {
       window.dispatchEvent(touch("touchend", [{ clientX: 200, clientY: 110 }]));
     });
     expect(page.style.transform).toBe("");
-    expect(screen.queryByTestId("preview")).toBeNull();
     expect(mock.navigate).not.toHaveBeenCalled();
   });
 
@@ -281,7 +270,8 @@ describe("useSwipeBack", () => {
         touch("touchmove", [{ clientX: 200, clientY: 110 }])
       );
     });
-    expect(screen.getByTestId("preview").textContent).toBe("/");
+    // No route is mounted for the peek (preview-retirement decision).
+    expect(screen.queryByTestId("preview")).toBeNull();
     expect(page.style.transform).toBe("translateX(187.5px)");
   });
 
@@ -302,7 +292,6 @@ describe("useSwipeBack", () => {
     // No spring-back animation: a touchcancel usually means a system gesture
     // claimed the touch, and our layers must not animate under its transition.
     expect(page.style.transform).toBe("");
-    expect(screen.queryByTestId("preview")).toBeNull();
   });
 
   it("yields route-level swipes entirely on browsers whose system gesture owns the edge", () => {
@@ -315,7 +304,6 @@ describe("useSwipeBack", () => {
     const page = screen.getByTestId("page");
     act(() => swipeFromEdge(200));
     expect(page.style.transform).toBe("");
-    expect(screen.queryByTestId("preview")).toBeNull();
     expect(mock.navigate).not.toHaveBeenCalled();
   });
 
@@ -376,7 +364,8 @@ describe("useSwipeBack", () => {
         touch("touchmove", [{ clientX: 200, clientY: 110 }])
       );
     });
-    expect(screen.getByTestId("preview").textContent).toBe("/");
+    // No route is mounted for the peek (preview-retirement decision).
+    expect(screen.queryByTestId("preview")).toBeNull();
     expect(page.style.transform).toBe("translateX(187.5px)");
   });
 });

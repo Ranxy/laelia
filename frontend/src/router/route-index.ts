@@ -57,6 +57,16 @@ export function buildSearchString(query: NavQuery): string {
   return search.toString();
 }
 
+// Reverse lookup for the mobile swipe-back peek: which named route a
+// back-target path belongs to (the peek surface shows the target's title
+// without mounting the route — see the preview-retirement decision).
+export function routeNameForPath(path: string): string | undefined {
+  for (const [name, routePath] of nameIndex) {
+    if (routePath === path) return name;
+  }
+  return undefined;
+}
+
 export function resolvePath(
   name: string,
   params?: Record<string, string | string[] | undefined>,
