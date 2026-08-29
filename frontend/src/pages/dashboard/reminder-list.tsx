@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { ReminderStatusBadge } from "@/components/reminder-status-badge";
@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { agentResourceName, formatTimestamp } from "@/lib/command-status";
+import { useResourceList } from "@/lib/use-resource-list";
 import { useAppStore } from "@/stores";
 import type { Reminder } from "@/types/proto-es/v1/command_pb";
 import { ReminderStatus } from "@/types/proto-es/v1/command_pb";
@@ -69,66 +70,31 @@ export function ReminderListPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const agent = agentResourceName(agentId);
 
-  const reminders = useAppStore((s) => s.reminders);
-  const loading = useAppStore((s) => s.remindersLoading);
   const listReminders = useAppStore((s) => s.listReminders);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
-  // 分页：pageTokens 为已访问页的 cursor 栈，pageIndex 指向当前页。
-  const [pageTokens, setPageTokens] = useState<string[]>([""]);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [nextPageToken, setNextPageToken] = useState("");
-
-  const pageToken = pageTokens[pageIndex] ?? "";
-  const canPrev = pageIndex > 0;
-  const canNext = nextPageToken !== "";
-
-  const load = useCallback(
-    async (silent = false) => {
-      if (!agent) return;
+  // Pagination + race protection + the 5s silent poll of the current page
+  // moved into the shared hook (the old page hand-rolled it and drifted:
+  // next-cursor kept on next, never backfilled on prev, no race guard).
+  const list = useResourceList<Reminder>({
+    resetKey: `${agent ?? ""}|${statusFilter}`,
+    pollMs: LIST_POLL_INTERVAL_MS,
+    fetch: async (pageToken, { silent }) => {
       const res = await listReminders(agent, {
         pageSize: PAGE_SIZE,
         pageToken,
         statusFilter: statusFilterToValues[statusFilter],
         silent,
       });
-      setNextPageToken(res?.nextPageToken ?? "");
+      return res
+        ? { rows: res.reminders, nextPageToken: res.nextPageToken }
+        : undefined;
     },
-    [agent, listReminders, pageToken, statusFilter]
-  );
-
-  // Track whether the initial load has completed so background polls can be
-  // silent (no loading spinner flash).
-  const initialLoadDone = useRef(false);
-
-  useEffect(() => {
-    // Initial load and filter/page changes always show loading.
-    load(false).then(() => {
-      initialLoadDone.current = true;
-    });
-    // Background polls are silent — they don't toggle the loading flag,
-    // avoiding visual flicker when the data hasn't changed.
-    const handle = setInterval(() => load(true), LIST_POLL_INTERVAL_MS);
-    return () => clearInterval(handle);
-  }, [load]);
+  });
 
   const handleStatusFilterChange = (f: StatusFilter) => {
     setStatusFilter(f);
-    setPageTokens([""]);
-    setPageIndex(0);
-    setNextPageToken("");
-  };
-
-  const onNext = () => {
-    if (!canNext) return;
-    setPageTokens((tok) => [...tok, nextPageToken]);
-    setPageIndex((i) => i + 1);
-  };
-
-  const onPrev = () => {
-    if (!canPrev) return;
-    setPageIndex((i) => Math.max(0, i - 1));
   };
 
   function handleRowClick(r: Reminder) {
@@ -189,7 +155,7 @@ export function ReminderListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading && (
+                {list.loading && (
                   <TableRow>
                     <TableCell
                       colSpan={5}
@@ -199,7 +165,7 @@ export function ReminderListPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {!loading && reminders.length === 0 && (
+                {!list.loading && list.rows.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-12">
                       <p className="text-control-light text-sm">
@@ -208,8 +174,8 @@ export function ReminderListPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {!loading &&
-                  reminders.map((r) => (
+                {!list.loading &&
+                  list.rows.map((r) => (
                     <TableRow
                       key={r.name}
                       className="cursor-pointer"
@@ -250,13 +216,13 @@ export function ReminderListPage() {
 
       <div className="shrink-0 border-t border-control-border px-4 py-2">
         <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-control-light">
-          <span>{t("reminders.page", { n: pageIndex + 1 })}</span>
+          <span>{t("reminders.page", { n: list.pageIndex + 1 })}</span>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={!canPrev || loading}
-              onClick={onPrev}
+              disabled={!list.canPrev || list.refreshing}
+              onClick={list.prevPage}
             >
               <ChevronLeft className="size-3.5" />
               {t("reminders.prev")}
@@ -264,8 +230,8 @@ export function ReminderListPage() {
             <Button
               variant="outline"
               size="sm"
-              disabled={!canNext || loading}
-              onClick={onNext}
+              disabled={!list.canNext || list.refreshing}
+              onClick={list.nextPage}
             >
               {t("reminders.next")}
               <ChevronRight className="size-3.5" />

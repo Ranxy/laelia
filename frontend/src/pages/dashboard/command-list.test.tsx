@@ -60,7 +60,15 @@ function seedStore() {
     commandsLoading: false,
     activeOutputs: {},
     activeEvents: {},
-    listCommands: vi.fn(async () => undefined),
+    // The page loads rows through useResourceList → listCommands; mirror the
+    // seeded commands so store-seeded fixtures keep rendering.
+    listCommands: vi.fn(async () => {
+      return {
+        commands: (useAppStore.getState().commands ?? []) as Command[],
+        nextPageToken: "",
+      };
+    }),
+    releaseCommand: vi.fn(),
     getCommand: vi.fn(async () => undefined),
     watchCommand: vi.fn(async () => true),
     watchCommandEvents: vi.fn(async () => true),
@@ -189,7 +197,16 @@ describe("command list page", () => {
   });
 
   it("shows the loading row while commands are being fetched", () => {
-    useAppStore.setState({ commands: [], commandsLoading: true });
+    useAppStore.setState({
+      commands: [],
+      commandsLoading: false,
+      // A never-resolving fetch keeps the hook in its skeleton state.
+      listCommands: vi.fn(
+        (): Promise<
+          { commands: Command[]; nextPageToken: string } | undefined
+        > => new Promise(() => {})
+      ),
+    });
 
     renderListPage();
 

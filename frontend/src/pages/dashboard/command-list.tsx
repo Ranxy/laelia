@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Expand, Plus } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { CommandStatusBadge } from "@/components/command-status-badge";
@@ -28,6 +28,7 @@ import {
   formatTimestamp,
 } from "@/lib/command-status";
 import { FinalSummary } from "@/lib/markdown";
+import { useResourceList } from "@/lib/use-resource-list";
 import { useAppStore } from "@/stores";
 import type { Command } from "@/types/proto-es/v1/command_pb";
 import { CommandStatus } from "@/types/proto-es/v1/command_pb";
@@ -52,58 +53,31 @@ export function CommandListPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const agent = agentResourceName(agentId);
 
-  const commands = useAppStore((s) => s.commands);
-  const loading = useAppStore((s) => s.commandsLoading);
-  const listCommands = useAppStore((s) => s.listCommands);
   const sendChatMessage = useAppStore((s) => s.sendChatMessage);
+
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const list = useResourceList<Command>({
+    resetKey: `${agent ?? ""}|${statusFilter}`,
+    fetch: async (pageToken) => {
+      const res = await useAppStore.getState().listCommands(agent, {
+        pageSize: PAGE_SIZE,
+        pageToken,
+        status: statusFilterToStatusValue[statusFilter],
+      });
+      return res
+        ? { rows: res.commands, nextPageToken: res.nextPageToken }
+        : undefined;
+    },
+  });
 
   const [sendOpen, setSendOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
   const [sending, setSending] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
-  // 分页：pageTokens 为已访问页的 cursor 栈，pageIndex 指向当前页。
-  const [pageTokens, setPageTokens] = useState<string[]>([""]);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [nextPageToken, setNextPageToken] = useState("");
   const [expandedSummary, setExpandedSummary] = useState<Command | null>(null);
-
-  const pageToken = pageTokens[pageIndex] ?? "";
-  const canPrev = pageIndex > 0;
-  const canNext = nextPageToken !== "";
-
-  const load = useCallback(async () => {
-    if (!agent) return;
-    const res = await listCommands(agent, {
-      pageSize: PAGE_SIZE,
-      pageToken,
-      status: statusFilterToStatusValue[statusFilter],
-    });
-    setNextPageToken(res?.nextPageToken ?? "");
-  }, [agent, listCommands, pageToken, statusFilter]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const handleStatusFilterChange = (f: StatusFilter) => {
     setStatusFilter(f);
-    setPageTokens([""]);
-    setPageIndex(0);
-    setNextPageToken("");
-  };
-
-  const onNext = () => {
-    if (!canNext) return;
-    setPageTokens((t) => [...t, nextPageToken]);
-    setPageIndex((i) => i + 1);
-    setNextPageToken(""); // reset until the new page loads
-  };
-
-  const onPrev = () => {
-    if (!canPrev) return;
-    setPageIndex((i) => Math.max(0, i - 1));
-    setNextPageToken(pageToken); // the page we're leaving becomes the "next" page
+    // The resetKey change drives the hook back to page 1 + reload.
   };
 
   const handleSend = async () => {
@@ -113,14 +87,7 @@ export function CommandListPage() {
       await sendChatMessage(agent, instruction.trim());
       setInstruction("");
       setSendOpen(false);
-      setPageTokens([""]);
-      setPageIndex(0);
-      setNextPageToken("");
-      await listCommands(agent, {
-        pageSize: PAGE_SIZE,
-        pageToken: "",
-        status: statusFilterToStatusValue[statusFilter],
-      });
+      list.reload();
     } finally {
       setSending(false);
     }
@@ -183,7 +150,7 @@ export function CommandListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading && (
+                {list.loading && (
                   <TableRow>
                     <TableCell
                       colSpan={4}
@@ -193,7 +160,7 @@ export function CommandListPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {!loading && commands.length === 0 && (
+                {!list.loading && list.rows.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-12">
                       <div className="flex flex-col items-center gap-3">
@@ -212,8 +179,8 @@ export function CommandListPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {!loading &&
-                  commands.map((cmd) => (
+                {!list.loading &&
+                  list.rows.map((cmd) => (
                     <TableRow
                       key={cmd.name}
                       className="cursor-pointer"
@@ -269,13 +236,13 @@ export function CommandListPage() {
 
       <div className="shrink-0 border-t border-control-border px-4 py-2">
         <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-control-light">
-          <span>{t("tasks.page", { n: pageIndex + 1 })}</span>
+          <span>{t("tasks.page", { n: list.pageIndex + 1 })}</span>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={!canPrev || loading}
-              onClick={onPrev}
+              disabled={!list.canPrev || list.refreshing}
+              onClick={list.prevPage}
             >
               <ChevronLeft className="size-3.5" />
               {t("tasks.prev")}
@@ -283,8 +250,8 @@ export function CommandListPage() {
             <Button
               variant="outline"
               size="sm"
-              disabled={!canNext || loading}
-              onClick={onNext}
+              disabled={!list.canNext || list.refreshing}
+              onClick={list.nextPage}
             >
               {t("tasks.next")}
               <ChevronRight className="size-3.5" />
