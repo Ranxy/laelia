@@ -1,5 +1,6 @@
 import { create, equals } from "@bufbuild/protobuf";
 import { machineServiceClient } from "@/connect";
+import { queryClient } from "@/lib/query-client";
 import type {
   AgentModelOption,
   AgentProviderInfo,
@@ -23,6 +24,27 @@ import type {
   MachineSlice,
 } from "./types";
 
+// Query cache key family for this slice (ADR-1: query keys live with the slice
+// that fetches them). showDeleted selects a different server view (active vs
+// recycled machines), so it participates in the key; pageSize/pageToken stay
+// OUT of the key on purpose — the pageToken callers page strictly
+// sequentially, and one stable key per view lets fetchQuery's in-flight merge
+// dedupe overlapping refreshes (e.g. the machine list poll racing a
+// detail-page refresh). The tradeoff: two truly concurrent same-key calls with
+// different paging params resolve with whichever queryFn registered first —
+// today every caller pins pageSize: 100, so the merged result matches what the
+// merged-away call would have fetched. staleTime: 0 keeps "action call == one
+// explicit fetch" semantics so page-level pollers keep their cadence;
+// retry: false keeps the explicit failure path deterministic.
+
+// Logout clears the slice's Query cache (whole ["machines", ...] family).
+// Wired up at the batch-3 unified release point; until then a logout-relogin
+// can serve gcTime-stale data briefly, bounded by the 5-minute gcTime in
+// query-client defaults.
+export function invalidateMachinesCache(): void {
+  void queryClient.removeQueries({ queryKey: ["machines"] });
+}
+
 export const createMachineSlice: AppSliceCreator<MachineSlice> = (
   set,
   get
@@ -31,16 +53,29 @@ export const createMachineSlice: AppSliceCreator<MachineSlice> = (
   machinesLoading: false,
 
   async fetchMachines(params, opts) {
+    const showDeleted = params?.showDeleted ?? false;
     const silent = opts?.silent;
     // Silent (background) refreshes must not flip the loading flag — otherwise
     // the table swaps to "Loading…" and back on every poll, causing flicker.
     if (!silent) set({ machinesLoading: true });
     try {
-      const res = await machineServiceClient.listMachines({
-        pageSize: params?.pageSize ?? 100,
-        pageToken: params?.pageToken ?? "",
-        showDeleted: params?.showDeleted ?? false,
+      const res = await queryClient.fetchQuery({
+        queryKey: ["machines", showDeleted],
+        // Action semantics: exactly one RPC attempt per call — retries are
+        // batch-3 page-level useQuery territory.
+        retry: false,
+        staleTime: 0,
+        queryFn: () =>
+          machineServiceClient.listMachines({
+            pageSize: params?.pageSize ?? 100,
+            pageToken: params?.pageToken ?? "",
+            showDeleted,
+          }),
       });
+      // Skip the state update entirely when nothing changed, so unchanged
+      // polls cause no re-render at all (the store field is a mirrored view
+      // of the Query cache during the migration; components still subscribe
+      // to the store).
       if (silent && machinesEqual(get().machines, res.machines)) {
         return { nextPageToken: res.nextPageToken };
       }

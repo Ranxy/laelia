@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores";
+import { invalidateMachinesCache } from "@/stores/machine";
 import {
   MachineStatus_ConnectionState,
   MachineSummarySchema,
@@ -71,6 +72,7 @@ beforeEach(() => {
     machines: [],
     machinesLoading: false,
   });
+  invalidateMachinesCache();
   mock.listMachines.mockReset();
   mock.deleteMachine.mockReset();
   mock.getWorkspaceInfo.mockReset();

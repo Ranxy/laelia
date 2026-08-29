@@ -1,6 +1,7 @@
 import { create, equals } from "@bufbuild/protobuf";
 import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 import { agentServiceClient } from "@/connect";
+import { queryClient } from "@/lib/query-client";
 import type {
   AgentModelOption,
   AgentSummary,
@@ -27,6 +28,29 @@ import {
 } from "@/types/proto-es/v1/agent_pb";
 import type { AgentACPConfigInput, AgentSlice, AppSliceCreator } from "./types";
 
+// Query cache key for this slice (ADR-1: query keys live with the slice that
+// fetches them). The list request has no filter beyond paging, so a single
+// fixed key covers the roster; pageSize/pageToken stay OUT of the key on
+// purpose: the only pageToken caller (members.ts drainRoster) pages strictly
+// sequentially, and the key must stay identical across the presence
+// heartbeat's silent refresh and any explicit load so overlapping calls merge
+// into one in-flight promise — the dedupe protection the old hand-rolled path
+// lacked. The tradeoff: two truly concurrent same-key calls with different
+// paging params resolve with whichever queryFn registered first — today every
+// caller pins pageSize: 100, so the merged result matches what the
+// merged-away call would have fetched. staleTime: 0 keeps "action call == one
+// explicit fetch" semantics (one heartbeat tick is still exactly one RPC, so
+// the 30s presence cadence is untouched); retry: false keeps the explicit
+// failure path deterministic.
+const QUERY_KEY = ["agents"];
+
+// Logout clears the slice's Query cache. Wired up at the batch-3 unified
+// release point; until then a logout-relogin can serve gcTime-stale data
+// briefly, bounded by the 5-minute gcTime in query-client defaults.
+export function invalidateAgentsCache(): void {
+  void queryClient.removeQueries({ queryKey: QUERY_KEY });
+}
+
 export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
   agents: [],
   agentsLoading: false,
@@ -37,12 +61,22 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     // the table swaps to "Loading…" and back on every poll, causing flicker.
     if (!silent) set({ agentsLoading: true });
     try {
-      const res = await agentServiceClient.listAgents({
-        pageSize: params?.pageSize ?? 100,
-        pageToken: params?.pageToken ?? "",
+      const res = await queryClient.fetchQuery({
+        queryKey: QUERY_KEY,
+        // Action semantics: exactly one RPC attempt per call — retries are
+        // batch-3 page-level useQuery territory.
+        retry: false,
+        staleTime: 0,
+        queryFn: () =>
+          agentServiceClient.listAgents({
+            pageSize: params?.pageSize ?? 100,
+            pageToken: params?.pageToken ?? "",
+          }),
       });
       // Skip the state update entirely when nothing changed, so unchanged
-      // polls cause no re-render at all.
+      // polls cause no re-render at all (the store field is a mirrored view
+      // of the Query cache during the migration; components still subscribe
+      // to the store).
       if (silent && agentsEqual(get().agents, res.agents)) {
         return { nextPageToken: res.nextPageToken };
       }
