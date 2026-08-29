@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { buildHtmlPreviewDoc, randomId } from "@/lib/html-file";
+import { safeOpenExternal } from "@/lib/open-external";
 
 // HtmlFileView renders a workspace html file inline in a sandboxed iframe.
 // The bridge script inside intercepts link clicks (opened in a new tab) and
@@ -34,7 +35,11 @@ export function HtmlFileView({
         return;
       if (d.type === "link-clicked") {
         const href = String(d.href ?? "");
-        if (href) window.open(href, "_blank", "noopener,noreferrer");
+        // Bridge payloads come from untrusted preview documents; only
+        // allow-listed schemes may reach window.open.
+        if (href && !safeOpenExternal(href)) {
+          console.warn("[html-file-view] blocked link with rejected scheme");
+        }
       }
     };
     window.addEventListener("message", onMessage);

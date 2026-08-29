@@ -25,6 +25,7 @@ import {
   randomId,
 } from "@/lib/html-file";
 import type { CommentAnchor } from "@/lib/markdown-file";
+import { safeOpenExternal } from "@/lib/open-external";
 import { useAppStore } from "@/stores";
 import { HtmlCommentsAside, useHtmlComments } from "./html-comments-aside";
 
@@ -217,7 +218,11 @@ export function HtmlPreviewOverlay() {
         }
         case "link-clicked": {
           const href = String(d.href ?? "");
-          if (href) window.open(href, "_blank", "noopener,noreferrer");
+          // Bridge payloads come from untrusted preview documents; only
+          // allow-listed schemes may reach window.open.
+          if (href && !safeOpenExternal(href)) {
+            console.warn("[html-preview] blocked link with rejected scheme");
+          }
           break;
         }
         case "esc":

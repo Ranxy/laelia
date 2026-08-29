@@ -1,6 +1,6 @@
 import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
 import { ModelCombobox } from "./combobox";
 
 (
@@ -36,18 +36,19 @@ function Harness({ initial = "" }: { initial?: string }) {
   );
 }
 
-describe("ModelCombobox", () => {
-  beforeEach(() => {
-    // The combobox closes 120ms after blur; fake timers keep that pending
-    // timer deterministic so it can't fire after the jsdom environment is
-    // torn down (vitest reports that as an unhandled "window is not defined").
-    vi.useFakeTimers();
-  });
+// The popup renders through a portal into the shared overlay layer root, so
+// its options never live inside the trigger's container.
+function popupItems(): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>('[role="listbox"] button')];
+}
 
+function isPopupOpen(): boolean {
+  return document.querySelector('[role="listbox"]') !== null;
+}
+
+describe("ModelCombobox", () => {
   afterEach(() => {
     document.body.innerHTML = "";
-    vi.clearAllTimers();
-    vi.useRealTimers();
   });
 
   test("filtering the options by typed text and selecting one commits its id", async () => {
@@ -70,7 +71,7 @@ describe("ModelCombobox", () => {
       typeInto(input, "reasoner");
     });
 
-    const items = container.querySelectorAll('[role="listbox"] button');
+    const items = popupItems();
     expect(items.length).toBe(1);
     expect(items[0]?.textContent).toContain("deepseek-reasoner");
 
@@ -82,6 +83,7 @@ describe("ModelCombobox", () => {
     expect((Harness as unknown as { value: string }).value).toBe(
       "deepseek-reasoner"
     );
+    expect(isPopupOpen()).toBe(false);
 
     await act(async () => {
       root.unmount();
@@ -105,6 +107,117 @@ describe("ModelCombobox", () => {
     expect((Harness as unknown as { value: string }).value).toBe(
       "some/custom-model-id"
     );
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  test("a pointerdown outside the trigger and popup closes the dropdown", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    const input = container.querySelector("input") as HTMLInputElement;
+    await act(async () => {
+      input.focus();
+    });
+    expect(isPopupOpen()).toBe(true);
+
+    // Pressing inside the popup does not close it.
+    await act(async () => {
+      document
+        .querySelector('[role="listbox"]')
+        ?.dispatchEvent(
+          new MouseEvent("pointerdown", { bubbles: true, composed: true })
+        );
+    });
+    expect(isPopupOpen()).toBe(true);
+
+    // Pressing on the trigger still does not close it.
+    await act(async () => {
+      input.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    });
+    expect(isPopupOpen()).toBe(true);
+
+    // Pressing anywhere else closes it.
+    await act(async () => {
+      document.body.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true })
+      );
+    });
+    expect(isPopupOpen()).toBe(false);
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  test("escape closes the dropdown without changing the value", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    const input = container.querySelector("input") as HTMLInputElement;
+    await act(async () => {
+      input.focus();
+    });
+    await act(async () => {
+      typeInto(input, "chat");
+    });
+    expect(popupItems().length).toBe(1);
+
+    await act(async () => {
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+      );
+    });
+    expect(isPopupOpen()).toBe(false);
+    expect((Harness as unknown as { value: string }).value).toBe("chat");
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  test("keyboard navigation still picks the highlighted option with Enter", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+
+    const input = container.querySelector("input") as HTMLInputElement;
+    await act(async () => {
+      input.focus();
+    });
+    await act(async () => {
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })
+      );
+    });
+    expect(isPopupOpen()).toBe(true);
+
+    await act(async () => {
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
+      );
+    });
+
+    expect((Harness as unknown as { value: string }).value).toBe(
+      "deepseek-chat"
+    );
+    expect(isPopupOpen()).toBe(false);
 
     await act(async () => {
       root.unmount();
