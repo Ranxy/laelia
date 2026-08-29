@@ -26,7 +26,8 @@ import {
   SetConversationPinnedRequestSchema,
   UnarchiveChannelRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
-import { appendNewMessages, fetchConversationDelta, toUiMessage } from "./chat";
+import { fetchConversationDelta } from "./chat";
+import { appendNewMessages, toUiMessage } from "./chat-helpers";
 import { sameList, sameUnreadMap } from "./list-equals";
 import { sleep } from "./polling";
 import type { AppSliceCreator, ChannelSlice, ChatMessageUI } from "./types";

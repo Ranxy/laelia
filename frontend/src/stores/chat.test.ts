@@ -6,7 +6,7 @@ import {
   ChatMessageSchema,
   MentionSchema,
 } from "@/types/proto-es/v1/command_pb";
-import { appendNewMessages, toUiMessage } from "./chat";
+import { appendNewMessages, toUiMessage } from "./chat-helpers";
 
 // A fixed timestamp shared across fixtures so unchanged round-trips produce
 // equal Date values (timestampDate(ts) is deterministic for a given input).

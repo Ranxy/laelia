@@ -11,9 +11,6 @@ import {
 import { appendNewMessages, toUiMessage } from "./chat-helpers";
 import type { AppSliceCreator, ChatMessageUI, ChatSlice } from "./types";
 
-// Re-export so existing `./chat` imports of these helpers keep working.
-export { appendNewMessages, toUiMessage } from "./chat-helpers";
-
 // Max pages the incremental delta fetch will follow. The backend caps each
 // after_version page at 100 (pageSize 200 is clamped), so a burst of >100 new
 // messages needs pagination to avoid dropping the newest ones.
