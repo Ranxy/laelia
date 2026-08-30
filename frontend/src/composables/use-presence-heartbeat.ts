@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
+import { usePolling } from "@/lib/use-polling";
 import { useAppStore } from "@/stores";
 
 // Heartbeat cadence. 30s beats against the manager's 90s presence window: two
@@ -25,37 +26,32 @@ const PRESENCE_POLL_INTERVAL_MS = 30000;
 // chat route would wrongly show a user offline while they browse other pages.
 // The badge UI itself stays in the feature components; they just read the store.
 export function usePresenceHeartbeat() {
-  useEffect(() => {
-    const tick = () => {
-      const state = useAppStore.getState();
-      const names = new Set<string>();
-      for (const c of state.channels) {
-        if (c.peer) names.add(c.peer);
-      }
-      for (const u of state.users) {
-        if (u.name) names.add(u.name);
-      }
-      for (const roster of Object.values(state.channelMembersByConv)) {
-        for (const m of roster) {
-          if (m.memberType === 1 && m.memberId) {
-            names.add(`users/${m.memberId}`);
-          }
+  const tick = useCallback(() => {
+    const state = useAppStore.getState();
+    const names = new Set<string>();
+    for (const c of state.channels) {
+      if (c.peer) names.add(c.peer);
+    }
+    for (const u of state.users) {
+      if (u.name) names.add(u.name);
+    }
+    for (const roster of Object.values(state.channelMembersByConv)) {
+      for (const m of roster) {
+        if (m.memberType === 1 && m.memberId) {
+          names.add(`users/${m.memberId}`);
         }
       }
-      void state.syncPresence([...names]);
-      // Same cadence refreshes agent connection state for the agent badges.
-      void state.fetchAgents({ pageSize: 100 }, { silent: true });
-    };
-
-    tick();
-    const timer = setInterval(tick, PRESENCE_POLL_INTERVAL_MS);
-    const onVisible = () => {
-      if (!document.hidden) tick();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
+    }
+    void state.syncPresence([...names]);
+    // Same cadence refreshes agent connection state for the agent badges.
+    void state.fetchAgents({ pageSize: 100 }, { silent: true });
   }, []);
+  // Immediate beat on mount so a freshly loaded page is online right away;
+  // the shared primitive drives the cadence. Visibility-gated: a background
+  // tab stops heartbeating, and returning to the foreground beats
+  // immediately.
+  useEffect(() => {
+    tick();
+  }, [tick]);
+  usePolling(tick, PRESENCE_POLL_INTERVAL_MS);
 }

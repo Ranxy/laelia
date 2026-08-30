@@ -1,6 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { agentServiceClient, userServiceClient } from "@/connect";
+import { registerCleanup } from "@/stores/cleanup-registry";
 import {
   DeleteAgentAvatarRequestSchema,
   DownloadAgentAvatarRequestSchema,
@@ -188,3 +189,9 @@ export function useAvatar(name: string | undefined | null): string | null {
 
   return url;
 }
+
+// Self-registered with the cleanup registry: a store reset/logout must drop
+// every cached blob URL so a re-login refetches avatars for the new
+// principal. Batch 4 归位 — this previously lived in stores/auth.ts as a
+// lazy-namespace shim for partial test mocks.
+registerCleanup(() => invalidateAvatar());

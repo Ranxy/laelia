@@ -12,6 +12,7 @@ import {
   buildMachineSetupCommand,
   type MachineInstallOS,
 } from "@/lib/machine-token";
+import { usePolling } from "@/lib/use-polling";
 import { useAppStore } from "@/stores";
 import type { MachineSummary } from "@/types/proto-es/v1/machine_pb";
 
@@ -70,10 +71,12 @@ export function MachineNewPage() {
   }, [candidate, fetchMachines]);
 
   useEffect(() => {
+    // Initial load only — the approval poll runs through usePolling below.
     void poll();
-    const id = setInterval(() => void poll(), 5000);
-    return () => clearInterval(id);
   }, [poll]);
+  // Waiting for a machine's approval; visibility-gated via usePolling (a
+  // hidden tab stops issuing 5s polls, and returning refreshes immediately).
+  usePolling(poll, 5000);
 
   // Detect the freshly approved machine. The full Machine (with host info) is
   // fetched on demand since MachineSummary only carries identity/status.

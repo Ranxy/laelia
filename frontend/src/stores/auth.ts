@@ -1,7 +1,5 @@
 import { create } from "@bufbuild/protobuf";
 import { authServiceClient, userServiceClient } from "@/connect";
-import * as avatarCache from "@/lib/avatar-cache";
-import * as imageBlobCache from "@/lib/image-blob-cache";
 import {
   LoginRequestSchema,
   LogoutRequestSchema,
@@ -13,18 +11,7 @@ import {
   UserSchema,
   UserType,
 } from "@/types/proto-es/v1/user_service_pb";
-import { registerCleanup } from "./cleanup-registry";
 import type { AppSliceCreator, AuthSlice } from "./types";
-
-// Avatar blob URLs and cached image-attachment blobs are module-level lib
-// caches a store reset cannot reach. The owning lib files are outside the
-// editable set for this ticket (batch 4: move registration into lib/), so
-// the registrations stay in this file in registry form until those libs
-// self-register (batch 4) and logout() needs no per-cache calls at all.
-registerCleanup(() => {
-  avatarCache.invalidateAvatar?.();
-  imageBlobCache.invalidateImageBlobs?.();
-});
 
 export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
   currentUser: null,

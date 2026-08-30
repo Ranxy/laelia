@@ -1,4 +1,5 @@
 import { commandServiceClient } from "@/connect";
+import { registerCleanup } from "@/stores/cleanup-registry";
 
 // Cached image-attachment bytes (Blob) keyed by attachment id, shared across
 // RemoteImage mounts so switching channels doesn't re-download every image.
@@ -52,3 +53,8 @@ export function invalidateImageBlobs() {
   imageBlobs.clear();
   inflight.clear();
 }
+
+// Self-registered with the cleanup registry: a store reset/logout clears the
+// cached attachment bytes so one principal's image data never survives into
+// the next session on the same tab.
+registerCleanup(() => invalidateImageBlobs());

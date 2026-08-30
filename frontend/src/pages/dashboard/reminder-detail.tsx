@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { formatTimestamp } from "@/lib/command-status";
+import { usePolling } from "@/lib/use-polling";
 import { useAppStore } from "@/stores";
 import type { Reminder } from "@/types/proto-es/v1/command_pb";
 import { ReminderStatus } from "@/types/proto-es/v1/command_pb";
@@ -123,16 +124,18 @@ export function ReminderDetailPage() {
     reminder?.status === ReminderStatus.FAILED;
 
   useEffect(() => {
-    load();
-    // Stop the re-fetch loop once the reminder reaches a terminal status
-    // (COMPLETED/CANCELLED/FAILED): it is immutable from here on, so polling
-    // would only burn requests. When the status is still active (or not yet
-    // loaded, `undefined` → not terminal) the loop keeps refreshing. Manual
-    // updates (edit/cancel actions) set the reminder directly.
-    if (isTerminal) return;
-    const handle = setInterval(load, DETAIL_POLL_INTERVAL_MS);
-    return () => clearInterval(handle);
-  }, [load, isTerminal]);
+    void load();
+    // Initial load only — the re-fetch loop runs through usePolling below.
+  }, [load]);
+
+  // Terminal reminders cannot be edited or cancelled, so stop the poll loop
+  // (COMPLETED/CANCELLED/FAILED are immutable: polling would only burn
+  // requests). While the status is still active (or not yet loaded,
+  // `undefined` → not terminal) the loop keeps refreshing. Manual updates
+  // (edit/cancel actions) set the reminder directly. Visibility-gated via
+  // usePolling: a background tab stops re-fetching and returning to the
+  // foreground refreshes immediately.
+  usePolling(load, DETAIL_POLL_INTERVAL_MS, { enabled: !isTerminal });
 
   // Open the reminder's discussion thread so ThreadPanel has messages to
   // render. ThreadPanel reads threadByRoot[rootId], which is populated by

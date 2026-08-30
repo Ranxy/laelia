@@ -6,6 +6,7 @@ import { ActivityRow } from "@/components/activity/activity-row";
 import { EmptyState, LoadingState } from "@/components/chat/states";
 import { Button } from "@/components/ui/button";
 import { useIsDesktop } from "@/lib/use-is-desktop";
+import { usePolling } from "@/lib/use-polling";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { Activity } from "@/types/proto-es/v1/command_pb";
@@ -115,33 +116,19 @@ export function ActivityList() {
   );
 
   // Initial load + background polling. A single effect (mirroring ReminderList):
-  // filter/page changes recreate `load`, which re-runs this effect, reloading
-  // and restarting the interval. The pagination reset lives in
-  // handleFilterChange, not here, so a filter switch issues exactly one fetch.
-  //
-  // Visibility gating: while the tab is hidden the interval keeps running but
-  // each tick is a no-op, so background tabs stop issuing fetches. The
-  // visibilitychange listener mirrors use-presence-heartbeat: coming back to
-  // the foreground refetches immediately (silent) instead of waiting up to a
-  // full interval.
+  // Initial load + background polling. A single load effect (mirroring
+  // ReminderList): filter/page changes recreate `load`, which re-runs this
+  // effect, reloading once per filter/page change. The pagination reset lives
+  // in handleFilterChange, not here, so a filter switch issues exactly one
+  // fetch; the silent poll rides the shared usePolling primitive (fixed
+  // cadence + visibility gating + immediate refetch on visible).
   useEffect(() => {
     initialLoadDone.current = false;
     load(false).then(() => {
       initialLoadDone.current = true;
     });
-    const handle = setInterval(() => {
-      if (document.hidden) return;
-      load(true);
-    }, POLL_INTERVAL_MS);
-    const onVisible = () => {
-      if (!document.hidden) load(true);
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      clearInterval(handle);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
   }, [load]);
+  usePolling(() => load(true), POLL_INTERVAL_MS);
 
   const handleFilterChange = (next: Filter) => {
     if (next === filter) return;
