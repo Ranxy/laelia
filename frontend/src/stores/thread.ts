@@ -5,16 +5,9 @@ import {
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { appendNewMessages, toUiMessage } from "./chat-helpers";
-import { sleep } from "./polling";
+import { LONG_POLL_MS, startLongPollLoop } from "./chat-watcher";
 import type { AppSliceCreator, ChatMessageUI, ThreadSlice } from "./types";
 
-// Long-poll hold time for the thread watcher (mirrors the channel watcher).
-// The server caps wait_ms at 30000; 25000 leaves headroom for network/proxy
-// latency so the client re-issues before the server would time out the request.
-const THREAD_LONG_POLL_MS = 25000;
-// Backoff between a failed long poll and the next attempt, so a network blip
-// does not turn into a tight retry loop.
-const THREAD_RETRY_DELAY_MS = 1000;
 // Bounded thread cache: each cached thread holds up to 200 messages, so an
 // unbounded map grows with every thread the user ever opened. Eviction is
 // lazy (after opening a thread / closing the panel): the just-closed thread
@@ -22,16 +15,26 @@ const THREAD_RETRY_DELAY_MS = 1000;
 // returns to "never opened" state — reopening simply reloads it.
 const MAX_CACHED_THREADS = 8;
 
+// ThreadState is the per-thread cache entry shape (see ThreadSlice).
+interface ThreadState {
+  messages: ChatMessageUI[];
+  currentVersion: bigint;
+  loading: boolean;
+}
+
+// emptyThreadState is the pristine per-thread snapshot used when an optimistic
+// write lands before openThread's initial load returns (or the snapshot was
+// evicted). Kept in one place so the slice's invariant shape never drifts.
+const emptyThreadState = (): ThreadState => ({
+  messages: [],
+  currentVersion: 0n,
+  loading: false,
+});
+
 function pruneThreadCache(
-  threads: Record<
-    string,
-    { messages: ChatMessageUI[]; currentVersion: bigint; loading: boolean }
-  >,
+  threads: Record<string, ThreadState>,
   activeRoot: string | null
-): Record<
-  string,
-  { messages: ChatMessageUI[]; currentVersion: bigint; loading: boolean }
-> {
+): Record<string, ThreadState> {
   const keys = Object.keys(threads);
   if (keys.length <= MAX_CACHED_THREADS) return threads;
   // JS object insertion order makes keys[] oldest-first. Drop the oldest
@@ -204,11 +207,7 @@ export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
         threadByRoot: {
           ...state.threadByRoot,
           [rootMessageId]: {
-            ...(state.threadByRoot[rootMessageId] ?? {
-              messages: [],
-              currentVersion: 0n,
-              loading: false,
-            }),
+            ...(state.threadByRoot[rootMessageId] ?? emptyThreadState()),
             messages: appendNewMessages(withoutOptimistic, [chatMsg]),
           },
         },
@@ -220,13 +219,76 @@ export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
     bumpRootReplyCount(set, get, conversationName, rootMessageId, +1);
     return res;
   },
+
+  // Optimistic-message actions (audit 05 D5): the thread composer's optimistic
+  // send pipeline now routes through these slice actions instead of inlining
+  // useAppStore.setState surgery in the component, so the slice's invariants
+  // (ensure-thread literal, id dedup via appendNewMessages, same-reference
+  // bail-outs) live in exactly one place.
+  appendThreadMessage(rootMessageId, msg) {
+    set((state) => {
+      const thread = state.threadByRoot[rootMessageId] ?? emptyThreadState();
+      const merged = appendNewMessages(thread.messages, [msg]);
+      if (merged === thread.messages) return {};
+      return {
+        threadByRoot: {
+          ...state.threadByRoot,
+          [rootMessageId]: { ...thread, messages: merged },
+        },
+      };
+    });
+  },
+
+  patchThreadMessage(rootMessageId, messageId, patch) {
+    set((state) => {
+      const thread = state.threadByRoot[rootMessageId];
+      const list = thread?.messages;
+      if (!list) return {};
+      const idx = list.findIndex((m) => m.id === messageId);
+      if (idx < 0) return {};
+      // Apply only when at least one patched key differs, so repeated no-op
+      // patches (e.g. upload progress ticks) keep the row reference stable and
+      // subscribers bail out.
+      const changed = Object.keys(patch).some(
+        (k) =>
+          list[idx][k as keyof ChatMessageUI] !==
+          patch[k as keyof ChatMessageUI]
+      );
+      if (!changed) return {};
+      const messages = [...list];
+      messages[idx] = { ...list[idx], ...patch };
+      return {
+        threadByRoot: {
+          ...state.threadByRoot,
+          [rootMessageId]: { ...thread, messages },
+        },
+      };
+    });
+  },
+
+  removeThreadMessage(rootMessageId, messageId) {
+    set((state) => {
+      const thread = state.threadByRoot[rootMessageId];
+      if (!thread) return {};
+      const filtered = thread.messages.filter((m) => m.id !== messageId);
+      if (filtered.length === thread.messages.length) return {};
+      return {
+        threadByRoot: {
+          ...state.threadByRoot,
+          [rootMessageId]: { ...thread, messages: filtered },
+        },
+      };
+    });
+  },
 });
 
 // startWatcher begins long-polling for new thread replies. Each request asks
 // only for replies with room_version after the last seen version, dedups
 // against the cached list, and advances the cursor. The request is held by the
 // server until a new reply lands or the 25s timeout elapses, then re-issued
-// immediately — the old 2s interval at ~1/12 the request rate.
+// immediately — the old 2s interval at ~1/12 the request rate. The loop
+// scaffolding (re-issue, backoff, visibility gating) comes from the shared
+// chat-watcher module.
 function startWatcher(
   set: Parameters<AppSliceCreator<ThreadSlice>>[0],
   get: Parameters<AppSliceCreator<ThreadSlice>>[1],
@@ -236,9 +298,10 @@ function startWatcher(
   if (get().threadWatchers[root]) return;
 
   const ctrl = new AbortController();
-  const poll = async () => {
-    if (get().activeThreadRoot !== root) return; // panel closed/switched
-    try {
+  startLongPollLoop({
+    signal: ctrl.signal,
+    round: async () => {
+      if (get().activeThreadRoot !== root) return; // panel closed/switched
       const afterVersion = get().threadByRoot[root]?.currentVersion ?? 0n;
       const res = await commandServiceClient.listThreadMessages(
         create(ListThreadMessagesRequestSchema, {
@@ -247,7 +310,7 @@ function startWatcher(
           pageSize: 200,
           pageToken: "",
           afterVersion,
-          waitMs: THREAD_LONG_POLL_MS,
+          waitMs: LONG_POLL_MS,
         }),
         { signal: ctrl.signal }
       );
@@ -275,16 +338,9 @@ function startWatcher(
       // channel watcher (refreshChannelThreadCounts), so this watcher does not
       // also write back to the main list — it only maintains the thread's own
       // messages.
-    } catch {
-      if (ctrl.signal.aborted) return; // stopped — exit the loop
-      // Network error — back off briefly, then re-issue the long poll.
-      await sleep(THREAD_RETRY_DELAY_MS, ctrl.signal);
-    }
-    if (ctrl.signal.aborted) return;
-    void poll();
-  };
+    },
+  });
 
-  poll();
   set((state) => ({
     threadWatchers: { ...state.threadWatchers, [root]: { ctrl } },
   }));

@@ -47,7 +47,16 @@ describe("store reset", () => {
 
     store.setState({
       channelWatchers: {
-        "conversations/1": { ctrl: channelCtrl, badgeTimer },
+        "conversations/1": {
+          ctrl: channelCtrl,
+          // The badge handle's stop() is what clears the interval now; the
+          // fake timer here only feeds the clearInterval assertion below.
+          badge: {
+            stop: () => {
+              clearInterval(badgeTimer);
+            },
+          },
+        },
       },
       threadWatchers: { "conversations/1": { ctrl: threadCtrl } },
     });

@@ -413,4 +413,59 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
     }));
     await get().loadMessages(conversation);
   },
+
+  // appendChatMessage appends an optimistic composer message to the
+  // conversation (id-deduped so a watcher echo racing the append can't
+  // duplicate it) and keeps the append a same-reference no-op when the
+  // message is already present. Shared by the channel and DM composers via
+  // the shared useChatComposer pipeline — components no longer inline
+  // useAppStore.setState surgery.
+  appendChatMessage(conversation, msg) {
+    set((state) => {
+      const prev = state.chatMessages[conversation] ?? [];
+      const merged = appendNewMessages(prev, [msg]);
+      if (merged === prev) return {};
+      return {
+        chatMessages: { ...state.chatMessages, [conversation]: merged },
+      };
+    });
+  },
+
+  // patchChatMessage replaces one message row with {...row, ...patch}, only
+  // when at least one patched key differs — repeated no-op patches (upload
+  // progress ticks landing on an already-updated row) keep the row reference
+  // stable so subscribers bail out.
+  patchChatMessage(conversation, messageId, patch) {
+    set((state) => {
+      const list = state.chatMessages[conversation];
+      if (!list) return {};
+      const idx = list.findIndex((m) => m.id === messageId);
+      if (idx < 0) return {};
+      const changed = Object.keys(patch).some(
+        (k) =>
+          list[idx][k as keyof ChatMessageUI] !==
+          patch[k as keyof ChatMessageUI]
+      );
+      if (!changed) return {};
+      const updated = [...list];
+      updated[idx] = { ...list[idx], ...patch };
+      return {
+        chatMessages: { ...state.chatMessages, [conversation]: updated },
+      };
+    });
+  },
+
+  // removeChatMessage drops one message row (the optimistic placeholder on a
+  // failed send or an empty send). No-op when the row is already gone.
+  removeChatMessage(conversation, messageId) {
+    set((state) => {
+      const list = state.chatMessages[conversation];
+      if (!list) return {};
+      const filtered = list.filter((m) => m.id !== messageId);
+      if (filtered.length === list.length) return {};
+      return {
+        chatMessages: { ...state.chatMessages, [conversation]: filtered },
+      };
+    });
+  },
 });

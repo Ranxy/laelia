@@ -47,6 +47,7 @@ import type {
   ChatPreferences,
   User,
 } from "@/types/proto-es/v1/user_service_pb";
+import { type BadgeIntervalHandle } from "./chat-watcher";
 
 export interface ChatMessageUI {
   id: string;
@@ -468,6 +469,18 @@ export interface ChatSlice {
   // clearJump exits jump mode and reloads the latest messages for the
   // conversation.
   clearJump: (conversation: string) => Promise<void>;
+
+  // Optimistic message mutations for the chat composer (top-level channel/DM
+  // sends). append/patch/remove keep the slice's invariants (id dedup via
+  // appendNewMessages, same-reference bail-outs) out of the component: the
+  // composer calls these instead of inlining useAppStore.setState surgery.
+  appendChatMessage: (conversation: string, msg: ChatMessageUI) => void;
+  patchChatMessage: (
+    conversation: string,
+    messageId: string,
+    patch: Partial<ChatMessageUI>
+  ) => void;
+  removeChatMessage: (conversation: string, messageId: string) => void;
 }
 
 // ChannelSlice owns channel conversations: the channel roster, per-conversation
@@ -497,7 +510,7 @@ export interface ChannelSlice {
   // registry) so it is testable and survives HMR without leaking timers.
   channelWatchers: Record<
     string,
-    { ctrl: AbortController; badgeTimer: ReturnType<typeof setInterval> }
+    { ctrl: AbortController; badge: BadgeIntervalHandle }
   >;
   // Channels an agent is a member of, keyed by agent resource name
   // (`agents/{id}`). Populated by fetchChannelsForAgent for the agent detail
@@ -608,6 +621,18 @@ export interface ThreadSlice {
     attachments?: Attachment[],
     optimisticId?: string
   ) => Promise<ChatMessage>;
+
+  // Optimistic message mutations for the thread composer's optimistic send
+  // pipeline (same contract as ChatSlice.appendChatMessage, scoped to one
+  // thread snapshot; the thread snapshot is created on demand when a send
+  // races ahead of openThread's initial load).
+  appendThreadMessage: (rootMessageId: string, msg: ChatMessageUI) => void;
+  patchThreadMessage: (
+    rootMessageId: string,
+    messageId: string,
+    patch: Partial<ChatMessageUI>
+  ) => void;
+  removeThreadMessage: (rootMessageId: string, messageId: string) => void;
 }
 
 // PreviewSlice owns the markdown/html file preview overlay: the active

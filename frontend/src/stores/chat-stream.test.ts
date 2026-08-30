@@ -222,6 +222,37 @@ describe("channel watcher long-poll loop", () => {
     expect(mock.listMessagesCalls).toBe(2);
     vi.useRealTimers();
   });
+  it("pauses long-poll re-issues while the tab is hidden and resumes on visible", async () => {
+    // jsdom reports a visible tab; stub hidden=hidden to exercise the watcher
+    // loop's visibility gate.
+    let hidden = true;
+    const hiddenSpy = vi
+      .spyOn(document, "hidden", "get")
+      .mockImplementation(() => hidden);
+    try {
+      // The initial long poll still starts immediately (the watcher is being
+      // set up as the conversation opens); the gate applies to re-issues.
+      mock.listMessagesReplies.push({ messages: [] });
+      mock.activityReplies.push({ activities: [] });
+      useAppStore.getState().startWatchingChannel("conversations/c");
+      expect(mock.listMessagesCalls).toBe(1);
+
+      // While the tab stays hidden, resolving the first round does NOT
+      // re-issue the next long poll.
+      resolveNextListMessage();
+      await new Promise((r) => setTimeout(r, 30));
+      expect(mock.listMessagesCalls).toBe(1);
+
+      // Returning to the foreground re-issues immediately.
+      hidden = false;
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => {
+        expect(mock.listMessagesCalls).toBe(2);
+      });
+    } finally {
+      hiddenSpy.mockRestore();
+    }
+  });
 });
 
 describe("send vs watcher echo race", () => {

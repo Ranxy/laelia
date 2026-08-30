@@ -28,21 +28,14 @@ import {
 } from "@/types/proto-es/v1/command_pb";
 import { fetchConversationDelta } from "./chat";
 import { appendNewMessages, toUiMessage } from "./chat-helpers";
+import {
+  BADGE_INTERVAL_MS,
+  LONG_POLL_MS,
+  startBadgeInterval,
+  startLongPollLoop,
+} from "./chat-watcher";
 import { sameList, sameUnreadMap } from "./list-equals";
-import { sleep } from "./polling";
 import type { AppSliceCreator, ChannelSlice, ChatMessageUI } from "./types";
-
-// Badge/activity cadence: thread reply counts, task badges, and agent activity
-// are not covered by the message delta (server-side), so they keep their own
-// 5s poll while the message watcher long-polls (Phase 1 boundary).
-const WATCHER_POLL_INTERVAL_MS = 5000;
-// Long-poll hold time for the message watcher. The server caps wait_ms at
-// 30000; 25000 leaves headroom for network/proxy latency so the client
-// re-issues before the server would time out the request.
-const WATCHER_LONG_POLL_MS = 25000;
-// Backoff between a failed long poll and the next attempt, so a network blip
-// does not turn into a tight retry loop.
-const WATCHER_RETRY_DELAY_MS = 1000;
 
 // agentActivitiesEqual reports whether two activity arrays are visually
 // identical (the fields AgentStatusBar renders: id + display name + status).
@@ -438,123 +431,116 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
 
     const ctrl = new AbortController();
 
-    // Long-poll loop: holds one request open until a new message lands or the
-    // server timeout (25s) elapses, then immediately re-issues. Same delta
-    // semantics as the old 5s poll at ~1/5 the request rate; the server returns
-    // the empty delta with the current version on timeout, so the cursor
-    // advances and the next request is a fresh long poll.
+    // Long-poll round: holds one request open until a new message lands or the
+    // server timeout (25s) elapses, then the shared loop re-issues it
+    // immediately. Same delta semantics as the old 5s poll at ~1/5 the request
+    // rate; the server returns the empty delta with the current version on
+    // timeout, so the cursor advances and the next request is a fresh long
+    // poll.
     const pollMessages = async () => {
-      try {
-        // Incremental fetch: ask only for messages with room_version strictly
-        // after the last version we saw (captured by loadMessages). This returns
-        // a small delta (usually 0–2 messages) instead of the whole history, so
-        // large conversations no longer re-download and re-merge the entire list
-        // every tick. When no cursor is set yet (e.g. loadMessages failed) this
-        // falls back to afterVersion=0, which the backend serves as latest-N.
-        const afterVersion = get().chatCurrentVersion[conversationName] ?? 0n;
-        // Shared delta fetch: follows nextPageToken so a >100-message burst is
-        // not truncated, and keeps the cursor at the last received message when
-        // the delta can't finish in one pass so the next tick continues.
-        const { uiMsgs, currentVersion } = await fetchConversationDelta(
-          conversationName,
-          afterVersion,
-          { waitMs: WATCHER_LONG_POLL_MS, signal: ctrl.signal }
-        );
-        const prev = get().chatMessages[conversationName] ?? [];
-        const prevVersion = get().chatCurrentVersion[conversationName] ?? 0n;
-        // While a focused jump window is open, the watcher must not append the
-        // delta into it: the window may have unloaded newer pages, and appending
-        // here would either skip them or defeat incremental loading. Advance the
-        // cursor and, when the delta contains messages beyond the loaded window,
-        // surface the newer sentinel so the user can load them on demand.
-        if (get().chatJumpByConv[conversationName]) {
-          if (ctrl.signal.aborted) return;
-          const loadedIds = new Set(prev.map((m) => m.id));
-          const hasUnseen = uiMsgs.some((m) => !loadedIds.has(m.id));
-          if (currentVersion !== prevVersion || hasUnseen) {
-            set((state) => ({
-              chatCurrentVersion: {
-                ...state.chatCurrentVersion,
-                [conversationName]: currentVersion,
-              },
-              ...(hasUnseen && !state.chatHasNewerByConv[conversationName]
-                ? {
-                    chatHasNewerByConv: {
-                      ...state.chatHasNewerByConv,
-                      [conversationName]: true,
-                    },
-                  }
-                : {}),
-            }));
-          }
-        } else if (afterVersion > 0n && prevVersion === 0n) {
-          // The cursor was reset to 0 while this poll was in flight (clearJump
-          // reloading the latest page). That reload owns the next append;
-          // writing this delta now would put newer messages before the reloaded
-          // page. Just advance the cursor and let loadMessages reconcile.
-          if (ctrl.signal.aborted) return;
+      // Incremental fetch: ask only for messages with room_version strictly
+      // after the last version we saw (captured by loadMessages). This returns
+      // a small delta (usually 0–2 messages) instead of the whole history, so
+      // large conversations no longer re-download and re-merge the entire list
+      // every tick. When no cursor is set yet (e.g. loadMessages failed) this
+      // falls back to afterVersion=0, which the backend serves as latest-N.
+      const afterVersion = get().chatCurrentVersion[conversationName] ?? 0n;
+      // Shared delta fetch: follows nextPageToken so a >100-message burst is
+      // not truncated, and keeps the cursor at the last received message when
+      // the delta can't finish in one pass so the next tick continues.
+      const { uiMsgs, currentVersion } = await fetchConversationDelta(
+        conversationName,
+        afterVersion,
+        { waitMs: LONG_POLL_MS, signal: ctrl.signal }
+      );
+      const prev = get().chatMessages[conversationName] ?? [];
+      const prevVersion = get().chatCurrentVersion[conversationName] ?? 0n;
+      // While a focused jump window is open, the watcher must not append the
+      // delta into it: the window may have unloaded newer pages, and appending
+      // here would either skip them or defeat incremental loading. Advance the
+      // cursor and, when the delta contains messages beyond the loaded window,
+      // surface the newer sentinel so the user can load them on demand.
+      if (get().chatJumpByConv[conversationName]) {
+        if (ctrl.signal.aborted) return;
+        const loadedIds = new Set(prev.map((m) => m.id));
+        const hasUnseen = uiMsgs.some((m) => !loadedIds.has(m.id));
+        if (currentVersion !== prevVersion || hasUnseen) {
           set((state) => ({
             chatCurrentVersion: {
               ...state.chatCurrentVersion,
               [conversationName]: currentVersion,
             },
+            ...(hasUnseen && !state.chatHasNewerByConv[conversationName]
+              ? {
+                  chatHasNewerByConv: {
+                    ...state.chatHasNewerByConv,
+                    [conversationName]: true,
+                  },
+                }
+              : {}),
           }));
-        } else {
-          // Append only messages we don't already have. This dedups the
-          // optimistic send already in the list against its server echo, and
-          // returns the same reference when nothing new arrived so subscribers
-          // bail out.
-          const merged = appendNewMessages(prev, uiMsgs);
-          if (merged !== prev || currentVersion !== prevVersion) {
-            // Bail if the watcher was stopped/reset while this poll was in
-            // flight — abort can't cancel an already-resolved response, but
-            // writing here would repopulate a freshly reset store (cross-user
-            // data leak on logout/401).
-            if (ctrl.signal.aborted) return;
-            set((state) => ({
-              chatMessages:
-                merged !== prev
-                  ? {
-                      ...state.chatMessages,
-                      [conversationName]: merged,
-                    }
-                  : state.chatMessages,
-              chatCurrentVersion: {
-                ...state.chatCurrentVersion,
-                [conversationName]: currentVersion,
-              },
-            }));
-          }
         }
-      } catch {
-        if (ctrl.signal.aborted) return; // stopped — exit the loop
-        // Network error — back off briefly, then re-issue the long poll.
-        await sleep(WATCHER_RETRY_DELAY_MS, ctrl.signal);
+      } else if (afterVersion > 0n && prevVersion === 0n) {
+        // The cursor was reset to 0 while this poll was in flight (clearJump
+        // reloading the latest page). That reload owns the next append;
+        // writing this delta now would put newer messages before the reloaded
+        // page. Just advance the cursor and let loadMessages reconcile.
+        if (ctrl.signal.aborted) return;
+        set((state) => ({
+          chatCurrentVersion: {
+            ...state.chatCurrentVersion,
+            [conversationName]: currentVersion,
+          },
+        }));
+      } else {
+        // Append only messages we don't already have. This dedups the
+        // optimistic send already in the list against its server echo, and
+        // returns the same reference when nothing new arrived so subscribers
+        // bail out.
+        const merged = appendNewMessages(prev, uiMsgs);
+        if (merged !== prev || currentVersion !== prevVersion) {
+          // Bail if the watcher was stopped/reset while this poll was in
+          // flight — abort can't cancel an already-resolved response, but
+          // writing here would repopulate a freshly reset store (cross-user
+          // data leak on logout/401).
+          if (ctrl.signal.aborted) return;
+          set((state) => ({
+            chatMessages:
+              merged !== prev
+                ? {
+                    ...state.chatMessages,
+                    [conversationName]: merged,
+                  }
+                : state.chatMessages,
+            chatCurrentVersion: {
+              ...state.chatCurrentVersion,
+              [conversationName]: currentVersion,
+            },
+          }));
+        }
       }
-      if (ctrl.signal.aborted) return;
-      void pollMessages();
     };
 
     // Badge/activity refresh: thread reply counts, task badges, and agent
-    // activity are not covered by the message delta (server-side), so they keep
-    // their own 5s cadence instead of riding the long-poll loop. Run once
-    // immediately (the old poll did), then on the interval.
-    refreshChannelThreadCounts(set, get, conversationName, ctrl);
-    refreshChannelTaskInfo(set, get, conversationName, ctrl);
-    get().fetchConversationActivity(conversationName);
-    const badgeTimer = setInterval(() => {
+    // activity are not covered by the message delta (server-side), so they
+    // keep their own 5s cadence instead of riding the long-poll loop. Run once
+    // immediately (the old poll did), then on the interval (visibility-gated
+    // — a hidden tab stops issuing badge refreshes).
+    const refreshBadges = () => {
       refreshChannelThreadCounts(set, get, conversationName, ctrl);
       refreshChannelTaskInfo(set, get, conversationName, ctrl);
       get().fetchConversationActivity(conversationName);
-    }, WATCHER_POLL_INTERVAL_MS);
+    };
+    refreshBadges();
+    const badge = startBadgeInterval(refreshBadges, BADGE_INTERVAL_MS);
 
     // Start the long-poll loop immediately. The watcher handle lives in store
     // state so it is testable and stoppable across HMR.
-    void pollMessages();
+    startLongPollLoop({ signal: ctrl.signal, round: pollMessages });
     set((state) => ({
       channelWatchers: {
         ...state.channelWatchers,
-        [conversationName]: { ctrl, badgeTimer },
+        [conversationName]: { ctrl, badge },
       },
     }));
   },
@@ -563,7 +549,7 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
     const watcher = get().channelWatchers[conversationName];
     if (watcher) {
       watcher.ctrl.abort();
-      clearInterval(watcher.badgeTimer);
+      watcher.badge.stop();
       set((state) => {
         const channelWatchers = { ...state.channelWatchers };
         delete channelWatchers[conversationName];

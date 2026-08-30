@@ -57,7 +57,7 @@ export const useAppStore = create<AppStoreState>()((...args) => {
       // closures, which are still bound to the live set/get).
       for (const w of Object.values(get().channelWatchers)) {
         w.ctrl.abort();
-        clearInterval(w.badgeTimer);
+        w.badge.stop();
       }
       for (const w of Object.values(get().threadWatchers)) w.ctrl.abort();
       set(useAppStore.getInitialState());
