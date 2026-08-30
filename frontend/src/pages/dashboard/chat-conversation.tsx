@@ -1,4 +1,3 @@
-import { create } from "@bufbuild/protobuf";
 import {
   ArrowDown,
   Bot,
@@ -7,12 +6,10 @@ import {
   Hash,
   ListTodo,
   Loader2,
-  Paperclip,
   Search,
   Send,
   User,
   Users,
-  X,
 } from "lucide-react";
 import {
   memo,
@@ -30,36 +27,31 @@ import { Avatar } from "@/components/chat/avatar";
 import { ChannelFilesPanel } from "@/components/chat/channel-files-panel";
 import { ChannelMembersPanel } from "@/components/chat/channel-members-panel";
 import { ChannelSearchPanel } from "@/components/chat/channel-search-panel";
+import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatDrawerSheet } from "@/components/chat/chat-drawer-sheet";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
-import { MentionPopup } from "@/components/chat/mention-popup";
 import {
   EMPTY_EVENTS,
   MessageRow,
   rowStreamingProps,
 } from "@/components/chat/message-row";
-import { RemoteImage } from "@/components/chat/remote-image";
 import { EmptyState, LoadingState } from "@/components/chat/states";
 import { TasksPanel } from "@/components/chat/tasks-panel";
 import { ThreadPanel } from "@/components/chat/thread-panel";
 import { Button } from "@/components/ui/button";
 import { SheetBody, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Textarea } from "@/components/ui/textarea";
-import { detectMention } from "@/composables/useMentionDetect";
 import {
-  type MentionTarget,
-  targetToMention,
+  type ComposerDraft,
+  type ComposerDraftsRef,
+} from "@/composables/use-chat-composer";
+import {
   useMentionLabelResolver,
   useMentionTargets,
 } from "@/composables/useMentionTargets";
 import { commandServiceClient } from "@/connect";
-import { getCaretCoordinates } from "@/lib/caret-position";
-import { filesFromClipboard } from "@/lib/clipboard-file";
-import { MAX_UPLOAD_BYTES, uploadFileToConversation } from "@/lib/file-upload";
-import { isImageAttachment } from "@/lib/image-file";
-import "@/lib/markdown";
 import { useAvatar } from "@/lib/avatar-cache";
+import "@/lib/markdown";
 import { peerPresenceOnline } from "@/lib/presence";
 import { toastManager } from "@/lib/toast";
 import { useIsDesktop } from "@/lib/use-is-desktop";
@@ -75,7 +67,6 @@ import type {
   Conversation,
   ConversationFile,
 } from "@/types/proto-es/v1/command_pb";
-import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
 
 // Stable empty fallbacks so per-key selectors returning undefined for an
 // unloaded conversation don't mint a new array each run (which would defeat
@@ -83,20 +74,6 @@ import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
 const EMPTY_MESSAGES: ChatMessageUI[] = [];
 const EMPTY_MEMBERS: ChannelMember[] = [];
 const EMPTY_ACTIVITIES: AgentActivity[] = [];
-
-// UploadItem tracks a file currently being uploaded so the composer can render
-// a real progress bar instead of a generic spinner.
-interface UploadItem {
-  id: string;
-  name: string;
-  progress: number;
-  file: File;
-  error?: string;
-}
-
-// DOM id of the mention popup listbox, used to wire the textarea's
-// aria-controls / aria-activedescendant to the active option.
-const MENTION_POPUP_ID = "mention-popup";
 
 // Conversation type values mirror Conversation.type: 1 = direct/DM (user+agent),
 // 2 = channel, 3 = AGENT_DM (agent+agent, owned by the system bot),
@@ -223,7 +200,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
 
   const channels = useAppStore((s) => s.channels);
   const loadMessages = useAppStore((s) => s.loadMessages);
-  const sendChannelMessage = useAppStore((s) => s.sendChannelMessage);
   const listChannelMembers = useAppStore((s) => s.listChannelMembers);
   const startWatchingChannel = useAppStore((s) => s.startWatchingChannel);
   const stopWatchingChannel = useAppStore((s) => s.stopWatchingChannel);
@@ -308,26 +284,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const loadNewerMessages = useAppStore((s) => s.loadNewerMessages);
   const clearJump = useAppStore((s) => s.clearJump);
 
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>(
-    []
-  );
-  const [uploads, setUploads] = useState<UploadItem[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  // Uploads still in flight, stored as promises resolving to their Attachment
-  // so handleSend can wait for them before composing the message.
-  const inFlightUploadsRef = useRef<Promise<Attachment | null>[]>([]);
-  // Upload ids that have been adopted by an optimistic send; their completion
-  // must not re-add to the composer's pendingAttachments (already cleared).
-  const adoptedUploadIdsRef = useRef<Set<string>>(new Set());
-  // The optimistic message id currently being sent (if any), so in-flight
-  // upload progress can update the message bubble inline.
-  const activeOptimisticIdRef = useRef<string | null>(null);
-  // Re-entrancy guard for handleSend: the `sending` state updates asynchronously,
-  // so a fast double-click could otherwise start two sends (the second one with
-  // no in-flight uploads -> the file would be dropped).
-  const sendingRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Latest messages for the scroll handler without re-creating the handler
   // every time the watcher appends a message.
@@ -365,17 +321,13 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const lastChannelRef = useRef<string | null>(null);
   const stickToBottomRef = useRef(true);
   const [showScrollDown, setShowScrollDown] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isDesktop = useIsDesktop();
-  // Per-conversation input draft cache so switching channels does not leak the
-  // half-typed message, pending attachments, or @mention map across channels.
-  // Keyed by channelId; lives for the lifetime of this page instance.
-  const draftRef = useRef<
-    Record<
-      string,
-      { input: string; attachments: Attachment[]; mentions: MentionTarget[] }
-    >
-  >({});
+  // Per-conversation input draft cache (half-typed text + completed
+  // attachments) owned here and consumed by ChatComposer keyed per channelId,
+  // so switching channels does not leak the half-typed message across
+  // channels. In-flight uploads are not part of the draft — they belong to
+  // the composer instance that started them (see useChatComposer).
+  const draftsRef: ComposerDraftsRef = useRef(new Map<string, ComposerDraft>());
 
   const [membersOpen, setMembersOpen] = useState(false);
   const [filesOpen, setFilesOpen] = useState(false);
@@ -392,19 +344,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // message pane is hidden (see the ThreadPanel expand toggle).
   const [threadExpanded, setThreadExpanded] = useState(false);
 
-  const [mentionState, setMentionState] = useState<{
-    active: boolean;
-    query: string;
-    startIndex: number;
-    matched: MentionTarget[];
-  } | null>(null);
-  const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
-  const [mentionMap, setMentionMap] = useState<MentionTarget[]>([]);
-  const [cursorPos, setCursorPos] = useState(0);
-  // asTask toggles whether the next send creates a channel task (a top-level
-  // message with task metadata) instead of a plain message. It resets to false
-  // after each send so task creation is deliberate per message.
-  const [asTask, setAsTask] = useState(false);
   const [detailMention, setDetailMention] = useState<{
     type: "user" | "agent";
     id: string;
@@ -881,33 +820,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     messagesRef.current = messages;
   }, [messages]);
 
-  // Restore the entering conversation's draft. Declared before the persist
-  // effect so it reads the saved draft before any stale write lands.
-  useEffect(() => {
-    if (!channelId) return;
-    const d = draftRef.current[channelId];
-    setInput(d?.input ?? "");
-    setPendingAttachments(d?.attachments ?? []);
-    setMentionMap(d?.mentions ?? []);
-    setMentionState(null);
-    setMentionSelectedIndex(0);
-    setCursorPos(0);
-  }, [channelId]);
-
-  // Persist the current input/attachments/mentions to the draft cache on every
-  // change. On a switch the restore effect above seeds the new conversation's
-  // state, which re-triggers this effect and writes the restored values back —
-  // so each conversation keeps its own draft without cross-talk.
-  useEffect(() => {
-    if (channelId) {
-      draftRef.current[channelId] = {
-        input,
-        attachments: pendingAttachments,
-        mentions: mentionMap,
-      };
-    }
-  }, [channelId, input, pendingAttachments, mentionMap]);
-
   // Auto-mark-read as new messages arrive via polling while the conversation
   // is open. On conversation switch we just reset the baseline; the initial
   // markRead is handled by init() above.
@@ -1027,274 +939,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     loadNewerMessages,
   ]);
 
-  const autoResize = useCallback(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
-  }, []);
-
-  useEffect(() => {
-    autoResize();
-  }, [input, autoResize]);
-
-  // uploadFile uploads a file via the browser multipart endpoint and returns an
-  // Attachment describing it. The onProgress callback powers the per-file
-  // progress bar rendered in the composer.
-  const uploadFile = useCallback(
-    async (
-      file: File,
-      onProgress?: (progress: number) => void
-    ): Promise<Attachment | null> => {
-      if (!channelId) return null;
-      return uploadFileToConversation({
-        conversation: `conversations/${channelId}`,
-        originalName: file.name,
-        mimeType: file.type || "",
-        file,
-        onProgress: (p) => onProgress?.(p.percent),
-      });
-    },
-    [channelId]
-  );
-
-  const handleFiles = useCallback(
-    async (files: FileList | File[]) => {
-      const list = Array.from(files);
-      if (list.length === 0) return;
-      // Upload files in parallel; each has its own progress entry. The
-      // browser streams the multipart bodies natively, so this no longer
-      // blocks the main thread or requires reading the whole file into memory.
-      const tasks = list.map((file) => {
-        const id = `${file.name}-${Date.now()}-${Math.random()}`;
-        // Reject oversized files immediately, before starting the upload, so
-        // the user sees a clear error instead of a mid-upload failure. The
-        // file is not added to the composer at all.
-        if (file.size > MAX_UPLOAD_BYTES) {
-          toastManager.add({ type: "error", title: t("chat.file-too-large") });
-          return Promise.resolve(null);
-        }
-        setUploads((prev) => [
-          ...prev,
-          { id, name: file.name, progress: 0, file },
-        ]);
-        const task = uploadFile(file, (progress) => {
-          setUploads((prev) =>
-            prev.map((u) => (u.id === id ? { ...u, progress } : u))
-          );
-          // If this upload was adopted by an optimistic send, mirror the
-          // progress into the message bubble in the chat list.
-          const optimisticId = activeOptimisticIdRef.current;
-          if (optimisticId && adoptedUploadIdsRef.current.has(id)) {
-            useAppStore.setState((state) => ({
-              chatMessages: {
-                ...state.chatMessages,
-                [conversationName]: (
-                  state.chatMessages[conversationName] ?? []
-                ).map((m) =>
-                  m.id === optimisticId
-                    ? {
-                        ...m,
-                        uploadProgress: {
-                          ...(m.uploadProgress ?? {}),
-                          [`pending-${id}`]: progress,
-                        },
-                      }
-                    : m
-                ),
-              },
-            }));
-          }
-        })
-          .then((att) => {
-            if (att && !adoptedUploadIdsRef.current.has(id)) {
-              setPendingAttachments((prev) => [...prev, att]);
-            }
-            return att;
-          })
-          .catch((err) => {
-            // Keep the failed upload visible with an error so it doesn't
-            // silently vanish; the user can dismiss it manually.
-            console.error("file upload failed", err);
-            const message =
-              err instanceof Error
-                ? err.message
-                : String(err ?? "upload failed");
-            setUploads((prev) =>
-              prev.map((u) => (u.id === id ? { ...u, error: message } : u))
-            );
-            return null;
-          })
-          .finally(() => {
-            // Remove only successful uploads; failed ones stay visible so the
-            // user can see what went wrong.
-            setUploads((prev) => prev.filter((u) => u.id !== id || u.error));
-          });
-        inFlightUploadsRef.current.push(task);
-        return task;
-      });
-      await Promise.all(tasks);
-    },
-    [uploadFile]
-  );
-
-  const handleSend = useCallback(async () => {
-    const text = input.trim();
-    if (sendingRef.current || !channelId) return;
-    sendingRef.current = true;
-
-    const completedAttachments = pendingAttachments;
-    const inFlight = inFlightUploadsRef.current;
-    const hasInFlight = inFlight.length > 0;
-    const tempId = crypto.randomUUID();
-
-    // Build the optimistic message: completed attachments plus temp
-    // placeholders for files still uploading, so the whole message (text +
-    // files) appears in the chat immediately with a "sending" state.
-    const tempAttachments: Attachment[] = [
-      ...completedAttachments,
-      ...uploads.map((u) =>
-        create(AttachmentSchema, {
-          id: `pending-${u.id}`,
-          name: u.name,
-          mimeType: u.file.type || "",
-          sizeBytes: BigInt(u.file.size),
-        })
-      ),
-    ];
-    const uploadProgress: Record<string, number> = {};
-    for (const u of uploads) {
-      uploadProgress[`pending-${u.id}`] = u.progress;
-    }
-
-    const optimisticMsg: ChatMessageUI = {
-      id: tempId,
-      role: "user",
-      content: text,
-      timestamp: new Date(),
-      attachments: tempAttachments,
-      sending: true,
-      uploadProgress: hasInFlight ? uploadProgress : undefined,
-    };
-
-    // Append the optimistic message immediately so the user sees it sending.
-    useAppStore.setState((state) => ({
-      chatMessages: {
-        ...state.chatMessages,
-        [conversationName]: [
-          ...(state.chatMessages[conversationName] ?? []),
-          optimisticMsg,
-        ],
-      },
-    }));
-
-    // Clear the composer right away so the user can start typing the next
-    // message while uploads continue in the background.
-    setInput("");
-    setMentionState(null);
-    setPendingAttachments([]);
-    setAsTask(false);
-    setSending(true);
-    activeOptimisticIdRef.current = tempId;
-
-    // Adopt in-flight uploads: their completion updates the optimistic
-    // message, not the (now cleared) composer pending list.
-    for (const u of uploads) adoptedUploadIdsRef.current.add(u.id);
-    inFlightUploadsRef.current = [];
-    // The uploads are now represented inside the optimistic message; clear the
-    // composer's progress chips so they don't show twice.
-    setUploads([]);
-
-    let finalAttachments = completedAttachments;
-    if (hasInFlight) {
-      const results = await Promise.all(inFlight);
-      const uploaded = results.filter((a): a is Attachment => a !== null);
-      // Dedupe by id: an upload that finished just before send may already be
-      // in completedAttachments AND in the resolved in-flight results.
-      finalAttachments = [
-        ...new Map(
-          [...completedAttachments, ...uploaded].map((a) => [a.id, a])
-        ).values(),
-      ];
-
-      // Replace temp placeholders with the real attachments in the message.
-      useAppStore.setState((state) => ({
-        chatMessages: {
-          ...state.chatMessages,
-          [conversationName]: (state.chatMessages[conversationName] ?? []).map(
-            (m) =>
-              m.id === tempId
-                ? {
-                    ...m,
-                    attachments: finalAttachments,
-                    uploadProgress: undefined,
-                  }
-                : m
-          ),
-        },
-      }));
-    }
-
-    if (!text && finalAttachments.length === 0) {
-      // Nothing to send (e.g. all uploads failed) — remove the optimistic row.
-      useAppStore.setState((state) => ({
-        chatMessages: {
-          ...state.chatMessages,
-          [conversationName]: (
-            state.chatMessages[conversationName] ?? []
-          ).filter((m) => m.id !== tempId),
-        },
-      }));
-      setSending(false);
-      sendingRef.current = false;
-      activeOptimisticIdRef.current = null;
-      return;
-    }
-
-    const sendAsTask = asTask;
-    const mentions = mentionMap.map(targetToMention);
-    try {
-      await sendChannelMessage(
-        channelId,
-        text,
-        mentions,
-        finalAttachments,
-        sendAsTask,
-        tempId
-      );
-    } catch {
-      // send failed — remove the optimistic row and restore the composer so
-      // the user can retry.
-      useAppStore.setState((state) => ({
-        chatMessages: {
-          ...state.chatMessages,
-          [conversationName]: (
-            state.chatMessages[conversationName] ?? []
-          ).filter((m) => m.id !== tempId),
-        },
-      }));
-      setPendingAttachments(finalAttachments);
-      setAsTask(sendAsTask);
-    } finally {
-      setSending(false);
-      sendingRef.current = false;
-      activeOptimisticIdRef.current = null;
-      // The textarea is disabled while sending, which drops focus; restore it
-      // after the send settles so the user can keep typing.
-      setTimeout(() => textareaRef.current?.focus(), 0);
-    }
-  }, [
-    input,
-    sending,
-    channelId,
-    conversationName,
-    mentionMap,
-    sendChannelMessage,
-    pendingAttachments,
-    uploads,
-    asTask,
-  ]);
-
   const handleMentionClick = useCallback(
     (type: string, id: string, name: string) => {
       setDetailMention({
@@ -1314,33 +958,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
       void toggleReaction(conversationName, msg.id, emoji);
     },
     [conversationName, toggleReaction]
-  );
-
-  const handleMentionSelect = useCallback(
-    (target: MentionTarget) => {
-      if (!mentionState) return;
-      const before = input.slice(0, mentionState.startIndex);
-      const after = input.slice(cursorPos);
-      const newInput = `${before}@${target.handle} ${after}`;
-      setInput(newInput);
-      setMentionMap((prev) => {
-        if (prev.some((m) => m.id === target.id && m.type === target.type)) {
-          return prev;
-        }
-        return [...prev, target];
-      });
-      setMentionState(null);
-      setMentionSelectedIndex(0);
-      setTimeout(() => {
-        const el = textareaRef.current;
-        if (el) {
-          const newPos = mentionState.startIndex + target.handle.length + 2;
-          el.focus();
-          el.setSelectionRange(newPos, newPos);
-        }
-      }, 0);
-    },
-    [input, cursorPos, mentionState]
   );
 
   // Channel rows are never in DM-style streaming mode (channel messages are
@@ -1760,301 +1377,22 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                     {t("chat.channel-archived")}
                   </div>
                 </div>
-              ) : (
+              ) : channelId ? (
                 <div className="px-4 pb-2 pt-2 lg:px-6 lg:pb-5">
-                  <div
-                    className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors"
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      if (e.dataTransfer.files.length > 0)
-                        handleFiles(e.dataTransfer.files);
-                    }}
-                    onPaste={(e) => {
-                      // Pasting a clipboard image (screenshot, copied image)
-                      // uploads it like a picked file. Only preventDefault
-                      // when real files were found, so text paste keeps
-                      // inserting into the textarea.
-                      const files = filesFromClipboard(e.clipboardData);
-                      if (files.length > 0) {
-                        e.preventDefault();
-                        handleFiles(files);
-                      }
-                    }}
-                  >
-                    {(pendingAttachments.length > 0 || uploads.length > 0) && (
-                      <div className="flex flex-wrap gap-1.5 px-3 pt-2">
-                        {uploads.map((u) =>
-                          u.error ? (
-                            <span
-                              key={u.id}
-                              className="flex items-center gap-1.5 rounded-md border border-error/40 bg-error/5 px-2 py-1 text-xs text-error"
-                            >
-                              <span className="max-w-[120px] truncate">
-                                {u.name}
-                              </span>
-                              <span className="text-error/80">{u.error}</span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setUploads((prev) =>
-                                    prev.filter((p) => p.id !== u.id)
-                                  )
-                                }
-                                className="text-error/60 hover:text-error transition-colors"
-                                aria-label={t("common.delete")}
-                              >
-                                <X className="size-3" />
-                              </button>
-                            </span>
-                          ) : (
-                            <span
-                              key={u.id}
-                              className="flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
-                            >
-                              <Loader2 className="size-3 animate-spin" />
-                              <span className="max-w-[120px] truncate">
-                                {u.name}
-                              </span>
-                              <span className="text-control-placeholder">
-                                {u.progress}%
-                              </span>
-                            </span>
-                          )
-                        )}
-                        {pendingAttachments.map((att) =>
-                          isImageAttachment(att) ? (
-                            <div
-                              key={att.id}
-                              className="group relative shrink-0"
-                            >
-                              <RemoteImage
-                                attachment={att}
-                                variant="thumb"
-                                onClick={() => openImagePreview(att)}
-                              />
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setPendingAttachments((prev) =>
-                                    prev.filter((p) => p.id !== att.id)
-                                  )
-                                }
-                                className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-control-border bg-background text-control-placeholder opacity-0 transition-opacity hover:text-error group-hover:opacity-100"
-                                aria-label={t("common.delete")}
-                              >
-                                <X className="size-3" />
-                              </button>
-                              <div className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 max-w-[240px] -translate-y-1/2 truncate rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                                {att.name}
-                              </div>
-                            </div>
-                          ) : (
-                            <span
-                              key={att.id}
-                              className="group flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
-                            >
-                              <span className="max-w-[160px] truncate">
-                                {att.name}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setPendingAttachments((prev) =>
-                                    prev.filter((p) => p.id !== att.id)
-                                  )
-                                }
-                                className="text-control-placeholder hover:text-error transition-colors"
-                                aria-label={t("common.delete")}
-                              >
-                                <X className="size-3" />
-                              </button>
-                            </span>
-                          )
-                        )}
-                      </div>
-                    )}
-                    <Textarea
-                      ref={textareaRef}
-                      className={cn(
-                        "block w-full resize-none border-0 bg-transparent px-4 py-3 text-sm text-main",
-                        "placeholder:text-control-placeholder focus:ring-0 focus:border-transparent",
-                        "max-h-[200px] min-h-[24px]"
-                      )}
-                      rows={1}
-                      placeholder={t("channel.placeholder")}
-                      aria-controls={
-                        mentionState?.active ? MENTION_POPUP_ID : undefined
-                      }
-                      aria-activedescendant={
-                        mentionState?.active && mentionState.matched.length > 0
-                          ? `${MENTION_POPUP_ID}-opt-${mentionSelectedIndex}`
-                          : undefined
-                      }
-                      value={input}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setInput(value);
-                        const pos = e.target.selectionStart ?? 0;
-                        setCursorPos(pos);
-                        const state = detectMention(value, pos, mentionTargets);
-                        setMentionState(state);
-                        setMentionSelectedIndex(0);
-                        if (state?.active) {
-                          const newMap: MentionTarget[] = [];
-                          const re = /(?:^|\s)@(\S+)/g;
-                          let m: RegExpExecArray | null;
-                          while ((m = re.exec(value)) !== null) {
-                            const name = m[1];
-                            const found = mentionTargets.find(
-                              (t) => t.handle === name
-                            );
-                            if (found) newMap.push(found);
-                          }
-                          setMentionMap(newMap);
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (mentionState?.active) {
-                          const total = mentionState.matched.length;
-                          if (e.key === "ArrowDown") {
-                            e.preventDefault();
-                            setMentionSelectedIndex((idx) =>
-                              idx + 1 < total ? idx + 1 : 0
-                            );
-                            return;
-                          }
-                          if (e.key === "ArrowUp") {
-                            e.preventDefault();
-                            setMentionSelectedIndex((idx) =>
-                              idx - 1 >= 0 ? idx - 1 : total - 1
-                            );
-                            return;
-                          }
-                          if (e.key === "Enter" || e.key === "Tab") {
-                            if (total === 0) return;
-                            e.preventDefault();
-                            if (mentionState.matched[mentionSelectedIndex]) {
-                              handleMentionSelect(
-                                mentionState.matched[mentionSelectedIndex]
-                              );
-                            }
-                            return;
-                          }
-                          if (e.key === "Escape") {
-                            e.preventDefault();
-                            setMentionState(null);
-                            return;
-                          }
-                        }
-                        if (e.nativeEvent.isComposing) return;
-                        if (e.key !== "Enter") return;
-                        const wantSend = enterToSend ? !e.shiftKey : e.shiftKey;
-                        if (wantSend) {
-                          e.preventDefault();
-                          handleSend();
-                        }
-                      }}
-                      onSelect={(e) => {
-                        const target = e.target as HTMLTextAreaElement;
-                        const pos = target.selectionStart ?? 0;
-                        setCursorPos(pos);
-                        const state = detectMention(
-                          target.value,
-                          pos,
-                          mentionTargets
-                        );
-                        setMentionState(state);
-                        setMentionSelectedIndex(0);
-                      }}
-                    />
-                    <div className="flex items-center justify-between px-3 pb-2">
-                      <div className="flex items-center gap-2">
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => {
-                            if (e.target.files) handleFiles(e.target.files);
-                            e.target.value = "";
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={uploads.length > 0 || sending}
-                          className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors disabled:opacity-50"
-                          aria-label={t("channel.attach-file")}
-                        >
-                          {uploads.length > 0 ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <Paperclip className="size-4" />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAsTask((v) => !v)}
-                          aria-pressed={asTask}
-                          disabled={sending}
-                          className={cn(
-                            "flex h-7 items-center gap-1 rounded-md px-2 text-xs transition-colors disabled:opacity-50 lg:ml-0",
-                            "ml-2",
-                            asTask
-                              ? "bg-accent/15 text-accent"
-                              : "text-control-placeholder hover:text-main hover:bg-control-bg"
-                          )}
-                          aria-label={t("channelTask.as-task")}
-                          title={t("channelTask.as-task-hint")}
-                        >
-                          <ListTodo className="size-3.5" />
-                          <span className="sm:hidden lg:inline">
-                            {t("channelTask.as-task")}
-                          </span>
-                        </button>
-                        {isDesktop && (
-                          <span className="text-xs text-control-placeholder">
-                            {t(
-                              enterToSend
-                                ? "chat.send-hint"
-                                : "chat.send-hint-inverted"
-                            )}
-                          </span>
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        size="xs"
-                        onClick={handleSend}
-                        disabled={
-                          (!input.trim() && pendingAttachments.length === 0) ||
-                          sending
-                        }
-                      >
-                        <Send className="size-3" />
-                        {t("common.send")}
-                      </Button>
-                    </div>
-                  </div>
-                  {mentionState?.active && textareaRef.current && (
-                    <MentionPopup
-                      id={MENTION_POPUP_ID}
-                      targets={mentionState.matched}
-                      query={mentionState.query}
-                      position={getCaretCoordinates(
-                        textareaRef.current,
-                        cursorPos
-                      )}
-                      selectedIndex={mentionSelectedIndex}
-                      onSelect={handleMentionSelect}
-                      onClose={() => setMentionState(null)}
-                    />
-                  )}
+                  <ChatComposer
+                    key={channelId}
+                    channelId={channelId}
+                    draftKey={channelId}
+                    draftsRef={draftsRef}
+                    enterToSend={enterToSend}
+                    mentionTargets={mentionTargets}
+                    popupId="mention-popup"
+                    placeholder={t("channel.placeholder")}
+                    size="main"
+                    taskEnabled
+                  />
                 </div>
-              )}
+              ) : null}
             </div>
           )}
         </div>

@@ -1,11 +1,8 @@
-import { create } from "@bufbuild/protobuf";
 import {
   ArrowLeft,
   ExternalLink,
-  Loader2,
   Maximize2,
   Minimize2,
-  Paperclip,
   Send,
   X,
 } from "lucide-react";
@@ -20,17 +17,15 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { ChatComposer } from "@/components/chat/chat-composer";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
-import { MentionPopup } from "@/components/chat/mention-popup";
 import {
   EMPTY_EVENTS,
   MessageRow,
   rowStreamingProps,
 } from "@/components/chat/message-row";
-import { RemoteImage } from "@/components/chat/remote-image";
 import { EmptyState, LoadingState } from "@/components/chat/states";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -38,42 +33,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { detectMention } from "@/composables/useMentionDetect";
+import { type ComposerDraft } from "@/composables/use-chat-composer";
 import {
-  type MentionTarget,
-  targetToMention,
   useMentionLabelResolver,
   useMentionTargets,
 } from "@/composables/useMentionTargets";
 import { agentTeamServiceClient } from "@/connect";
-import { getCaretCoordinates } from "@/lib/caret-position";
-import { filesFromClipboard } from "@/lib/clipboard-file";
-import { MAX_UPLOAD_BYTES, uploadFileToConversation } from "@/lib/file-upload";
-import { isImageAttachment } from "@/lib/image-file";
 import { taskStatusLabel } from "@/lib/task-status";
 import { toastManager } from "@/lib/toast";
 import { useHistorySentinel } from "@/lib/use-history-sentinel";
 import { useIsDesktop } from "@/lib/use-is-desktop";
-import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { senderKeyForMessage } from "@/stores/chat-helpers";
 import type { ChatMessageUI } from "@/stores/types";
 import type { AgentTeam } from "@/types/proto-es/v1/agent_team_service_pb";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
-import { AttachmentSchema, TaskStatus } from "@/types/proto-es/v1/command_pb";
-
-const MENTION_POPUP_ID = "thread-mention-popup";
-
-// UploadItem tracks a file currently being uploaded so the composer can render
-// a real progress bar instead of a generic spinner.
-interface UploadItem {
-  id: string;
-  name: string;
-  progress: number;
-  file: File;
-  error?: string;
-}
+import { TaskStatus } from "@/types/proto-es/v1/command_pb";
 
 // ThreadReplies renders the beginning-of-replies divider + the reply list. It
 // is memoized so typing a reply (which re-renders the panel's header/composer
@@ -232,7 +207,6 @@ export function ThreadPanel({
 }: ThreadPanelProps) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
-  const conversationName = `conversations/${channelId}`;
   // On real iOS/iPadOS browsers the system edge-swipe owns edge touches (see
   // platform-edge-swipe.ts): the history sentinel turns it (and the back
   // button) into a thread dismissal instead of leaving the page.
@@ -242,9 +216,7 @@ export function ThreadPanel({
     : "fixed inset-0 z-panel flex w-full flex-col bg-background pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:static lg:inset-auto lg:w-[420px] lg:shrink-0 lg:border-l lg:border-control-border lg:pt-0 lg:pb-0";
 
   const thread = useAppStore((s) => s.threadByRoot[rootMessageId]);
-  const sendThreadMessage = useAppStore((s) => s.sendThreadMessage);
   const agents = useAppStore((s) => s.agents);
-  const openImagePreview = useAppStore((s) => s.openImagePreview);
   const currentUser = useAppStore((s) => s.currentUser);
   const convertMessageToTask = useAppStore((s) => s.convertMessageToTask);
   // Per-user chat keybinding (see chat-conversation.tsx for rationale).
@@ -265,44 +237,19 @@ export function ThreadPanel({
   const mentionTargets = useMentionTargets(channelId);
   const mentionLabel = useMentionLabelResolver(channelId);
 
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>(
-    []
-  );
-  const [uploads, setUploads] = useState<UploadItem[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  // Uploads still in flight, stored as promises resolving to their Attachment
-  // so handleSend can wait for them before composing the message.
-  const inFlightUploadsRef = useRef<Promise<Attachment | null>[]>([]);
-  // Upload ids that have been adopted by an optimistic send; their completion
-  // must not re-add to the composer's pendingAttachments (already cleared).
-  const adoptedUploadIdsRef = useRef<Set<string>>(new Set());
-  // The optimistic message id currently being sent (if any), so in-flight
-  // upload progress can update the message bubble inline.
-  const activeOptimisticIdRef = useRef<string | null>(null);
-  // Re-entrancy guard for handleSend: the `sending` state updates asynchronously,
-  // so a fast double-click could otherwise start two sends (the second one with
-  // no in-flight uploads -> the file would be dropped).
-  const sendingRef = useRef(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
-
-  const [mentionState, setMentionState] = useState<{
-    active: boolean;
-    query: string;
-    startIndex: number;
-    matched: MentionTarget[];
-  } | null>(null);
-  const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
-  const [mentionMap, setMentionMap] = useState<MentionTarget[]>([]);
-  const [cursorPos, setCursorPos] = useState(0);
   const [detailMention, setDetailMention] = useState<{
     type: "user" | "agent";
     id: string;
     name: string;
   } | null>(null);
+  // Per-thread composer draft cache, owned here and consumed by ChatComposer
+  // keyed per rootMessageId, so switching threads does not leak a half-typed
+  // reply into the next thread. In-flight uploads are not part of the draft —
+  // they belong to the composer instance that started them (see
+  // useChatComposer).
+  const draftsRef = useRef(new Map<string, ComposerDraft>());
 
   // Keyed by both the agent's resource name and its title so sender-title
   // lookup is O(1) instead of a linear scan per message (a thread with many
@@ -355,325 +302,6 @@ export function ThreadPanel({
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
     stickToBottomRef.current = scrollHeight - scrollTop - clientHeight < 100;
   }, []);
-
-  const autoResize = useCallback(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
-  }, []);
-
-  useEffect(() => {
-    autoResize();
-  }, [input, autoResize]);
-
-  const uploadFile = useCallback(
-    async (
-      file: File,
-      onProgress?: (progress: number) => void
-    ): Promise<Attachment | null> => {
-      return uploadFileToConversation({
-        conversation: conversationName,
-        originalName: file.name,
-        mimeType: file.type || "",
-        file,
-        onProgress: (p) => onProgress?.(p.percent),
-      });
-    },
-    [conversationName]
-  );
-
-  const handleFiles = useCallback(
-    async (files: FileList | File[]) => {
-      const list = Array.from(files);
-      if (list.length === 0) return;
-      const tasks = list.map((file) => {
-        const id = `${file.name}-${Date.now()}-${Math.random()}`;
-        // Reject oversized files immediately, before starting the upload, so
-        // the user sees a clear error instead of a mid-upload failure. The
-        // file is not added to the composer at all.
-        if (file.size > MAX_UPLOAD_BYTES) {
-          toastManager.add({ type: "error", title: t("chat.file-too-large") });
-          return Promise.resolve(null);
-        }
-        setUploads((prev) => [
-          ...prev,
-          { id, name: file.name, progress: 0, file },
-        ]);
-        const task = uploadFile(file, (progress) => {
-          setUploads((prev) =>
-            prev.map((u) => (u.id === id ? { ...u, progress } : u))
-          );
-          // If this upload was adopted by an optimistic send, mirror the
-          // progress into the message bubble in the thread.
-          const optimisticId = activeOptimisticIdRef.current;
-          if (optimisticId && adoptedUploadIdsRef.current.has(id)) {
-            useAppStore.setState((state) => ({
-              threadByRoot: {
-                ...state.threadByRoot,
-                [rootMessageId]: {
-                  ...(state.threadByRoot[rootMessageId] ?? {
-                    messages: [],
-                    currentVersion: 0n,
-                    loading: false,
-                  }),
-                  messages: (
-                    state.threadByRoot[rootMessageId]?.messages ?? []
-                  ).map((m) =>
-                    m.id === optimisticId
-                      ? {
-                          ...m,
-                          uploadProgress: {
-                            ...(m.uploadProgress ?? {}),
-                            [`pending-${id}`]: progress,
-                          },
-                        }
-                      : m
-                  ),
-                },
-              },
-            }));
-          }
-        })
-          .then((att) => {
-            if (att && !adoptedUploadIdsRef.current.has(id)) {
-              setPendingAttachments((prev) => [...prev, att]);
-            }
-            return att;
-          })
-          .catch((err) => {
-            // Keep the failed upload visible with an error so it doesn't
-            // silently vanish; the user can dismiss it manually.
-            console.error("thread file upload failed", err);
-            const message =
-              err instanceof Error
-                ? err.message
-                : String(err ?? "upload failed");
-            setUploads((prev) =>
-              prev.map((u) => (u.id === id ? { ...u, error: message } : u))
-            );
-            return null;
-          })
-          .finally(() => {
-            // Remove only successful uploads; failed ones stay visible so the
-            // user can see what went wrong.
-            setUploads((prev) => prev.filter((u) => u.id !== id || u.error));
-          });
-        inFlightUploadsRef.current.push(task);
-        return task;
-      });
-      await Promise.all(tasks);
-    },
-    [uploadFile]
-  );
-
-  const handleSend = useCallback(async () => {
-    const text = input.trim();
-    if (sendingRef.current) return;
-    sendingRef.current = true;
-
-    const completedAttachments = pendingAttachments;
-    const inFlight = inFlightUploadsRef.current;
-    const hasInFlight = inFlight.length > 0;
-    const tempId = crypto.randomUUID();
-
-    // Build the optimistic message: completed attachments plus temp
-    // placeholders for files still uploading, so the whole reply (text +
-    // files) appears in the thread immediately with a "sending" state.
-    const tempAttachments: Attachment[] = [
-      ...completedAttachments,
-      ...uploads.map((u) =>
-        create(AttachmentSchema, {
-          id: `pending-${u.id}`,
-          name: u.name,
-          mimeType: u.file.type || "",
-          sizeBytes: BigInt(u.file.size),
-        })
-      ),
-    ];
-    const uploadProgress: Record<string, number> = {};
-    for (const u of uploads) {
-      uploadProgress[`pending-${u.id}`] = u.progress;
-    }
-
-    const optimisticMsg: ChatMessageUI = {
-      id: tempId,
-      role: "user",
-      content: text,
-      timestamp: new Date(),
-      attachments: tempAttachments,
-      sending: true,
-      uploadProgress: hasInFlight ? uploadProgress : undefined,
-    };
-
-    // Append the optimistic message immediately so the user sees it sending.
-    useAppStore.setState((state) => ({
-      threadByRoot: {
-        ...state.threadByRoot,
-        [rootMessageId]: {
-          ...(state.threadByRoot[rootMessageId] ?? {
-            messages: [],
-            currentVersion: 0n,
-            loading: false,
-          }),
-          messages: [
-            ...(state.threadByRoot[rootMessageId]?.messages ?? []),
-            optimisticMsg,
-          ],
-        },
-      },
-    }));
-
-    // Clear the composer right away so the user can start typing the next
-    // reply while uploads continue in the background.
-    setInput("");
-    setMentionState(null);
-    setPendingAttachments([]);
-    setSending(true);
-    stickToBottomRef.current = true;
-    activeOptimisticIdRef.current = tempId;
-
-    // Adopt in-flight uploads: their completion updates the optimistic
-    // message, not the (now cleared) composer pending list.
-    for (const u of uploads) adoptedUploadIdsRef.current.add(u.id);
-    inFlightUploadsRef.current = [];
-    // The uploads are now represented inside the optimistic message; clear the
-    // composer's progress chips so they don't show twice.
-    setUploads([]);
-
-    let finalAttachments = completedAttachments;
-    if (hasInFlight) {
-      const results = await Promise.all(inFlight);
-      const uploaded = results.filter((a): a is Attachment => a !== null);
-      // Dedupe by id: an upload that finished just before send may already be
-      // in completedAttachments AND in the resolved in-flight results.
-      finalAttachments = [
-        ...new Map(
-          [...completedAttachments, ...uploaded].map((a) => [a.id, a])
-        ).values(),
-      ];
-
-      // Replace temp placeholders with the real attachments in the message.
-      useAppStore.setState((state) => ({
-        threadByRoot: {
-          ...state.threadByRoot,
-          [rootMessageId]: {
-            ...(state.threadByRoot[rootMessageId] ?? {
-              messages: [],
-              currentVersion: 0n,
-              loading: false,
-            }),
-            messages: (state.threadByRoot[rootMessageId]?.messages ?? []).map(
-              (m) =>
-                m.id === tempId
-                  ? {
-                      ...m,
-                      attachments: finalAttachments,
-                      uploadProgress: undefined,
-                    }
-                  : m
-            ),
-          },
-        },
-      }));
-    }
-
-    if (!text && finalAttachments.length === 0) {
-      // Nothing to send (e.g. all uploads failed) — remove the optimistic row.
-      useAppStore.setState((state) => ({
-        threadByRoot: {
-          ...state.threadByRoot,
-          [rootMessageId]: {
-            ...(state.threadByRoot[rootMessageId] ?? {
-              messages: [],
-              currentVersion: 0n,
-              loading: false,
-            }),
-            messages: (
-              state.threadByRoot[rootMessageId]?.messages ?? []
-            ).filter((m) => m.id !== tempId),
-          },
-        },
-      }));
-      setSending(false);
-      sendingRef.current = false;
-      activeOptimisticIdRef.current = null;
-      return;
-    }
-
-    const mentions = mentionMap.map(targetToMention);
-    try {
-      await sendThreadMessage(
-        channelId,
-        rootMessageId,
-        text,
-        mentions,
-        finalAttachments,
-        tempId
-      );
-    } catch {
-      // send failed — remove the optimistic row and restore the composer so
-      // the user can retry.
-      useAppStore.setState((state) => ({
-        threadByRoot: {
-          ...state.threadByRoot,
-          [rootMessageId]: {
-            ...(state.threadByRoot[rootMessageId] ?? {
-              messages: [],
-              currentVersion: 0n,
-              loading: false,
-            }),
-            messages: (
-              state.threadByRoot[rootMessageId]?.messages ?? []
-            ).filter((m) => m.id !== tempId),
-          },
-        },
-      }));
-      setPendingAttachments(finalAttachments);
-    } finally {
-      setSending(false);
-      sendingRef.current = false;
-      activeOptimisticIdRef.current = null;
-      // The textarea is disabled while sending, which drops focus; restore it
-      // after the send settles so the user can keep typing.
-      setTimeout(() => textareaRef.current?.focus(), 0);
-    }
-  }, [
-    input,
-    sending,
-    channelId,
-    rootMessageId,
-    mentionMap,
-    sendThreadMessage,
-    pendingAttachments,
-    uploads,
-  ]);
-
-  const handleMentionSelect = useCallback(
-    (target: MentionTarget) => {
-      if (!mentionState) return;
-      const before = input.slice(0, mentionState.startIndex);
-      const after = input.slice(cursorPos);
-      const newInput = `${before}@${target.handle} ${after}`;
-      setInput(newInput);
-      setMentionMap((prev) =>
-        prev.some((m) => m.id === target.id && m.type === target.type)
-          ? prev
-          : [...prev, target]
-      );
-      setMentionState(null);
-      setMentionSelectedIndex(0);
-      setTimeout(() => {
-        const el = textareaRef.current;
-        if (el) {
-          const newPos = mentionState.startIndex + target.handle.length + 2;
-          el.focus();
-          el.setSelectionRange(newPos, newPos);
-        }
-      }, 0);
-    },
-    [input, cursorPos, mentionState]
-  );
 
   const handleViewDetails = useCallback(
     (commandId: string, agentId: string) => {
@@ -862,256 +490,21 @@ export function ThreadPanel({
               : t("chat.agent-dm-view-only")}
           </div>
         ) : (
-          <>
-            <div
-              className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (e.dataTransfer.files.length > 0)
-                  handleFiles(e.dataTransfer.files);
-              }}
-              onPaste={(e) => {
-                // Pasting a clipboard image (screenshot, copied image) uploads
-                // it like a picked file. Only preventDefault when real files
-                // were found, so text paste keeps inserting into the textarea.
-                const files = filesFromClipboard(e.clipboardData);
-                if (files.length > 0) {
-                  e.preventDefault();
-                  handleFiles(files);
-                }
-              }}
-            >
-              {(pendingAttachments.length > 0 || uploads.length > 0) && (
-                <div className="flex flex-wrap gap-1.5 px-3 pt-2">
-                  {uploads.map((u) =>
-                    u.error ? (
-                      <span
-                        key={u.id}
-                        className="flex items-center gap-1.5 rounded-md border border-error/40 bg-error/5 px-2 py-1 text-xs text-error"
-                      >
-                        <span className="max-w-[120px] truncate">{u.name}</span>
-                        <span className="text-error/80">{u.error}</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setUploads((prev) =>
-                              prev.filter((p) => p.id !== u.id)
-                            )
-                          }
-                          className="text-error/60 hover:text-error transition-colors"
-                          aria-label={t("common.delete")}
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </span>
-                    ) : (
-                      <span
-                        key={u.id}
-                        className="flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
-                      >
-                        <Loader2 className="size-3 animate-spin" />
-                        <span className="max-w-[120px] truncate">{u.name}</span>
-                        <span className="text-control-placeholder">
-                          {u.progress}%
-                        </span>
-                      </span>
-                    )
-                  )}
-                  {pendingAttachments.map((att) =>
-                    isImageAttachment(att) ? (
-                      <div key={att.id} className="group relative shrink-0">
-                        <RemoteImage
-                          attachment={att}
-                          variant="thumb"
-                          onClick={() => openImagePreview(att)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPendingAttachments((prev) =>
-                              prev.filter((p) => p.id !== att.id)
-                            )
-                          }
-                          className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-control-border bg-background text-control-placeholder opacity-0 transition-opacity hover:text-error group-hover:opacity-100"
-                          aria-label={t("common.delete")}
-                        >
-                          <X className="size-3" />
-                        </button>
-                        <div className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 max-w-[240px] -translate-y-1/2 truncate rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                          {att.name}
-                        </div>
-                      </div>
-                    ) : (
-                      <span
-                        key={att.id}
-                        className="group flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
-                      >
-                        <span className="max-w-[160px] truncate">
-                          {att.name}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPendingAttachments((prev) =>
-                              prev.filter((p) => p.id !== att.id)
-                            )
-                          }
-                          className="text-control-placeholder hover:text-error transition-colors"
-                          aria-label={t("common.delete")}
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </span>
-                    )
-                  )}
-                </div>
-              )}
-              <Textarea
-                ref={textareaRef}
-                className={cn(
-                  "block w-full resize-none border-0 bg-transparent px-3 py-2.5 text-sm text-main",
-                  "placeholder:text-control-placeholder focus:ring-0 focus:border-transparent",
-                  "max-h-[160px] min-h-[24px]"
-                )}
-                rows={1}
-                placeholder={t("chat.thread-placeholder")}
-                aria-controls={
-                  mentionState?.active ? MENTION_POPUP_ID : undefined
-                }
-                aria-activedescendant={
-                  mentionState?.active && mentionState.matched.length > 0
-                    ? `${MENTION_POPUP_ID}-opt-${mentionSelectedIndex}`
-                    : undefined
-                }
-                value={input}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setInput(value);
-                  const pos = e.target.selectionStart ?? 0;
-                  setCursorPos(pos);
-                  const state = detectMention(value, pos, mentionTargets);
-                  setMentionState(state);
-                  setMentionSelectedIndex(0);
-                  if (state?.active) {
-                    const newMap: MentionTarget[] = [];
-                    const re = /(?:^|\s)@(\S+)/g;
-                    let m: RegExpExecArray | null;
-                    while ((m = re.exec(value)) !== null) {
-                      const found = mentionTargets.find(
-                        (t) => t.handle === m![1]
-                      );
-                      if (found) newMap.push(found);
-                    }
-                    setMentionMap(newMap);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (mentionState?.active) {
-                    const total = mentionState.matched.length;
-                    if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      setMentionSelectedIndex((idx) =>
-                        idx + 1 < total ? idx + 1 : 0
-                      );
-                      return;
-                    }
-                    if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      setMentionSelectedIndex((idx) =>
-                        idx - 1 >= 0 ? idx - 1 : total - 1
-                      );
-                      return;
-                    }
-                    if (e.key === "Enter" || e.key === "Tab") {
-                      if (total === 0) return;
-                      e.preventDefault();
-                      if (mentionState.matched[mentionSelectedIndex]) {
-                        handleMentionSelect(
-                          mentionState.matched[mentionSelectedIndex]
-                        );
-                      }
-                      return;
-                    }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      setMentionState(null);
-                      return;
-                    }
-                  }
-                  if (e.nativeEvent.isComposing) return;
-                  if (e.key !== "Enter") return;
-                  const wantSend = enterToSend ? !e.shiftKey : e.shiftKey;
-                  if (wantSend) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                onSelect={(e) => {
-                  const target = e.target as HTMLTextAreaElement;
-                  const pos = target.selectionStart ?? 0;
-                  setCursorPos(pos);
-                  const state = detectMention(
-                    target.value,
-                    pos,
-                    mentionTargets
-                  );
-                  setMentionState(state);
-                  setMentionSelectedIndex(0);
-                }}
-              />
-              <div className="flex items-center justify-between px-2.5 pb-1.5">
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files) handleFiles(e.target.files);
-                      e.target.value = "";
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploads.length > 0 || sending}
-                    className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors disabled:opacity-50"
-                    aria-label={t("channel.attach-file")}
-                  >
-                    {uploads.length > 0 ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Paperclip className="size-4" />
-                    )}
-                  </button>
-                </div>
-                <Button
-                  type="button"
-                  size="xs"
-                  onClick={handleSend}
-                  disabled={
-                    (!input.trim() && pendingAttachments.length === 0) ||
-                    sending
-                  }
-                >
-                  <Send className="size-3" />
-                  {t("common.send")}
-                </Button>
-              </div>
-            </div>
-            {mentionState?.active && textareaRef.current && (
-              <MentionPopup
-                id={MENTION_POPUP_ID}
-                targets={mentionState.matched}
-                query={mentionState.query}
-                position={getCaretCoordinates(textareaRef.current, cursorPos)}
-                selectedIndex={mentionSelectedIndex}
-                onSelect={handleMentionSelect}
-                onClose={() => setMentionState(null)}
-              />
-            )}
-          </>
+          <ChatComposer
+            key={rootMessageId}
+            channelId={channelId}
+            rootMessageId={rootMessageId}
+            draftKey={rootMessageId}
+            draftsRef={draftsRef}
+            enterToSend={enterToSend}
+            mentionTargets={mentionTargets}
+            popupId="thread-mention-popup"
+            placeholder={t("chat.thread-placeholder")}
+            size="compact"
+            onSendStart={() => {
+              stickToBottomRef.current = true;
+            }}
+          />
         )}
       </div>
 
