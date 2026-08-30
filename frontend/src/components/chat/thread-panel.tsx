@@ -20,11 +20,7 @@ import { useNavigate } from "react-router-dom";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
-import {
-  EMPTY_EVENTS,
-  MessageRow,
-  rowStreamingProps,
-} from "@/components/chat/message-row";
+import { MessageRow } from "@/components/chat/message-row";
 import { EmptyState, LoadingState } from "@/components/chat/states";
 import {
   Select,
@@ -110,15 +106,12 @@ const ThreadReplies = memo(function ThreadReplies({
         const prev = idx > 0 ? replies[idx - 1] : null;
         const showAvatar =
           !prev || senderKeyForMessage(prev) !== senderKeyForMessage(msg);
-        const rowProps = rowStreamingProps(msg, false, "", EMPTY_EVENTS);
         return (
           <div key={msg.id} data-msg-id={msg.id}>
             <MessageRow
               msg={msg}
               showAvatar={showAvatar}
               agentTitle={agentTitleFor(msg)}
-              streamingContent={rowProps.streamingContent}
-              streamingEvents={rowProps.streamingEvents}
               onViewDetails={onViewDetails}
               onSenderClick={onSenderClick}
               mentionLabel={mentionLabel}
@@ -435,8 +428,6 @@ export function ThreadPanel({
                 msg={rootMsg}
                 showAvatar
                 agentTitle={agentTitleFor(rootMsg)}
-                streamingContent=""
-                streamingEvents={rootMsg.events ?? EMPTY_EVENTS}
                 onViewDetails={handleViewDetails}
                 onSenderClick={handleSenderClick}
                 mentionLabel={mentionLabel}

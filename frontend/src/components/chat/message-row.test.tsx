@@ -110,8 +110,6 @@ describe("MessageRow shared render", () => {
           msg={baseMsg({ role: "user", content: "**hi** there" })}
           showAvatar
           agentTitle="Agent"
-          streamingContent=""
-          streamingEvents={[]}
           onViewDetails={onViewDetails}
           markdownCustomId="chat"
           debugMode={false}
@@ -134,8 +132,6 @@ describe("MessageRow shared render", () => {
           })}
           showAvatar
           agentTitle="Agent"
-          streamingContent=""
-          streamingEvents={[]}
           onViewDetails={onViewDetails}
           MentionBadge={MentionBadge}
           onMentionClick={() => {}}
@@ -162,8 +158,6 @@ describe("MessageRow thread entry", () => {
           msg={baseMsg({ role: "user", content: "hi there" })}
           showAvatar
           agentTitle="Agent"
-          streamingContent=""
-          streamingEvents={[]}
           onViewDetails={() => {}}
           onOpenThread={onOpenThread}
           markdownCustomId="chat"
@@ -225,8 +219,6 @@ describe("MessageRow reaction bar", () => {
           msg={baseMsg({ role: "assistant", content: "done", reactions })}
           showAvatar
           agentTitle="Agent"
-          streamingContent=""
-          streamingEvents={[]}
           onViewDetails={() => {}}
           markdownCustomId="chat"
           debugMode={false}
@@ -283,8 +275,6 @@ describe("MessageRow sender click", () => {
           msg={msg}
           showAvatar
           agentTitle={msg.role === "assistant" ? "Agent One" : ""}
-          streamingContent=""
-          streamingEvents={[]}
           onViewDetails={() => {}}
           onSenderClick={onSenderClick}
           currentPrincipalId={currentPrincipalId}
@@ -383,8 +373,6 @@ describe("MessageRow inline thread preview", () => {
           })}
           showAvatar
           agentTitle="Agent"
-          streamingContent=""
-          streamingEvents={[]}
           onViewDetails={() => {}}
           onOpenThread={() => {}}
           onOpenThreadAt={onOpenThreadAt}
@@ -462,8 +450,6 @@ describe("MessageRow inline thread preview", () => {
           })}
           showAvatar
           agentTitle="Agent"
-          streamingContent=""
-          streamingEvents={[]}
           onViewDetails={() => {}}
           onOpenThread={() => {}}
           onOpenThreadAt={() => {}}
@@ -484,8 +470,6 @@ describe("MessageRow context menu", () => {
           msg={baseMsg({ role: "assistant", content: "hello" })}
           showAvatar
           agentTitle="Agent"
-          streamingContent=""
-          streamingEvents={[]}
           onViewDetails={() => {}}
           markdownCustomId="chat"
           debugMode={false}

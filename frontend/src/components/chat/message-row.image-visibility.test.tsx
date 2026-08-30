@@ -81,8 +81,6 @@ describe("MessageRow inline image visibility (recipient vs sender)", () => {
           })}
           showAvatar
           currentPrincipalId="ran-user-2"
-          streamingContent=""
-          streamingEvents={[]}
           agentTitle="Agent"
           onViewDetails={() => {}}
           markdownCustomId="chat"
@@ -108,8 +106,6 @@ describe("MessageRow inline image visibility (recipient vs sender)", () => {
           })}
           showAvatar
           currentPrincipalId="ran-user-2"
-          streamingContent=""
-          streamingEvents={[]}
           agentTitle="Agent"
           onViewDetails={() => {}}
           markdownCustomId="chat"
@@ -137,8 +133,6 @@ describe("MessageRow inline image visibility (recipient vs sender)", () => {
           })}
           showAvatar
           currentPrincipalId="ran-user-2"
-          streamingContent=""
-          streamingEvents={[]}
           agentTitle="Agent"
           onViewDetails={() => {}}
           markdownCustomId="chat"
@@ -169,8 +163,6 @@ describe("MessageRow inline image visibility (recipient vs sender)", () => {
           })}
           showAvatar
           currentPrincipalId="ran-user-2"
-          streamingContent=""
-          streamingEvents={[]}
           agentTitle="Agent"
           onViewDetails={() => {}}
           markdownCustomId="chat"
@@ -196,8 +188,6 @@ describe("MessageRow inline image visibility (recipient vs sender)", () => {
           })}
           showAvatar
           currentPrincipalId="ran-user-2"
-          streamingContent=""
-          streamingEvents={[]}
           agentTitle="Agent"
           onViewDetails={() => {}}
           markdownCustomId="chat"

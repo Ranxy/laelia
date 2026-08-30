@@ -31,11 +31,7 @@ import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatDrawerSheet } from "@/components/chat/chat-drawer-sheet";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
-import {
-  EMPTY_EVENTS,
-  MessageRow,
-  rowStreamingProps,
-} from "@/components/chat/message-row";
+import { MessageRow } from "@/components/chat/message-row";
 import { EmptyState, LoadingState } from "@/components/chat/states";
 import { TasksPanel } from "@/components/chat/tasks-panel";
 import { ThreadPanel } from "@/components/chat/thread-panel";
@@ -152,15 +148,12 @@ const MessageList = memo(function MessageList({
         const prevMsg = idx > 0 ? messages[idx - 1] : null;
         const showAvatar =
           !prevMsg || senderKeyForMessage(prevMsg) !== senderKeyForMessage(msg);
-        const rowProps = rowStreamingProps(msg, false, "", EMPTY_EVENTS);
         return (
           <div key={msg.id} data-msg-id={msg.id}>
             <MessageRow
               msg={msg}
               showAvatar={showAvatar}
               agentTitle={msg.senderName ?? ""}
-              streamingContent={rowProps.streamingContent}
-              streamingEvents={rowProps.streamingEvents}
               onViewDetails={onViewDetails}
               onMentionClick={onMentionClick}
               onSenderClick={onMentionClick}

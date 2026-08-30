@@ -58,7 +58,6 @@ export interface ChatMessageUI {
   commandId?: string;
   agentId?: string;
   status?: number;
-  streaming?: boolean;
   events?: CommandEvent[];
   senderName?: string;
   senderType?: number;

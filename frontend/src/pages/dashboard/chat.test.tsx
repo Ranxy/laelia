@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MessageRow, rowStreamingProps } from "@/components/chat/message-row";
+import { MessageRow } from "@/components/chat/message-row";
 import type { ChatMessageUI } from "@/stores/types";
 
 // MessageRow pulls react-i18next (no provider in the test environment) and
@@ -74,8 +74,6 @@ describe("MessageRow memo", () => {
       msg,
       showAvatar: true,
       agentTitle: "Agent",
-      streamingContent: "",
-      streamingEvents: [] as never[],
       onViewDetails,
       markdownCustomId: "chat",
       debugMode: false,
@@ -103,45 +101,5 @@ describe("MessageRow memo", () => {
       );
     });
     expect(translationHookCalls).toBe(initialCalls + 1);
-  });
-});
-
-describe("rowStreamingProps", () => {
-  it("only the streaming row receives the live streaming slices", () => {
-    const liveContent = "streaming token";
-    const liveEvents = [{ seqNo: 1 }] as never[];
-    const ownEvents = [{ seqNo: 9 }] as never[];
-
-    // A row that is actively streaming gets the live slices.
-    const streaming = rowStreamingProps(
-      baseMsg({ streaming: true, commandName: "c/cmd", events: ownEvents }),
-      true,
-      liveContent,
-      liveEvents
-    );
-    expect(streaming.streamingContent).toBe(liveContent);
-    expect(streaming.streamingEvents).toBe(liveEvents);
-
-    // A finished row never sees the live slices: it gets an empty content and
-    // its own stable events so memo skips it while the streaming row updates.
-    const finished = rowStreamingProps(
-      baseMsg({ events: ownEvents }),
-      false,
-      liveContent,
-      liveEvents
-    );
-    expect(finished.streamingContent).toBe("");
-    expect(finished.streamingEvents).toBe(ownEvents);
-
-    // A row with no events falls back to the stable module-level empty array
-    // (not a per-render literal) so Object.is holds across re-renders.
-    const noEvents = rowStreamingProps(
-      baseMsg(),
-      false,
-      liveContent,
-      liveEvents
-    );
-    expect(noEvents.streamingContent).toBe("");
-    expect(noEvents.streamingEvents).toEqual([]);
   });
 });

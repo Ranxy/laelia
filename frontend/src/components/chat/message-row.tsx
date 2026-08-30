@@ -5,15 +5,7 @@ import {
   MessageCircleReply,
 } from "lucide-react";
 import MarkdownRender from "markstream-react";
-import {
-  memo,
-  type RefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { memo, type RefObject, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Avatar, formatTime } from "@/components/chat/avatar";
 import { FileCard } from "@/components/chat/file-card";
@@ -49,10 +41,8 @@ import type { ChatMessageUI } from "@/stores/types";
 import type { Attachment, CommandEvent } from "@/types/proto-es/v1/command_pb";
 import { CommandEventType, SenderType } from "@/types/proto-es/v1/command_pb";
 
-// Stable empty fallback so selectors returning `undefined` for an unloaded
-// conversation don't create a new array literal each run (which would defeat
-// zustand's Object.is equality and re-render on every store change). Exported
-// so non-streaming consumers (channel chat) can pass a stable empty slice.
+// Stable empty fallback so events-bearing rows (no events) keep a stable
+// array reference across renders, and MemoMarkdown's memo keeps bailing out.
 const EMPTY_EVENTS: CommandEvent[] = [];
 
 // Module-level constant for the mention path's customHtmlTags prop. Passing an
@@ -61,53 +51,29 @@ const EMPTY_EVENTS: CommandEvent[] = [];
 // channel/thread path the memo was added for.
 const MENTION_HTML_TAGS = ["mention"];
 
-export { EMPTY_EVENTS };
-
-// Computes the streaming props for a single row. Only the row that is
-// actively streaming (`msg.streaming` with a bound commandName) receives the
-// live streamingContent/streamingEvents slices; every other row gets stable
-// empty / own-event values so React.memo skips it when the parent re-renders
-// on each streamed token. Exported for unit testing.
-export function rowStreamingProps(
-  msg: ChatMessageUI,
-  isStreamingRow: boolean,
-  streamingContent: string,
-  streamingEvents: CommandEvent[]
-): { streamingContent: string; streamingEvents: CommandEvent[] } {
-  return {
-    streamingContent: isStreamingRow ? streamingContent : "",
-    streamingEvents: isStreamingRow
-      ? streamingEvents
-      : (msg.events ?? EMPTY_EVENTS),
-  };
-}
-
 // MemoMarkdown isolates the markstream/LazyMarkdown subtree so it only
-// re-renders (and re-parses markdown) when the content or streaming state
-// actually changed. A row otherwise re-renders on cheap field patches — e.g.
-// the channel watcher replacing the msg object to update a reply-count or task
-// badge — and without this the unchanged (possibly long) markdown was re-parsed
-// on every such patch.
+// re-renders (and re-parses markdown) when the content actually changed. A row
+// otherwise re-renders on cheap field patches — e.g. the channel watcher
+// replacing the msg object to update a reply-count or task badge — and without
+// this the unchanged (possibly long) markdown was re-parsed on every such
+// patch. (The streaming pipeline is retired: rows always render their
+// committed content, so the memo input surface is content + eager only.)
 const MemoMarkdown = memo(function MemoMarkdown({
   content,
-  isStreaming,
   eager,
   scrollRoot,
   markdownCustomId,
-  fade,
   customHtmlTags,
 }: {
   content: string;
-  isStreaming: boolean;
   eager: boolean;
   scrollRoot?: RefObject<HTMLElement | null>;
   markdownCustomId: string;
-  fade: boolean;
   customHtmlTags?: string[];
 }) {
   return (
     <LazyMarkdown
-      eager={isStreaming || eager}
+      eager={eager}
       scrollRoot={scrollRoot}
       fallback={
         <span className="whitespace-pre-wrap break-words">{content}</span>
@@ -117,11 +83,7 @@ const MemoMarkdown = memo(function MemoMarkdown({
           customId={markdownCustomId}
           content={content}
           customHtmlTags={customHtmlTags}
-          final={!isStreaming}
-          smoothStreaming={isStreaming ? "auto" : false}
-          fade={fade}
-          typewriter={isStreaming}
-          maxLiveNodes={isStreaming ? 0 : undefined}
+          final
         />
       )}
     />
@@ -132,8 +94,6 @@ export interface MessageRowProps {
   msg: ChatMessageUI;
   showAvatar: boolean;
   agentTitle: string;
-  streamingContent: string;
-  streamingEvents: CommandEvent[];
   onViewDetails: (commandId: string, agentId: string) => void;
   // Optional mention-aware rendering (channel chat). When provided, the row
   // renders @mentions as badges and lets the caller react to clicks.
@@ -343,8 +303,6 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     msg,
     showAvatar,
     agentTitle,
-    streamingContent,
-    streamingEvents,
     onViewDetails,
     onMentionClick,
     onSenderClick,
@@ -424,14 +382,15 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
       : msg.senderName || t("chat.you")
     : agentTitle || msg.senderName || t("chat.agent");
 
-  const isStreaming = msg.streaming;
-  const displayContent = isStreaming ? streamingContent : msg.content;
+  // The streaming pipeline is retired: rows always render their committed
+  // content and their own (already final) event list.
+  const displayContent = msg.content;
   // A file-only message (attachment with no text) still needs its bubble: the
   // attachments render inside it, so hiding an empty-content bubble would hide
   // the files from every viewer except the sender (whose bubble is always
   // visible via the isOwnUser branch below).
   const hasAttachments = (msg.attachments?.length ?? 0) > 0;
-  const events = isStreaming ? streamingEvents : (msg.events ?? EMPTY_EVENTS);
+  const events = msg.events ?? EMPTY_EVENTS;
 
   const toolCallPairs = useMemo(() => pairToolCallEvents(events), [events]);
   const diffEvents = useMemo(
@@ -449,25 +408,6 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
       warningEvents.length > 0);
 
   const [eventsCollapsed, setEventsCollapsed] = useState(false);
-  const prevStreamingRef = useRef(isStreaming);
-  useEffect(() => {
-    if (prevStreamingRef.current && !isStreaming && displayContent) {
-      setEventsCollapsed(true);
-    }
-    prevStreamingRef.current = isStreaming;
-  }, [isStreaming, displayContent]);
-
-  // fade gates markstream-react's node fade-in on the streaming→final transition
-  // that happens *within this mount*, not on "this is a final message." A row
-  // that mounts already-final (history from the server) would otherwise replay
-  // the 280ms opacity fade on every channel entry — and because rows are keyed
-  // by msg.id they remount on every switch, so the flash recurred each visit.
-  // The sticky ref records whether this row was ever streaming in its lifetime:
-  // historical rows start false and stay false (no fade); rows that mounted
-  // streaming stay true after finalizing, so the finalize fade still plays once.
-  const wasStreamingRef = useRef(isStreaming);
-  if (isStreaming) wasStreamingRef.current = true;
-  const fade = wasStreamingRef.current && !isStreaming;
 
   const eventSummary = useMemo(() => {
     const parts: string[] = [];
@@ -531,13 +471,13 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
       // tapping the message bubble itself opens the thread. Interactive
       // elements (links, buttons, mention chips, image zoom) keep their own
       // behavior.
-      if (!isDesktop && onOpenThread && !msg.threadRoot && !isStreaming) {
+      if (!isDesktop && onOpenThread && !msg.threadRoot) {
         if (target?.closest?.("a, button, [role='button'], [data-mtype]"))
           return;
         onOpenThread(msg);
       }
     },
-    [onMentionClick, isDesktop, onOpenThread, msg, isStreaming]
+    [onMentionClick, isDesktop, onOpenThread, msg]
   );
 
   // "Reply in thread" entry. Rendered in the header when the header is shown
@@ -546,7 +486,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
   // (Consecutive messages from the same sender skip the header to group the
   // bubble, which previously swallowed this button along with it.)
   const renderReplyInThread = () =>
-    isDesktop && onOpenThread && !msg.threadRoot && !isStreaming ? (
+    isDesktop && onOpenThread && !msg.threadRoot ? (
       <button
         type="button"
         onClick={() => onOpenThread(msg)}
@@ -647,13 +587,13 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                 {t("chat.sending")}
               </span>
             )}
-            {!isUser && msg.status !== undefined && !isStreaming && (
+            {!isUser && msg.status !== undefined && (
               <CommandStatusBadge
                 status={msg.status}
                 className="text-[10px] px-1.5 py-0"
               />
             )}
-            {msg.task && !isStreaming && (
+            {msg.task && (
               <TaskStatusBadge
                 taskNumber={msg.task.taskNumber}
                 status={msg.task.status}
@@ -686,16 +626,14 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
             {warningEvents.map((e) => (
               <ChatWarning key={`warn-${e.seqNo}`} event={e} />
             ))}
-            {!isStreaming && (
-              <button
-                type="button"
-                onClick={() => setEventsCollapsed(true)}
-                className="flex items-center gap-1 text-xs text-control-placeholder hover:text-accent cursor-pointer transition-colors self-start"
-              >
-                <ArrowUp className="size-3" />
-                {t("command.collapse")}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setEventsCollapsed(true)}
+              className="flex items-center gap-1 text-xs text-control-placeholder hover:text-accent cursor-pointer transition-colors self-start"
+            >
+              <ArrowUp className="size-3" />
+              {t("command.collapse")}
+            </button>
           </div>
         )}
 
@@ -720,7 +658,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
             // agents' sit on the left (top-left corner sharp).
             isOwnUser
               ? "bg-control-bg/60 text-main rounded-tr-sm px-4 py-2.5 max-w-[80%]"
-              : displayContent || isStreaming || hasAttachments
+              : displayContent || hasAttachments
                 ? "bg-control-bg/60 text-main rounded-tl-sm px-4 py-3 max-w-[80%]"
                 : "hidden"
           )}
@@ -737,11 +675,9 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
             <div className="markstream-chat break-words">
               <MemoMarkdown
                 content={mentionContent ?? ""}
-                isStreaming={isStreaming ?? false}
                 eager={eager}
                 scrollRoot={scrollRoot}
                 markdownCustomId={markdownCustomId}
-                fade={fade ?? false}
                 customHtmlTags={MENTION_HTML_TAGS}
               />
             </div>
@@ -749,20 +685,10 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
             <div className="markstream-chat break-words">
               <MemoMarkdown
                 content={displayContent}
-                isStreaming={isStreaming ?? false}
                 eager={eager}
                 scrollRoot={scrollRoot}
                 markdownCustomId={markdownCustomId}
-                fade={fade ?? false}
               />
-            </div>
-          ) : isStreaming ? (
-            <div className="flex items-center gap-2 text-control-light text-xs py-1">
-              <span className="flex gap-1">
-                <span className="size-1.5 rounded-full bg-control-light/60 animate-bounce [animation-delay:0ms]" />
-                <span className="size-1.5 rounded-full bg-control-light/60 animate-bounce [animation-delay:150ms]" />
-                <span className="size-1.5 rounded-full bg-control-light/60 animate-bounce [animation-delay:300ms]" />
-              </span>
             </div>
           ) : null}
           {msg.attachments && msg.attachments.length > 0 && (
@@ -852,32 +778,30 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
         {/* Reaction bar: existing emoji pills, click to toggle the caller's
             reaction. Only rendered when the message has reactions and the
             caller wired the toggle handler. */}
-        {onToggleReaction &&
-          !isStreaming &&
-          (msg.reactions?.length ?? 0) > 0 && (
-            <div className="flex flex-wrap items-center gap-1 px-0.5">
-              {msg.reactions!.map((r) => (
-                <button
-                  key={r.emoji}
-                  type="button"
-                  onClick={() => onToggleReaction(msg, r.emoji)}
-                  title={r.reactors.join(", ")}
-                  className={cn(
-                    "flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors cursor-pointer",
-                    r.reacted
-                      ? "border-accent bg-accent/10 text-accent"
-                      : "border-control-border text-control hover:border-accent hover:text-accent"
-                  )}
-                >
-                  <span>{r.emoji}</span>
-                  <span>{r.count}</span>
-                </button>
-              ))}
-            </div>
-          )}
+        {onToggleReaction && (msg.reactions?.length ?? 0) > 0 && (
+          <div className="flex flex-wrap items-center gap-1 px-0.5">
+            {msg.reactions!.map((r) => (
+              <button
+                key={r.emoji}
+                type="button"
+                onClick={() => onToggleReaction(msg, r.emoji)}
+                title={r.reactors.join(", ")}
+                className={cn(
+                  "flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors cursor-pointer",
+                  r.reacted
+                    ? "border-accent bg-accent/10 text-accent"
+                    : "border-control-border text-control hover:border-accent hover:text-accent"
+                )}
+              >
+                <span>{r.emoji}</span>
+                <span>{r.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* View details link */}
-        {!isUser && msg.commandId && !isStreaming && debugMode && (
+        {!isUser && msg.commandId && debugMode && (
           <button
             type="button"
             className="text-xs text-control-placeholder hover:text-accent px-0.5 cursor-pointer transition-colors"
@@ -897,7 +821,6 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
         {onOpenThread &&
           !msg.threadRoot &&
           (msg.threadReplyCount ?? 0) > 0 &&
-          !isStreaming &&
           (msg.threadPreview?.length ? (
             <ThreadPreviewBlock
               rootMsg={msg}
