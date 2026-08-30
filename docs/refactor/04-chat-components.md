@@ -1,8 +1,8 @@
 # 聊天模块深度代码审查报告(frontend/src/components/chat/)
 
-> **⚙ 实施进度标注(批 3 收口后)**
-- ✅ 已完成:ThreadReplies mentionLabel 透传(含回归测试,`5bc9f90`)。
-- ⏳ 未完成:useChatComposer 双份管线收编与 9 处组件内联 setState(批 4,连同三个真实 bug:上传跨会话串台/mentionMap 残留/发送失败不恢复);streaming 管线拆除(待产品确认);thread-panel 拆四件;ConversationRow 方向锁;Avatar sizeClass 显式映射;messages 轻窗口化(ADR-3)。
+> **⚙ 实施进度标注(批 4 收口后)**
+- ✅ 已完成:ThreadReplies mentionLabel 透传(含回归测试,`5bc9f90`);useChatComposer 双份管线收编与全部组件内联 setState 清零(`5c6665c`,共享 `composables/use-chat-composer.ts` + `components/chat/chat-composer.tsx`,per-surface keyed 挂载),连同三个真实 bug:上传跨会话串台 / mentionMap 残留 / 发送失败不恢复(新增回归测试 `chat-composer.test.tsx`)。
+- ⏳ 未完成:streaming 管线拆除(待产品确认);thread-panel 拆四件(批 5);ConversationRow 方向锁;Avatar sizeClass 显式映射;messages 轻窗口化(ADR-3)。
 
 > **决策状态更新**:本报告 §6.2 的虚拟化建议已由总报告 ADR-3 拍板——按"分片订阅 → 行级 memo → 轻窗口化"三步执行,消息列表不引入 react-virtuoso,原 P2-1(列表窗口化)按此顺序在拆分完成后执行。流式管线去留(P0-2)仍需产品确认后执行。
 

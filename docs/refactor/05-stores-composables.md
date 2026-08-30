@@ -1,8 +1,9 @@
 # 前端数据层深度审查报告:`src/stores` + `src/composables`
 
-> **⚙ 实施进度标注(批 3 收口后)**
-- ✅ 已完成:ADR-1 五 slice 纵切(user/agent/machine/api-provider/mcp,`b95c530`/`9c9c353`/`e7aca3a`,新增 17+3 测试);equal-bailout 六列表(`c9fe388`);chat shim 删除(`b95c530`);无界缓存 LRU + releaseCommand(`5efb461`);全局冻结拆除(`d4774c3`);cleanup 注册表(`e440ba0`,reset/logout 手工清单归零)。
-- ⏳ 未完成:ChatGateway(channel/thread 双 watcher 合一 + badge 同节拍);乐观发送编排与 10 处组件 setState;presence/activity/reminder 收编 Query;types.ts 拆分与写入面收敛;`conversations` map 私有化;polling.ts 更名。
+> **⚙ 实施进度标注(批 4 收口后)**
+- ✅ 已完成:ADR-1 五 slice 纵切(user/agent/machine/api-provider/mcp,`b95c530`/`9c9c353`/`e7aca3a`,新增 17+3 测试);equal-bailout 六列表(`c9fe388`);chat shim 删除(`b95c530`);无界缓存 LRU + releaseCommand(`5efb461`);全局冻结拆除(`d4774c3`);cleanup 注册表(`e440ba0`,reset/logout 手工清单归零);批 4(`bc65511`)后 avatar/image-blob 清理注册迁回 lib 自注册。
+- ✅ 批 4:ChatGateway(`4085c66`,channel/thread watcher 合一 + 统一可见性门控 + badge 同节拍,chat-stream 竞态基线保持全绿);乐观发送编排下沉(`5c6665c`,useChatComposer + ChatSlice/ThreadSlice 的 append/patch/remove action,组件内联 setState 清零)。
+- ⏳ 未完成:presence/activity/reminder 数据源迁 Query(已先经 usePolling 收敛,`bc65511`);types.ts 拆分与写入面收敛;`conversations` map 私有化;polling.ts 更名。
 
 > **决策状态更新**:本报告 §7.1 的 TanStack Query 建议已由总报告 **ADR-1 拍板:引入**(`@tanstack/react-query@5`;`useResourceList` 作为列表特化薄壳;迁移按 §7.3 七步执行)。§4 B3 的全局 set 冻结由总报告 **ADR-2 拍板:旧预览体系整体退役**——`use-preview-routes.tsx` 删除、`setSuppressLoadingFlags` 删除、swipe-back 改 CSS 转场(保留手势识别与 sentinel)。其余内容不变。
 > 审查对象:React 19.2 + Zustand 5.0.14 + ConnectRPC(proto-es) + Tailwind 4 单页应用,自定义 Zustand 单 store 承担全部数据获取与轮询。

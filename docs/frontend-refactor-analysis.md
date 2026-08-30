@@ -8,7 +8,7 @@
 
 ## ⚡ 实施进度总览(更新于重构执行 5 个批次后)
 
-重构已执行 **18 个提交、5 个批次**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **103 文件 / 686 用例**。各章文件头部已附加对应的"进度标注"块。
+重构已执行 **21 个提交、6 个批次**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **105 文件 / 699 用例**。各章文件头部已附加对应的"进度标注"块。
 
 | 批次 | 提交范围 | 内容 | 状态 |
 |---|---|---|---|
@@ -16,9 +16,10 @@
 | 批 1(Phase 1 第一批)| `d4774c3`~`5efb461`(3 提交) | ADR-2 落地(preview 退役 + 冻结删除)、equal-bailout(6 lists)、无界缓存 LRU | ✅ 完成 |
 | 批 2(Phase 1 第二批)| `b95c530`~`389ce97`(4 提交) | TanStack Query 铺路 + api-provider/mcp 纵切、错误分类学 + showErrorToast、useResourceList | ✅ 完成 |
 | 批 3(Phase 1 收官)| `e7aca3a`~`acb701d`(4 提交) | user/agent/machine 纵切、watch 断线重连、cleanup registry、usePolling 收敛 | ✅ 完成 |
-| 批 4+(重设计后路线) | —— | 聊天域收拢(ChatGateway)、页面拆分、UI/事件管线 | ⏳ 见 §7 重设计版 |
+| 批 4(Phase 2 聊天域收拢)| `4085c66`~`bc65511`(3 提交) | ChatGateway watcher 合一与可见性门控、useChatComposer(-600 行重复)+ 3 真实 bug 修复、批 4 归位(interval 收编 + lib 自注册) | ✅ 完成 |
+| 批 5+(重设计后路线) | —— | 页面拆分(Phase 3)、UI/事件管线(Phase 4) | ⏳ 见 §7 重设计版 |
 
-**当前数据层状态**:Query 已纵切 5 个低风险 slice(api-provider/mcp/user/agent/machine)+ 应用级单例与 Provider;useResourceList 覆盖 command/reminder 列表页;全局 store 冻结已删除;错误出口统一;登出经注册表。**遗留大件:ChatGateway(聊天域收拢)、乐观发送下沉、流式管线决策(产品侧)**。
+**当前数据层状态**:Query 已纵切 5 个低风险 slice + 应用级单例与 Provider;聊天域长轮询已收敛为共享 ChatGateway 循环(可见性门控 + badge 同节拍);乐观发送经 useChatComposer 走 slice action;错误出口统一;登出经注册表(lib 自注册)。**遗留大件:流式管线决策(产品侧)、页面拆分、UI/事件管线**。
 
 ---
 
@@ -33,8 +34,8 @@
 | 3 | **安全与门禁**:i18n 门禁修复(`027009f`)、`safeOpenExternal` XSS 白名单 + Combobox portal(`75d844b`) | ✅ 完成 |
 | 4 | **错误处理单点化**:`showErrorToast` + `connectErrorKind`,40+ 处裸 message 被 codemod 收敛到 `describeError`(`389ce97`) | ✅ 完成(146 处 toast 中形状规则的已收敛;动态 title 的 2 块保留 toastManager + 共享 description) |
 | 5 | **列表获取基建**:`useResourceList`(`723de0e`,command/reminder 已迁;activity-list 因双分页语义未迁);equal-bailout 六列表(`c9fe388`) | ✅ 完成(settings 7 页的脚手架迁移归入页面拆分阶段) |
-| 6 | **统一发送/乐观更新管线**(`useChatComposer`) | ⏳ 未开始 → 归入批 4 聊天域收拢 |
-| 7 | **ADR-1 引入 TanStack Query**(`b95c530`+`9c9c353`+`e7aca3a`)/ **ADR-2 preview 退役 + 冻结删除**(`d4774c3`) | 🟨 部分:5 个 slice 已纵切;聊天域 + presence/activity 收编未动 |
+| 6 | **统一发送/乐观更新管线**(`useChatComposer`) | ✅ 完成(`4085c66` watcher + `5c6665c` composer;三个聊天域 bug 一并修复) |
+| 7 | **ADR-1 引入 TanStack Query**(`b95c530`~`e7aca3a`)/ **ADR-2 preview 退役 + 冻结删除**(`d4774c3`) | ✅ 完成:数据层 slice + 聊天域长轮询与组件 interval 全部收敛(`4085c66`/`bc65511`) |
 | 8 | **流式管线拆除决策** | ⏳ 待产品确认(未动) |
 | 9 | **三个巨型页面拆分** | ⏳ 未开始(原计划因数据层先行而顺延,见新路线 §7) |
 | 10 | **事件渲染管线统一** | 🟨 部分:watch 断线重连(`4b7cf57`)已做;TimelineModel 归一/合批/虚拟化未动 |
@@ -235,13 +236,12 @@ src/
 | watch 断线重连(原列于事件管线阶段) | `4b7cf57`,提前完成 |
 | 乐观发送编排下沉 | ⏳ 未动(归入批 4 聊天域) |
 
-### ⏳ Phase 2(重设计)· 聊天域收拢(下一批,主控亲自执行)
-数据层已稳,现在把最纠缠的聊天域一次性收拢(01 章不动点为基准):
-1. **ChatGateway**:channel/thread 双 25s 长轮询 watcher 合一,5s badge interval 与长轮询同节拍(请求量 -40~60%);visibility gating 统一;以 `chat-stream/chat-history/chat` 既有竞态测试为行为基准;
-2. **乐观发送编排下沉**:`useChatComposer` 收编 channel/thread 双份 ~600 行(04 §1.1),ThreadSlice 增补 append/patch/remove 三个 action 消灭 9 处组件内联 `useAppStore.setState`(05 D5);**顺手修掉三个仍未修的真实 bug**——附件上传跨会话串台(02)、删除 @mention 后 mentionMap 残留、发送失败输入不恢复;
-3. **流式管线决策**:产品确认 token 流式不再保留 → 一次性拆除 streaming prop 链(MessageRow 接口面 -7 props);
-4. **批 4 归位**:avatar/image-blob 失效回调从 auth.ts 迁回 lib 自注册;presence/activity/reminder 的组件 interval 收编 `useQuery refetchInterval`(或 usePolling 统一);
-5. reset 中的 watcher 枚举随 ChatGateway 简化(注册表已就位)。
+### ✅ Phase 2(重设计)· 聊天域收拢 — 已完成(流式决策待产品确认)
+1. **ChatGateway** ✅ `4085c66`:channel/thread 双 25s 长轮询 watcher 合一(`stores/chat-watcher.ts` 共享 round loop:同步首启 + abort-aware 退避 + 隐藏页暂停/回前台立即续发);5s badge interval 同节拍并接入可见性门控(`startBadgeInterval`);`channelWatchers` 句柄带 `badge.stop()`,reset 不再泄漏 visibilitychange 监听;`command.ts` prune/recency 复核无恙;`chat-stream` 竞态基线全绿并新增隐藏页暂停/恢复用例;
+2. **useChatComposer** ✅ `5c6665c`:双份 ~600 行收编为 `composables/use-chat-composer.ts` + `components/chat/chat-composer.tsx`(per-surface keyed 挂载 + 宿主 draft map),ThreadSlice/ChatSlice append/patch/remove 三个 action 消灭全部组件内联 `useAppStore.setState`(05 D5);**三个真实 bug 一并修复**——上传跨会话串台(per-surface 隔离)、@mention 残留(mentionMap 改为从草稿文本派生)、发送失败输入不恢复(恢复原文并重派生 mentions);回归测试 `chat-composer.test.tsx` + `chat-optimistic.test.ts`;
+3. **流式管线拆除**:⏳ 待产品确认后执行(`ChatMessageUI.streaming` 无生产者,chat 测试除外);
+4. **批 4 归位** ✅ `bc65511`:avatar/image-blob 失效回调迁回 lib 自注册(auth.ts 不再持 per-cache shim);presence/activity/reminder/machine-new 的组件 interval 全部收编 `usePolling`;
+5. reset() 的 watcher 枚举随 `badge.stop()` 形状调整完成(注册表已就位)。
 
 ### ⏳ Phase 3(原 Phase 2)· 页面与组件拆分
 数据层定型后执行,避免页面迁移返工:
@@ -269,8 +269,8 @@ src/
 | 阶段 | 状态 | 实际产出 |
 |---|---|---|
 | Phase 0 快赢 | ✅ 完成(7 提交) | 七项高危 bug 清零、-500 行死代码、i18n 门禁恢复、reminder/activity/device-login 轮询治理 |
-| Phase 1 数据层 | ✅ 基本完成(批 1~3,11 提交) | Query 五 slice 纵切、ADR-2 -2 个 hack、useResourceList、错误出口单点化、缓存 LRU、注册表、watch 重连、usePolling;**剩余:聊天域 ChatGateway + 乐观编排** |
-| Phase 2 聊天域收拢(重设计) | ⏳ 下一批,~2 周(主控执行) | 双 watcher 合一、-600 行 composer 重复、三个真实 bug、流式决策落地 |
+| Phase 1 数据层 | ✅ 完成(批 1~3,11 提交) | Query 五 slice 纵切、ADR-2 -2 个 hack、useResourceList、错误出口单点化、缓存 LRU、注册表、watch 重连、usePolling |
+| Phase 2 聊天域收拢(重设计)| ✅ 完成(批 4,3 提交)| ChatGateway watcher 合一 + 可见性门控、useChatComposer 收编 -600 行与 9 处内联 setState、三个聊天域 bug 修复、interval/cleanup 归位;**余:流式拆除待产品确认** |
 | Phase 3 页面拆分(重排) | ⏳ 3~4 周 | settings 页 -40~50%、三棵组件树、测试盲区收窄 |
 | Phase 4 UI/事件管线 | ⏳ 2 周 | TimelineModel 4→1、badge/modal 收敛、proto 修复、轻窗口化 |
 
