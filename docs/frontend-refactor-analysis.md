@@ -8,7 +8,7 @@
 
 ## ⚡ 实施进度总览(更新于重构执行 5 个批次后)
 
-重构已执行 **21 个提交、6 个批次**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **105 文件 / 699 用例**。各章文件头部已附加对应的"进度标注"块。
+重构已执行 **22 个提交、6 个批次**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **105 文件 / 699 用例**。各章文件头部已附加对应的"进度标注"块。
 
 | 批次 | 提交范围 | 内容 | 状态 |
 |---|---|---|---|
@@ -36,7 +36,7 @@
 | 5 | **列表获取基建**:`useResourceList`(`723de0e`,command/reminder 已迁;activity-list 因双分页语义未迁);equal-bailout 六列表(`c9fe388`) | ✅ 完成(settings 7 页的脚手架迁移归入页面拆分阶段) |
 | 6 | **统一发送/乐观更新管线**(`useChatComposer`) | ✅ 完成(`4085c66` watcher + `5c6665c` composer;三个聊天域 bug 一并修复) |
 | 7 | **ADR-1 引入 TanStack Query**(`b95c530`~`e7aca3a`)/ **ADR-2 preview 退役 + 冻结删除**(`d4774c3`) | ✅ 完成:数据层 slice + 聊天域长轮询与组件 interval 全部收敛(`4085c66`/`bc65511`) |
-| 8 | **流式管线拆除决策** | ⏳ 待产品确认(未动) |
+| 8 | **流式管线拆除决策** | ✅ 完成(`07b2799`,产品确认拆除):ChatMessageUI.streaming 字段 + rowStreamingProps + typing-dots + fade 全部移除,MessageRow 接口面 -2 个流式 props |
 | 9 | **三个巨型页面拆分** | ⏳ 未开始(原计划因数据层先行而顺延,见新路线 §7) |
 | 10 | **事件渲染管线统一** | 🟨 部分:watch 断线重连(`4b7cf57`)已做;TimelineModel 归一/合批/虚拟化未动 |
 
@@ -239,7 +239,7 @@ src/
 ### ✅ Phase 2(重设计)· 聊天域收拢 — 已完成(流式决策待产品确认)
 1. **ChatGateway** ✅ `4085c66`:channel/thread 双 25s 长轮询 watcher 合一(`stores/chat-watcher.ts` 共享 round loop:同步首启 + abort-aware 退避 + 隐藏页暂停/回前台立即续发);5s badge interval 同节拍并接入可见性门控(`startBadgeInterval`);`channelWatchers` 句柄带 `badge.stop()`,reset 不再泄漏 visibilitychange 监听;`command.ts` prune/recency 复核无恙;`chat-stream` 竞态基线全绿并新增隐藏页暂停/恢复用例;
 2. **useChatComposer** ✅ `5c6665c`:双份 ~600 行收编为 `composables/use-chat-composer.ts` + `components/chat/chat-composer.tsx`(per-surface keyed 挂载 + 宿主 draft map),ThreadSlice/ChatSlice append/patch/remove 三个 action 消灭全部组件内联 `useAppStore.setState`(05 D5);**三个真实 bug 一并修复**——上传跨会话串台(per-surface 隔离)、@mention 残留(mentionMap 改为从草稿文本派生)、发送失败输入不恢复(恢复原文并重派生 mentions);回归测试 `chat-composer.test.tsx` + `chat-optimistic.test.ts`;
-3. **流式管线拆除**:⏳ 待产品确认后执行(`ChatMessageUI.streaming` 无生产者,chat 测试除外);
+3. **流式管线拆除** ✅ `07b2799`(产品确认后执行):streaming 字段/rowStreamingProps/typing-dots/fade 全部移除,MessageRow 渲染走纯 final 内容路径;
 4. **批 4 归位** ✅ `bc65511`:avatar/image-blob 失效回调迁回 lib 自注册(auth.ts 不再持 per-cache shim);presence/activity/reminder/machine-new 的组件 interval 全部收编 `usePolling`;
 5. reset() 的 watcher 枚举随 `badge.stop()` 形状调整完成(注册表已就位)。
 
@@ -254,7 +254,7 @@ src/
 ### ⏳ Phase 4(原 Phase 3)· UI 体系与事件管线
 1. Badge 家族(xs variant + 范型 StatusBadge)、modal 壳/弹层三连提取、size/variant 命名 codemod、`Avatar.sizeClass` 显式映射、组件 API 约定写入 AGENTS.md;
 2. `lib/command-events-model.ts` 归一 merge/pair/kind(4 份拷贝→1,行键漂移根治);评论面板双胞胎合并;`FilePreviewShell` + `useHtmlPreviewBridge`;
-3. `tool_call_id` 进 proto(后端协同,需立项)、ActivityState 魔数清除;ledger/workspace 虚拟化(ADR-3 第②步)+ 消息列表轻窗口化(第③步,需流式管线决策落地后);
+3. `tool_call_id` 进 proto(后端协同,需立项)、ActivityState 魔数清除;ledger/workspace 虚拟化(ADR-3 第②步)+ 消息列表轻窗口化(第③步,流式决策已落地 `07b2799`,前置已解除);
 4. UI 侧收尾:`toast.ts` 去 Base UI 私有接口依赖、PWA controllerchange reload 加用户可见护栏、`Separator` 去留决策(20 处 border-t 替换或删组件)。
 
 ### 贯穿全程的规则(部分已落地)
