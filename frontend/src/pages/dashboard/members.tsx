@@ -4,10 +4,12 @@ import { useTranslation } from "react-i18next";
 import { Outlet, useMatch, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
+import { RailRow } from "@/components/rail-row";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
+import { TwoPaneShell } from "@/components/ui/two-pane-shell";
 import {
   avatarNameForAgentId,
   avatarNameForUserId,
@@ -119,167 +121,160 @@ export function MembersPage() {
   const showChannels = !searching || myChannelsLoading || channels.length > 0;
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
-      {/* Left rail: members directory. */}
-      <aside
-        className={cn(
-          "shrink-0 flex-col border-r border-control-border overflow-hidden",
-          hasSelection ? "hidden lg:flex lg:w-60" : "flex w-full lg:w-60"
-        )}
-      >
-        <div className="hidden lg:flex items-center justify-between gap-2 border-b border-control-border px-3 py-3 shrink-0">
-          <h1 className="text-sm font-semibold text-main truncate">
-            {t("members.title")}
-          </h1>
-        </div>
+    <TwoPaneShell
+      detailOpen={hasSelection}
+      width="w-60"
+      railClassName="overflow-hidden"
+      rail={
+        <>
+          {/* Left rail: members directory. */}
+          <div className="hidden lg:flex items-center justify-between gap-2 border-b border-control-border px-3 py-3 shrink-0">
+            <h1 className="text-sm font-semibold text-main truncate">
+              {t("members.title")}
+            </h1>
+          </div>
 
-        <div className="shrink-0 px-3 py-2">
-          <SearchInput
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("members.search-placeholder")}
-            aria-label={t("members.search-placeholder")}
-            className="h-8 rounded-full text-sm"
-          />
-        </div>
+          <div className="shrink-0 px-3 py-2">
+            <SearchInput
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("members.search-placeholder")}
+              aria-label={t("members.search-placeholder")}
+              className="h-8 rounded-full text-sm"
+            />
+          </div>
 
-        <div className="flex-1 overflow-y-auto py-1">
-          {loading ? (
-            <p className="px-3 py-2 text-sm text-control-light">
-              {t("common.loading")}
-            </p>
-          ) : error ? (
-            <div className="flex flex-col gap-3 px-3 py-2">
-              <Alert variant="error" description={t("members.load-failed")} />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void fetchMembers()}
-              >
-                {t("common.retry")}
-              </Button>
-            </div>
-          ) : members.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-control-light">
-              {t("members.no-data")}
-            </p>
-          ) : searching &&
-            !myChannelsLoading &&
-            agents.length === 0 &&
-            humans.length === 0 &&
-            channels.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-control-light">
-              {t("members.no-search-results", { query: query.trim() })}
-            </p>
-          ) : (
-            <div className="flex flex-col">
-              {showAgents && (
-                <>
-                  <SectionHeader
-                    label={t("members.section-agents")}
-                    count={agents.length}
-                    open={sections.agents}
-                    onToggle={() => toggleSection("agents")}
-                    onAdd={() => navigate("/machines")}
-                    addLabel={t("members.add-agent")}
-                  />
-                  {sections.agents && (
-                    <div className="divide-y divide-control-border/50">
-                      {agents.map((member) => (
-                        <MemberRow
-                          key={member.name}
-                          member={member}
-                          selected={
-                            selectedAgentId ===
-                            member.name.replace(/^agents\//, "")
-                          }
-                        />
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-              {showHumans && (
-                <>
-                  <SectionHeader
-                    label={t("members.section-humans")}
-                    count={humans.length}
-                    open={sections.humans}
-                    onToggle={() => toggleSection("humans")}
-                    onAdd={() => navigate("/settings/users")}
-                    addLabel={t("members.add-human")}
-                  />
-                  {sections.humans && (
-                    <div className="divide-y divide-control-border/50">
-                      {humans.map((member) => (
-                        <MemberRow
-                          key={member.name}
-                          member={member}
-                          selected={
-                            selectedUserId ===
-                            member.name.replace(/^users\//, "")
-                          }
-                        />
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+          <div className="flex-1 overflow-y-auto py-1">
+            {loading ? (
+              <p className="px-3 py-2 text-sm text-control-light">
+                {t("common.loading")}
+              </p>
+            ) : error ? (
+              <div className="flex flex-col gap-3 px-3 py-2">
+                <Alert variant="error" description={t("members.load-failed")} />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void fetchMembers()}
+                >
+                  {t("common.retry")}
+                </Button>
+              </div>
+            ) : members.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-control-light">
+                {t("members.no-data")}
+              </p>
+            ) : searching &&
+              !myChannelsLoading &&
+              agents.length === 0 &&
+              humans.length === 0 &&
+              channels.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-control-light">
+                {t("members.no-search-results", { query: query.trim() })}
+              </p>
+            ) : (
+              <div className="flex flex-col">
+                {showAgents && (
+                  <>
+                    <SectionHeader
+                      label={t("members.section-agents")}
+                      count={agents.length}
+                      open={sections.agents}
+                      onToggle={() => toggleSection("agents")}
+                      onAdd={() => navigate("/machines")}
+                      addLabel={t("members.add-agent")}
+                    />
+                    {sections.agents && (
+                      <div className="divide-y divide-control-border/50">
+                        {agents.map((member) => (
+                          <MemberRow
+                            key={member.name}
+                            member={member}
+                            selected={
+                              selectedAgentId ===
+                              member.name.replace(/^agents\//, "")
+                            }
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+                {showHumans && (
+                  <>
+                    <SectionHeader
+                      label={t("members.section-humans")}
+                      count={humans.length}
+                      open={sections.humans}
+                      onToggle={() => toggleSection("humans")}
+                      onAdd={() => navigate("/settings/users")}
+                      addLabel={t("members.add-human")}
+                    />
+                    {sections.humans && (
+                      <div className="divide-y divide-control-border/50">
+                        {humans.map((member) => (
+                          <MemberRow
+                            key={member.name}
+                            member={member}
+                            selected={
+                              selectedUserId ===
+                              member.name.replace(/^users\//, "")
+                            }
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
-          {/* Channels roster — all joined/created channels including closed
+            {/* Channels roster — all joined/created channels including closed
               ones, so a closed conversation always has an entry point back.
               It has its own fetch/loading state; the member search filters it
               like the agent/human sections. */}
-          {showChannels && (
-            <div className="flex flex-col">
-              <SectionHeader
-                label={t("members.section-channels")}
-                count={channels.length}
-                open={sections.channels}
-                onToggle={() => toggleSection("channels")}
-              />
-              {myChannelsLoading && sections.channels && (
-                <p className="px-3 py-2 text-sm text-control-light">
-                  {t("common.loading")}
-                </p>
-              )}
-              {!myChannelsLoading &&
-                sections.channels &&
-                (channels.length === 0 ? (
+            {showChannels && (
+              <div className="flex flex-col">
+                <SectionHeader
+                  label={t("members.section-channels")}
+                  count={channels.length}
+                  open={sections.channels}
+                  onToggle={() => toggleSection("channels")}
+                />
+                {myChannelsLoading && sections.channels && (
                   <p className="px-3 py-2 text-sm text-control-light">
-                    {t("members.channels-empty")}
+                    {t("common.loading")}
                   </p>
-                ) : (
-                  <div className="divide-y divide-control-border/50">
-                    {channels.map((channel) => (
-                      <ChannelRow
-                        key={channel.name}
-                        channel={channel}
-                        selected={
-                          selectedChannelId ===
-                          channel.name.replace(/^conversations\//, "")
-                        }
-                      />
-                    ))}
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
-      </aside>
-
+                )}
+                {!myChannelsLoading &&
+                  sections.channels &&
+                  (channels.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-control-light">
+                      {t("members.channels-empty")}
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-control-border/50">
+                      {channels.map((channel) => (
+                        <ChannelRow
+                          key={channel.name}
+                          channel={channel}
+                          selected={
+                            selectedChannelId ===
+                            channel.name.replace(/^conversations\//, "")
+                          }
+                        />
+                      ))}
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </>
+      }
+    >
       {/* Right pane: member detail (or empty state). */}
-      <div
-        className={cn(
-          "min-w-0 flex-1 overflow-hidden",
-          !hasSelection && "hidden lg:block"
-        )}
-      >
-        <Outlet />
-      </div>
-    </div>
+      <Outlet />
+    </TwoPaneShell>
   );
 }
 
@@ -338,7 +333,7 @@ function SectionHeader({
 
 // MemberRow is a single directory row. Agents navigate to the embedded agent
 // detail; humans navigate to the human profile. Selection is shown with the
-// same left-border + bg highlight as machines.tsx.
+// shared RailRow highlight (left-border + bg), the same as machines.tsx.
 function MemberRow({
   member,
   selected,
@@ -360,27 +355,21 @@ function MemberRow({
   const onlineUsers = useAppStore((s) => s.onlineUsers);
   const userOnline = !isAgent && onlineUsers[member.name] === true;
 
-  function open() {
-    navigate(
-      isAgent ? `/members/agents/${resourceId}` : `/members/users/${resourceId}`
-    );
-  }
-
   return (
-    <button
-      type="button"
-      onClick={open}
-      aria-label={
+    <RailRow
+      selected={selected}
+      label={
         isAgent
           ? t("members.row-open-agent", { title: member.title })
           : t("members.row-open-human", { title: member.title })
       }
-      className={cn(
-        "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors border-l-2",
-        selected
-          ? "border-l-accent bg-control-bg"
-          : "border-l-transparent hover:bg-control-bg/60"
-      )}
+      onSelect={() =>
+        navigate(
+          isAgent
+            ? `/members/agents/${resourceId}`
+            : `/members/users/${resourceId}`
+        )
+      }
     >
       <Avatar seed={resourceId || member.title} src={avatarSrc} />
       <div className="min-w-0 flex-1 flex flex-col gap-0.5">
@@ -403,7 +392,7 @@ function MemberRow({
       ) : (
         <Badge variant="secondary">{t("chat.presence-offline")}</Badge>
       )}
-    </button>
+    </RailRow>
   );
 }
 
@@ -421,16 +410,10 @@ function ChannelRow({
   const resourceId = channel.name.replace(/^conversations\//, "");
 
   return (
-    <button
-      type="button"
-      onClick={() => navigate(`/members/channels/${resourceId}`)}
-      aria-label={t("members.row-open-channel", { title: channel.title })}
-      className={cn(
-        "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors border-l-2",
-        selected
-          ? "border-l-accent bg-control-bg"
-          : "border-l-transparent hover:bg-control-bg/60"
-      )}
+    <RailRow
+      selected={selected}
+      label={t("members.row-open-channel", { title: channel.title })}
+      onSelect={() => navigate(`/members/channels/${resourceId}`)}
     >
       <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-control-bg text-control">
         <Hash className="size-3.5" />
@@ -443,7 +426,7 @@ function ChannelRow({
       <span className="text-xs text-control-light">
         {t("channel.members", { count: channel.memberCount ?? 0 })}
       </span>
-    </button>
+    </RailRow>
   );
 }
 

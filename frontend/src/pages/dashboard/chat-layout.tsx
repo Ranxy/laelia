@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Outlet, useParams } from "react-router-dom";
 import { ConversationList } from "@/components/chat/conversation-list";
+import { TwoPaneShell } from "@/components/ui/two-pane-shell";
 import { usePolling } from "@/lib/use-polling";
 import { useAppStore } from "@/stores";
 
@@ -21,28 +22,23 @@ export function ChatLayout() {
   usePolling(fetchChannels, LIST_POLL_INTERVAL_MS);
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
-      {/* Left rail: merged channel + DM list with unread badges.
-          Desktop: always visible as a fixed column.
-          Mobile: shown full-width only when no conversation is open. */}
-      <aside
-        className={
-          conversationId
-            ? "hidden w-72 shrink-0 border-r border-control-border bg-background lg:flex lg:flex-col"
-            : "flex w-full shrink-0 border-r border-control-border bg-background lg:w-72 lg:flex-col"
-        }
-      >
+    <TwoPaneShell
+      detailOpen={Boolean(conversationId)}
+      width="w-72"
+      // ChatLayout's mobile rail keeps its historical row direction —
+      // ConversationList manages its own column internally (see
+      // TwoPaneShell.railMobileDirection). Preserved from its old copy.
+      railMobileDirection="row"
+      railClassName="bg-background"
+      rail={
+        // Merged channel + DM list with unread badges. Desktop: always a fixed
+        // column; mobile: full-width only while no conversation is open.
         <ConversationList />
-      </aside>
-      {/* Right pane: the selected conversation (or empty state).
-          Mobile: hidden until a conversation is opened. */}
-      <main
-        className={
-          conversationId ? "min-w-0 flex-1" : "hidden min-w-0 flex-1 lg:block"
-        }
-      >
-        <Outlet />
-      </main>
-    </div>
+      }
+    >
+      {/* The open conversation (or empty state); mobile: hidden until one is
+          opened. */}
+      <Outlet />
+    </TwoPaneShell>
   );
 }

@@ -7,11 +7,10 @@ import {
   Plug,
   UserCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AGENT_ROUTE_CHAT,
   AGENT_ROUTE_MCP,
@@ -20,28 +19,20 @@ import {
   COMMAND_ROUTE_LIST,
   REMINDER_ROUTE_LIST,
 } from "@/router/handles";
-import { resolvePath } from "@/router/route-index";
 import { useAppStore } from "@/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
-
-type TabKey =
-  | "profile"
-  | "commands"
-  | "reminders"
-  | "chat"
-  | "workspace"
-  | "mcp";
+import { type DetailTab, DetailTabsLayout } from "./detail-tabs-layout";
 
 // AgentDetailLayout is the right-pane agent detail embedded in the Members
 // page. It renders the agent tabs (profile / commands / reminders / chat /
-// workspace / mcp) and an Outlet for the active child route. The Members left rail
-// already conveys the agent's identity and connection state, so — unlike the old
-// standalone /agents page — this layout omits the back + title + status
-// header bar. The global MobileHeader handles back navigation on small screens.
+// workspace / mcp) via the shared DetailTabsLayout and an Outlet for the
+// active child route. The Members left rail already conveys the agent's
+// identity and connection state, so — unlike the old standalone /agents page —
+// this layout omits the back + title + status header bar. The global
+// MobileHeader handles back navigation on small screens.
 export function AgentDetailLayout() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const location = useLocation();
   const { agentId } = useParams<{ agentId: string }>();
   const getOrCreateConversation = useAppStore((s) => s.getOrCreateConversation);
   const fetchChannels = useAppStore((s) => s.fetchChannels);
@@ -66,19 +57,45 @@ export function AgentDetailLayout() {
 
   const canEdit = agent?.canEdit === true;
 
-  // Derive the active tab from the URL so deep links, refresh, and back/forward
-  // keep the highlight in sync with the rendered child route.
-  const activeTab = useMemo<TabKey>(() => {
-    const segments = location.pathname.split("/").filter(Boolean);
-    // /members/agents/:agentId/<tab?> — the segment after the agent id.
-    const afterId = segments[segments.indexOf(agentId ?? "") + 1];
-    if (afterId === "commands") return "commands";
-    if (afterId === "reminders") return "reminders";
-    if (afterId === "chat") return "chat";
-    if (afterId === "workspace") return "workspace";
-    if (afterId === "mcp") return "mcp";
-    return "profile";
-  }, [location.pathname, agentId]);
+  const tabs: DetailTab[] = [
+    {
+      key: "profile",
+      icon: UserCircle,
+      labelKey: "agent.tab-profile",
+      route: AGENT_ROUTE_PROFILE,
+    },
+    {
+      key: "commands",
+      icon: ListChecks,
+      labelKey: "agent.tab-commands",
+      route: COMMAND_ROUTE_LIST,
+    },
+    {
+      key: "reminders",
+      icon: Bell,
+      labelKey: "agent.tab-reminders",
+      route: REMINDER_ROUTE_LIST,
+    },
+    {
+      key: "chat",
+      icon: MessageSquare,
+      labelKey: "agent.tab-chat",
+      route: AGENT_ROUTE_CHAT,
+    },
+    {
+      key: "mcp",
+      icon: Plug,
+      labelKey: "agent.tab-mcp",
+      route: AGENT_ROUTE_MCP,
+    },
+    {
+      key: "workspace",
+      icon: FolderTree,
+      labelKey: "agent.tab-workspace",
+      route: AGENT_ROUTE_WORKSPACE,
+      gate: canEdit,
+    },
+  ];
 
   // startChat opens (or reuses) the user↔agent DM and jumps to the chat surface.
   // The DM also appears in the chat left rail once channels are refreshed.
@@ -95,108 +112,41 @@ export function AgentDetailLayout() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <Tabs value={activeTab} className="flex h-full flex-col overflow-hidden">
-        <div className="border-b border-control-border shrink-0">
-          <div className="flex items-end gap-2 px-4 pt-2 lg:px-6">
-            <TabsList className="gap-x-6 border-b-0!">
-              <TabsTrigger
-                value="profile"
-                className="px-1"
-                onClick={() =>
-                  navigate(resolvePath(AGENT_ROUTE_PROFILE, { agentId }))
-                }
-              >
-                <UserCircle className="size-4" />
-                {t("agent.tab-profile")}
-              </TabsTrigger>
-              <TabsTrigger
-                value="commands"
-                className="px-1"
-                onClick={() =>
-                  navigate(resolvePath(COMMAND_ROUTE_LIST, { agentId }))
-                }
-              >
-                <ListChecks className="size-4" />
-                {t("agent.tab-commands")}
-              </TabsTrigger>
-              <TabsTrigger
-                value="reminders"
-                className="px-1"
-                onClick={() =>
-                  navigate(resolvePath(REMINDER_ROUTE_LIST, { agentId }))
-                }
-              >
-                <Bell className="size-4" />
-                {t("agent.tab-reminders")}
-              </TabsTrigger>
-              <TabsTrigger
-                value="chat"
-                className="px-1"
-                onClick={() =>
-                  navigate(resolvePath(AGENT_ROUTE_CHAT, { agentId }))
-                }
-              >
-                <MessageSquare className="size-4" />
-                {t("agent.tab-chat")}
-              </TabsTrigger>
-              <TabsTrigger
-                value="mcp"
-                className="px-1"
-                onClick={() =>
-                  navigate(resolvePath(AGENT_ROUTE_MCP, { agentId }))
-                }
-              >
-                <Plug className="size-4" />
-                {t("agent.tab-mcp")}
-              </TabsTrigger>
-              {canEdit && (
-                <TabsTrigger
-                  value="workspace"
-                  className="px-1"
-                  onClick={() =>
-                    navigate(resolvePath(AGENT_ROUTE_WORKSPACE, { agentId }))
-                  }
-                >
-                  <FolderTree className="size-4" />
-                  {t("agent.tab-workspace")}
-                </TabsTrigger>
-              )}
-            </TabsList>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={startChat}
-              disabled={startingChat || !agentId}
-              className="mb-1 ml-auto hidden shrink-0 lg:inline-flex"
-            >
-              {startingChat ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <MessageSquare className="size-4" />
-              )}
-              {t("members.message-agent")}
-            </Button>
-          </div>
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <Outlet />
-        </div>
-      </Tabs>
-      {/* Mobile send-message FAB: replaces the header Message button on touch
-          layouts, styled like the chat list's create-channel FAB. */}
-      <button
-        type="button"
-        onClick={() => void startChat()}
-        disabled={startingChat || !agentId}
-        className="fixed right-4 bottom-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom)+0.75rem)] z-chrome flex h-14 items-center justify-center rounded-full bg-accent px-6 text-sm font-semibold whitespace-nowrap text-accent-text shadow-lg transition-all duration-200 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50 lg:hidden"
-      >
-        {startingChat ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : (
-          t("members.send-message")
-        )}
-      </button>
-    </div>
+    <DetailTabsLayout
+      idParam="agentId"
+      tabs={tabs}
+      tabsTrailing={
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={startChat}
+          disabled={startingChat || !agentId}
+          className="mb-1 ml-auto hidden shrink-0 lg:inline-flex"
+        >
+          {startingChat ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <MessageSquare className="size-4" />
+          )}
+          {t("members.message-agent")}
+        </Button>
+      }
+      footer={
+        // Mobile send-message FAB: replaces the header Message button on touch
+        // layouts, styled like the chat list's create-channel FAB.
+        <button
+          type="button"
+          onClick={() => void startChat()}
+          disabled={startingChat || !agentId}
+          className="fixed right-4 bottom-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom)+0.75rem)] z-chrome flex h-14 items-center justify-center rounded-full bg-accent px-6 text-sm font-semibold whitespace-nowrap text-accent-text shadow-lg transition-all duration-200 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50 lg:hidden"
+        >
+          {startingChat ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            t("members.send-message")
+          )}
+        </button>
+      }
+    />
   );
 }
