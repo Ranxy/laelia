@@ -45,6 +45,7 @@ import { peerPresenceOnline } from "@/lib/presence";
 import { toastManager } from "@/lib/toast";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { useMessageScroller } from "@/lib/use-message-scroller";
+import { useWindowedMessageRange } from "@/lib/use-windowed-message-range";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { senderKeyForMessage } from "@/stores/chat-helpers";
@@ -112,6 +113,8 @@ interface MessageListProps {
   currentPrincipalId?: string;
   scrollRoot: React.RefObject<HTMLDivElement | null>;
   onToggleReaction: (msg: ChatMessageUI, emoji: string) => void;
+  /** Keep every row mounted (jump loading / focused jump window / small chat). */
+  forceFullRender?: boolean;
 }
 
 // MessageList is memoized so typing in the composer (which re-renders the
@@ -119,6 +122,9 @@ interface MessageListProps {
 // every keystroke. Its props are either stable store refs/callbacks or
 // primitives, so it bails out unless a message actually changed — MessageRow's
 // own memo then skips rows whose msg object is untouched.
+// Below this row count the light window is bypassed entirely: everything
+// mounts, matching the synchronous-markdown eager tier.
+const WINDOW_MIN_ROWS = 60;
 const MessageList = memo(function MessageList({
   messages,
   onViewDetails,
@@ -134,15 +140,37 @@ const MessageList = memo(function MessageList({
   currentPrincipalId,
   scrollRoot,
   onToggleReaction,
+  forceFullRender,
 }: MessageListProps) {
+  // ADR-3 step ③ light windowing: far rows degrade to height-memory
+  // placeholders once the list is large enough to matter; small chats and
+  // jsdom (zero-height container) render everything. A jump (loading or a
+  // focused jump window) keeps the full tree mounted so the scroller's
+  // target queries resolve against real rows, not placeholders.
+  const rowIds = messages.map((msg) => msg.id);
+  const { start, end, rowRef, placeholderHeight } = useWindowedMessageRange({
+    containerRef: scrollRoot,
+    rowIds,
+    forceFullRender,
+  });
   return (
     <div className="flex flex-col gap-4 px-6 pt-6 pb-4">
       {messages.map((msg, idx) => {
+        if (idx < start || idx >= end) {
+          return (
+            <div
+              key={msg.id}
+              data-msg-id={msg.id}
+              style={{ height: placeholderHeight(msg.id) }}
+              aria-hidden="true"
+            />
+          );
+        }
         const prevMsg = idx > 0 ? messages[idx - 1] : null;
         const showAvatar =
           !prevMsg || senderKeyForMessage(prevMsg) !== senderKeyForMessage(msg);
         return (
-          <div key={msg.id} data-msg-id={msg.id}>
+          <div key={msg.id} data-msg-id={msg.id} ref={rowRef(msg.id)}>
             <MessageRow
               msg={msg}
               showAvatar={showAvatar}
@@ -950,6 +978,11 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
               currentPrincipalId={currentUser?.handle}
               scrollRoot={scrollRef}
               onToggleReaction={handleToggleReaction}
+              forceFullRender={
+                Boolean(jumpTarget) ||
+                jumpLoading ||
+                messages.length <= WINDOW_MIN_ROWS
+              }
             />
             {hasNewer && (
               <div
