@@ -10,7 +10,7 @@ import {
   SteerCommandRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { registerCleanup } from "./cleanup-registry";
-import { sleep } from "./polling";
+import { sleep } from "./delay";
 import type { AppSliceCreator } from "./types";
 
 export interface CommandSlice {

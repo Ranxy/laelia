@@ -1,4 +1,4 @@
-import { sleep } from "./polling";
+import { sleep } from "./delay";
 
 // Shared cadences for the chat-domain watchers: the channel message watcher
 // (channel.ts) and the thread reply watcher (thread.ts) run the same shape of
