@@ -20,10 +20,8 @@ import {
   useAvatar,
 } from "@/lib/avatar-cache";
 import { agentResourceName } from "@/lib/command-status";
-import { platformOwnsEdgeSwipe } from "@/lib/platform-edge-swipe";
 import { toastManager } from "@/lib/toast";
-import { useHistorySentinel } from "@/lib/use-history-sentinel";
-import { useSwipeToCloseSheet } from "@/lib/use-swipe-to-close-sheet";
+import { useEdgeDragToClose } from "@/lib/use-edge-drag-to-close";
 import { useAppStore } from "@/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";
@@ -68,22 +66,10 @@ export function MentionDetailSheet({
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [startingChat, setStartingChat] = useState(false);
-  const [popup, setPopup] = useState<HTMLDivElement | null>(null);
-  const [overlay, setOverlay] = useState<HTMLDivElement | null>(null);
-
   // Mobile-only: mirror the thread panel's swipe-back gesture so the sheet can
-  // be dragged from the left edge to close, revealing the page underneath. On
-  // real iOS/iPadOS browsers the system edge-swipe owns the touch instead (see
-  // platform-edge-swipe.ts) — the synthetic gesture yields there and dismissal
-  // goes through the history sentinel below.
-  useSwipeToCloseSheet({
-    open,
-    onClose,
-    popup,
-    overlay,
-    enabled: !platformOwnsEdgeSwipe(),
-  });
-  useHistorySentinel(open, onClose);
+  // be dragged from the left edge to close, revealing the page underneath (or
+  // yield to the system edge-swipe on iOS/iPadOS — see use-edge-drag-to-close).
+  const { setPopup, setOverlay } = useEdgeDragToClose({ open, onClose });
 
   useEffect(() => {
     if (!open) return;
