@@ -10,6 +10,15 @@ import { NetworkFirst } from "workbox-strategies";
 
 declare const self: ServiceWorkerGlobalScope;
 
+// The WebWorker lib's NotificationOptions lags the spec: `renotify` (resurface
+// an existing tag instead of silently dropping it) is valid at showNotification
+// time per the Notifications API.
+declare global {
+  interface NotificationOptions {
+    renotify?: boolean | undefined;
+  }
+}
+
 // Laelia Service Worker.
 //
 // Two responsibilities live in this single worker (a scope can only have one):
