@@ -1,4 +1,3 @@
-import { create } from "@bufbuild/protobuf";
 import { FileText, Loader2, X } from "lucide-react";
 import MarkdownRender from "markstream-react";
 import { useEffect, useState } from "react";
@@ -7,10 +6,9 @@ import { formatBytes } from "@/components/chat/file-card";
 import { Button } from "@/components/ui/button";
 import { HtmlFileView } from "@/components/workspace/html-file-view";
 import { useAppStore } from "@/stores";
-import {
-  type WorkspaceEntry,
-  type WorkspaceReadResponse,
-  WorkspaceReadResponseSchema,
+import type {
+  WorkspaceEntry,
+  WorkspaceReadResponse,
 } from "@/types/proto-es/v1/agent_pb";
 
 interface WorkspaceFilePanelProps {
@@ -49,28 +47,28 @@ export function WorkspaceFilePanel({
   const { t } = useTranslation();
   const readAgentWorkspaceFile = useAppStore((s) => s.readAgentWorkspaceFile);
   const [file, setFile] = useState<WorkspaceReadResponse | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!entry) {
       setFile(null);
+      setLoadFailed(false);
       setLoading(false);
       return;
     }
     let cancelled = false;
     setLoading(true);
     setFile(null);
+    setLoadFailed(false);
     readAgentWorkspaceFile(agentName, entry.path)
       .then((res) => {
         if (!cancelled) setFile(res);
       })
       .catch(() => {
-        if (!cancelled)
-          setFile(
-            create(WorkspaceReadResponseSchema, {
-              error: t("workspace.load-error"),
-            })
-          );
+        // Store a sentinel flag, not pre-translated text, so the effect does
+        // not depend on `t` (a language switch must not re-fetch the file).
+        if (!cancelled) setLoadFailed(true);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -78,7 +76,7 @@ export function WorkspaceFilePanel({
     return () => {
       cancelled = true;
     };
-  }, [agentName, entry, readAgentWorkspaceFile, t]);
+  }, [agentName, entry, readAgentWorkspaceFile]);
 
   if (!entry) {
     return (
@@ -120,6 +118,10 @@ export function WorkspaceFilePanel({
           </div>
         ) : !file ? null : file.error ? (
           <p className="px-4 py-2 text-sm text-error">{file.error}</p>
+        ) : loadFailed ? (
+          <p className="px-4 py-2 text-sm text-error">
+            {t("workspace.load-error")}
+          </p>
         ) : file.binary && file.mimeType && file.content ? (
           <div className="flex h-full items-start justify-center p-4">
             <img
