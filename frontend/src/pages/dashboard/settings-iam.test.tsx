@@ -1,7 +1,9 @@
 import { create } from "@bufbuild/protobuf";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Code, ConnectError } from "@connectrpc/connect";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores";
+import { renderWithQueryClient } from "@/test/query";
 import {
   type Binding,
   BindingSchema,
@@ -9,6 +11,7 @@ import {
   IamPolicySchema,
 } from "@/types/proto-es/store/policy_pb";
 import type { Role } from "@/types/proto-es/v1/role_service_pb";
+import type { User } from "@/types/proto-es/v1/user_service_pb";
 import { SettingsIamPage } from "./settings-iam";
 
 const mock = vi.hoisted(() => ({
@@ -16,7 +19,7 @@ const mock = vi.hoisted(() => ({
   setWorkspaceIamPolicy: vi.fn(),
   listRoles: vi.fn(),
   listGroups: vi.fn(),
-  fetchUsers: vi.fn(),
+  listUsers: vi.fn(),
 }));
 
 vi.mock("@/connect", () => ({
@@ -26,6 +29,7 @@ vi.mock("@/connect", () => ({
   },
   roleServiceClient: { listRoles: mock.listRoles },
   groupServiceClient: { listGroups: mock.listGroups },
+  userServiceClient: { listUsers: mock.listUsers },
 }));
 
 const tFn = (key: string, params?: Record<string, string | number>) => {
@@ -63,8 +67,17 @@ function role(overrides?: Partial<Role>): Role {
   } as unknown as Role;
 }
 
+function user(overrides?: Partial<User>): User {
+  return {
+    name: "users/1",
+    title: "Alice",
+    email: "alice@example.com",
+    ...overrides,
+  } as unknown as User;
+}
+
 function renderPage() {
-  return render(<SettingsIamPage />);
+  return renderWithQueryClient(<SettingsIamPage />);
 }
 
 beforeEach(() => {
@@ -74,20 +87,12 @@ beforeEach(() => {
       title: "Admin",
       permissions: ["laelia.iam.getPolicy", "laelia.iam.setPolicy"],
     } as never,
-    users: [
-      {
-        name: "users/1",
-        title: "Alice",
-        email: "alice@example.com",
-      },
-    ],
-    fetchUsers: mock.fetchUsers,
-  } as never);
+  });
   mock.getWorkspaceIamPolicy.mockReset();
   mock.setWorkspaceIamPolicy.mockReset();
   mock.listRoles.mockReset();
   mock.listGroups.mockReset();
-  mock.fetchUsers.mockReset();
+  mock.listUsers.mockReset();
   mock.getWorkspaceIamPolicy.mockResolvedValue({
     policy: policy([]),
     etag: "etag-1",
@@ -98,7 +103,7 @@ beforeEach(() => {
   });
   mock.listRoles.mockResolvedValue({ roles: [] });
   mock.listGroups.mockResolvedValue({ groups: [] });
-  mock.fetchUsers.mockResolvedValue(undefined);
+  mock.listUsers.mockResolvedValue({ users: [user()] });
   toastMock.add.mockReset();
 });
 
@@ -231,20 +236,12 @@ describe("settings-iam", () => {
   });
 
   it("confirms discarding unsaved role sheet changes", async () => {
-    useAppStore.setState({
+    mock.listUsers.mockResolvedValue({
       users: [
-        {
-          name: "users/1",
-          title: "Alice",
-          email: "alice@example.com",
-        },
-        {
-          name: "users/2",
-          title: "Bob",
-          email: "bob@example.com",
-        },
+        user(),
+        user({ name: "users/2", title: "Bob", email: "bob@example.com" }),
       ],
-    } as never);
+    });
     mock.getWorkspaceIamPolicy.mockResolvedValue({
       policy: policy([binding("roles/admin", ["users/1"])]),
       etag: "etag-1",
@@ -274,6 +271,43 @@ describe("settings-iam", () => {
       expect(
         screen.queryByText("settings.iam.role-sheet-discard-title")
       ).not.toBeInTheDocument();
+    });
+  });
+
+  it("surfaces the etag mismatch and refetches the policy", async () => {
+    mock.setWorkspaceIamPolicy.mockRejectedValue(
+      new ConnectError("etag conflict", Code.Aborted)
+    );
+    mock.listRoles.mockResolvedValue({ roles: [role()] });
+    renderPage();
+
+    fireEvent.click(await screen.findByText("settings.iam.assign"));
+
+    const search = await screen.findByPlaceholderText(
+      "settings.iam.member-picker-search"
+    );
+    fireEvent.change(search, { target: { value: "alice" } });
+    fireEvent.click(await screen.findByText("alice@example.com"));
+
+    const checkbox = await screen.findByRole("checkbox", { name: /Admin/ });
+    fireEvent.click(checkbox);
+
+    fireEvent.click(screen.getByRole("button", { name: "common.save" }));
+
+    // The etag-mismatch catch shows the sheet's internal alert…
+    expect(
+      await screen.findByText("settings.iam.etag-mismatch")
+    ).toBeInTheDocument();
+
+    // …and the awaited reload refetches the policy (mount + recovery).
+    await waitFor(() => {
+      expect(mock.getWorkspaceIamPolicy).toHaveBeenCalledTimes(2);
+    });
+    // The sheet stays open for a retry; the save spinner is released.
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /^common\.save$/ })
+      ).toBeEnabled();
     });
   });
 });
