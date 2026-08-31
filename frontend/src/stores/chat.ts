@@ -10,11 +10,11 @@ import {
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { appendNewMessages, toUiMessage } from "./chat-helpers";
+import { registerCleanup } from "./cleanup-registry";
 import type { AppSliceCreator } from "./types";
 import type { ChatMessageUI } from "./ui-models";
 
 export interface ChatSlice {
-  conversations: Record<string, string>;
   chatMessages: Record<string, ChatMessageUI[]>;
   chatLoading: Record<string, boolean>;
   // Last-seen conversation.current_version per conversation, keyed by
@@ -85,6 +85,12 @@ export interface ChatSlice {
   removeChatMessage: (conversation: string, messageId: string) => void;
 }
 
+// Agent→conversation cache backing getOrCreateConversation/sendChatMessage.
+// Deliberately module-scoped instead of store state: nothing subscribes to it,
+// so it exists only to skip repeat getOrCreateConversation RPCs. Cleared on
+// logout/reset via the cleanup registry (registration at the file bottom).
+const conversationIdByAgent: Record<string, string> = {};
+
 // Max pages the incremental delta fetch will follow. The backend caps each
 // after_version page at 100 (pageSize 200 is clamped), so a burst of >100 new
 // messages needs pagination to avoid dropping the newest ones.
@@ -150,7 +156,6 @@ function mergeMessages(msgs: ChatMessageUI[]): ChatMessageUI[] {
 }
 
 export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
-  conversations: {},
   chatMessages: {},
   chatLoading: {},
   chatCurrentVersion: {},
@@ -159,15 +164,13 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
   chatHasOlderByConv: {},
   chatHasNewerByConv: {},
   async getOrCreateConversation(agent) {
-    const existing = get().conversations[agent];
+    const existing = conversationIdByAgent[agent];
     if (existing) return existing;
 
     const res = await commandServiceClient.getOrCreateConversation(
       create(GetOrCreateConversationRequestSchema, { agent })
     );
-    set((state) => ({
-      conversations: { ...state.conversations, [agent]: res.name },
-    }));
+    conversationIdByAgent[agent] = res.name;
     return res.name;
   },
 
@@ -234,7 +237,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
 
   async sendChatMessage(agent, instruction, conversationId) {
     const tempId = crypto.randomUUID();
-    const conversation = conversationId || get().conversations[agent];
+    const conversation = conversationId || conversationIdByAgent[agent];
     const userMsg: ChatMessageUI = {
       id: tempId,
       role: "user",
@@ -542,4 +545,13 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       };
     });
   },
+});
+
+// Registered so logout/reset clears the module agent→conversation cache
+// (contract: synchronous and idempotent — restart from a fresh RPC after
+// reset; sweeping keys on every reset is both).
+registerCleanup(() => {
+  for (const agent of Object.keys(conversationIdByAgent)) {
+    delete conversationIdByAgent[agent];
+  }
 });

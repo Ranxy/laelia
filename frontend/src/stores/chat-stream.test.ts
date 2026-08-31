@@ -100,7 +100,6 @@ beforeEach(() => {
     state.stopWatchingChannel(k);
   }
   useAppStore.setState({
-    conversations: {},
     chatMessages: {},
     chatLoading: {},
     channels: [],
