@@ -82,6 +82,18 @@ export interface AcpConfigEditorProps {
   // Probes the agent's machine for the selected provider's models with the
   // given (possibly unsaved) config. The page wires this to the store.
   onRefreshModels: (input: AgentACPConfigInput) => Promise<AgentModelOption[]>;
+  // "edit" (default) renders the runtime-config Card for the agent profile
+  // page; "create" renders the bare field list for embedding in the machine
+  // profile's add-agent sheet (no Card chrome / save-status header there).
+  mode?: "edit" | "create";
+  // create mode only: the embedding sheet owns the draft via useAcpConfigDraft
+  // and passes the hook result, so the owner's canSubmit computation and this
+  // editor render from one shared draft instance. Undefined in edit mode,
+  // where the editor owns the draft itself.
+  draftController?: ReturnType<typeof useAcpConfigDraft>;
+  // create mode only: hint rendered under the provider select when the machine
+  // probes zero providers (the create sheet still offers builtin-pi + custom).
+  noProvidersHint?: string;
 }
 
 function AcpConfigEditorImpl(
@@ -97,15 +109,21 @@ function AcpConfigEditorImpl(
     saveStatus,
     onAutoSave,
     onRefreshModels,
+    mode,
+    draftController,
+    noProvidersHint,
   }: AcpConfigEditorProps,
   ref: React.Ref<AcpConfigEditorHandle>
 ) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const showLegacyInline = canEditAdminOnly || canSelfProvide;
-  // The runtime-config draft lives here (remounted per agent by the page),
-  // with a synchronous ref mirror so async save closures always read the
-  // current values.
+  const isCreate = mode === "create";
+  // The runtime-config draft lives here while in edit mode (remounted per
+  // agent by the page), with a synchronous ref mirror so async save closures
+  // always read the current values. In create mode the embedding sheet's
+  // controller is used instead so both see one shared draft.
+  const ownDraft = useAcpConfigDraft(draftFromPersisted(acpConfig));
   const {
     draft,
     draftRef,
@@ -114,7 +132,7 @@ function AcpConfigEditorImpl(
     toInput,
     canSave,
     isDirtyAgainst,
-  } = useAcpConfigDraft(draftFromPersisted(acpConfig));
+  } = draftController ?? ownDraft;
   useImperativeHandle(
     ref,
     () => ({
@@ -293,487 +311,498 @@ function AcpConfigEditorImpl(
     </>
   );
 
-  return (
-    <Card
-      title={t("agent.runtime-config")}
-      actions={
-        saveStatus === "saving" ? (
-          <span className="flex items-center gap-1 text-xs text-control-light">
-            <Loader2 className="size-3 animate-spin" />
-            {t("agent.acp-config-saving")}
-          </span>
-        ) : saveStatus === "saved" ? (
-          <span className="flex items-center gap-1 text-xs text-control-light">
-            <Check className="size-3" />
-            {t("agent.acp-config-saved")}
-          </span>
-        ) : saveStatus === "error" ? (
-          <span className="flex items-center gap-1 text-xs text-error">
-            <span className="size-1.5 rounded-full bg-error" />
-            {t("agent.acp-config-save-error")}
-          </span>
-        ) : null
-      }
-    >
-      <fieldset disabled={!canEditAdminOnly && !canEdit} className="contents">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium">
-              {t("agent.acp-config-provider")}
-            </label>
-            {availableProviders.length === 0 && !canEditAdminOnly ? (
-              <p className="text-xs text-control-light">
-                {machineResourceID
-                  ? t("agent.acp-config-no-providers-machine")
-                  : t("agent.acp-config-no-providers")}
-              </p>
-            ) : (
-              <Select
-                value={draft.provider}
-                onValueChange={handleProviderChange}
-              >
-                <SelectTrigger>
-                  <SelectValue>
-                    {(v: string | null) =>
-                      v
-                        ? v === "builtin-pi"
-                          ? t("agent.acp-config-provider-builtin-pi")
-                          : providerLabel(v, availableProviders)
-                        : ""
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {/* builtin-pi is always available — it is bundled with
+  // The save-status header node only applies to the edit-mode Card; create
+  // mode renders the bare field layout.
+  const saveStatusActions =
+    saveStatus === "saving" ? (
+      <span className="flex items-center gap-1 text-xs text-control-light">
+        <Loader2 className="size-3 animate-spin" />
+        {t("agent.acp-config-saving")}
+      </span>
+    ) : saveStatus === "saved" ? (
+      <span className="flex items-center gap-1 text-xs text-control-light">
+        <Check className="size-3" />
+        {t("agent.acp-config-saved")}
+      </span>
+    ) : saveStatus === "error" ? (
+      <span className="flex items-center gap-1 text-xs text-error">
+        <span className="size-1.5 rounded-full bg-error" />
+        {t("agent.acp-config-save-error")}
+      </span>
+    ) : null;
+
+  const body = (
+    <fieldset disabled={!canEditAdminOnly && !canEdit} className="contents">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium">
+            {t("agent.acp-config-provider")}
+          </label>
+          {!isCreate && availableProviders.length === 0 && !canEditAdminOnly ? (
+            <p className="text-xs text-control-light">
+              {machineResourceID
+                ? t("agent.acp-config-no-providers-machine")
+                : t("agent.acp-config-no-providers")}
+            </p>
+          ) : (
+            <Select value={draft.provider} onValueChange={handleProviderChange}>
+              <SelectTrigger>
+                <SelectValue>
+                  {(v: string | null) =>
+                    v
+                      ? v === "builtin-pi"
+                        ? t("agent.acp-config-provider-builtin-pi")
+                        : providerLabel(v, availableProviders)
+                      : ""
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {/* builtin-pi is always available — it is bundled with
                     laelia, not host-detected — so it shows on every agent
                     regardless of the machine's probe results. */}
-                  <SelectItem value="builtin-pi">
-                    {t("agent.acp-config-provider-builtin-pi")}
-                  </SelectItem>
-                  {availableProviders.map((p) => (
-                    <SelectItem
-                      key={p.providerId}
-                      value={p.providerId}
-                      disabled={p.compatible === false}
-                    >
-                      {providerDisplayName(p)}
-                      {p.compatible === false && p.incompatibilityReason
-                        ? ` — ${p.incompatibilityReason}`
-                        : ""}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="custom">
-                    {t("agent.acp-config-provider-custom")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-            {machineResourceID && canEdit && (
-              <p className="text-xs text-control-light">
-                <button
-                  type="button"
-                  className="text-link hover:underline"
-                  onClick={() => navigate(`/machines/${machineResourceID}`)}
-                >
-                  {t("agent.acp-config-manage-providers")}
-                </button>
-              </p>
-            )}
-          </div>
-
-          {isPiRuntime && (
-            <>
-              {(showLegacyInline || draft.provider === "pi") && (
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium">
-                    {t("agent.acp-config-pi-mode")}
-                  </label>
-                  <Select
-                    value={draft.piMode}
-                    onValueChange={handlePiModeChange}
+                <SelectItem value="builtin-pi">
+                  {t("agent.acp-config-provider-builtin-pi")}
+                </SelectItem>
+                {availableProviders.map((p) => (
+                  <SelectItem
+                    key={p.providerId}
+                    value={p.providerId}
+                    disabled={p.compatible === false}
                   >
-                    <SelectTrigger>
+                    {providerDisplayName(p)}
+                    {p.compatible === false && p.incompatibilityReason
+                      ? ` — ${p.incompatibilityReason}`
+                      : ""}
+                  </SelectItem>
+                ))}
+                <SelectItem value="custom">
+                  {t("agent.acp-config-provider-custom")}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          {isCreate && noProvidersHint && availableProviders.length === 0 && (
+            <p className="text-xs text-control-light">{noProvidersHint}</p>
+          )}
+          {machineResourceID && canEdit && (
+            <p className="text-xs text-control-light">
+              <button
+                type="button"
+                className="text-link hover:underline"
+                onClick={() => navigate(`/machines/${machineResourceID}`)}
+              >
+                {t("agent.acp-config-manage-providers")}
+              </button>
+            </p>
+          )}
+        </div>
+
+        {isPiRuntime && (
+          <>
+            {(showLegacyInline || draft.provider === "pi") && (
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">
+                  {t("agent.acp-config-pi-mode")}
+                </label>
+                <Select value={draft.piMode} onValueChange={handlePiModeChange}>
+                  <SelectTrigger>
+                    <SelectValue>
+                      {(v: string | null) =>
+                        v === "own"
+                          ? t("agent.acp-config-pi-mode-own")
+                          : v === "self"
+                            ? t("agent.acp-config-pi-mode-self")
+                            : t("agent.acp-config-pi-mode-managed")
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {draft.provider === "pi" && (
+                      <SelectItem value="own">
+                        {t("agent.acp-config-pi-mode-own")}
+                      </SelectItem>
+                    )}
+                    <SelectItem value="global">
+                      {t("agent.acp-config-pi-mode-managed")}
+                    </SelectItem>
+                    {showLegacyInline && (
+                      <SelectItem value="self">
+                        {t("agent.acp-config-pi-mode-self")}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {draft.piMode === "own" && draft.provider === "pi" && (
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">
+                  {t("agent.acp-config-model")}
+                </label>
+                {selectedProviderInfo?.models?.length ? (
+                  <Select
+                    value={draft.model}
+                    onValueChange={(v) => {
+                      const next = String(v ?? "");
+                      setField("model", next);
+                      onAutoSave();
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
                       <SelectValue>
                         {(v: string | null) =>
-                          v === "own"
-                            ? t("agent.acp-config-pi-mode-own")
-                            : v === "self"
-                              ? t("agent.acp-config-pi-mode-self")
-                              : t("agent.acp-config-pi-mode-managed")
+                          v
+                            ? modelLabel(v, selectedProviderInfo?.models ?? [])
+                            : ""
                         }
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {draft.provider === "pi" && (
-                        <SelectItem value="own">
-                          {t("agent.acp-config-pi-mode-own")}
+                      {(selectedProviderInfo?.models ?? []).map((m) => (
+                        <SelectItem key={m.value} value={m.value}>
+                          {m.name || m.value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-xs text-control-light">
+                    {t("agent.acp-config-pi-own-models-empty")}
+                  </p>
+                )}
+                <p className="text-xs text-control-light">
+                  {t("agent.acp-config-pi-own-model-hint")}
+                </p>
+              </div>
+            )}
+
+            {draft.piMode === "global" && (
+              <>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">
+                    {t("agent.acp-config-pi-global-provider")}
+                  </label>
+                  <Select
+                    value={draft.globalProvider}
+                    onValueChange={(v) => {
+                      const next = String(v ?? "");
+                      const nextProvider = apiProviders.find(
+                        (p) => p.name === next
+                      );
+                      // Keep the optional context config only when the
+                      // newly selected managed provider is a custom one
+                      // (a built-in type fixes both by itself).
+                      const keepContext =
+                        nextProvider?.providerType === "custom";
+                      setDraft((d) => ({
+                        ...d,
+                        globalProvider: next,
+                        globalProviderEntry: "",
+                        contextWindow: keepContext ? d.contextWindow : 0,
+                        maxTokens: keepContext ? d.maxTokens : 0,
+                      }));
+                      onAutoSave();
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue>
+                        {(v: string | null) =>
+                          v
+                            ? (apiProviders.find((p) => p.name === v)?.title ??
+                              v)
+                            : ""
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {apiProviders.length === 0 && (
+                        <SelectItem value="__no_provider" disabled>
+                          {t("agent.acp-config-pi-global-providers-empty")}
                         </SelectItem>
                       )}
-                      <SelectItem value="global">
-                        {t("agent.acp-config-pi-mode-managed")}
-                      </SelectItem>
-                      {showLegacyInline && (
-                        <SelectItem value="self">
-                          {t("agent.acp-config-pi-mode-self")}
+                      {apiProviders.map((p) => (
+                        <SelectItem key={p.name} value={p.name}>
+                          {p.title}
                         </SelectItem>
-                      )}
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-              )}
 
-              {draft.piMode === "own" && draft.provider === "pi" && (
+                {draft.globalProvider &&
+                  (globalProviderEntries.length > 0 ? (
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm font-medium">
+                        {t("agent.acp-config-pi-global-entry")}
+                      </label>
+                      <Select
+                        value={draft.globalProviderEntry}
+                        onValueChange={(v) => {
+                          const next = String(v ?? "");
+                          setField("globalProviderEntry", next);
+                          onAutoSave();
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue>
+                            {(v: string | null) =>
+                              v
+                                ? entryLabel(
+                                    globalProviderEntries.find(
+                                      (e) => e.name === v
+                                    )
+                                  )
+                                : ""
+                            }
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {globalProviderEntries.map((e) => (
+                            <SelectItem key={e.name} value={e.name}>
+                              {entryLabel(e)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-control-light">
+                        {t("agent.acp-config-pi-global-entry-hint")}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-control-light">
+                      {t("agent.acp-config-pi-global-entries-empty")}
+                    </p>
+                  ))}
+                {selectedGlobalProvider?.providerType === "custom" &&
+                  draft.globalProviderEntry &&
+                  renderPiContextFields()}
+              </>
+            )}
+
+            {draft.piMode === "self" && showLegacyInline && (
+              <>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">
+                    {t("agent.acp-config-pi-api-provider")}
+                  </label>
+                  <Select
+                    value={draft.apiProvider}
+                    onValueChange={(v) => {
+                      const next = String(v ?? "");
+                      // Reset model when the API provider changes — the
+                      // previous model belongs to the old provider's set.
+                      // Clear the cached model list too (it is per
+                      // provider) and cancel a pending key-change fetch;
+                      // the user clicks Refresh to load the new list.
+                      setDraft((d) => ({
+                        ...d,
+                        apiProvider: next,
+                        model: "",
+                        apiBaseUrl: next === "custom" ? d.apiBaseUrl : "",
+                        contextWindow: next === "custom" ? d.contextWindow : 0,
+                        maxTokens: next === "custom" ? d.maxTokens : 0,
+                      }));
+                      piModels.cancelPendingFetch();
+                      piModels.clear();
+                      onAutoSave();
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue>{(v: string | null) => v ?? ""}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {piAPIProviderIds.map((id) => (
+                        <SelectItem key={id} value={id}>
+                          {id}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {draft.apiProvider === "custom" && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium">
+                      {t("agent.acp-config-pi-api-base-url")}
+                    </label>
+                    <Input
+                      value={draft.apiBaseUrl}
+                      onChange={(e) => setField("apiBaseUrl", e.target.value)}
+                      onBlur={() => {
+                        onAutoSave();
+                        if (draftRef.current.apiBaseUrl.trim()) {
+                          void piModels.fetchModels(
+                            draftRef.current.apiProvider,
+                            draftRef.current.apiKey,
+                            draftRef.current.apiBaseUrl
+                          );
+                        }
+                      }}
+                      placeholder={t(
+                        "agent.acp-config-pi-api-base-url-placeholder"
+                      )}
+                      spellCheck={false}
+                    />
+                    <p className="text-xs text-control-light">
+                      {t("agent.acp-config-pi-api-base-url-hint")}
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium">
                     {t("agent.acp-config-model")}
                   </label>
-                  {selectedProviderInfo?.models?.length ? (
-                    <Select
+                  <div className="flex items-center gap-2">
+                    <ModelCombobox
+                      className="flex-1"
                       value={draft.model}
-                      onValueChange={(v) => {
-                        const next = String(v ?? "");
-                        setField("model", next);
-                        onAutoSave();
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue>
-                          {(v: string | null) =>
-                            v
-                              ? modelLabel(
-                                  v,
-                                  selectedProviderInfo?.models ?? []
-                                )
-                              : ""
-                          }
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(selectedProviderInfo?.models ?? []).map((m) => (
-                          <SelectItem key={m.value} value={m.value}>
-                            {m.name || m.value}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <p className="text-xs text-control-light">
-                      {t("agent.acp-config-pi-own-models-empty")}
-                    </p>
-                  )}
-                  <p className="text-xs text-control-light">
-                    {t("agent.acp-config-pi-own-model-hint")}
-                  </p>
-                </div>
-              )}
-
-              {draft.piMode === "global" && (
-                <>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium">
-                      {t("agent.acp-config-pi-global-provider")}
-                    </label>
-                    <Select
-                      value={draft.globalProvider}
-                      onValueChange={(v) => {
-                        const next = String(v ?? "");
-                        const nextProvider = apiProviders.find(
-                          (p) => p.name === next
-                        );
-                        // Keep the optional context config only when the
-                        // newly selected managed provider is a custom one
-                        // (a built-in type fixes both by itself).
-                        const keepContext =
-                          nextProvider?.providerType === "custom";
-                        setDraft((d) => ({
-                          ...d,
-                          globalProvider: next,
-                          globalProviderEntry: "",
-                          contextWindow: keepContext ? d.contextWindow : 0,
-                          maxTokens: keepContext ? d.maxTokens : 0,
-                        }));
-                        onAutoSave();
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue>
-                          {(v: string | null) =>
-                            v
-                              ? (apiProviders.find((p) => p.name === v)
-                                  ?.title ?? v)
-                              : ""
-                          }
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {apiProviders.length === 0 && (
-                          <SelectItem value="__no_provider" disabled>
-                            {t("agent.acp-config-pi-global-providers-empty")}
-                          </SelectItem>
-                        )}
-                        {apiProviders.map((p) => (
-                          <SelectItem key={p.name} value={p.name}>
-                            {p.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {draft.globalProvider &&
-                    (globalProviderEntries.length > 0 ? (
-                      <div className="flex flex-col gap-1">
-                        <label className="text-sm font-medium">
-                          {t("agent.acp-config-pi-global-entry")}
-                        </label>
-                        <Select
-                          value={draft.globalProviderEntry}
-                          onValueChange={(v) => {
-                            const next = String(v ?? "");
-                            setField("globalProviderEntry", next);
-                            onAutoSave();
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue>
-                              {(v: string | null) =>
-                                v
-                                  ? entryLabel(
-                                      globalProviderEntries.find(
-                                        (e) => e.name === v
-                                      )
-                                    )
-                                  : ""
-                              }
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {globalProviderEntries.map((e) => (
-                              <SelectItem key={e.name} value={e.name}>
-                                {entryLabel(e)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-control-light">
-                          {t("agent.acp-config-pi-global-entry-hint")}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-control-light">
-                        {t("agent.acp-config-pi-global-entries-empty")}
-                      </p>
-                    ))}
-                  {selectedGlobalProvider?.providerType === "custom" &&
-                    draft.globalProviderEntry &&
-                    renderPiContextFields()}
-                </>
-              )}
-
-              {draft.piMode === "self" && showLegacyInline && (
-                <>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium">
-                      {t("agent.acp-config-pi-api-provider")}
-                    </label>
-                    <Select
-                      value={draft.apiProvider}
-                      onValueChange={(v) => {
-                        const next = String(v ?? "");
-                        // Reset model when the API provider changes — the
-                        // previous model belongs to the old provider's set.
-                        // Clear the cached model list too (it is per
-                        // provider) and cancel a pending key-change fetch;
-                        // the user clicks Refresh to load the new list.
-                        setDraft((d) => ({
-                          ...d,
-                          apiProvider: next,
-                          model: "",
-                          apiBaseUrl: next === "custom" ? d.apiBaseUrl : "",
-                          contextWindow:
-                            next === "custom" ? d.contextWindow : 0,
-                          maxTokens: next === "custom" ? d.maxTokens : 0,
-                        }));
+                      options={piModels.models}
+                      loading={piModels.loading}
+                      placeholder={t("agent.acp-config-pi-model-placeholder")}
+                      disabled={!draft.apiProvider}
+                      emptyLabel={t("agent.acp-config-pi-models-empty")}
+                      onValueChange={(next) => setField("model", next)}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={
+                        !draft.apiProvider ||
+                        piModels.loading ||
+                        (draft.apiProvider === "deepseek" &&
+                          draft.apiKey.trim() === "") ||
+                        (draft.apiProvider === "custom" &&
+                          draft.apiBaseUrl.trim() === "")
+                      }
+                      onClick={() => {
+                        // Force a refetch: drop the cache entry first and
+                        // cancel any pending key-change debounce.
                         piModels.cancelPendingFetch();
-                        piModels.clear();
-                        onAutoSave();
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue>
-                          {(v: string | null) => v ?? ""}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {piAPIProviderIds.map((id) => (
-                          <SelectItem key={id} value={id}>
-                            {id}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {draft.apiProvider === "custom" && (
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm font-medium">
-                        {t("agent.acp-config-pi-api-base-url")}
-                      </label>
-                      <Input
-                        value={draft.apiBaseUrl}
-                        onChange={(e) => setField("apiBaseUrl", e.target.value)}
-                        onBlur={() => {
-                          onAutoSave();
-                          if (draftRef.current.apiBaseUrl.trim()) {
-                            void piModels.fetchModels(
-                              draftRef.current.apiProvider,
-                              draftRef.current.apiKey,
-                              draftRef.current.apiBaseUrl
-                            );
-                          }
-                        }}
-                        placeholder={t(
-                          "agent.acp-config-pi-api-base-url-placeholder"
-                        )}
-                        spellCheck={false}
-                      />
-                      <p className="text-xs text-control-light">
-                        {t("agent.acp-config-pi-api-base-url-hint")}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium">
-                      {t("agent.acp-config-model")}
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <ModelCombobox
-                        className="flex-1"
-                        value={draft.model}
-                        options={piModels.models}
-                        loading={piModels.loading}
-                        placeholder={t("agent.acp-config-pi-model-placeholder")}
-                        disabled={!draft.apiProvider}
-                        emptyLabel={t("agent.acp-config-pi-models-empty")}
-                        onValueChange={(next) => setField("model", next)}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={
-                          !draft.apiProvider ||
-                          piModels.loading ||
-                          (draft.apiProvider === "deepseek" &&
-                            draft.apiKey.trim() === "") ||
-                          (draft.apiProvider === "custom" &&
-                            draft.apiBaseUrl.trim() === "")
-                        }
-                        onClick={() => {
-                          // Force a refetch: drop the cache entry first and
-                          // cancel any pending key-change debounce.
-                          piModels.cancelPendingFetch();
-                          if (draft.apiProvider) {
-                            piModels.invalidate(
-                              draft.apiProvider,
-                              draft.apiBaseUrl
-                            );
-                          }
-                          void piModels.fetchModels(
+                        if (draft.apiProvider) {
+                          piModels.invalidate(
                             draft.apiProvider,
-                            draft.apiKey,
                             draft.apiBaseUrl
                           );
-                        }}
-                      >
-                        {piModels.loading ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          t("agent.acp-config-pi-models-refresh")
-                        )}
-                      </Button>
-                    </div>
-                    {piModels.error && (
-                      <p className="text-xs text-error">{piModels.error}</p>
-                    )}
-                  </div>
-
-                  {draft.apiProvider === "custom" && renderPiContextFields()}
-
-                  <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium">
-                      {t("agent.acp-config-pi-api-key")}
-                    </label>
-                    <SecretInput
-                      placeholder={t("agent.acp-config-pi-api-key-placeholder")}
-                      value={draft.apiKey}
-                      onChange={(e) => {
-                        const next = e.target.value;
-                        setField("apiKey", next);
-                        // Fetch the model list once the user stops typing the
-                        // key (debounced) — this is the "user changed the api
-                        // key" trigger. deepseek needs the key; fetchModels
-                        // no-ops for deepseek + empty key.
-                        piModels.debouncedFetchModels(
-                          draftRef.current.apiProvider,
-                          next,
-                          draftRef.current.apiBaseUrl
-                        );
-                      }}
-                      onBlur={() => {
-                        // Leaving the field: persist the key, and fetch
-                        // immediately rather than waiting on the debounce.
-                        piModels.cancelPendingFetch();
-                        onAutoSave();
+                        }
                         void piModels.fetchModels(
-                          draftRef.current.apiProvider,
-                          draftRef.current.apiKey,
-                          draftRef.current.apiBaseUrl
+                          draft.apiProvider,
+                          draft.apiKey,
+                          draft.apiBaseUrl
                         );
-                      }}
-                    />
-                    <p className="text-xs text-control-light">
-                      {t("agent.acp-config-pi-api-key-hint")}
-                    </p>
-                  </div>
-                </>
-              )}
-            </>
-          )}
-
-          {selectedProviderInfo && !isPiRuntime && (
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">
-                {t("agent.acp-config-model")}
-              </label>
-              {providerSupportsModel && modelOptions.length > 0 ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <Select
-                      value={draft.model}
-                      onValueChange={(v) => {
-                        const next = String(v ?? "");
-                        setField("model", next);
-                        onAutoSave();
                       }}
                     >
-                      <SelectTrigger className="w-full">
-                        <SelectValue>
-                          {(v: string | null) =>
-                            v ? modelLabel(v, modelOptions) : ""
-                          }
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {modelOptions.map((m) => (
-                          <SelectItem key={m.value} value={m.value}>
-                            {m.name || m.value}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      {piModels.loading ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        t("agent.acp-config-pi-models-refresh")
+                      )}
+                    </Button>
                   </div>
+                  {piModels.error && (
+                    <p className="text-xs text-error">{piModels.error}</p>
+                  )}
+                </div>
+
+                {draft.apiProvider === "custom" && renderPiContextFields()}
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">
+                    {t("agent.acp-config-pi-api-key")}
+                  </label>
+                  <SecretInput
+                    placeholder={t("agent.acp-config-pi-api-key-placeholder")}
+                    value={draft.apiKey}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setField("apiKey", next);
+                      // Fetch the model list once the user stops typing the
+                      // key (debounced) — this is the "user changed the api
+                      // key" trigger. deepseek needs the key; fetchModels
+                      // no-ops for deepseek + empty key.
+                      piModels.debouncedFetchModels(
+                        draftRef.current.apiProvider,
+                        next,
+                        draftRef.current.apiBaseUrl
+                      );
+                    }}
+                    onBlur={() => {
+                      // Leaving the field: persist the key, and fetch
+                      // immediately rather than waiting on the debounce.
+                      piModels.cancelPendingFetch();
+                      onAutoSave();
+                      void piModels.fetchModels(
+                        draftRef.current.apiProvider,
+                        draftRef.current.apiKey,
+                        draftRef.current.apiBaseUrl
+                      );
+                    }}
+                  />
+                  <p className="text-xs text-control-light">
+                    {t("agent.acp-config-pi-api-key-hint")}
+                  </p>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {selectedProviderInfo && !isPiRuntime && (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">
+              {t("agent.acp-config-model")}
+            </label>
+            {providerSupportsModel && modelOptions.length > 0 ? (
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <Select
+                    value={draft.model}
+                    onValueChange={(v) => {
+                      const next = String(v ?? "");
+                      setField("model", next);
+                      onAutoSave();
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue>
+                        {(v: string | null) =>
+                          v ? modelLabel(v, modelOptions) : ""
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {modelOptions.map((m) => (
+                        <SelectItem key={m.value} value={m.value}>
+                          {m.name || m.value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!canEdit || modelsRefreshing}
+                  onClick={() => void refreshModels()}
+                  title={t("agent.acp-config-models-refresh-hint")}
+                >
+                  {modelsRefreshing ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    t("agent.acp-config-models-refresh")
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <p className="text-xs text-control-light">
+                  {t("agent.acp-config-model-unsupported")}
+                </p>
+                <div className="flex items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -789,136 +818,122 @@ function AcpConfigEditorImpl(
                     )}
                   </Button>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs text-control-light">
-                    {t("agent.acp-config-model-unsupported")}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={!canEdit || modelsRefreshing}
-                      onClick={() => void refreshModels()}
-                      title={t("agent.acp-config-models-refresh-hint")}
-                    >
-                      {modelsRefreshing ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        t("agent.acp-config-models-refresh")
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
-              {modelsRefreshError && (
-                <p className="text-xs text-error">{modelsRefreshError}</p>
-              )}
-            </div>
-          )}
-
-          {isCustomProvider && !isPiRuntime && (
-            <>
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">
-                  {t("agent.acp-config-protocol")}
-                </label>
-                <Select
-                  value={draft.protocol}
-                  onValueChange={(v) => {
-                    const next = String(v ?? "");
-                    setField("protocol", next);
-                    onAutoSave();
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue>
-                      {(v: string | null) =>
-                        t(
-                          v === "acp-v2"
-                            ? "agent.acp-config-protocol-v2"
-                            : v === "acp-v1"
-                              ? "agent.acp-config-protocol-v1"
-                              : t("agent.acp-config-protocol-auto")
-                        )
-                      }
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">
-                      {t("agent.acp-config-protocol-auto")}
-                    </SelectItem>
-                    <SelectItem value="acp-v1">
-                      {t("agent.acp-config-protocol-v1")}
-                    </SelectItem>
-                    <SelectItem value="acp-v2">
-                      {t("agent.acp-config-protocol-v2")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-control-light">
-                  {t("agent.acp-config-protocol-hint")}
-                </p>
               </div>
+            )}
+            {modelsRefreshError && (
+              <p className="text-xs text-error">{modelsRefreshError}</p>
+            )}
+          </div>
+        )}
 
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">
-                  {t("agent.acp-config-executable")}
-                </label>
-                <Input
-                  placeholder={t("agent.acp-config-executable-placeholder")}
-                  value={draft.executable}
-                  onChange={(e) => setField("executable", e.target.value)}
-                  onBlur={() => onAutoSave()}
-                />
-              </div>
-
-              <StringListEditor
-                label={t("agent.acp-config-args")}
-                placeholder={t("agent.acp-config-args-placeholder")}
-                values={draft.args}
-                onChange={(next) => setField("args", next)}
-                onCommit={(next) => {
-                  setField("args", next);
+        {isCustomProvider && !isPiRuntime && (
+          <>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium">
+                {t("agent.acp-config-protocol")}
+              </label>
+              <Select
+                value={draft.protocol}
+                onValueChange={(v) => {
+                  const next = String(v ?? "");
+                  setField("protocol", next);
                   onAutoSave();
                 }}
+              >
+                <SelectTrigger>
+                  <SelectValue>
+                    {(v: string | null) =>
+                      t(
+                        v === "acp-v2"
+                          ? "agent.acp-config-protocol-v2"
+                          : v === "acp-v1"
+                            ? "agent.acp-config-protocol-v1"
+                            : t("agent.acp-config-protocol-auto")
+                      )
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">
+                    {t("agent.acp-config-protocol-auto")}
+                  </SelectItem>
+                  <SelectItem value="acp-v1">
+                    {t("agent.acp-config-protocol-v1")}
+                  </SelectItem>
+                  <SelectItem value="acp-v2">
+                    {t("agent.acp-config-protocol-v2")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-control-light">
+                {t("agent.acp-config-protocol-hint")}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium">
+                {t("agent.acp-config-executable")}
+              </label>
+              <Input
+                placeholder={t("agent.acp-config-executable-placeholder")}
+                value={draft.executable}
+                onChange={(e) => setField("executable", e.target.value)}
+                onBlur={() => onAutoSave()}
               />
-            </>
-          )}
+            </div>
 
-          {selectedProviderInfo && !isCustomProvider && !isPiRuntime && (
-            <p className="text-xs text-control-light">
-              {t("agent.acp-config-derived-command-hint")}
-            </p>
-          )}
-
-          {!isPiRuntime && (
-            <KeyValueEnvEditor
-              label={t("agent.acp-config-custom-env")}
-              entries={draft.customEnvEntries}
-              onChange={(next) => setField("customEnvEntries", next)}
-              onCommit={(next) => {
-                setField("customEnvEntries", next);
-                onAutoSave();
-              }}
-            />
-          )}
-
-          {!isPiRuntime && (
             <StringListEditor
-              label={t("agent.acp-config-allow-env")}
-              placeholder={t("agent.acp-config-allow-env-placeholder")}
-              values={draft.allowEnv}
-              onChange={(next) => setField("allowEnv", next)}
+              label={t("agent.acp-config-args")}
+              placeholder={t("agent.acp-config-args-placeholder")}
+              values={draft.args}
+              onChange={(next) => setField("args", next)}
               onCommit={(next) => {
-                setField("allowEnv", next);
+                setField("args", next);
                 onAutoSave();
               }}
             />
-          )}
-        </div>
-      </fieldset>
+          </>
+        )}
+
+        {selectedProviderInfo && !isCustomProvider && !isPiRuntime && (
+          <p className="text-xs text-control-light">
+            {t("agent.acp-config-derived-command-hint")}
+          </p>
+        )}
+
+        {!isPiRuntime && (
+          <KeyValueEnvEditor
+            label={t("agent.acp-config-custom-env")}
+            entries={draft.customEnvEntries}
+            onChange={(next) => setField("customEnvEntries", next)}
+            onCommit={(next) => {
+              setField("customEnvEntries", next);
+              onAutoSave();
+            }}
+          />
+        )}
+
+        {!isPiRuntime && (
+          <StringListEditor
+            label={t("agent.acp-config-allow-env")}
+            placeholder={t("agent.acp-config-allow-env-placeholder")}
+            values={draft.allowEnv}
+            onChange={(next) => setField("allowEnv", next)}
+            onCommit={(next) => {
+              setField("allowEnv", next);
+              onAutoSave();
+            }}
+          />
+        )}
+      </div>
+    </fieldset>
+  );
+  if (isCreate) {
+    return body;
+  }
+  return (
+    <Card title={t("agent.runtime-config")} actions={saveStatusActions}>
+      {body}
     </Card>
   );
 }
