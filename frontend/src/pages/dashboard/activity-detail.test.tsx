@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +12,6 @@ const mock = vi.hoisted(() => ({
   markConversationRead: vi.fn(),
   openFilePreview: vi.fn(),
   openImagePreview: vi.fn(),
-  activities: [] as Activity[],
   channels: [] as Conversation[],
 }));
 
@@ -21,9 +21,6 @@ vi.mock("@/connect", () => ({
 
 vi.mock("@/stores", () => {
   const state = {
-    get activities() {
-      return mock.activities;
-    },
     get channels() {
       return mock.channels;
     },
@@ -71,18 +68,31 @@ function activity(overrides: Partial<Activity>): Activity {
   } as unknown as Activity;
 }
 
-function renderPage(messageId = "msg1") {
+// The fallback path (no router state) scans the feed's Query cache, so tests
+// seed a cached first page instead of mocking the old store list.
+function renderPage(messageId = "msg1", seed?: Activity[]) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  if (seed?.length) {
+    queryClient.setQueryData(["activities", "0:", ""], {
+      activities: seed,
+      nextPageToken: "",
+    });
+  }
   return render(
-    <MemoryRouter initialEntries={[`/activity/${messageId}`]}>
-      <Routes>
-        <Route path="/activity/:messageId" element={<ActivityDetail />} />
-        <Route path="/activity" element={<div data-testid="activity" />} />
-        <Route
-          path="/:conversationId"
-          element={<div data-testid="channel" />}
-        />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[`/activity/${messageId}`]}>
+        <Routes>
+          <Route path="/activity/:messageId" element={<ActivityDetail />} />
+          <Route path="/activity" element={<div data-testid="activity" />} />
+          <Route
+            path="/:conversationId"
+            element={<div data-testid="channel" />}
+          />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
@@ -93,7 +103,6 @@ beforeEach(() => {
   mock.markConversationRead.mockReset();
   mock.openFilePreview.mockReset();
   mock.openImagePreview.mockReset();
-  mock.activities = [];
   mock.channels = [];
 });
 
@@ -107,18 +116,17 @@ describe("activity-detail", () => {
   });
 
   it("embeds the thread panel for a thread-rooted activity", async () => {
-    mock.activities = [
+    mock.channels = [
+      { name: "conversations/c1", title: "General", type: 2 } as Conversation,
+    ];
+
+    renderPage("msg1", [
       activity({
         name: "activities/msg1",
         conversation: "conversations/c1",
         threadRoot: "messages/root1",
       }),
-    ];
-    mock.channels = [
-      { name: "conversations/c1", title: "General", type: 2 } as Conversation,
-    ];
-
-    renderPage();
+    ]);
 
     expect(await screen.findByTestId("thread-panel")).toBeInTheDocument();
     expect(mock.openThread).toHaveBeenCalledWith("conversations/c1", "root1");
@@ -133,12 +141,11 @@ describe("activity-detail", () => {
   });
 
   it("embeds the channel view for a top-level activity", async () => {
-    mock.activities = [activity({ name: "activities/msg1" })];
     mock.channels = [
       { name: "conversations/c1", title: "General", type: 2 } as Conversation,
     ];
 
-    renderPage();
+    renderPage("msg1", [activity({ name: "activities/msg1" })]);
 
     const view = await screen.findByTestId("channel-view");
     const props = JSON.parse(view.getAttribute("data-props") ?? "{}");
@@ -148,7 +155,6 @@ describe("activity-detail", () => {
   });
 
   it("scrolls a DM activity to the read version instead of a message", async () => {
-    mock.activities = [activity({ name: "activities/msg1" })];
     mock.channels = [
       {
         name: "conversations/c1",
@@ -158,7 +164,7 @@ describe("activity-detail", () => {
       } as unknown as Conversation,
     ];
 
-    renderPage();
+    renderPage("msg1", [activity({ name: "activities/msg1" })]);
 
     const view = await screen.findByTestId("channel-view");
     const props = JSON.parse(view.getAttribute("data-props") ?? "{}");
@@ -167,14 +173,13 @@ describe("activity-detail", () => {
   });
 
   it("fetches the conversation when it is not in the left-rail list", async () => {
-    mock.activities = [activity({ name: "activities/msg1" })];
     mock.getChannel.mockResolvedValue({
       name: "conversations/c1",
       title: "Fetched",
       type: 2,
     });
 
-    renderPage();
+    renderPage("msg1", [activity({ name: "activities/msg1" })]);
 
     await waitFor(() =>
       expect(mock.getChannel).toHaveBeenCalledWith({ name: "conversations/c1" })

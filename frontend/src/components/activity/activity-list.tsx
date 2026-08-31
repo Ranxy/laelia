@@ -1,25 +1,21 @@
 import { ChevronLeft, ChevronRight, Inbox, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { ActivityRow } from "@/components/activity/activity-row";
 import { EmptyState, LoadingState } from "@/components/chat/states";
 import { Button } from "@/components/ui/button";
+import {
+  useActivityPages,
+  useMarkActivityDone,
+} from "@/composables/use-activity-feed";
 import { useIsDesktop } from "@/lib/use-is-desktop";
-import { usePolling } from "@/lib/use-polling";
 import { cn } from "@/lib/utils";
-import { useAppStore } from "@/stores";
 import type { Activity } from "@/types/proto-es/v1/command_pb";
 import {
   ActivityCategory,
   ActivityState,
 } from "@/types/proto-es/v1/command_pb";
-
-// Left-rail poll cadence. The activity feed is less urgent than the open
-// conversation's message stream, so it polls at the same light cadence as the
-// channel list (5s), silently so background refreshes never flicker the list.
-const POLL_INTERVAL_MS = 5000;
-const PAGE_SIZE = 50;
 
 // Filter tabs. "all" = every not-done activity (read or unread); "unread" =
 // unread across all categories; the category tabs narrow to not-done items of
@@ -59,82 +55,54 @@ export function ActivityList() {
   const { messageId: selectedId } = useParams<{ messageId: string }>();
   const isDesktop = useIsDesktop();
 
-  const activities = useAppStore((s) => s.activities);
-  const loading = useAppStore((s) => s.activitiesLoading);
-  const activitiesNextPageToken = useAppStore((s) => s.activitiesNextPageToken);
-  const listActivities = useAppStore((s) => s.listActivities);
-  const loadMoreActivities = useAppStore((s) => s.loadMoreActivities);
-  const markActivityDone = useAppStore((s) => s.markActivityDone);
-
   const [filter, setFilter] = useState<Filter>("unread");
   // pageTokens[i] is the page_token to ENTER page i; page 0 is "" (offset 0).
-  // Kept for desktop Prev/Next pagination. Mobile uses infinite scroll and
-  // appends via the store's loadMoreActivities.
+  // Desktop keeps a visited-page stack for Prev/Next; mobile grows it through
+  // infinite scroll. The list data itself lives in the Query cache, one entry
+  // per (filter, token) — use-activity-feed.ts owns it.
   const [pageTokens, setPageTokens] = useState<string[]>([""]);
   const [pageIndex, setPageIndex] = useState(0);
   const [markingDone, setMarkingDone] = useState<string>("");
-  const initialLoadDone = useRef(false);
-  // requestSeq is a monotonic epoch for in-flight listActivities calls. Every
-  // load increments it; a response whose captured seq no longer matches the
-  // current value is from a stale request (an old filter or old page) and is
-  // dropped, so a slow poll can never overwrite the list after a filter/page
-  // change.
-  const requestSeq = useRef(0);
 
-  const pageToken = pageTokens[pageIndex] ?? "";
+  const params = filterToParams(filter);
+  // The 5s silent poll rides exactly one visible page: the one on screen on
+  // desktop, page 0 on mobile (matching the old slice poll that merged the
+  // first page and left scrolled-in pages untouched).
+  const pages = useActivityPages({
+    params,
+    pageTokens,
+    intervalIndex: isDesktop ? pageIndex : 0,
+  });
+  const markDone = useMarkActivityDone();
+
+  const activePage = pages[pageIndex] ?? {
+    activities: [],
+    nextPageToken: "",
+    pending: true,
+    fetching: true,
+  };
+
+  // While a just-entered page is loading, keep the previous page's rows on
+  // screen — the old store-backed list never cleared rows on a page turn, it
+  // only flipped loading flags. Cleared on filter changes so a new filter's
+  // first load owns the screen.
+  const lastRowsRef = useRef<Activity[]>([]);
+  const shownRows =
+    activePage.pending && lastRowsRef.current.length > 0
+      ? lastRowsRef.current
+      : activePage.activities;
+  if (!activePage.pending) lastRowsRef.current = activePage.activities;
+
   const canPrev = pageIndex > 0;
   const canNext =
-    pageIndex < pageTokens.length - 1 || activitiesNextPageToken !== "";
-
-  const load = useCallback(
-    async (silent?: boolean) => {
-      const seq = ++requestSeq.current;
-      const { readStateFilter, categoryFilter } = filterToParams(filter);
-      const res = await listActivities({
-        filter: categoryFilter,
-        readStateFilter,
-        pageSize: PAGE_SIZE,
-        pageToken,
-        silent,
-      });
-      // A newer load (filter/page change, or a later poll) has started since
-      // this one was issued — drop the stale result.
-      if (seq !== requestSeq.current) return;
-      // The store now owns activitiesNextPageToken; desktop pagination just
-      // tracks the token stack locally.
-      const next = res?.nextPageToken ?? "";
-      if (!silent) {
-        setPageTokens((tok) => {
-          // If the first page returned a next token we haven't captured yet,
-          // append it so the Next button works immediately.
-          if (next && !tok.includes(next)) return [...tok, next];
-          return tok;
-        });
-      }
-    },
-    [filter, pageToken, listActivities]
-  );
-
-  // Initial load + background polling. A single effect (mirroring ReminderList):
-  // Initial load + background polling. A single load effect (mirroring
-  // ReminderList): filter/page changes recreate `load`, which re-runs this
-  // effect, reloading once per filter/page change. The pagination reset lives
-  // in handleFilterChange, not here, so a filter switch issues exactly one
-  // fetch; the silent poll rides the shared usePolling primitive (fixed
-  // cadence + visibility gating + immediate refetch on visible).
-  useEffect(() => {
-    initialLoadDone.current = false;
-    load(false).then(() => {
-      initialLoadDone.current = true;
-    });
-  }, [load]);
-  usePolling(() => load(true), POLL_INTERVAL_MS);
+    pageIndex < pageTokens.length - 1 || activePage.nextPageToken !== "";
 
   const handleFilterChange = (next: Filter) => {
     if (next === filter) return;
     setFilter(next);
     setPageTokens([""]);
     setPageIndex(0);
+    lastRowsRef.current = [];
   };
 
   const gotoPage = (delta: number) => {
@@ -143,8 +111,8 @@ export function ActivityList() {
         setPageIndex((i) => i + 1);
         return;
       }
-      if (!activitiesNextPageToken) return;
-      setPageTokens((tok) => [...tok, activitiesNextPageToken]);
+      if (!activePage.nextPageToken) return;
+      setPageTokens((tok) => [...tok, activePage.nextPageToken]);
       setPageIndex((i) => i + 1);
     } else {
       if (pageIndex <= 0) return;
@@ -165,14 +133,29 @@ export function ActivityList() {
 
   const handleMarkDone = async (a: { name: string }) => {
     setMarkingDone(a.name);
-    await markActivityDone(a.name);
-    setMarkingDone("");
-    // Re-fetch the current filter so a now-DONE row drops out of the All/Unread
-    // views (they exclude done). Best-effort: silent.
-    load(true);
+    try {
+      // The mutation removes the row from the cache optimistically and
+      // invalidates the pages, so no extra refill is needed here.
+      await markDone(a.name);
+    } finally {
+      setMarkingDone("");
+    }
   };
 
-  const unreadCount = activities.filter(
+  // Mobile infinite scroll appends the next page's token; desktop keeps the
+  // Prev/Next pagination footer over the visited-page stack. The tail token
+  // comes from the last page WITH data: while a just-appended page is loading
+  // it has no rows yet, so the previous page still carries hasMore.
+  const loadedPages = pages.filter((p) => !p.pending);
+  const tailLoaded = loadedPages[loadedPages.length - 1];
+  const tailToken = tailLoaded?.nextPageToken ?? activePage.nextPageToken;
+  const tailBusy = pages.length > loadedPages.length;
+  const rows = isDesktop ? shownRows : pages.flatMap((p) => p.activities);
+  const initialPending = isDesktop
+    ? activePage.pending
+    : (pages[0]?.pending ?? true);
+
+  const unreadCount = rows.filter(
     (a) => a.state === ActivityState.UNREAD
   ).length;
 
@@ -182,24 +165,21 @@ export function ActivityList() {
   // there is another page available, load and append it. Hidden on desktop,
   // which keeps the Prev/Next pagination footer.
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const hasMore = activitiesNextPageToken !== "";
+  const hasMore = !isDesktop && tailToken !== "";
   useEffect(() => {
     if (isDesktop) return;
     const el = sentinelRef.current;
     if (!el) return;
     const observer = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting) && hasMore && !loading) {
-        const { readStateFilter, categoryFilter } = filterToParams(filter);
-        void loadMoreActivities({
-          filter: categoryFilter,
-          readStateFilter,
-          pageSize: PAGE_SIZE,
-        });
+      if (entries.some((e) => e.isIntersecting) && hasMore && !tailBusy) {
+        setPageTokens((tok) =>
+          tok.includes(tailToken) ? tok : [...tok, tailToken]
+        );
       }
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [filter, hasMore, loading, loadMoreActivities, isDesktop]);
+  }, [hasMore, tailBusy, tailToken, isDesktop]);
 
   return (
     <div className="flex h-full flex-col">
@@ -263,9 +243,9 @@ export function ActivityList() {
 
       {/* List. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {loading && !initialLoadDone.current ? (
+        {rows.length === 0 && initialPending ? (
           <LoadingState />
-        ) : activities.length === 0 ? (
+        ) : rows.length === 0 ? (
           <EmptyState
             icon={Inbox}
             message={
@@ -276,7 +256,7 @@ export function ActivityList() {
           />
         ) : (
           <div className="divide-y divide-control-border/50">
-            {activities.map((a) => (
+            {rows.map((a) => (
               <ActivityRow
                 key={a.name}
                 activity={a}
@@ -292,7 +272,7 @@ export function ActivityList() {
                 ref={sentinelRef}
                 className="flex items-center justify-center py-3"
               >
-                {loading && (
+                {(tailBusy || pages.length === 0) && hasMore && (
                   <Loader2 className="size-4 animate-spin text-control-light" />
                 )}
               </div>
@@ -304,7 +284,7 @@ export function ActivityList() {
       {/* Pagination footer — desktop only. On mobile infinite scroll replaces it;
           also hide entirely when there are no activities so empty tabs don't show
           two disabled icon-only buttons floating at the bottom. */}
-      {isDesktop && activities.length > 0 && (
+      {isDesktop && rows.length > 0 && (
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-control-border px-3 py-2 text-xs text-control-light">
           <span className="hidden lg:inline">
             {t("activity.page", { n: pageIndex + 1 })}
@@ -314,7 +294,7 @@ export function ActivityList() {
               variant="outline"
               size="sm"
               onClick={() => gotoPage(-1)}
-              disabled={!canPrev || loading}
+              disabled={!canPrev || activePage.pending}
             >
               <ChevronLeft className="size-3.5" />
               <span className="hidden lg:inline">{t("activity.prev")}</span>
@@ -323,7 +303,7 @@ export function ActivityList() {
               variant="outline"
               size="sm"
               onClick={() => gotoPage(1)}
-              disabled={!canNext || loading}
+              disabled={!canNext || activePage.pending}
             >
               <span className="hidden lg:inline">{t("activity.next")}</span>
               <ChevronRight className="size-3.5" />

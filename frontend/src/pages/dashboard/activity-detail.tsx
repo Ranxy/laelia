@@ -5,6 +5,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { EmptyState } from "@/components/chat/states";
 import { ThreadPanel } from "@/components/chat/thread-panel";
 import { Button } from "@/components/ui/button";
+import { useActivityFromCache } from "@/composables/use-activity-feed";
 import { commandServiceClient } from "@/connect";
 import { ChannelConversationView } from "@/pages/dashboard/chat-conversation";
 import { useAppStore } from "@/stores";
@@ -23,15 +24,16 @@ import type { Activity, Conversation } from "@/types/proto-es/v1/command_pb";
 //
 // The activity is read from router state (passed by the list when a row is
 // clicked) so the pane renders even if the row has since dropped out of the
-// filtered list; the store.activities list is a fallback for a direct load or
-// a page refresh where the state is lost.
+// filtered list; the activity feed's Query cache is a fallback for a direct
+// load or a page refresh where the state is lost (best-effort like the old
+// store list: the row is only found if a loaded page contains it).
 export function ActivityDetail() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { messageId } = useParams<{ messageId: string }>();
   const location = useLocation();
 
-  const activities = useAppStore((s) => s.activities);
+  const cachedActivity = useActivityFromCache(messageId ?? "");
   const channels = useAppStore((s) => s.channels);
   const openThread = useAppStore((s) => s.openThread);
   const closeThread = useAppStore((s) => s.closeThread);
@@ -41,9 +43,7 @@ export function ActivityDetail() {
 
   const stateActivity = (location.state as { activity?: Activity } | null)
     ?.activity;
-  const activity =
-    stateActivity ??
-    activities.find((a) => a.name.endsWith(`/${messageId ?? ""}`));
+  const activity = stateActivity ?? cachedActivity;
 
   // Conversation title: prefer the left-rail channel list; fall back to a
   // GetChannel fetch for conversations the user isn't a member of (e.g. an
