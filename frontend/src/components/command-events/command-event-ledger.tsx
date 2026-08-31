@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   formatEventTime,
@@ -214,6 +215,12 @@ function OutputContent({ content }: { content: string }) {
   );
 }
 
+// A merged run can carry megabytes of stream output (08 F-P2); rendering the
+// whole payload as one text node is what made the ledger unusable at length.
+// The row shows the head of the content — the inspector's raw tab has the
+// full text — and the virtualizer bounding rows keeps the rest off-DOM.
+const MAX_OUTPUT_RENDER_CHARS = 100_000;
+
 export function CommandEventLedger({
   outputs,
   events,
@@ -226,7 +233,6 @@ export function CommandEventLedger({
   className,
 }: CommandEventLedgerProps) {
   const { t } = useTranslation();
-  const scrollRef = useRef<HTMLDivElement>(null);
   // Range dimming is O(1) per row: the prop arrives as an array from the
   // timeline selection, so build the set once per change instead of the
   // O(rows × keys) includes() inside the row render.
@@ -234,29 +240,6 @@ export function CommandEventLedger({
     () => (rangeKeys ? new Set(rangeKeys) : null),
     [rangeKeys]
   );
-
-  useEffect(() => {
-    if (!scrollToKey || !scrollRef.current) return;
-    const container = scrollRef.current;
-    const el = container.querySelector<HTMLElement>(
-      `[data-row-key="${scrollToKey}"]`
-    );
-    if (!el) return;
-    // Account for the sticky table header so the target row is not hidden
-    // behind it, and add a little breathing room below the header.
-    const header = container.querySelector("thead");
-    const headerHeight = header ? header.getBoundingClientRect().height : 0;
-    const containerRect = container.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    const targetTop =
-      elRect.top - containerRect.top + container.scrollTop - headerHeight - 8;
-    const top = Math.max(0, targetTop);
-    if (typeof container.scrollTo === "function") {
-      container.scrollTo({ top, behavior: "smooth" });
-    } else {
-      container.scrollTop = top;
-    }
-  }, [scrollToKey]);
 
   const rows = useMemo<LedgerRow[]>(() => {
     const pairs = pairToolCallEvents(events);
@@ -357,105 +340,226 @@ export function CommandEventLedger({
     );
   }
 
+  // The virtualized table lives in a child so its lifecycle starts with the
+  // scroll container already mounted (the virtualizer snapshot the element at
+  // mount; an empty-ledger early return above keeps that guaranteed).
+  return (
+    <LedgerTable
+      rows={rows}
+      selectedKey={selectedKey}
+      onSelect={onSelect}
+      scrollToKey={scrollToKey}
+      rangeKeySet={rangeKeySet}
+      className={className}
+    />
+  );
+}
+
+interface LedgerTableProps {
+  rows: LedgerRow[];
+  selectedKey?: string | null;
+  onSelect?: (key: string) => void;
+  scrollToKey?: string | null;
+  rangeKeySet: Set<string> | null;
+  className?: string;
+}
+
+function LedgerTable({
+  rows,
+  selectedKey,
+  onSelect,
+  scrollToKey,
+  rangeKeySet,
+  className,
+}: LedgerTableProps) {
+  const { t } = useTranslation();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Virtualization engages only once a ResizeObserver has measured the scroll
+  // viewport. jsdom reports zero-height containers and never fires observers,
+  // so tests (and any embed before layout) render all rows in normal flow —
+  // no test-side mocks needed.
+  const [virtualizationReady, setVirtualizationReady] = useState(false);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      setVirtualizationReady(true);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 30,
+    overscan: 12,
+    getItemKey: (index) => rows[index]?.key ?? index,
+    measureElement: (el) => el.getBoundingClientRect().height,
+  });
+  const virtualRows = virtualizationReady
+    ? virtualizer.getVirtualItems()
+    : null;
+  const virtualTotalSize = virtualRows ? virtualizer.getTotalSize() : 0;
+
+  // Scroll the requested row into view. With virtualization the target row
+  // may not be in the DOM yet, so jump by the virtual offset; the fallback
+  // path resolves the rendered element (accounting for nothing — the header
+  // lives outside the scroll area in this layout).
+  useEffect(() => {
+    if (!scrollToKey || !scrollRef.current) return;
+    const container = scrollRef.current;
+    if (virtualRows) {
+      const index = rows.findIndex((row) => row.key === scrollToKey);
+      if (index < 0) return;
+      virtualizer.scrollToIndex(index, { align: "start" });
+      return;
+    }
+    const el = container.querySelector<HTMLElement>(
+      `[data-row-key="${scrollToKey}"]`
+    );
+    if (!el) return;
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const targetTop = elRect.top - containerRect.top + container.scrollTop - 8;
+    const top = Math.max(0, targetTop);
+    if (typeof container.scrollTo === "function") {
+      container.scrollTo({ top, behavior: "smooth" });
+    } else {
+      container.scrollTop = top;
+    }
+  }, [scrollToKey, virtualRows, rows, virtualizer]);
+
   return (
     <div
-      ref={scrollRef}
       className={cn(
-        "flex h-full min-h-0 flex-col overflow-auto rounded border border-control-border bg-background",
+        "flex h-full min-h-0 flex-col rounded border border-control-border bg-background",
         className
       )}
     >
-      <table className="w-full border-collapse text-xs">
-        <colgroup>
-          <col className="w-[150px]" />
-          <col />
-        </colgroup>
-        <thead className="sticky top-0 z-10 bg-control-bg">
-          <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-control-light">
-            <th className="px-3 py-1.5 font-medium">
-              {t("command.event-column")}
-            </th>
-            <th className="px-3 py-1.5 font-medium">
-              {t("command.content-column")}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const isTool = row.kind === "tool";
-            const isOutput = row.kind === "output";
-            const event = isTool
-              ? row.pair.started
-              : isOutput
-                ? undefined
-                : row.event;
-            const kind = isOutput
-              ? getOutputStreamKind(row.output.type)
-              : getCommandEventKind(event!.type);
-            const seqNo = isTool
-              ? row.pair.started.seqNo
-              : isOutput
-                ? row.output.seqNo
-                : event!.seqNo;
-            const selected = selectedKey === row.key;
-            const Icon = kind.icon;
+      <div className="grid shrink-0 grid-cols-[150px_minmax(0,1fr)] border-b border-control-border bg-control-bg text-left text-[10px] font-medium uppercase tracking-wide text-control-light">
+        <div className="px-3 py-1.5 font-medium">
+          {t("command.event-column")}
+        </div>
+        <div className="px-3 py-1.5 font-medium">
+          {t("command.content-column")}
+        </div>
+      </div>
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+        <div style={{ position: "relative", height: virtualTotalSize }}>
+          {(virtualRows ?? rows.map((_, index) => ({ index, start: 0 }))).map(
+            (entry) => {
+              const index = entry.index;
+              const row = rows[index]!;
+              const isTool = row.kind === "tool";
+              const isOutput = row.kind === "output";
+              const event = isTool
+                ? row.pair.started
+                : isOutput
+                  ? undefined
+                  : row.event;
+              const kind = isOutput
+                ? getOutputStreamKind(row.output.type)
+                : getCommandEventKind(event!.type);
+              const seqNo = isTool
+                ? row.pair.started.seqNo
+                : isOutput
+                  ? row.output.seqNo
+                  : event!.seqNo;
+              const selected = selectedKey === row.key;
+              const Icon = kind.icon;
+              const outputTruncated =
+                isOutput && row.content.length > MAX_OUTPUT_RENDER_CHARS;
 
-            return (
-              <tr
-                key={row.key}
-                data-row-key={row.key}
-                data-tool-seq={isTool ? seqNo : undefined}
-                role={onSelect ? "button" : undefined}
-                tabIndex={onSelect ? 0 : undefined}
-                aria-pressed={selected}
-                onClick={() => onSelect?.(row.key)}
-                onKeyDown={(e) => {
-                  if (!onSelect || (e.key !== "Enter" && e.key !== " ")) return;
-                  e.preventDefault();
-                  onSelect(row.key);
-                }}
-                className={cn(
-                  "cursor-pointer border-b border-control-border/60 transition-colors",
-                  "hover:bg-control-bg/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
-                  selected &&
-                    "bg-accent/5 shadow-[inset_3px_0_0_0_rgb(var(--color-accent))]",
-                  rangeKeySet && !rangeKeySet.has(row.key) && "opacity-30"
-                )}
-              >
-                <td className="px-3 py-1.5 align-top">
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium",
-                      kind.tagClass
-                    )}
-                  >
-                    <Icon className="size-3 shrink-0" />
-                    {t(kind.labelKey)}
-                  </span>
-                </td>
-                <td className="min-w-0 px-3 py-1.5">
-                  <div className="flex min-w-0 items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      {isOutput ? (
-                        <OutputContent content={row.content} />
-                      ) : isTool ? (
-                        <ToolContent pair={row.pair} />
-                      ) : (
-                        <EventContent event={row.event} />
+              return (
+                <div
+                  key={row.key}
+                  data-row-key={row.key}
+                  data-tool-seq={isTool ? seqNo : undefined}
+                  role={onSelect ? "button" : undefined}
+                  tabIndex={onSelect ? 0 : undefined}
+                  aria-pressed={selected}
+                  onClick={() => onSelect?.(row.key)}
+                  onKeyDown={(e) => {
+                    if (!onSelect || (e.key !== "Enter" && e.key !== " "))
+                      return;
+                    e.preventDefault();
+                    onSelect(row.key);
+                  }}
+                  ref={virtualRows ? virtualizer.measureElement : undefined}
+                  data-index={virtualRows ? index : undefined}
+                  style={
+                    virtualRows
+                      ? {
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          transform: `translateY(${entry.start}px)`,
+                        }
+                      : undefined
+                  }
+                  className={cn(
+                    "grid grid-cols-[150px_minmax(0,1fr)] border-b border-control-border/60 transition-colors",
+                    "hover:bg-control-bg/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
+                    selected &&
+                      "bg-accent/5 shadow-[inset_3px_0_0_0_rgb(var(--color-accent))]",
+                    rangeKeySet && !rangeKeySet.has(row.key) && "opacity-30"
+                  )}
+                >
+                  <div className="px-3 py-1.5 align-top">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium",
+                        kind.tagClass
                       )}
-                    </div>
-                    <span className="shrink-0 pt-0.5 font-mono text-[9px] tabular-nums text-control-light/70">
-                      {isOutput
-                        ? formatRunTimeRange(row.startTs, row.endTs)
-                        : formatEventTime(event?.timestamp)}
+                    >
+                      <Icon className="size-3 shrink-0" />
+                      {t(kind.labelKey)}
                     </span>
                   </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  <div className="min-w-0 px-3 py-1.5">
+                    <div className="flex min-w-0 items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        {isOutput ? (
+                          <>
+                            <OutputContent
+                              content={
+                                outputTruncated
+                                  ? `${row.content.slice(0, MAX_OUTPUT_RENDER_CHARS)}\n…`
+                                  : row.content
+                              }
+                            />
+                            {outputTruncated && (
+                              <span className="mt-1 block text-[10px] text-warning">
+                                {t("command.output-truncated", {
+                                  count:
+                                    row.content.length -
+                                    MAX_OUTPUT_RENDER_CHARS,
+                                })}
+                              </span>
+                            )}
+                          </>
+                        ) : isTool ? (
+                          <ToolContent pair={row.pair} />
+                        ) : (
+                          <EventContent event={row.event} />
+                        )}
+                      </div>
+                      <span className="shrink-0 pt-0.5 font-mono text-[9px] tabular-nums text-control-light/70">
+                        {isOutput
+                          ? formatRunTimeRange(row.startTs, row.endTs)
+                          : formatEventTime(event?.timestamp)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+          )}
+        </div>
+      </div>
     </div>
   );
 }

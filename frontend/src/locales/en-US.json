@@ -485,6 +485,7 @@
     "inspector-type": "Type",
     "inspector-usage": "Usage",
     "no-final-summary": "No final summary.",
+    "output-truncated": "…truncated, {{count}} more chars — open the inspector for the full output",
     "row-open-detail": "Open command details",
     "search-events": "Search events…",
     "sent-by": "Sent by",

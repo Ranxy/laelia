@@ -1,5 +1,6 @@
-import { Search } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { SearchInput } from "@/components/ui/search-input";
 import { cn } from "@/lib/utils";
 import type { CommandEventFilter } from "./command-event-ledger";
 
@@ -31,6 +32,12 @@ const FILTER_LABEL_KEY: Record<CommandEventFilter, string> = {
   system: "command.filter-system",
 };
 
+// Search runs over the full merged output content, so every keystroke is a
+// full-corpus scan (08 F-R7/F-P3): keep the input controlled by local state
+// and push upstream only after a 250ms debounce, mirroring the chat search
+// panels' cadence.
+const SEARCH_DEBOUNCE_MS = 250;
+
 export function CommandEventToolbar({
   searchQuery,
   onSearchQueryChange,
@@ -39,6 +46,21 @@ export function CommandEventToolbar({
   className,
 }: CommandEventToolbarProps) {
   const { t } = useTranslation();
+  const [inputValue, setInputValue] = useState(searchQuery);
+
+  // The parent owns the committed query (resets on command switch): external
+  // changes win over the stale local value.
+  useEffect(() => {
+    setInputValue(searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (inputValue === searchQuery) return;
+    const timer = window.setTimeout(() => {
+      onSearchQueryChange(inputValue);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [inputValue, searchQuery, onSearchQueryChange]);
 
   return (
     <div
@@ -47,17 +69,14 @@ export function CommandEventToolbar({
         className
       )}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded border border-control-border bg-control-bg/50 px-2 py-1">
-        <Search className="size-3 shrink-0 text-control-light" />
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(e) => onSearchQueryChange(e.target.value)}
-          placeholder={t("command.search-events")}
-          aria-label={t("command.search-events")}
-          className="min-w-0 flex-1 bg-transparent text-xs text-control outline-none placeholder:text-control-light"
-        />
-      </div>
+      <SearchInput
+        type="search"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        placeholder={t("command.search-events")}
+        aria-label={t("command.search-events")}
+        className="h-7 min-w-0 border-control-border bg-control-bg/50 text-xs"
+      />
 
       <div className="flex items-center gap-1">
         {FILTERS.map((f) => (

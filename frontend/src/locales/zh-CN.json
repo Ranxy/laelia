@@ -485,6 +485,7 @@
     "inspector-type": "类型",
     "inspector-usage": "用量",
     "no-final-summary": "暂无最终摘要。",
+    "output-truncated": "…输出已截断,余 {{count}} 字符,完整内容见检查器",
     "row-open-detail": "打开命令详情",
     "search-events": "搜索事件…",
     "sent-by": "发送者",
