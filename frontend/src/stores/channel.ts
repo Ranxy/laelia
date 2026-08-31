@@ -39,7 +39,7 @@ import {
   startLongPollLoop,
 } from "./chat-watcher";
 import { sameList, sameUnreadMap } from "./list-equals";
-import type { AppSliceCreator } from "./types";
+import type { AppSliceCreator, ChannelCross } from "./types";
 import type { ChatMessageUI } from "./ui-models";
 
 // ChannelSlice owns channel conversations: the channel roster, per-conversation
@@ -208,7 +208,7 @@ const reorderChannels = (channels: Conversation[]): Conversation[] =>
     return 0;
   });
 
-export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
+export const createChannelSlice: AppSliceCreator<ChannelSlice, ChannelCross> = (
   set,
   get
 ) => ({
@@ -815,8 +815,8 @@ export function applyChannelThreadSummaries(
 // Failures are swallowed and retried next tick; they must not abort the
 // surrounding poll.
 async function refreshChannelThreadCounts(
-  set: Parameters<AppSliceCreator<ChannelSlice>>[0],
-  get: Parameters<AppSliceCreator<ChannelSlice>>[1],
+  set: Parameters<typeof createChannelSlice>[0],
+  get: Parameters<typeof createChannelSlice>[1],
   conversationName: string,
   ctrl: AbortController
 ) {
@@ -878,8 +878,8 @@ function sameThreadPreview(
 // (same-reference bail-out so subscribers don't churn). Failures are swallowed
 // and retried next tick; they must not abort the surrounding poll.
 async function refreshChannelTaskInfo(
-  set: Parameters<AppSliceCreator<ChannelSlice>>[0],
-  get: Parameters<AppSliceCreator<ChannelSlice>>[1],
+  set: Parameters<typeof createChannelSlice>[0],
+  get: Parameters<typeof createChannelSlice>[1],
   conversationName: string,
   ctrl: AbortController
 ) {

@@ -77,8 +77,8 @@ function bumpCommandRecency(name: string): void {
 // was actually dropped, so chunks are appended with a single set as before.
 function pruneCommandCaches(
   protect: string,
-  get: Parameters<AppSliceCreator<CommandSlice>>[1],
-  set: Parameters<AppSliceCreator<CommandSlice>>[0]
+  get: Parameters<typeof createCommandSlice>[1],
+  set: Parameters<typeof createCommandSlice>[0]
 ): void {
   if (commandRecency.length <= MAX_TRACKED_COMMANDS) return;
   // The currently streaming command is always kept; the rest fall out once

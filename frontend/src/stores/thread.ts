@@ -11,7 +11,7 @@ import {
 } from "@/types/proto-es/v1/command_pb";
 import { appendNewMessages, toUiMessage } from "./chat-helpers";
 import { LONG_POLL_MS, startLongPollLoop } from "./chat-watcher";
-import type { AppSliceCreator } from "./types";
+import type { AppSliceCreator, ThreadCross } from "./types";
 import type { ChatMessageUI } from "./ui-models";
 
 // ThreadSlice owns the right-side thread panel state: per-thread cached
@@ -100,7 +100,10 @@ function pruneThreadCache(
   return next;
 }
 
-export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
+export const createThreadSlice: AppSliceCreator<ThreadSlice, ThreadCross> = (
+  set,
+  get
+) => ({
   threadByRoot: {},
   activeThreadRoot: null,
   activeThreadConversation: null,
@@ -342,8 +345,8 @@ export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
 // scaffolding (re-issue, backoff, visibility gating) comes from the shared
 // chat-watcher module.
 function startWatcher(
-  set: Parameters<AppSliceCreator<ThreadSlice>>[0],
-  get: Parameters<AppSliceCreator<ThreadSlice>>[1],
+  set: Parameters<typeof createThreadSlice>[0],
+  get: Parameters<typeof createThreadSlice>[1],
   conversation: string,
   root: string
 ) {
@@ -399,8 +402,8 @@ function startWatcher(
 }
 
 function stopWatcher(
-  set: Parameters<AppSliceCreator<ThreadSlice>>[0],
-  get: Parameters<AppSliceCreator<ThreadSlice>>[1],
+  set: Parameters<typeof createThreadSlice>[0],
+  get: Parameters<typeof createThreadSlice>[1],
   root: string
 ) {
   const watcher = get().threadWatchers[root];
@@ -422,8 +425,8 @@ function stopWatcher(
 // isn't in the main list or the count is already current. `rootMsg` may be null
 // (e.g. an empty delta) — then nothing is synced.
 function syncRootReplyCount(
-  set: Parameters<AppSliceCreator<ThreadSlice>>[0],
-  get: Parameters<AppSliceCreator<ThreadSlice>>[1],
+  set: Parameters<typeof createThreadSlice>[0],
+  get: Parameters<typeof createThreadSlice>[1],
   conversation: string,
   rootId: string,
   rootMsg: ChatMessageUI | undefined
@@ -439,8 +442,8 @@ function syncRootReplyCount(
 // a delta (e.g. +1 on optimistic send). Used when we don't yet have the
 // authoritative total from the backend.
 function bumpRootReplyCount(
-  set: Parameters<AppSliceCreator<ThreadSlice>>[0],
-  get: Parameters<AppSliceCreator<ThreadSlice>>[1],
+  set: Parameters<typeof createThreadSlice>[0],
+  get: Parameters<typeof createThreadSlice>[1],
   conversation: string,
   rootId: string,
   delta: number
@@ -454,8 +457,8 @@ function bumpRootReplyCount(
 // applies `fn` to its current threadReplyCount, replacing the row only if the
 // value changes (so subscribers bail out on no-ops).
 function updateRootReplyCount(
-  set: Parameters<AppSliceCreator<ThreadSlice>>[0],
-  get: Parameters<AppSliceCreator<ThreadSlice>>[1],
+  set: Parameters<typeof createThreadSlice>[0],
+  get: Parameters<typeof createThreadSlice>[1],
   conversation: string,
   rootId: string,
   fn: (prev: number | undefined) => number

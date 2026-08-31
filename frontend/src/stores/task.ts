@@ -10,7 +10,7 @@ import {
   UpdateTaskStatusRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { toUiMessage } from "./chat-helpers";
-import type { AppSliceCreator } from "./types";
+import type { AppSliceCreator, TaskCross } from "./types";
 import type { ChatMessageUI } from "./ui-models";
 
 // TaskSlice owns the channel task board panel: per-conversation task listings
@@ -86,7 +86,10 @@ const TASKS_PAGE_SIZE = 30;
 // resource name, built here. The list is paginated newest-first; per-status
 // totals come from a separate ListTaskCounts call so the summary is accurate
 // regardless of how many tasks are loaded.
-export const createTaskSlice: AppSliceCreator<TaskSlice> = (set, get) => ({
+export const createTaskSlice: AppSliceCreator<TaskSlice, TaskCross> = (
+  set,
+  get
+) => ({
   tasksByConv: {},
   tasksNextPageToken: {},
   taskCountsByConv: {},

@@ -1,4 +1,4 @@
-import type { AppSliceCreator } from "./types";
+import type { AppSliceCreator, MembersCross } from "./types";
 import type { MemberSummary } from "./ui-models";
 
 // MembersSlice owns the flat workspace directory that merges the user roster
@@ -32,7 +32,7 @@ const MAX_DRAIN_PAGES = 50;
 // silently truncated, surfaces a load failure via `membersError`, and writes
 // the full rosters back into the source slices so the Machines / Agents /
 // Settings pages stay consistent with this view.
-export const createMembersSlice: AppSliceCreator<MembersSlice> = (
+export const createMembersSlice: AppSliceCreator<MembersSlice, MembersCross> = (
   set,
   get
 ) => ({
