@@ -175,7 +175,6 @@ export function ActivityDetail() {
       scrollToMessageId={isDM ? undefined : msgId}
       scrollToReadVersion={isDM ? readVersion : undefined}
       onViewInChannel={viewInChannel}
-      onClose={() => navigate("/activity")}
     />
   );
 }
