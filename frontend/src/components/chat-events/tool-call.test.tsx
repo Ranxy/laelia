@@ -17,10 +17,11 @@ function toolEvent(
     seqNo: 1,
     summary: "",
     timestamp: { seconds: 1700000000n },
-    payload: { case: undefined, value: undefined },
-    ...(type === CommandEventType.TOOL_CALL_STARTED
-      ? { type, payload: { case: "toolCallStarted", value: payload } }
-      : { type, payload: { case: "toolCallFinished", value: payload } }),
+    type,
+    payload:
+      type === CommandEventType.TOOL_CALL_STARTED
+        ? { case: "toolCallStarted", value: payload }
+        : { case: "toolCallFinished", value: payload },
   } as unknown as CommandEvent;
 }
 

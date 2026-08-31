@@ -54,17 +54,17 @@ function ToastList() {
  */
 export function Toaster() {
   return (
-    <BaseToast.Provider
-      // biome-ignore lint/suspicious/noExplicitAny: Base UI ToastManager internal type mismatch
-      toastManager={toastManager as any}
-      limit={TOAST_LIMIT}
-    >
+    <BaseToast.Provider toastManager={toastManager} limit={TOAST_LIMIT}>
       <BaseToast.Portal container={getLayerRoot("overlay")}>
         <BaseToast.Viewport
           className="fixed bottom-4 right-4 flex w-(--toast-width) flex-col gap-2"
           style={{
             // Tailwind v4 reads CSS vars; expose toast width here so the
-            // toast card class can reference it.
+            // toast card class can reference it. The inline zIndex uses the
+            // overlay family value (same value a LAYER_SURFACE_CLASS root
+            // would carry); the Viewport is fixed-position, not a portaled
+            // sibling of layer surfaces, so LAYER_SURFACE_CLASS does not
+            // apply here.
             ["--toast-width" as string]: "24rem",
             zIndex: LAYER_Z_INDEX.overlay,
           }}
