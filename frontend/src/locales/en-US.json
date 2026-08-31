@@ -542,6 +542,7 @@
     "offline-reconnecting": "You're offline — reconnecting…",
     "password": "Password",
     "profile": "Profile",
+    "pwa-updated-reload": "A new version was installed — reloading…",
     "remove": "Remove",
     "restart": "Restart",
     "retry": "Retry",

@@ -542,6 +542,7 @@
     "offline-reconnecting": "当前离线，正在重新连接…",
     "password": "密码",
     "profile": "个人资料",
+    "pwa-updated-reload": "新版本已就绪,即将刷新页面…",
     "remove": "移除",
     "restart": "强制冷启动",
     "retry": "重试",

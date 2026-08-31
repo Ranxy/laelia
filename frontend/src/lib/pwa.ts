@@ -7,6 +7,9 @@
 // production only; dev mode leaves the SW out so hot reload is never shadowed
 // by a stale cache.
 
+import { i18n } from "@/lib/i18n";
+import { toastManager } from "@/lib/toast";
+
 const SW_URL = "/sw.js";
 
 export function registerServiceWorker(): void {
@@ -35,12 +38,19 @@ export function registerServiceWorker(): void {
 // would get a pointless second load.
 function watchForUpdates(reg: ServiceWorkerRegistration): void {
   let hadController = navigator.serviceWorker.controller !== null;
+  let reloading = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (!hadController) {
       hadController = true;
       return;
     }
-    window.location.reload();
+    // A silent reload mid-work is a nasty surprise (lost draft text, closed
+    // sheets). Announce the version swap first and give the toast a beat to
+    // render; the reload still happens without any user action.
+    if (reloading) return;
+    reloading = true;
+    toastManager.add({ title: i18n.t("common.pwa-updated-reload") });
+    window.setTimeout(() => window.location.reload(), 1500);
   });
 
   // Boot-time register() already triggers an update check; long-lived tabs get
