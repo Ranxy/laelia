@@ -12,7 +12,10 @@ import { formatActivityListTime, formatTimestamp } from "@/lib/command-status";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import type { Activity } from "@/types/proto-es/v1/command_pb";
-import { ActivityCategory } from "@/types/proto-es/v1/command_pb";
+import {
+  ActivityCategory,
+  ActivityState,
+} from "@/types/proto-es/v1/command_pb";
 
 // ActivityCategory flags (mirror the proto enum). A single activity row may
 // carry several OR-ed together; we pick the most specific icon for the row.
@@ -58,7 +61,7 @@ export function ActivityRow({
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
   const Icon = primaryCategoryIcon(activity.categories);
-  const isDone = activity.state === 3; // ActivityState.DONE
+  const isDone = activity.state === ActivityState.DONE;
   const { date: mobileDate, time: mobileTime } = formatActivityListTime(
     activity.createdAt
   );
