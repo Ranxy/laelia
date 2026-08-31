@@ -26,11 +26,22 @@ function formatTime(ts?: { seconds?: bigint; nanos?: number }): string {
   return new Date(ms).toLocaleString();
 }
 
+// escapeCel makes a user-supplied string safe to embed in a CEL double-quoted
+// string literal: a raw backslash is escaped first, then quotes and newlines,
+// so an actor/method value containing quotes cannot break out of the
+// expression.
+function escapeCel(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n");
+}
+
 function buildFilter(method: string, actor: string, status: string): string {
   const parts: string[] = [];
-  if (method) parts.push(`method = "${method}"`);
-  if (actor) parts.push(`actor = "${actor}"`);
-  if (status) parts.push(`status = "${status}"`);
+  if (method) parts.push(`method = "${escapeCel(method)}"`);
+  if (actor) parts.push(`actor = "${escapeCel(actor)}"`);
+  if (status) parts.push(`status = "${escapeCel(status)}"`);
   return parts.join(" && ");
 }
 
@@ -57,8 +68,14 @@ export function SettingsAuditPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
 
+  // seqRef guards against out-of-order resolutions: every load start bumps
+  // the sequence, and a stale response (one that finishes after a newer load
+  // began — e.g. a pending Load-more append racing a filter reset) drops its
+  // state writes instead of overwriting fresher data.
+  const seqRef = useRef(0);
   const load = useCallback(
     async (pageToken: string) => {
+      const seq = ++seqRef.current;
       setLoading(true);
       try {
         const res = await auditLogServiceClient.searchAuditLogs({
@@ -66,6 +83,7 @@ export function SettingsAuditPage() {
           pageToken,
           filter: buildFilter(method, actor, status),
         });
+        if (seq !== seqRef.current) return;
         if (pageToken) {
           setLogs((prev) => [...prev, ...(res.auditLogs ?? [])]);
         } else {
@@ -73,9 +91,10 @@ export function SettingsAuditPage() {
         }
         setNextPageToken(res.nextPageToken ?? "");
       } catch (err) {
+        if (seq !== seqRef.current) return;
         void showErrorToast(err, t("settings.audit.load-failed"));
       } finally {
-        setLoading(false);
+        if (seq === seqRef.current) setLoading(false);
       }
     },
     [method, actor, status, t]

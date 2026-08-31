@@ -1,9 +1,10 @@
 import { Loader2, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { PageLoading } from "@/components/settings-page";
+import { PageLoading, SettingsPage } from "@/components/settings-page";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { FieldRow } from "@/components/ui/field-row";
 import { Input } from "@/components/ui/input";
 import { SecretInput } from "@/components/ui/secret-input";
 import { toastManager } from "@/lib/toast";
@@ -106,114 +107,94 @@ export function SettingsSmtpPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <div className="flex h-full overflow-y-auto flex-col">
-      <div className="mx-auto w-full max-w-2xl px-4 pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom)+1rem)] pt-4 lg:px-6 lg:py-8">
-        <h1 className="hidden text-lg font-semibold text-main lg:block">
-          {t("settings.smtp.title")}
-        </h1>
-        <p className="hidden mt-1 text-sm text-control-light lg:block">
-          {t("settings.smtp.description")}
-        </p>
-
-        {loading ? (
-          <PageLoading />
-        ) : (
-          <div className="mt-6 space-y-4">
-            <Field label={t("settings.smtp.host")}>
+    <SettingsPage
+      title={t("settings.smtp.title")}
+      description={t("settings.smtp.description")}
+      contentWidth="mx-auto w-full max-w-2xl"
+    >
+      {loading ? (
+        <PageLoading />
+      ) : (
+        <div className="space-y-4">
+          <FieldRow label={t("settings.smtp.host")} htmlFor="smtp-host">
+            <Input
+              id="smtp-host"
+              value={form.host}
+              placeholder={t("settings.smtp.host-placeholder")}
+              onChange={(e) => set("host", e.target.value)}
+            />
+          </FieldRow>
+          <div className="grid grid-cols-2 gap-4">
+            <FieldRow label={t("settings.smtp.port")} htmlFor="smtp-port">
               <Input
-                value={form.host}
-                placeholder={t("settings.smtp.host-placeholder")}
-                onChange={(e) => set("host", e.target.value)}
+                id="smtp-port"
+                type="number"
+                min={1}
+                max={65535}
+                value={Number.isFinite(form.port) ? form.port : ""}
+                onChange={(e) => set("port", Number(e.target.value) || 0)}
               />
-            </Field>
-            <div className="grid grid-cols-2 gap-4">
-              <Field label={t("settings.smtp.port")}>
-                <Input
-                  type="number"
-                  min={1}
-                  max={65535}
-                  value={Number.isFinite(form.port) ? form.port : ""}
-                  onChange={(e) => set("port", Number(e.target.value) || 0)}
-                />
-              </Field>
-              <Field label={t("settings.smtp.from")}>
-                <Input
-                  value={form.from}
-                  placeholder={t("settings.smtp.from-placeholder")}
-                  onChange={(e) => set("from", e.target.value)}
-                />
-              </Field>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Field label={t("settings.smtp.username")}>
-                <Input
-                  value={form.username}
-                  onChange={(e) => set("username", e.target.value)}
-                  autoComplete="off"
-                />
-              </Field>
-              <Field
-                label={t("settings.smtp.password")}
-                hint={
-                  isMasked(form.password)
-                    ? t("settings.smtp.password-masked")
-                    : undefined
-                }
-              >
-                <SecretInput
-                  value={form.password}
-                  placeholder={t("settings.smtp.password-placeholder")}
-                  onChange={(e) => set("password", e.target.value)}
-                />
-              </Field>
-            </div>
-            <div className="flex flex-col gap-3 pt-2">
-              <label className="flex items-center gap-2.5 text-sm text-main">
-                <Checkbox
-                  checked={form.useTls}
-                  onCheckedChange={(v) => set("useTls", v)}
-                  size="md"
-                />
-                {t("settings.smtp.use-tls")}
-              </label>
-            </div>
-            <div className="flex justify-end pt-2">
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Save className="size-4" />
-                )}
-                {t("common.save")}
-              </Button>
-            </div>
+            </FieldRow>
+            <FieldRow label={t("settings.smtp.from")} htmlFor="smtp-from">
+              <Input
+                id="smtp-from"
+                value={form.from}
+                placeholder={t("settings.smtp.from-placeholder")}
+                onChange={(e) => set("from", e.target.value)}
+              />
+            </FieldRow>
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-control">
-        {label}
-      </span>
-      {children}
-      {hint && (
-        <span className="mt-1 block text-xs text-control-placeholder">
-          {hint}
-        </span>
+          <div className="grid grid-cols-2 gap-4">
+            <FieldRow
+              label={t("settings.smtp.username")}
+              htmlFor="smtp-username"
+            >
+              <Input
+                id="smtp-username"
+                value={form.username}
+                onChange={(e) => set("username", e.target.value)}
+                autoComplete="off"
+              />
+            </FieldRow>
+            <FieldRow
+              label={t("settings.smtp.password")}
+              htmlFor="smtp-password"
+              hint={
+                isMasked(form.password)
+                  ? t("settings.smtp.password-masked")
+                  : undefined
+              }
+            >
+              <SecretInput
+                id="smtp-password"
+                value={form.password}
+                placeholder={t("settings.smtp.password-placeholder")}
+                onChange={(e) => set("password", e.target.value)}
+              />
+            </FieldRow>
+          </div>
+          <div className="flex flex-col gap-3 pt-2">
+            <label className="flex items-center gap-2.5 text-sm text-main">
+              <Checkbox
+                checked={form.useTls}
+                onCheckedChange={(v) => set("useTls", v)}
+                size="md"
+              />
+              {t("settings.smtp.use-tls")}
+            </label>
+          </div>
+          <div className="flex justify-end pt-2">
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Save className="size-4" />
+              )}
+              {t("common.save")}
+            </Button>
+          </div>
+        </div>
       )}
-    </label>
+    </SettingsPage>
   );
 }

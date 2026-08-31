@@ -1,5 +1,5 @@
 import { Loader2, Save } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PageLoading, SettingsPage } from "@/components/settings-page";
 import { Button } from "@/components/ui/button";
@@ -44,17 +44,59 @@ function parseDomains(raw: string): string[] {
   return out;
 }
 
+// ToggleField is a boolean GeneralForm field driven by one of the four
+// workspace toggles.
+type ToggleField =
+  | "allowSignup"
+  | "requireEmailVerification"
+  | "enforceIdentityDomain"
+  | "allowUserCreateMachine";
+
+// useSettingToggle backs one boolean workspace toggle: it flips form[key]
+// optimistically, tracks that key's saving flag, and on failure reverts the
+// form field and shows the shared save-failed toast. patchFn maps the
+// requested value onto the wire patch — the disallow* fields invert
+// (disallowSignup = !v) while the others pass the value through — and commit
+// is the page's field-level save (saveField → settingServiceClient
+// .updateSetting with the toggle's mask path).
+function useSettingToggle(
+  key: ToggleField,
+  paths: string[],
+  patchFn: (v: boolean) => Partial<WorkspaceProfileSetting>,
+  form: GeneralForm,
+  setForm: Dispatch<SetStateAction<GeneralForm>>,
+  commit: (
+    patch: Partial<WorkspaceProfileSetting>,
+    paths: string[]
+  ) => Promise<void>
+) {
+  const { t } = useTranslation();
+  const [saving, setSaving] = useState(false);
+
+  async function handleToggle(v: boolean) {
+    const prev = form[key];
+    setForm((f) => ({ ...f, [key]: v }));
+    setSaving(true);
+    try {
+      await commit(patchFn(v), [...paths]);
+    } catch (err) {
+      setForm((f) => ({ ...f, [key]: prev }));
+      void showErrorToast(err, t("settings.general.save-failed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return { saving, handleToggle };
+}
+
 export function SettingsGeneralPage() {
   const { t } = useTranslation();
   const [form, setForm] = useState<GeneralForm>(EMPTY);
   const [saved, setSaved] = useState<GeneralForm>(EMPTY);
   const [loading, setLoading] = useState(true);
-  const [savingSignup, setSavingSignup] = useState(false);
-  const [savingDomain, setSavingDomain] = useState(false);
-  const [savingEmailVerification, setSavingEmailVerification] = useState(false);
   const [savingDomains, setSavingDomains] = useState(false);
   const [savingExternalUrl, setSavingExternalUrl] = useState(false);
-  const [savingUserCreateMachine, setSavingUserCreateMachine] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,69 +152,48 @@ export function SettingsGeneralPage() {
     applyProfile(profile);
   }
 
-  async function handleToggleSignup(v: boolean) {
-    const prev = form.allowSignup;
-    setForm((f) => ({ ...f, allowSignup: v }));
-    setSavingSignup(true);
-    try {
-      await saveField({ disallowSignup: !v }, [
-        "value.workspace_profile.disallow_signup",
-      ]);
-    } catch (err) {
-      setForm((f) => ({ ...f, allowSignup: prev }));
-      void showErrorToast(err, t("settings.general.save-failed"));
-    } finally {
-      setSavingSignup(false);
-    }
-  }
-
-  async function handleToggleDomain(v: boolean) {
-    const prev = form.enforceIdentityDomain;
-    setForm((f) => ({ ...f, enforceIdentityDomain: v }));
-    setSavingDomain(true);
-    try {
-      await saveField({ enforceIdentityDomain: v }, [
-        "value.workspace_profile.enforce_identity_domain",
-      ]);
-    } catch (err) {
-      setForm((f) => ({ ...f, enforceIdentityDomain: prev }));
-      void showErrorToast(err, t("settings.general.save-failed"));
-    } finally {
-      setSavingDomain(false);
-    }
-  }
-
-  async function handleToggleEmailVerification(v: boolean) {
-    const prev = form.requireEmailVerification;
-    setForm((f) => ({ ...f, requireEmailVerification: v }));
-    setSavingEmailVerification(true);
-    try {
-      await saveField({ requireEmailVerification: v }, [
-        "value.workspace_profile.require_email_verification",
-      ]);
-    } catch (err) {
-      setForm((f) => ({ ...f, requireEmailVerification: prev }));
-      void showErrorToast(err, t("settings.general.save-failed"));
-    } finally {
-      setSavingEmailVerification(false);
-    }
-  }
-
-  async function handleToggleUserCreateMachine(v: boolean) {
-    const prev = form.allowUserCreateMachine;
-    setForm((f) => ({ ...f, allowUserCreateMachine: v }));
-    setSavingUserCreateMachine(true);
-    try {
-      await saveField({ disallowUserCreateMachine: !v }, [
-        "value.workspace_profile.disallow_user_create_machine",
-      ]);
-    } catch (err) {
-      setForm((f) => ({ ...f, allowUserCreateMachine: prev }));
-      void showErrorToast(err, t("settings.general.save-failed"));
-    } finally {
-      setSavingUserCreateMachine(false);
-    }
-  }
+  // The four boolean workspace toggles share one handler engine: each call
+  // gets its own saving flag while the optimistic flip/revert stays identical.
+  const { saving: savingSignup, handleToggle: handleToggleSignup } =
+    useSettingToggle(
+      "allowSignup",
+      ["value.workspace_profile.disallow_signup"],
+      (v) => ({ disallowSignup: !v }),
+      form,
+      setForm,
+      saveField
+    );
+  const {
+    saving: savingEmailVerification,
+    handleToggle: handleToggleEmailVerification,
+  } = useSettingToggle(
+    "requireEmailVerification",
+    ["value.workspace_profile.require_email_verification"],
+    (v) => ({ requireEmailVerification: v }),
+    form,
+    setForm,
+    saveField
+  );
+  const {
+    saving: savingUserCreateMachine,
+    handleToggle: handleToggleUserCreateMachine,
+  } = useSettingToggle(
+    "allowUserCreateMachine",
+    ["value.workspace_profile.disallow_user_create_machine"],
+    (v) => ({ disallowUserCreateMachine: !v }),
+    form,
+    setForm,
+    saveField
+  );
+  const { saving: savingDomain, handleToggle: handleToggleDomain } =
+    useSettingToggle(
+      "enforceIdentityDomain",
+      ["value.workspace_profile.enforce_identity_domain"],
+      (v) => ({ enforceIdentityDomain: v }),
+      form,
+      setForm,
+      saveField
+    );
 
   async function handleSaveExternalUrl() {
     setSavingExternalUrl(true);

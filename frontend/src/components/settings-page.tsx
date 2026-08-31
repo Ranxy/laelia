@@ -30,16 +30,20 @@ export function PermissionNotice({ message }: { message: string }) {
 
 // SettingsPage is the standard settings-page frame: full-height scroll area,
 // title + optional description on the left, `actions` on the right, then the
-// page content.
+// page content. `contentWidth` optionally constrains the content column with
+// width classes (e.g. "mx-auto w-full max-w-2xl"); omitted, content keeps the
+// full-width default.
 export function SettingsPage({
   title,
   description,
   actions,
+  contentWidth,
   children,
 }: {
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
+  contentWidth?: string;
   children: ReactNode;
 }) {
   return (
@@ -53,7 +57,7 @@ export function SettingsPage({
         </div>
         {actions}
       </div>
-      {children}
+      {contentWidth ? <div className={contentWidth}>{children}</div> : children}
     </div>
   );
 }

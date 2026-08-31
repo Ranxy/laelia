@@ -1,9 +1,10 @@
 import { Loader2, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { PageLoading } from "@/components/settings-page";
+import { PageLoading, SettingsPage } from "@/components/settings-page";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { FieldRow } from "@/components/ui/field-row";
 import { Input } from "@/components/ui/input";
 import { SecretInput } from "@/components/ui/secret-input";
 import { toastManager } from "@/lib/toast";
@@ -111,119 +112,99 @@ export function SettingsStoragePage() {
     setForm((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <div className="flex h-full overflow-y-auto flex-col">
-      <div className="mx-auto w-full max-w-2xl px-4 pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom)+1rem)] pt-4 lg:px-6 lg:py-8">
-        <h1 className="hidden text-lg font-semibold text-main lg:block">
-          {t("settings.s3.title")}
-        </h1>
-        <p className="hidden mt-1 text-sm text-control-light lg:block">
-          {t("settings.s3.description")}
-        </p>
-
-        {loading ? (
-          <PageLoading />
-        ) : (
-          <div className="mt-6 space-y-4">
-            <Field label={t("settings.s3.endpoint")}>
+    <SettingsPage
+      title={t("settings.s3.title")}
+      description={t("settings.s3.description")}
+      contentWidth="mx-auto w-full max-w-2xl"
+    >
+      {loading ? (
+        <PageLoading />
+      ) : (
+        <div className="space-y-4">
+          <FieldRow label={t("settings.s3.endpoint")} htmlFor="s3-endpoint">
+            <Input
+              id="s3-endpoint"
+              value={form.endpoint}
+              placeholder={t("settings.s3.endpoint-placeholder")}
+              onChange={(e) => set("endpoint", e.target.value)}
+            />
+          </FieldRow>
+          <div className="grid grid-cols-2 gap-4">
+            <FieldRow label={t("settings.s3.region")} htmlFor="s3-region">
               <Input
-                value={form.endpoint}
-                placeholder={t("settings.s3.endpoint-placeholder")}
-                onChange={(e) => set("endpoint", e.target.value)}
+                id="s3-region"
+                value={form.region}
+                placeholder={t("settings.s3.region-placeholder")}
+                onChange={(e) => set("region", e.target.value)}
               />
-            </Field>
-            <div className="grid grid-cols-2 gap-4">
-              <Field label={t("settings.s3.region")}>
-                <Input
-                  value={form.region}
-                  placeholder={t("settings.s3.region-placeholder")}
-                  onChange={(e) => set("region", e.target.value)}
-                />
-              </Field>
-              <Field label={t("settings.s3.bucket")}>
-                <Input
-                  value={form.bucket}
-                  onChange={(e) => set("bucket", e.target.value)}
-                />
-              </Field>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Field label={t("settings.s3.access-key")}>
-                <Input
-                  value={form.accessKey}
-                  onChange={(e) => set("accessKey", e.target.value)}
-                  autoComplete="off"
-                />
-              </Field>
-              <Field
-                label={t("settings.s3.secret-key")}
-                hint={
-                  isMasked(form.secretKey)
-                    ? t("settings.s3.secret-masked")
-                    : undefined
-                }
-              >
-                <SecretInput
-                  value={form.secretKey}
-                  placeholder={t("settings.s3.secret-placeholder")}
-                  onChange={(e) => set("secretKey", e.target.value)}
-                />
-              </Field>
-            </div>
-            <div className="flex flex-col gap-3 pt-2">
-              <label className="flex items-center gap-2.5 text-sm text-main">
-                <Checkbox
-                  checked={form.forcePathStyle}
-                  onCheckedChange={(v) => set("forcePathStyle", v)}
-                  size="md"
-                />
-                {t("settings.s3.force-path-style")}
-              </label>
-              <label className="flex items-center gap-2.5 text-sm text-main">
-                <Checkbox
-                  checked={form.useSsl}
-                  onCheckedChange={(v) => set("useSsl", v)}
-                  size="md"
-                />
-                {t("settings.s3.use-ssl")}
-              </label>
-            </div>
-            <div className="flex justify-end pt-2">
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Save className="size-4" />
-                )}
-                {t("common.save")}
-              </Button>
-            </div>
+            </FieldRow>
+            <FieldRow label={t("settings.s3.bucket")} htmlFor="s3-bucket">
+              <Input
+                id="s3-bucket"
+                value={form.bucket}
+                onChange={(e) => set("bucket", e.target.value)}
+              />
+            </FieldRow>
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-control">
-        {label}
-      </span>
-      {children}
-      {hint && (
-        <span className="mt-1 block text-xs text-control-placeholder">
-          {hint}
-        </span>
+          <div className="grid grid-cols-2 gap-4">
+            <FieldRow
+              label={t("settings.s3.access-key")}
+              htmlFor="s3-access-key"
+            >
+              <Input
+                id="s3-access-key"
+                value={form.accessKey}
+                onChange={(e) => set("accessKey", e.target.value)}
+                autoComplete="off"
+              />
+            </FieldRow>
+            <FieldRow
+              label={t("settings.s3.secret-key")}
+              htmlFor="s3-secret-key"
+              hint={
+                isMasked(form.secretKey)
+                  ? t("settings.s3.secret-masked")
+                  : undefined
+              }
+            >
+              <SecretInput
+                id="s3-secret-key"
+                value={form.secretKey}
+                placeholder={t("settings.s3.secret-placeholder")}
+                onChange={(e) => set("secretKey", e.target.value)}
+              />
+            </FieldRow>
+          </div>
+          <div className="flex flex-col gap-3 pt-2">
+            <label className="flex items-center gap-2.5 text-sm text-main">
+              <Checkbox
+                checked={form.forcePathStyle}
+                onCheckedChange={(v) => set("forcePathStyle", v)}
+                size="md"
+              />
+              {t("settings.s3.force-path-style")}
+            </label>
+            <label className="flex items-center gap-2.5 text-sm text-main">
+              <Checkbox
+                checked={form.useSsl}
+                onCheckedChange={(v) => set("useSsl", v)}
+                size="md"
+              />
+              {t("settings.s3.use-ssl")}
+            </label>
+          </div>
+          <div className="flex justify-end pt-2">
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Save className="size-4" />
+              )}
+              {t("common.save")}
+            </Button>
+          </div>
+        </div>
       )}
-    </label>
+    </SettingsPage>
   );
 }

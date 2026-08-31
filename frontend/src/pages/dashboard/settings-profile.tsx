@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Avatar } from "@/components/chat/avatar";
 import { Card } from "@/components/profile-common";
+import { SettingsPage } from "@/components/settings-page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -335,246 +336,239 @@ export function SettingsProfilePage() {
     setForm((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <div className="flex h-full overflow-y-auto flex-col">
-      <div className="mx-auto w-full max-w-2xl px-4 pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom)+1rem)] pt-4 lg:px-6 lg:py-8">
-        <h1 className="hidden text-lg font-semibold text-main lg:block">
-          {t("settings.profile.title")}
-        </h1>
-        <p className="hidden mt-1 text-sm text-control-light lg:block">
-          {t("settings.profile.description")}
-        </p>
-
-        <div className="mt-6 flex flex-col gap-6">
-          <Card
-            title={t("settings.profile.section-identity")}
-            footer={
-              <div className="flex justify-end">
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Save className="size-4" />
-                  )}
-                  {t("common.save")}
-                </Button>
+    <SettingsPage
+      title={t("settings.profile.title")}
+      description={t("settings.profile.description")}
+      contentWidth="mx-auto w-full max-w-2xl"
+    >
+      <div className="flex flex-col gap-6">
+        <Card
+          title={t("settings.profile.section-identity")}
+          footer={
+            <div className="flex justify-end">
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Save className="size-4" />
+                )}
+                {t("common.save")}
+              </Button>
+            </div>
+          }
+        >
+          <div className="flex items-center gap-4">
+            <Avatar seed={userId} src={avatarSrc} />
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium text-control">
+                {t("settings.profile.avatar")}
               </div>
-            }
-          >
-            <div className="flex items-center gap-4">
-              <Avatar seed={userId} src={avatarSrc} />
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-medium text-control">
-                  {t("settings.profile.avatar")}
-                </div>
-                <p className="mt-0.5 text-xs text-control-placeholder">
-                  {t("settings.profile.avatar-hint")}
-                </p>
-                <div className="mt-2 flex items-center gap-2">
+              <p className="mt-0.5 text-xs text-control-placeholder">
+                {t("settings.profile.avatar-hint")}
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={avatarBusy}
+                >
+                  {avatarBusy ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="size-3.5" />
+                  )}
+                  {avatarBusy
+                    ? t("settings.profile.avatar-uploading")
+                    : t("settings.profile.avatar-upload")}
+                </Button>
+                {currentUser.avatar && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={handleAvatarRemove}
                     disabled={avatarBusy}
                   >
-                    {avatarBusy ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="size-3.5" />
-                    )}
-                    {avatarBusy
-                      ? t("settings.profile.avatar-uploading")
-                      : t("settings.profile.avatar-upload")}
+                    <Trash2 className="size-3.5" />
+                    {t("settings.profile.avatar-remove")}
                   </Button>
-                  {currentUser.avatar && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAvatarRemove}
-                      disabled={avatarBusy}
-                    >
-                      <Trash2 className="size-3.5" />
-                      {t("settings.profile.avatar-remove")}
-                    </Button>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif"
-                    className="hidden"
-                    onChange={(e) => {
-                      void handleAvatarChange(e.target.files?.[0]);
-                      e.target.value = "";
-                    }}
-                  />
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleAvatarChange(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <Field label={t("user.field-title")}>
+            <Input
+              value={form.title}
+              placeholder={t("user.field-title-placeholder")}
+              onChange={(e) => set("title", e.target.value)}
+            />
+          </Field>
+          <Field label={t("user.field-email")}>
+            <Input
+              value={form.email}
+              placeholder={t("user.field-email-placeholder")}
+              onChange={(e) => set("email", e.target.value)}
+            />
+          </Field>
+          <Field label={t("user.field-phone")}>
+            <Input
+              value={form.phone}
+              placeholder={t("user.field-phone-placeholder")}
+              onChange={(e) => set("phone", e.target.value)}
+            />
+          </Field>
+          <Field
+            label={t("settings.profile.field-description")}
+            hint={t("settings.profile.field-description-hint")}
+          >
+            <Textarea
+              className="min-h-[100px]"
+              placeholder={t("settings.profile.field-description-placeholder")}
+              value={form.description}
+              onChange={(e) => set("description", e.target.value)}
+            />
+          </Field>
+        </Card>
+
+        <Card title={t("settings.profile.section-chat")}>
+          <div className="flex items-center justify-between rounded-md border border-control-border p-4">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <Keyboard className="mt-0.5 size-4 shrink-0 text-control-light" />
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-main">
+                  {t("settings.profile.chat.enter-to-send")}
+                </div>
+                <div className="mt-0.5 text-xs text-control-light">
+                  {t("settings.profile.chat.enter-to-send-hint")}
                 </div>
               </div>
             </div>
+            <Switch
+              checked={enterToSend}
+              onCheckedChange={handleEnterToggle}
+              disabled={chatSaving}
+              size="md"
+              className="shrink-0"
+            />
+          </div>
 
-            <Field label={t("user.field-title")}>
-              <Input
-                value={form.title}
-                placeholder={t("user.field-title-placeholder")}
-                onChange={(e) => set("title", e.target.value)}
-              />
-            </Field>
-            <Field label={t("user.field-email")}>
-              <Input
-                value={form.email}
-                placeholder={t("user.field-email-placeholder")}
-                onChange={(e) => set("email", e.target.value)}
-              />
-            </Field>
-            <Field label={t("user.field-phone")}>
-              <Input
-                value={form.phone}
-                placeholder={t("user.field-phone-placeholder")}
-                onChange={(e) => set("phone", e.target.value)}
-              />
-            </Field>
-            <Field
-              label={t("settings.profile.field-description")}
-              hint={t("settings.profile.field-description-hint")}
+          <div className="flex flex-col gap-3 rounded-md border border-control-border p-4 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <Languages className="mt-0.5 size-4 shrink-0 text-control-light" />
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-main">
+                  {t("settings.profile.chat.preferred-language")}
+                </div>
+                <div className="mt-0.5 text-xs text-control-light">
+                  {t("settings.profile.chat.preferred-language-hint")}
+                </div>
+              </div>
+            </div>
+            <Select
+              value={String(preferredLanguage)}
+              onValueChange={(v) =>
+                void handleLanguageChange(Number(v) as PreferredLanguage)
+              }
             >
-              <Textarea
-                className="min-h-[100px]"
-                placeholder={t(
-                  "settings.profile.field-description-placeholder"
-                )}
-                value={form.description}
-                onChange={(e) => set("description", e.target.value)}
-              />
-            </Field>
-          </Card>
+              <SelectTrigger className="w-full shrink-0 lg:w-auto">
+                <SelectValue>
+                  {(value) =>
+                    preferredLanguageLabel(Number(value) as PreferredLanguage)
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={String(PreferredLanguage.UNSPECIFIED)}>
+                  {t("settings.profile.chat.language.auto")}
+                </SelectItem>
+                <SelectItem value={String(PreferredLanguage.ZH_CN)}>
+                  {t("settings.profile.chat.language.zh-CN")}
+                </SelectItem>
+                <SelectItem value={String(PreferredLanguage.EN_US)}>
+                  {t("settings.profile.chat.language.en-US")}
+                </SelectItem>
+                <SelectItem value={String(PreferredLanguage.JA_JP)}>
+                  {t("settings.profile.chat.language.ja-JP")}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </Card>
 
-          <Card title={t("settings.profile.section-chat")}>
-            <div className="flex items-center justify-between rounded-md border border-control-border p-4">
-              <div className="flex min-w-0 flex-1 items-start gap-3">
-                <Keyboard className="mt-0.5 size-4 shrink-0 text-control-light" />
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-main">
-                    {t("settings.profile.chat.enter-to-send")}
-                  </div>
-                  <div className="mt-0.5 text-xs text-control-light">
-                    {t("settings.profile.chat.enter-to-send-hint")}
-                  </div>
-                </div>
-              </div>
-              <Switch
-                checked={enterToSend}
-                onCheckedChange={handleEnterToggle}
-                disabled={chatSaving}
-                size="md"
-                className="shrink-0"
-              />
+        <Card title={t("settings.profile.section-notifications")}>
+          {notifStatus === "loading" ? (
+            <div className="flex items-center gap-2 text-sm text-control-light">
+              <Loader2 className="size-4 animate-spin" />
+              {t("settings.profile.notifications.loading")}
             </div>
+          ) : (
+            <>
+              {notifStatus === "unsupported" && (
+                <Notice>
+                  {t("settings.profile.notifications.unsupported")}
+                </Notice>
+              )}
+              {notifStatus === "not-configured" && (
+                <Notice>
+                  {t("settings.profile.notifications.not-configured")}
+                </Notice>
+              )}
+              {notifStatus === "denied" && (
+                <Notice>
+                  {t("settings.profile.notifications.permission-denied")}
+                </Notice>
+              )}
 
-            <div className="flex flex-col gap-3 rounded-md border border-control-border p-4 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-              <div className="flex min-w-0 flex-1 items-start gap-3">
-                <Languages className="mt-0.5 size-4 shrink-0 text-control-light" />
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-main">
-                    {t("settings.profile.chat.preferred-language")}
-                  </div>
-                  <div className="mt-0.5 text-xs text-control-light">
-                    {t("settings.profile.chat.preferred-language-hint")}
-                  </div>
-                </div>
-              </div>
-              <Select
-                value={String(preferredLanguage)}
-                onValueChange={(v) =>
-                  void handleLanguageChange(Number(v) as PreferredLanguage)
-                }
-              >
-                <SelectTrigger className="w-full shrink-0 lg:w-auto">
-                  <SelectValue>
-                    {(value) =>
-                      preferredLanguageLabel(Number(value) as PreferredLanguage)
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={String(PreferredLanguage.UNSPECIFIED)}>
-                    {t("settings.profile.chat.language.auto")}
-                  </SelectItem>
-                  <SelectItem value={String(PreferredLanguage.ZH_CN)}>
-                    {t("settings.profile.chat.language.zh-CN")}
-                  </SelectItem>
-                  <SelectItem value={String(PreferredLanguage.EN_US)}>
-                    {t("settings.profile.chat.language.en-US")}
-                  </SelectItem>
-                  <SelectItem value={String(PreferredLanguage.JA_JP)}>
-                    {t("settings.profile.chat.language.ja-JP")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </Card>
-
-          <Card title={t("settings.profile.section-notifications")}>
-            {notifStatus === "loading" ? (
-              <div className="flex items-center gap-2 text-sm text-control-light">
-                <Loader2 className="size-4 animate-spin" />
-                {t("settings.profile.notifications.loading")}
-              </div>
-            ) : (
-              <>
-                {notifStatus === "unsupported" && (
-                  <Notice>
-                    {t("settings.profile.notifications.unsupported")}
-                  </Notice>
-                )}
-                {notifStatus === "not-configured" && (
-                  <Notice>
-                    {t("settings.profile.notifications.not-configured")}
-                  </Notice>
-                )}
-                {notifStatus === "denied" && (
-                  <Notice>
-                    {t("settings.profile.notifications.permission-denied")}
-                  </Notice>
-                )}
-
-                <div className="flex items-center justify-between rounded-md border border-control-border p-4">
-                  <div className="flex items-start gap-3">
-                    <Bell className="mt-0.5 size-4 text-control-light" />
-                    <div>
-                      <div className="text-sm font-medium text-main">
-                        {t("settings.profile.notifications.enable")}
-                      </div>
-                      <div className="mt-0.5 text-xs text-control-light">
-                        {notifBusy ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <Loader2 className="size-3 animate-spin" />
-                            {t("settings.profile.notifications.updating")}
-                          </span>
-                        ) : notifEnabled ? (
-                          t("settings.profile.notifications.enabled")
-                        ) : (
-                          t("settings.profile.notifications.disabled")
-                        )}
-                      </div>
+              <div className="flex items-center justify-between rounded-md border border-control-border p-4">
+                <div className="flex items-start gap-3">
+                  <Bell className="mt-0.5 size-4 text-control-light" />
+                  <div>
+                    <div className="text-sm font-medium text-main">
+                      {t("settings.profile.notifications.enable")}
+                    </div>
+                    <div className="mt-0.5 text-xs text-control-light">
+                      {notifBusy ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Loader2 className="size-3 animate-spin" />
+                          {t("settings.profile.notifications.updating")}
+                        </span>
+                      ) : notifEnabled ? (
+                        t("settings.profile.notifications.enabled")
+                      ) : (
+                        t("settings.profile.notifications.disabled")
+                      )}
                     </div>
                   </div>
-                  <Switch
-                    checked={notifEnabled}
-                    onCheckedChange={handleNotifToggle}
-                    disabled={notifBusy || notifStatus !== "ready"}
-                    size="md"
-                  />
                 </div>
+                <Switch
+                  checked={notifEnabled}
+                  onCheckedChange={handleNotifToggle}
+                  disabled={notifBusy || notifStatus !== "ready"}
+                  size="md"
+                />
+              </div>
 
-                {notifStatus === "ready" && !notifEnabled && (
-                  <p className="text-xs text-control-placeholder">
-                    {t("settings.profile.notifications.permission-prompt")}
-                  </p>
-                )}
-              </>
-            )}
-          </Card>
-        </div>
+              {notifStatus === "ready" && !notifEnabled && (
+                <p className="text-xs text-control-placeholder">
+                  {t("settings.profile.notifications.permission-prompt")}
+                </p>
+              )}
+            </>
+          )}
+        </Card>
       </div>
-    </div>
+    </SettingsPage>
   );
 }
 
