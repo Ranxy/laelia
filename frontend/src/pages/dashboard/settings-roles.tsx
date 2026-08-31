@@ -1,20 +1,14 @@
-import { Key, Loader2, Save } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Key } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ConfirmActionDialog } from "@/components/settings/confirm-action-dialog";
+import { ResourceSheet } from "@/components/settings/resource-sheet";
 import {
   PageLoading,
   PermissionNotice,
   SettingsPage,
 } from "@/components/settings-page";
 import { Alert } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,6 +32,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { useCrudDialog } from "@/composables/use-crud-dialog";
+import { useResourceQuery } from "@/composables/use-resource-query";
 import { roleServiceClient } from "@/connect";
 import { roleIDFromName } from "@/lib/command-status";
 import { describeError } from "@/lib/connect-errors";
@@ -46,20 +42,10 @@ import {
   PERMISSION_GROUPS,
   permissionLabel,
 } from "@/lib/permissions";
-import { toastManager } from "@/lib/toast";
+import { slugify } from "@/lib/slug";
 import { showErrorToast } from "@/lib/toast-errors";
 import { useHasPermission } from "@/stores/permissions";
 import { type Role } from "@/types/proto-es/v1/role_service_pb";
-
-// slugify turns a free-form title into a role resource-id slug (lowercase,
-// alnum + dash). The role id is immutable after creation, so we derive it from
-// the title unless the user edits it directly.
-function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 interface RoleForm {
   resourceID: string;
@@ -72,6 +58,17 @@ function emptyForm(): RoleForm {
   return { resourceID: "", title: "", description: "", permissions: {} };
 }
 
+function roleToForm(role: Role): RoleForm {
+  const perms: Record<string, boolean> = {};
+  for (const p of role.permissions) perms[p] = true;
+  return {
+    resourceID: roleIDFromName(role.name),
+    title: role.title,
+    description: role.description,
+    permissions: perms,
+  };
+}
+
 export function SettingsRolesPage() {
   const { t } = useTranslation();
   const canList = useHasPermission("laelia.roles.list");
@@ -79,67 +76,34 @@ export function SettingsRolesPage() {
   const canUpdate = useHasPermission("laelia.roles.update");
   const canDelete = useHasPermission("laelia.roles.delete");
 
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(true);
+  const rolesQuery = useResourceQuery<Role>({
+    enabled: canList,
+    queryKey: ["settings", "roles"],
+    queryFn: async (signal) =>
+      (await roleServiceClient.listRoles({ pageSize: 1000 }, { signal }))
+        .roles ?? [],
+    failureTitle: t("settings.roles.load-failed"),
+  });
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState<RoleForm>(emptyForm());
-  const [creating, setCreating] = useState(false);
+  const roles = rolesQuery.items;
+
+  const crud = useCrudDialog<Role>({
+    // Post-mutation refresh of the resource list.
+    onChanged: () => void rolesQuery.reload(),
+  });
+
+  // Create/edit failures render as an inline Alert inside the sheet body
+  // (old behavior), so the error text must outlive the submit call.
   const [createError, setCreateError] = useState("");
-
-  const [editOpen, setEditOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<Role | null>(null);
-  const [editForm, setEditForm] = useState<RoleForm>(emptyForm());
-  const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState("");
-
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Role | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   const [viewOpen, setViewOpen] = useState(false);
   const [viewTarget, setViewTarget] = useState<Role | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await roleServiceClient.listRoles({});
-      setRoles(res.roles ?? []);
-    } catch (err) {
-      void showErrorToast(err, t("settings.roles.load-failed"));
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    if (canList) load();
-    else setLoading(false);
-  }, [canList, load]);
-
-  function resetCreate() {
-    setCreateForm(emptyForm());
+  const openCreate = () => {
     setCreateError("");
-  }
-
-  function openCreate() {
-    resetCreate();
-    setCreateOpen(true);
-  }
-
-  function openEdit(role: Role) {
-    setEditTarget(role);
-    const perms: Record<string, boolean> = {};
-    for (const p of role.permissions) perms[p] = true;
-    setEditForm({
-      resourceID: roleIDFromName(role.name),
-      title: role.title,
-      description: role.description,
-      permissions: perms,
-    });
-    setEditError("");
-    setEditOpen(true);
-  }
+    crud.openCreate();
+  };
 
   function openView(role: Role) {
     setViewTarget(role);
@@ -150,23 +114,15 @@ export function SettingsRolesPage() {
     if (!viewTarget) return;
     const target = viewTarget;
     setViewOpen(false);
-    openEdit(target);
+    setEditError("");
+    crud.openEdit(target);
   }
 
   function openDeleteFromView() {
     if (!viewTarget) return;
-    setDeleteTarget(viewTarget);
+    const target = viewTarget;
     setViewOpen(false);
-    setDeleteOpen(true);
-  }
-
-  function togglePermission(
-    form: RoleForm,
-    perm: string
-  ): Record<string, boolean> {
-    const next = { ...form.permissions, [perm]: !form.permissions[perm] };
-    if (!next[perm]) delete next[perm];
-    return next;
+    crud.openDelete(target);
   }
 
   // viewPermissions builds a permission map for the read-only view sheet from a
@@ -178,89 +134,87 @@ export function SettingsRolesPage() {
     return perms;
   }
 
-  async function handleCreate() {
+  const handleCreateForm = async (form: RoleForm) => {
     setCreateError("");
-    const id = createForm.resourceID.trim();
+    const id = form.resourceID.trim();
     if (!id) {
       setCreateError(t("settings.roles.id-required"));
       return;
     }
-    if (!createForm.title.trim()) {
+    if (!form.title.trim()) {
       setCreateError(t("settings.roles.title-required"));
       return;
     }
-    setCreating(true);
-    try {
-      await roleServiceClient.createRole({
-        role: {
-          name: `roles/${id}`,
-          title: createForm.title.trim(),
-          description: createForm.description.trim(),
-          permissions: Object.keys(createForm.permissions),
+    await crud.runCreate(
+      async () => {
+        await roleServiceClient.createRole({
+          role: {
+            name: `roles/${id}`,
+            title: form.title.trim(),
+            description: form.description.trim(),
+            permissions: Object.keys(form.permissions),
+          },
+        });
+      },
+      {
+        successTitle: t("settings.roles.created"),
+        onError: (err) => {
+          setCreateError(describeError(err));
         },
-      });
-      toastManager.add({ type: "success", title: t("settings.roles.created") });
-      setCreateOpen(false);
-      resetCreate();
-      load();
-    } catch (err) {
-      setCreateError(describeError(err));
-    } finally {
-      setCreating(false);
-    }
-  }
+      }
+    );
+  };
 
-  async function handleSaveEdit() {
-    if (!editTarget?.name) return;
+  const handleSaveForm = async (form: RoleForm) => {
+    const target = crud.editTarget;
+    if (!target?.name) return;
     setEditError("");
     const maskPaths: string[] = [];
-    if (editForm.title !== editTarget.title) maskPaths.push("title");
-    if (editForm.description !== editTarget.description)
-      maskPaths.push("description");
-    const original = new Set(editTarget.permissions);
-    const current = new Set(Object.keys(editForm.permissions));
+    if (form.title !== target.title) maskPaths.push("title");
+    if (form.description !== target.description) maskPaths.push("description");
+    const original = new Set(target.permissions);
+    const current = new Set(Object.keys(form.permissions));
     if (!setEqual(original, current)) maskPaths.push("permissions");
     if (maskPaths.length === 0) {
-      setEditOpen(false);
+      crud.closeEdit();
       return;
     }
-    setSaving(true);
-    try {
-      await roleServiceClient.updateRole({
-        role: {
-          name: editTarget.name,
-          title: editForm.title,
-          description: editForm.description,
-          permissions: Object.keys(editForm.permissions),
+    await crud.runSave(
+      async () => {
+        await roleServiceClient.updateRole({
+          role: {
+            name: target.name,
+            title: form.title,
+            description: form.description,
+            permissions: Object.keys(form.permissions),
+          },
+          updateMask: { paths: maskPaths },
+        });
+      },
+      {
+        successTitle: t("settings.roles.updated"),
+        onError: (err) => {
+          setEditError(describeError(err));
         },
-        updateMask: { paths: maskPaths },
-      });
-      toastManager.add({ type: "success", title: t("settings.roles.updated") });
-      setEditOpen(false);
-      setEditTarget(null);
-      load();
-    } catch (err) {
-      setEditError(describeError(err));
-    } finally {
-      setSaving(false);
-    }
-  }
+      }
+    );
+  };
 
-  async function handleConfirmDelete() {
-    if (!deleteTarget?.name) return;
-    setDeleting(true);
-    try {
-      await roleServiceClient.deleteRole({ name: deleteTarget.name });
-      toastManager.add({ type: "success", title: t("settings.roles.deleted") });
-      setDeleteOpen(false);
-      setDeleteTarget(null);
-      load();
-    } catch (err) {
-      void showErrorToast(err, t("settings.roles.delete-failed"));
-    } finally {
-      setDeleting(false);
-    }
-  }
+  const handleDelete = async () => {
+    const target = crud.deleteTarget;
+    if (!target?.name) return;
+    await crud.runDelete(
+      async () => {
+        await roleServiceClient.deleteRole({ name: target.name });
+      },
+      {
+        successTitle: t("settings.roles.deleted"),
+        onError: (err) => {
+          void showErrorToast(err, t("settings.roles.delete-failed"));
+        },
+      }
+    );
+  };
 
   if (!canList) {
     return <PermissionNotice message={t("settings.roles.not-allowed")} />;
@@ -278,7 +232,7 @@ export function SettingsRolesPage() {
         canCreate && <Button onClick={openCreate}>{t("common.create")}</Button>
       }
     >
-      {loading ? (
+      {rolesQuery.initialLoading ? (
         <PageLoading />
       ) : (
         <div className="rounded-xs border border-control-border bg-background shadow-xs overflow-hidden">
@@ -298,7 +252,39 @@ export function SettingsRolesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {roles.length === 0 ? (
+              {roles.map((role) => (
+                <TableRow
+                  key={role.name}
+                  className="cursor-pointer hover:bg-control-hover/40"
+                  onClick={() => openView(role)}
+                >
+                  <TableCell className="font-medium align-top">
+                    {role.title}
+                  </TableCell>
+                  <TableCell className="text-control-light align-top">
+                    {role.description || "-"}
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <span className="text-sm text-control-light">
+                      {t("settings.roles.permission-count", {
+                        count: role.permissions.length,
+                      })}
+                    </span>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    {role.predefined ? (
+                      <Badge variant="success">
+                        {t("settings.roles.type-predefined")}
+                      </Badge>
+                    ) : (
+                      <Badge variant="warning">
+                        {t("settings.roles.type-custom")}
+                      </Badge>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {roles.length === 0 && !rolesQuery.refreshing && (
                 <TableRow>
                   <TableCell
                     colSpan={4}
@@ -307,39 +293,6 @@ export function SettingsRolesPage() {
                     {t("common.no-data")}
                   </TableCell>
                 </TableRow>
-              ) : (
-                roles.map((role) => (
-                  <TableRow
-                    key={role.name}
-                    className="cursor-pointer hover:bg-control-hover/40"
-                    onClick={() => openView(role)}
-                  >
-                    <TableCell className="font-medium align-top">
-                      {role.title}
-                    </TableCell>
-                    <TableCell className="text-control-light align-top">
-                      {role.description || "-"}
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <span className="text-sm text-control-light">
-                        {t("settings.roles.permission-count", {
-                          count: role.permissions.length,
-                        })}
-                      </span>
-                    </TableCell>
-                    <TableCell className="align-top">
-                      {role.predefined ? (
-                        <Badge variant="success">
-                          {t("settings.roles.type-predefined")}
-                        </Badge>
-                      ) : (
-                        <Badge variant="warning">
-                          {t("settings.roles.type-custom")}
-                        </Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
               )}
             </TableBody>
           </Table>
@@ -402,21 +355,17 @@ export function SettingsRolesPage() {
       </Sheet>
 
       {/* Create role */}
-      <Sheet
-        open={createOpen}
-        onOpenChange={(next) => {
-          setCreateOpen(next);
-          if (!next) resetCreate();
-        }}
-      >
-        <SheetContent width="medium">
-          <SheetHeader>
-            <SheetTitle>{t("settings.roles.create-title")}</SheetTitle>
-            <SheetDescription>
-              {t("settings.roles.create-description")}
-            </SheetDescription>
-          </SheetHeader>
-          <SheetBody>
+      <ResourceSheet
+        open={crud.createOpen}
+        entity={null}
+        title={t("settings.roles.create-title")}
+        description={t("settings.roles.create-description")}
+        submitting={crud.creating}
+        submitLabel={t("common.create")}
+        width="medium"
+        onClose={crud.closeCreate}
+        renderForm={({ formId }) => (
+          <>
             {createError && (
               <Alert
                 variant="error"
@@ -424,209 +373,63 @@ export function SettingsRolesPage() {
                 className="mb-2"
               />
             )}
-            <div className="flex flex-col gap-5">
-              <FieldRow
-                label={t("settings.roles.field-title")}
-                htmlFor="role-title"
-              >
-                <Input
-                  id="role-title"
-                  value={createForm.title}
-                  placeholder={t("settings.roles.field-title-placeholder")}
-                  onChange={(e) => {
-                    const title = e.target.value;
-                    setCreateForm((prev) => ({
-                      ...prev,
-                      title,
-                      resourceID: prev.resourceID || slugify(title),
-                    }));
-                  }}
-                />
-              </FieldRow>
-              <FieldRow
-                label={t("settings.roles.field-id")}
-                hint={t("settings.roles.field-id-hint")}
-                htmlFor="role-id"
-              >
-                <Input
-                  id="role-id"
-                  value={createForm.resourceID}
-                  placeholder={t("settings.roles.field-id-placeholder")}
-                  onChange={(e) =>
-                    setCreateForm((prev) => ({
-                      ...prev,
-                      resourceID: slugify(e.target.value),
-                    }))
-                  }
-                />
-              </FieldRow>
-              <FieldRow
-                label={t("settings.roles.field-description")}
-                htmlFor="role-description"
-              >
-                <Textarea
-                  id="role-description"
-                  className="min-h-[60px]"
-                  value={createForm.description}
-                  placeholder={t(
-                    "settings.roles.field-description-placeholder"
-                  )}
-                  onChange={(e) =>
-                    setCreateForm((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                />
-              </FieldRow>
-              <PermissionGrid
-                permissions={createForm.permissions}
-                onToggle={(perm) =>
-                  setCreateForm((prev) => ({
-                    ...prev,
-                    permissions: togglePermission(prev, perm),
-                  }))
-                }
-              />
-            </div>
-          </SheetBody>
-          <SheetFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setCreateOpen(false);
-                resetCreate();
+            <RoleFormFields
+              entity={null}
+              formId={formId}
+              onSubmit={(form) => {
+                void handleCreateForm(form);
               }}
-              disabled={creating}
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button
-              disabled={creating || !createForm.title.trim()}
-              onClick={handleCreate}
-            >
-              {creating ? t("common.creating") : t("common.create")}
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+            />
+          </>
+        )}
+      />
 
       {/* Edit role */}
-      <Sheet
-        open={editOpen}
-        onOpenChange={(next) => {
-          setEditOpen(next);
-          if (!next) setEditTarget(null);
-        }}
-      >
-        <SheetContent width="medium">
-          <SheetHeader>
-            <SheetTitle>
-              {t("settings.roles.edit-title", {
-                title: editTarget?.title ?? "",
-              })}
-            </SheetTitle>
-            <SheetDescription>
-              {t("settings.roles.edit-description")}
-            </SheetDescription>
-          </SheetHeader>
-          <SheetBody>
-            {editError && (
-              <Alert variant="error" description={editError} className="mb-2" />
-            )}
-            <div className="flex flex-col gap-5">
-              <FieldRow
-                label={t("settings.roles.field-title")}
-                htmlFor="edit-title"
-              >
-                <Input
-                  id="edit-title"
-                  value={editForm.title}
-                  onChange={(e) =>
-                    setEditForm((prev) => ({ ...prev, title: e.target.value }))
-                  }
+      <ResourceSheet
+        open={crud.editOpen}
+        entity={crud.editTarget}
+        title={(target) =>
+          t("settings.roles.edit-title", { title: target?.title ?? "" })
+        }
+        description={t("settings.roles.edit-description")}
+        submitting={crud.saving}
+        width="medium"
+        onClose={crud.closeEdit}
+        renderForm={({ entity, formId }) =>
+          entity ? (
+            <>
+              {editError && (
+                <Alert
+                  variant="error"
+                  description={editError}
+                  className="mb-2"
                 />
-              </FieldRow>
-              <FieldRow
-                label={t("settings.roles.field-description")}
-                htmlFor="edit-description"
-              >
-                <Textarea
-                  id="edit-description"
-                  className="min-h-[60px]"
-                  value={editForm.description}
-                  onChange={(e) =>
-                    setEditForm((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                />
-              </FieldRow>
-              <PermissionGrid
-                permissions={editForm.permissions}
-                onToggle={(perm) =>
-                  setEditForm((prev) => ({
-                    ...prev,
-                    permissions: togglePermission(prev, perm),
-                  }))
-                }
-              />
-            </div>
-          </SheetBody>
-          <SheetFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditOpen(false)}
-              disabled={saving}
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button disabled={saving} onClick={handleSaveEdit}>
-              {saving ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Save className="size-4" />
               )}
-              {t("common.save")}
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+              <RoleFormFields
+                entity={entity}
+                formId={formId}
+                onSubmit={(form) => {
+                  void handleSaveForm(form);
+                }}
+              />
+            </>
+          ) : null
+        }
+      />
 
       {/* Delete role */}
-      <AlertDialog
-        open={deleteOpen}
-        onOpenChange={(next) => {
-          setDeleteOpen(next);
-          if (!next) setDeleteTarget(null);
+      <ConfirmActionDialog
+        open={crud.deleteOpen}
+        onClose={crud.closeDelete}
+        busy={crud.deleting}
+        title={t("settings.roles.delete-confirm-title")}
+        description={t("settings.roles.delete-confirm-description", {
+          title: crud.deleteTarget?.title ?? "",
+        })}
+        onConfirm={() => {
+          void handleDelete();
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogTitle>
-            {t("settings.roles.delete-confirm-title")}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("settings.roles.delete-confirm-description", {
-              title: deleteTarget?.title ?? "",
-            })}
-          </AlertDialogDescription>
-          <AlertDialogFooter>
-            <AlertDialogClose>
-              <Button variant="outline" disabled={deleting}>
-                {t("common.cancel")}
-              </Button>
-            </AlertDialogClose>
-            <Button
-              variant="destructive"
-              disabled={deleting}
-              onClick={handleConfirmDelete}
-            >
-              {deleting ? t("common.deleting") : t("common.delete")}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      />
     </SettingsPage>
   );
 }
@@ -687,6 +490,116 @@ function PermissionGrid({
       </p>
     </div>
   );
+}
+
+// Inner form of the role drawer. Mounts fresh per open (ResourceSheet keys
+// on the open sequence), so useState seeds read the current entity.
+function RoleFormFields({ entity, formId, onSubmit }: RoleFormFieldsProps) {
+  const { t } = useTranslation();
+  const [form, setForm] = useState<RoleForm>(() =>
+    entity ? roleToForm(entity) : emptyForm()
+  );
+  const createMode = entity === null;
+
+  return (
+    <form
+      id={formId}
+      className="flex flex-col gap-5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(form);
+      }}
+    >
+      <FieldRow
+        label={t("settings.roles.field-title")}
+        htmlFor={createMode ? "role-title" : "edit-title"}
+      >
+        <Input
+          id={createMode ? "role-title" : "edit-title"}
+          value={form.title}
+          placeholder={
+            createMode ? t("settings.roles.field-title-placeholder") : undefined
+          }
+          onChange={(e) => {
+            // The resource id is derived from the title unless the user edits
+            // it directly; the role id is immutable after creation.
+            const title = e.target.value;
+            setForm((prev) =>
+              createMode
+                ? {
+                    ...prev,
+                    title,
+                    resourceID: prev.resourceID || slugify(title),
+                  }
+                : { ...prev, title }
+            );
+          }}
+        />
+      </FieldRow>
+      {createMode && (
+        <FieldRow
+          label={t("settings.roles.field-id")}
+          hint={t("settings.roles.field-id-hint")}
+          htmlFor="role-id"
+        >
+          <Input
+            id="role-id"
+            value={form.resourceID}
+            placeholder={t("settings.roles.field-id-placeholder")}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                resourceID: slugify(e.target.value),
+              }))
+            }
+          />
+        </FieldRow>
+      )}
+      <FieldRow
+        label={t("settings.roles.field-description")}
+        htmlFor={createMode ? "role-description" : "edit-description"}
+      >
+        <Textarea
+          id={createMode ? "role-description" : "edit-description"}
+          className="min-h-[60px]"
+          value={form.description}
+          placeholder={
+            createMode
+              ? t("settings.roles.field-description-placeholder")
+              : undefined
+          }
+          onChange={(e) =>
+            setForm((prev) => ({ ...prev, description: e.target.value }))
+          }
+        />
+      </FieldRow>
+      <PermissionGrid
+        permissions={form.permissions}
+        onToggle={(perm) =>
+          setForm((prev) => ({
+            ...prev,
+            permissions: togglePermission(prev, perm),
+          }))
+        }
+      />
+    </form>
+  );
+}
+
+interface RoleFormFieldsProps {
+  // null seeds an empty create form; a role seeds its edit form.
+  entity: Role | null;
+  formId: string;
+  onSubmit: (form: RoleForm) => void;
+}
+
+function togglePermission(
+  form: RoleForm,
+  perm: string
+): Record<string, boolean> {
+  const next = { ...form.permissions, [perm]: !form.permissions[perm] };
+  if (!next[perm]) delete next[perm];
+  return next;
 }
 
 function setEqual(a: Set<string>, b: Set<string>): boolean {

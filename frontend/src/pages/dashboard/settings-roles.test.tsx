@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores";
+import { renderWithQueryClient } from "@/test/query";
 import type { Role } from "@/types/proto-es/v1/role_service_pb";
 import { SettingsRolesPage } from "./settings-roles";
 
@@ -45,7 +46,7 @@ function role(overrides?: Partial<Role>): Role {
 }
 
 function renderPage() {
-  return render(<SettingsRolesPage />);
+  return renderWithQueryClient(<SettingsRolesPage />);
 }
 
 beforeEach(() => {
