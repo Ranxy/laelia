@@ -12,9 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useReminderPage } from "@/composables/use-reminder-list";
 import { agentResourceName, formatTimestamp } from "@/lib/command-status";
-import { useResourceList } from "@/lib/use-resource-list";
-import { useAppStore } from "@/stores";
 import type { Reminder } from "@/types/proto-es/v1/command_pb";
 import { ReminderStatus } from "@/types/proto-es/v1/command_pb";
 
@@ -26,14 +25,6 @@ type StatusFilter =
   | "cancelled"
   | "missed"
   | "failed";
-
-const PAGE_SIZE = 50;
-
-// Background re-fetch cadence for the reminder table. 5s matches the chat
-// layout's left-rail list poll: reminder rows change at human/agent-action
-// pace, not per-message, so a slower refresh is plenty and background polls
-// stay silent (no loading-spinner flicker).
-const LIST_POLL_INTERVAL_MS = 5000;
 
 // statusFilterToValues maps a tab to the ReminderStatus values it shows. `all`
 // is an empty filter (server returns every status). The non-terminal tab
@@ -66,41 +57,10 @@ function scheduleSummary(r: Reminder): string {
 
 export function ReminderListPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { agentId } = useParams<{ agentId: string }>();
   const agent = agentResourceName(agentId);
 
-  const listReminders = useAppStore((s) => s.listReminders);
-
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
-  // Pagination + race protection + the 5s silent poll of the current page
-  // moved into the shared hook (the old page hand-rolled it and drifted:
-  // next-cursor kept on next, never backfilled on prev, no race guard).
-  const list = useResourceList<Reminder>({
-    resetKey: `${agent ?? ""}|${statusFilter}`,
-    pollMs: LIST_POLL_INTERVAL_MS,
-    fetch: async (pageToken, { silent }) => {
-      const res = await listReminders(agent, {
-        pageSize: PAGE_SIZE,
-        pageToken,
-        statusFilter: statusFilterToValues[statusFilter],
-        silent,
-      });
-      return res
-        ? { rows: res.reminders, nextPageToken: res.nextPageToken }
-        : undefined;
-    },
-  });
-
-  const handleStatusFilterChange = (f: StatusFilter) => {
-    setStatusFilter(f);
-  };
-
-  function handleRowClick(r: Reminder) {
-    if (!r.name) return;
-    navigate(`/members/agents/${agentId}/reminders/${r.name.split("/").pop()}`);
-  }
 
   return (
     <div className="flex h-full flex-col">
@@ -120,7 +80,7 @@ export function ReminderListPage() {
             <button
               key={f}
               type="button"
-              onClick={() => handleStatusFilterChange(f)}
+              onClick={() => setStatusFilter(f)}
               className={
                 statusFilter === f
                   ? "rounded-xs px-2.5 py-1 text-xs font-medium bg-accent text-accent-foreground"
@@ -133,6 +93,66 @@ export function ReminderListPage() {
         </div>
       </div>
 
+      <ReminderListBody
+        // agent/filter changes remount the body: the token stack resets to
+        // page 1 and the fresh query key starts as a real skeleton instead of
+        // showing the previous view's rows as placeholder. Page turns only
+        // change pageToken and keep the key, so keepPreviousData holds the
+        // old rows with a refreshing state.
+        key={`${agent}|${statusFilter}`}
+        agentId={agentId}
+        agent={agent}
+        statusFilterValues={statusFilterToValues[statusFilter]}
+      />
+    </div>
+  );
+}
+
+// ReminderListBody owns pagination + the query for one view generation. It
+// mounts fresh per agent|filter (keyed by the wrapper) and pages within it.
+function ReminderListBody(props: {
+  agentId: string | undefined;
+  agent: string;
+  statusFilterValues: ReminderStatus[];
+}) {
+  const { agentId, agent, statusFilterValues } = props;
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+
+  // pageTokens[i] = the page_token that enters page i; page 0 = "". Visited
+  // pages stay in the query cache, so Prev renders from cache immediately.
+  const [pageTokens, setPageTokens] = useState<string[]>([""]);
+  const [pageIndex, setPageIndex] = useState(0);
+
+  // Pagination + race-safe ordering + the 5s silent poll of the current page
+  // moved into the query (the old page hand-rolled it and drifted: next-token
+  // kept on next, never backfilled on prev, no race guard).
+  const list = useReminderPage({
+    agent,
+    statusFilter: statusFilterValues,
+    pageToken: pageTokens[pageIndex] ?? "",
+  });
+
+  function nextPage() {
+    // Truncate any forward history (e.g. after going back a page) and push
+    // the cursor for the page we are about to enter.
+    const cut = pageTokens.slice(0, pageIndex + 1);
+    cut.push(list.nextPageToken);
+    setPageTokens(cut);
+    setPageIndex(pageIndex + 1);
+  }
+
+  function prevPage() {
+    setPageIndex((i) => Math.max(0, i - 1));
+  }
+
+  function handleRowClick(r: Reminder) {
+    if (!r.name) return;
+    navigate(`/members/agents/${agentId}/reminders/${r.name.split("/").pop()}`);
+  }
+
+  return (
+    <>
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 py-4">
           <div className="overflow-x-auto">
@@ -155,7 +175,7 @@ export function ReminderListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {list.loading && (
+                {list.initial && (
                   <TableRow>
                     <TableCell
                       colSpan={5}
@@ -165,7 +185,7 @@ export function ReminderListPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {!list.loading && list.rows.length === 0 && (
+                {!list.initial && list.reminders.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-12">
                       <p className="text-control-light text-sm">
@@ -174,8 +194,8 @@ export function ReminderListPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {!list.loading &&
-                  list.rows.map((r) => (
+                {!list.initial &&
+                  list.reminders.map((r) => (
                     <TableRow
                       key={r.name}
                       className="cursor-pointer"
@@ -216,13 +236,13 @@ export function ReminderListPage() {
 
       <div className="shrink-0 border-t border-control-border px-4 py-2">
         <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-control-light">
-          <span>{t("reminders.page", { n: list.pageIndex + 1 })}</span>
+          <span>{t("reminders.page", { n: pageIndex + 1 })}</span>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={!list.canPrev || list.refreshing}
-              onClick={list.prevPage}
+              disabled={pageIndex === 0 || list.refreshing}
+              onClick={prevPage}
             >
               <ChevronLeft className="size-3.5" />
               {t("reminders.prev")}
@@ -230,8 +250,8 @@ export function ReminderListPage() {
             <Button
               variant="outline"
               size="sm"
-              disabled={!list.canNext || list.refreshing}
-              onClick={list.nextPage}
+              disabled={list.nextPageToken === "" || list.refreshing}
+              onClick={nextPage}
             >
               {t("reminders.next")}
               <ChevronRight className="size-3.5" />
@@ -239,6 +259,6 @@ export function ReminderListPage() {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
