@@ -6,9 +6,9 @@
 
 ---
 
-## ⚡ 实施进度总览(更新于重构执行 7 个批次后)
+## ⚡ 实施进度总览(更新于重构执行批 0~批 7 后)
 
-重构已执行 **53 个提交、8 个批次**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **119 文件 / 779 用例**,且自批 6 起全量 vitest 干净退出(exit 0,预存的 jsdom IntersectionObserver unhandled 随重构消失)。各章文件头部已附加对应的"进度标注"块。
+重构已执行 **76 个提交、8 个批次(含批次间 docs 收口提交)**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **120 文件 / 783 用例**,全量 vitest 干净退出(exit 0;预存的 jsdom IntersectionObserver unhandled 随重构消失)。各章文件头部已附加对应的"进度标注"块。
 
 | 批次 | 提交范围 | 内容 | 状态 |
 |---|---|---|---|
@@ -19,8 +19,9 @@
 | 批 4(Phase 2 聊天域收拢)| `4085c66`~`bc65511`(3 提交) | ChatGateway watcher 合一与可见性门控、useChatComposer(-600 行重复)+ 3 真实 bug 修复、批 4 归位(interval 收编 + lib 自注册) | ✅ 完成 |
 | 批 5(Phase 3 页面拆分)| `627bf6b`~`b6664ad`(19 提交) | settings CRUD 脚手架四原语 + 7 页全迁移(roles/api-providers/mcp/idp/iam 特化 + 尾部统一,idp 测试从 0 → 9 用例,B4/B6/B7/B8/B12 随迁修复)、thread-panel 拆四件(790→393)、agent-profile ACP 编辑器抽取(2379→1168)、global-search 手写 pickers 收敛 Base UI combobox(1011→477)+ 首个测试、sidebar 拆件(457→49)、chat-conversation/machine-new 页面级测试 | ✅ 完成(19 个提交) |
 | 批 6(Phase 4 UI/事件管线,重设计后路线)| `5fdf8fa`~`a4dcabf`(23 提交)| badge/词典收敛(StatusBadge 范型、destructive→error、Badge size="sm"、Button size 别名删除、Avatar 显式映射、组件 API 约定与 Separator 决策入 AGENTS.md)、modal 壳/弹层共享(LAYER_BACKDROP_SET + positioned-popup + ModelCombobox portal)、**TimelineModel 归一**(`lib/command-events-model.ts`:4 份 merge 拷贝→1、kind 注册表唯一化、isToolCallError 单点 + F-D7 死分支)、preview 收敛(CommentsPanel 双胞胎合并 + FilePreviewShell + useHtmlPreviewBridge,修 F-B9/F-S2/F-S3/F-B10)、**ADR-3 ②③**(ledger 虚拟化 + 100KB 输出截断 + 搜索防抖、workspace 树扁平化虚拟化 + role=tree a11y + 树内搜索、消息列表轻窗口化 `useWindowedMessageRange`)、TwoPaneShell/DetailTabsLayout 布局收敛、手势统一 + 共享 TransferOwnershipDialog + useMessageScroller 搬移(-499 行状态机出页面)、B7/B8/B-7 随手清偿、PWA reload 用户可见护栏、toast.ts 改 Base UI 官方工厂、tsconfig 覆盖 vite/sw(tool_call_id 需后端立项,未动)| ✅ 完成(24 个提交)|
+| 批 7(05 章 stores 收尾)| `2d4f224`~`4dad293`(6 提交)| **types.ts 拆分**(903 行契约上帝文件→共享 UI 模型入 `stores/ui-models.ts`、19 个 slice 接口与实现同文件、51 行组合点,组件导入改 `@/stores/ui-models`,50 文件)、**写入面收敛**(`SliceSet` 重载收窄 + 四条跨 slice 写入授予注册表:channel→chat 消息 map、thread→chatMessages 回复数、task→threadByRoot、members→user/agent 花名册;直接字面量越权写入编译期拦截)、**conversations 私有化**(module 缓存 + cleanup 注册,reset 即清,+4 测试)、**polling.ts→delay.ts 更名**、**reset 测试表驱动化**(覆盖面随 slice 自动补全)、**store 写入面守卫入 check 门禁**(`check-store-writes.mjs` 置首位 + AGENTS.md「Store Write Surface」)| ✅ 完成(6 个提交)|
 
-**当前数据层状态**:Query 已纵切 5 个低风险 slice + 应用级单例与 Provider;聊天域长轮询已收敛为共享 ChatGateway 循环(可见性门控 + badge 同节拍);乐观发送经 useChatComposer 走 slice action;错误出口统一;登出经注册表(lib 自注册)。**遗留大件:流式管线决策(产品侧)、页面拆分、UI/事件管线**。
+**当前数据层状态**:Query 已纵切 9 个 slice + 应用级单例与 Provider;聊天域长轮询已收敛为共享 ChatGateway 循环(可见性门控 + badge 同节拍);乐观发送经 useChatComposer 走 slice action;错误出口统一;登出经注册表(lib 自注册)。**批 7 收官**:types.ts 拆分、slice 写入面授予注册表、conversations 私有化、表驱动 reset 测试、写入守卫。**遗留:presence/activity/reminder 数据源迁 Query(05 章最后一项)、proto `tool_call_id`(后端立项)、Biome `useExhaustiveDependencies` 启用、activity 双分页等产品拍板项与穿插清理**。
 
 ---
 
@@ -258,9 +259,9 @@ src/
 4. UI 侧收尾 ✅:`toast.ts` 改 `Toast.createToastManager()` 官方工厂(`9655606`,as any 洞消除)、PWA controllerchange reload 增用户可见 toast 护栏(`0db2492`)、Separator 决策落地(AGENTS.md)、tsconfig 覆盖 vite/sw(`d8c8e46`,type-check 现跑 node 工程);TwoPaneShell/DetailTabsLayout/RailRow 布局收敛(`8ed13c3`)、手势统一 + TransferOwnershipDialog + useMessageScroller 搬移 + activity-detail 死契约(`d861c56`/`663867b`/`10cb1bb`/`c84281f`)同批清偿。
 
 ### 贯穿全程的规则(部分已落地)
-- ✅ AGENTS.md 幽灵引用修正(`b0499db`);🟨 组件直连 `useAppStore.setState` 禁令与 `*ServiceClient` 直连收敛(设置域 60 处)——settings 7 页已在批 5 收口,余量在 09 章 §2 清单;
+- ✅ AGENTS.md 幽灵引用修正(`b0499db`);✅ 组件直连 `useAppStore.setState` 禁令已入 check 门禁(`check-store-writes.mjs`,批 7 `4dad293`;设置域 *ServiceClient 直连收敛余量仍在 09 章 §2 清单);
 - ✅ tsconfig 已覆盖 vite.config 与 sw(`d8c8e46`,type-check 现跑双工程);❌ Biome `useExhaustiveDependencies` 等正确性规则仍未启用(15+ 存量黑洞待修,启用前需先批量清偿;4 处 eslint-disable no-op 已删 2 处,余 4 处在 profile 页);
-- ❌ `frontend/AGENTS.md` 尚需补:组件 API 约定(批 4 后)、Sheet 档位 medium(640px) 已在 Phase 0 修正 ✓。
+- ✅ `frontend/AGENTS.md` 已补:组件 API 约定与 Separator 决策(批 6 `5fdf8fb`)、Store Write Surface 写入面策略(批 7 `4dad293`)。
 
 ---
 
@@ -273,6 +274,7 @@ src/
 | Phase 2 聊天域收拢(重设计)| ✅ 完成(批 4,3 提交)| ChatGateway watcher 合一 + 可见性门控、useChatComposer 收编 -600 行与 9 处内联 setState、三个聊天域 bug 修复、interval/cleanup 归位;**余:流式拆除待产品确认** |
 | Phase 3 页面拆分(重排)| ✅ 完成(批 5,19 提交)| settings CRUD 四原语 + 7 页全迁移(settings -40%+)、三棵组件树收拢、idp/machine-new/chat-conversation 测试从 0 补齐 |
 | Phase 4 UI/事件管线 | ✅ 完成(批 6,24 提交)| TimelineModel 4→1 + 行键统一、badge/modal/弹层收敛 + AGENTS.md API 约定、ADR-3 ②③ 虚拟化与轻窗口化、preview 收敛、TwoPaneShell/手势/Ownership 收敛;proto `tool_call_id` 留待后端立项 |
+| 05 章 stores 收尾 | ✅ 完成(批 7,6 提交)| types.ts 903→51 行(ui-models + 接口同文件)、SliceSet 写入面授予注册表、conversations 私有化(reset 即清)、delay.ts 更名、表驱动 reset 测试、写入面守卫入 check;全量 120 文件/783 用例双跑 exit 0 |
 
 **已完成部分的实际收益(截至批 3)**:四道门禁全绿的测试规模 95→103 文件 / 611→686 用例;高危 bug 十项中**七项已修**(余三项在聊天域收拢内解决);错误呈现 5 种→1 种出口 + 2 处记录在案;轮询策略收敛(可见性门控、终态停轮、重连退避);预存竞态(fetchChannels 族)与三处无界缓存根治;swipe-back 的 UNSAFE_API + 冻结 hack 全部拆除。
 
