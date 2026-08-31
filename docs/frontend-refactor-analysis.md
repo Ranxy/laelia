@@ -17,7 +17,7 @@
 | 批 2(Phase 1 第二批)| `b95c530`~`389ce97`(4 提交) | TanStack Query 铺路 + api-provider/mcp 纵切、错误分类学 + showErrorToast、useResourceList | ✅ 完成 |
 | 批 3(Phase 1 收官)| `e7aca3a`~`acb701d`(4 提交) | user/agent/machine 纵切、watch 断线重连、cleanup registry、usePolling 收敛 | ✅ 完成 |
 | 批 4(Phase 2 聊天域收拢)| `4085c66`~`bc65511`(3 提交) | ChatGateway watcher 合一与可见性门控、useChatComposer(-600 行重复)+ 3 真实 bug 修复、批 4 归位(interval 收编 + lib 自注册) | ✅ 完成 |
-| 批 5(Phase 3 页面拆分)| `627bf6b`~(17+ 提交) | settings CRUD 脚手架四原语 + 7 页全迁移(roles/api-providers/mcp/idp/iam 特化 + 尾部统一,idp 测试从 0 → 9 用例,B4/B6/B7/B8/B12 随迁修复)、thread-panel 拆四件(790→393)、agent-profile ACP 编辑器抽取(2379→1168)、global-search 手写 pickers 收敛 Base UI combobox(1011→477)+ 首个测试、sidebar 拆件(457→49)、chat-conversation/machine-new 页面级测试 | ✅ 完成(machine-profile 复用迁移为跨批尾巴) |
+| 批 5(Phase 3 页面拆分)| `627bf6b`~`b6664ad`(19 提交) | settings CRUD 脚手架四原语 + 7 页全迁移(roles/api-providers/mcp/idp/iam 特化 + 尾部统一,idp 测试从 0 → 9 用例,B4/B6/B7/B8/B12 随迁修复)、thread-panel 拆四件(790→393)、agent-profile ACP 编辑器抽取(2379→1168)、global-search 手写 pickers 收敛 Base UI combobox(1011→477)+ 首个测试、sidebar 拆件(457→49)、chat-conversation/machine-new 页面级测试 | ✅ 完成(19 个提交) |
 | 批 6(Phase 4 UI/事件管线,重设计后路线) | —— | badge/Modal 收敛、TimelineModel、proto tool_call_id、轻窗口化 ADR-3③、machine-profile 复用收尾 | ⏳ |
 
 **当前数据层状态**:Query 已纵切 5 个低风险 slice + 应用级单例与 Provider;聊天域长轮询已收敛为共享 ChatGateway 循环(可见性门控 + badge 同节拍);乐观发送经 useChatComposer 走 slice action;错误出口统一;登出经注册表(lib 自注册)。**遗留大件:流式管线决策(产品侧)、页面拆分、UI/事件管线**。
@@ -247,7 +247,7 @@ src/
 ### ✅ Phase 3(原 Phase 2)· 页面与组件拆分 — 完成(批 5,`627bf6b`~ 17+ 提交)
 1. **settings 7 页脚手架迁移** ✅ `627bf6b`~`79351ff`:四原语(useResourceQuery/useCrudDialog/ResourceSheet/ConfirmActionDialog)+ MemberEditor/lib/slug/members;groups→roles→api-providers→mcp-servers→idp 逐页迁移并修 B4/B7/B9;iam 特化(use-iam-policy + 双 Sheet 拆出,B8);尾部(profile/smtp/storage 挂 SettingsPage + contentWidth、私有 Field→FieldRow、general 四 toggle 合并、audit B6/B12);idp 测试 0→9;
 2. **thread-panel 拆四件** ✅ `3c64942`(790→393 主文件 + replies/header/task-controls 三件;composer 已在批 4 拆出);
-3. **agent-profile 三棵树** ✅ `06f026c`+`f4e5a36`:AcpConfigEditor + useAcpConfigDraft + usePiModelOptions(2379→1168,24/24 测试保绿);⏳ machine-profile 复用迁移为跨批收尾(AddAgentSheet 独立化 + 校验单源);
+3. **agent-profile 三棵树** ✅ `06f026c`+`f4e5a36`:AcpConfigEditor + useAcpConfigDraft + usePiModelOptions(2379→1168,24/24 测试保绿);✅ machine-profile `b6664ad`(2184→763,AddAgentSheet 独立化 + 校验单源,create 模式复用,双页 49/49 保绿);
 4. ✅ `a40e83a`:global-search 手写 pickers(~460 行)重建于 Base UI combobox 家族并抽独立文件(1011→477)+ 首个测试;sidebar 拆三件 `8c583f6`(457→49);⏳ TwoPaneShell 合并与手势统一留待批 6(与 modal 收敛同类);
 5. **测试补齐(第一梯队)** ✅ `f762c1b`(chat-conversation 6 用例)、`d88e0de`(machine-new 5 用例,含 B2 否认回归)、`a40e83a`(global-search 4 用例)。第二梯队(38 清单余量)随批 6 推进。
 
