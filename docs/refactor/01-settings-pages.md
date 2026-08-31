@@ -1,8 +1,9 @@
 # 设置类页面(settings-*.tsx)深度代码审查报告
 
-> **⚙ 实施进度标注(批 3 收口后)**
-- ✅ 已完成:P0-1/2 前半(七连修 `5bc9f90`:MCP key 失焦、`common.no-data`、`common.deleting`、删除按钮 5 处)+ ProviderSheet 重置;错误出口统一(`389ce97`:全部裸 message → describeError/showErrorToast);死 i18n key 清除。identity-providers 测试仍缺。
-- ⏳ 未完成:useResourceList 页面迁移与 CRUD 脚手架(§7 全套)、directory store(users/agents/machines 已由 Query 纵切吸收 `e7aca3a`,设置页仍直连——归 Phase 3 页面拆分阶段)、B4 editTarget 清除、B6/B7/B8。
+> **⚙ 实施进度标注(批 5 收口后 — 本模块全部完成)**
+> - ✅ 全部落地(15 个提交,`627bf6b`~`79351ff`):CRUD 脚手架四原语(useResourceQuery/useCrudDialog/ResourceSheet/ConfirmActionDialog)+ MemberEditor/slug/members 三共享件;**7 个 CRUD 页全部迁移**(groups `832cce4` → roles `9f27537` → api-providers `e01dacf`(含 B9)→ mcp-servers `3bacf19`(含 B7/B9)→ idp `9bbfb4d`(含 B4)→ iam 特化 `8d972ca`(useIamPolicy + 双 Sheet 拆出,含 B8)→ 尾部 `79351ff`(profile/smtp/storage 挂 SettingsPage + contentWidth、smth/storage 私有 Field 收敛 FieldRow、general 四重复 toggle 合并 useSettingToggle、audit B6 序号/B12 CEL 转义));identity-providers 测试补齐 `cd43453`(9 用例,含 B4 回归)。
+> - §2 D1-D9 中 D1/D2 已由共享 Query 目录消解(跨页缓存 60s);D3 表单零基建由脚手架解决(inner form + ResourceSheet);D4(策略逻辑下沉)由 use-iam-policy.ts 完成;D5/P5 由 SettingsPage 挂接与 initialLoading/refreshing 拆分解决。
+> - 本报告 §3 的 B1/B2/B3/B5 早已修复(Phase 0),B4/B6/B7/B8/B12 随批 5 修复;B10/B13/B15 留待后续小修。批量测试从 14 个 mock 全客户端的文件收敛为 renderWithQueryClient 范式。
 
 > 审查范围:`frontend/src/pages/dashboard/settings-*.tsx` 全部 14 个源文件(整文件精读,非抽样),并交叉阅读了 `components/settings-page.tsx`、`components/member-picker.tsx`、`components/profile-common.tsx`、`components/ui/{sheet,field-row,alert-dialog}.tsx`、`stores/{setting,user,mcp,api-provider,index,permissions}.ts`、`lib/{connect-errors,toast,permissions,web-push,command-status}.ts`、`connect/index.ts`、`locales/{en-US,zh-CN}.json`、router 注册与全部 14 个对应测试文件。
 > 验证手段:`pnpm type-check`(0 错误)、`pnpm biome:lint`(无告警)实际运行;i18n key 全量交叉扫描脚本;十余轮针对性 grep。技术栈前提:React 19 + Zustand 5 + ConnectRPC(proto-es)+ Tailwind 4 + Biome,无 react-query,数据获取为自定义 store + 各页自建 load。

@@ -1,8 +1,8 @@
 # 巨型单文件页面深度审查:agent-profile / machine-profile / chat-conversation
 
-> **⚙ 实施进度标注(批 3 收口后)**
-- ✅ 已完成:refreshAgentProviders 死代码清除(`b0499db`);agent-profile text-danger 语义 token(`4c2d37c`);machine 列表缓存进 Query(`e7aca3a`)。
-- ⏳ 未完成:三棵组件树拆分与 ACP 表单收编(~650 行复制);**三个真实 bug 未修**——附件上传跨会话串台、删除 @mention 后 mentionMap 残留、发送失败输入不恢复(归批 4 的 useChatComposer/ChatGateway 一并解决);activity-detail onClose 死契约。
+> **⚙ 实施进度标注(批 5 后半进行中)**
+> - ✅ 已完成:批量 4 后的 chat 页面级测试落地(`f762c1b`:6 用例);agent-profile 完成 ACP 编辑器抽取与页拆(`06f026c` `f4e5a36`,2379→1168):`components/agent/acp-config-editor.tsx`(memoized + forwardRef imperative handle)+ `composables/use-acp-config-draft.ts`(单 draft 对象替代 17 useState + configRef 双写)+ `composables/use-pi-model-options.ts`(fetchPiModels 双份合一,防抖统一 400ms——已批准的 02-P1-3);seed effect 改 key={agent.name} 重挂,消除 eslint-deps 抑制;纯函数下沉 `lib/acp-config-draft.ts`;machine-new 页面测试 `d88e0de`(含 B2 否认不复活回归)。
+> - ⏳ 进行中:machine-profile 复用 AcpConfigEditor + AddAgentSheet 独立化(20 条校验收进 canSave 单源,02-D6);transfer 两段式弹窗的共享 TransferOwnershipDialog 抽取留到批 6;chat-conversation 的 useMessageScroller 机械搬移与活动详情 onClose 死契约(02 B-7)归批 6 前置。
 
 > 审查范围:`frontend/src/pages/dashboard/agent-profile.tsx`(2405 行)、`machine-profile.tsx`(2200 行)、`chat-conversation.tsx`(2166 行)。技术栈:React 19 + Zustand 5(单 store 多 slice,`src/stores/`,无 react-query)+ ConnectRPC(proto-es)+ Tailwind 4 + Biome。
 > 所有行号均已逐一核对,所有三个文件已全文阅读,结论均在仓库内 grep/验证过。

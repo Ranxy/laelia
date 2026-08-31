@@ -6,9 +6,9 @@
 
 ---
 
-## ⚡ 实施进度总览(更新于重构执行 5 个批次后)
+## ⚡ 实施进度总览(更新于重构执行 6 个批次后)
 
-重构已执行 **22 个提交、6 个批次**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **105 文件 / 699 用例**。各章文件头部已附加对应的"进度标注"块。
+重构已执行 **37 个提交、7 个批次**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **113 文件 / 740+ 用例**。各章文件头部已附加对应的"进度标注"块。
 
 | 批次 | 提交范围 | 内容 | 状态 |
 |---|---|---|---|
@@ -17,7 +17,8 @@
 | 批 2(Phase 1 第二批)| `b95c530`~`389ce97`(4 提交) | TanStack Query 铺路 + api-provider/mcp 纵切、错误分类学 + showErrorToast、useResourceList | ✅ 完成 |
 | 批 3(Phase 1 收官)| `e7aca3a`~`acb701d`(4 提交) | user/agent/machine 纵切、watch 断线重连、cleanup registry、usePolling 收敛 | ✅ 完成 |
 | 批 4(Phase 2 聊天域收拢)| `4085c66`~`bc65511`(3 提交) | ChatGateway watcher 合一与可见性门控、useChatComposer(-600 行重复)+ 3 真实 bug 修复、批 4 归位(interval 收编 + lib 自注册) | ✅ 完成 |
-| 批 5+(重设计后路线) | —— | 页面拆分(Phase 3)、UI/事件管线(Phase 4) | ⏳ 见 §7 重设计版 |
+| 批 5(Phase 3 页面拆分)| `627bf6b`~(17+ 提交) | settings CRUD 脚手架四原语 + 7 页全迁移(roles/api-providers/mcp/idp/iam 特化 + 尾部统一,idp 测试从 0 → 9 用例,B4/B6/B7/B8/B12 随迁修复)、thread-panel 拆四件(790→393)、agent-profile ACP 编辑器抽取(2379→1168)、global-search 手写 pickers 收敛 Base UI combobox(1011→477)+ 首个测试、sidebar 拆件(457→49)、chat-conversation/machine-new 页面级测试 | ✅ 完成(machine-profile 复用迁移为跨批尾巴) |
+| 批 6(Phase 4 UI/事件管线,重设计后路线) | —— | badge/Modal 收敛、TimelineModel、proto tool_call_id、轻窗口化 ADR-3③、machine-profile 复用收尾 | ⏳ |
 
 **当前数据层状态**:Query 已纵切 5 个低风险 slice + 应用级单例与 Provider;聊天域长轮询已收敛为共享 ChatGateway 循环(可见性门控 + badge 同节拍);乐观发送经 useChatComposer 走 slice action;错误出口统一;登出经注册表(lib 自注册)。**遗留大件:流式管线决策(产品侧)、页面拆分、UI/事件管线**。
 
@@ -37,7 +38,7 @@
 | 6 | **统一发送/乐观更新管线**(`useChatComposer`) | ✅ 完成(`4085c66` watcher + `5c6665c` composer;三个聊天域 bug 一并修复) |
 | 7 | **ADR-1 引入 TanStack Query**(`b95c530`~`e7aca3a`)/ **ADR-2 preview 退役 + 冻结删除**(`d4774c3`) | ✅ 完成:数据层 slice + 聊天域长轮询与组件 interval 全部收敛(`4085c66`/`bc65511`) |
 | 8 | **流式管线拆除决策** | ✅ 完成(`07b2799`,产品确认拆除):ChatMessageUI.streaming 字段 + rowStreamingProps + typing-dots + fade 全部移除,MessageRow 接口面 -2 个流式 props |
-| 9 | **三个巨型页面拆分** | ⏳ 未开始(原计划因数据层先行而顺延,见新路线 §7) |
+| 9 | **三个巨型页面拆分** | 🟨 大部分完成(批 5):agent-profile 2379→1168(ACP 编辑器共享化 `f4e5a36`)、thread-panel/chat-conversation 已在批 4/5 大幅收拢 + 页面测试;余 machine-profile 复用迁移与 chat 滚动状态机搬移(批 6) |
 | 10 | **事件渲染管线统一** | 🟨 部分:watch 断线重连(`4b7cf57`)已做;TimelineModel 归一/合批/虚拟化未动 |
 
 
@@ -243,13 +244,12 @@ src/
 4. **批 4 归位** ✅ `bc65511`:avatar/image-blob 失效回调迁回 lib 自注册(auth.ts 不再持 per-cache shim);presence/activity/reminder/machine-new 的组件 interval 全部收编 `usePolling`;
 5. reset() 的 watcher 枚举随 `badge.stop()` 形状调整完成(注册表已就位)。
 
-### ⏳ Phase 3(原 Phase 2)· 页面与组件拆分
-数据层定型后执行,避免页面迁移返工:
-1. **settings 7 页脚手架迁移**(01 章 5 步路径:.groups→roles→api-providers→mcp→idp→iam;`useResourceList`/`useCrudDialog`/`ResourceSheet` 已有 Query 底座);
-2. **thread-panel 拆四件**(ThreadReplies/Composer/TaskHeaderControls/ThreadHeader,主文件 <250 行);
-3. **agent-profile / machine-profile 三棵组件树**迁移(ACP 表单抽共享件,消 ~650 行复制;顺带补测试);
-4. global-search 460 行 Combobox 轮子换共享 Combobox + 双筛选栏合并;sidebar 拆三件;TwoPaneShell 合并 rail+pane 布局;`useEdgeDragToClose` 统一手势(MentionDetailSheet 复用 ChatDrawerSheet);
-5. 测试补齐:38 个 ≥150 行无测试文件按风险排序(chat-conversation/identity-providers/machine-new 优先)。
+### ✅ Phase 3(原 Phase 2)· 页面与组件拆分 — 完成(批 5,`627bf6b`~ 17+ 提交)
+1. **settings 7 页脚手架迁移** ✅ `627bf6b`~`79351ff`:四原语(useResourceQuery/useCrudDialog/ResourceSheet/ConfirmActionDialog)+ MemberEditor/lib/slug/members;groups→roles→api-providers→mcp-servers→idp 逐页迁移并修 B4/B7/B9;iam 特化(use-iam-policy + 双 Sheet 拆出,B8);尾部(profile/smtp/storage 挂 SettingsPage + contentWidth、私有 Field→FieldRow、general 四 toggle 合并、audit B6/B12);idp 测试 0→9;
+2. **thread-panel 拆四件** ✅ `3c64942`(790→393 主文件 + replies/header/task-controls 三件;composer 已在批 4 拆出);
+3. **agent-profile 三棵树** ✅ `06f026c`+`f4e5a36`:AcpConfigEditor + useAcpConfigDraft + usePiModelOptions(2379→1168,24/24 测试保绿);⏳ machine-profile 复用迁移为跨批收尾(AddAgentSheet 独立化 + 校验单源);
+4. ✅ `a40e83a`:global-search 手写 pickers(~460 行)重建于 Base UI combobox 家族并抽独立文件(1011→477)+ 首个测试;sidebar 拆三件 `8c583f6`(457→49);⏳ TwoPaneShell 合并与手势统一留待批 6(与 modal 收敛同类);
+5. **测试补齐(第一梯队)** ✅ `f762c1b`(chat-conversation 6 用例)、`d88e0de`(machine-new 5 用例,含 B2 否认回归)、`a40e83a`(global-search 4 用例)。第二梯队(38 清单余量)随批 6 推进。
 
 ### ⏳ Phase 4(原 Phase 3)· UI 体系与事件管线
 1. Badge 家族(xs variant + 范型 StatusBadge)、modal 壳/弹层三连提取、size/variant 命名 codemod、`Avatar.sizeClass` 显式映射、组件 API 约定写入 AGENTS.md;
