@@ -17,13 +17,13 @@ function renderLayout(
     {
       key: "profile",
       icon: CircleUser,
-      labelKey: "detail.tab-profile",
+      labelKey: "agent.tab-profile",
       route: "detail.profile",
     },
     {
       key: "workspace",
       icon: FolderTree,
-      labelKey: "detail.tab-workspace",
+      labelKey: "machine.tab-workspace",
       route: "detail.workspace",
       gate: workspaceGate,
     },
@@ -51,10 +51,10 @@ describe("detail-tabs-layout", () => {
     renderLayout("/things/t1/workspace");
 
     expect(
-      screen.getByRole("tab", { name: "detail.tab-workspace" })
+      screen.getByRole("tab", { name: "machine.tab-workspace" })
     ).toHaveAttribute("aria-selected", "true");
     expect(
-      screen.getByRole("tab", { name: "detail.tab-profile" })
+      screen.getByRole("tab", { name: "agent.tab-profile" })
     ).toHaveAttribute("aria-selected", "false");
     expect(screen.getByTestId("workspace-content")).toBeInTheDocument();
   });
@@ -63,7 +63,7 @@ describe("detail-tabs-layout", () => {
     renderLayout("/things/t1");
 
     expect(
-      screen.getByRole("tab", { name: "detail.tab-profile" })
+      screen.getByRole("tab", { name: "agent.tab-profile" })
     ).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("fallback")).toBeInTheDocument();
   });
@@ -72,10 +72,10 @@ describe("detail-tabs-layout", () => {
     renderLayout("/things/t1", { workspaceGate: false });
 
     expect(
-      screen.queryByRole("tab", { name: "detail.tab-workspace" })
+      screen.queryByRole("tab", { name: "machine.tab-workspace" })
     ).toBeNull();
     expect(
-      screen.getByRole("tab", { name: "detail.tab-profile" })
+      screen.getByRole("tab", { name: "agent.tab-profile" })
     ).toBeInTheDocument();
   });
 });
