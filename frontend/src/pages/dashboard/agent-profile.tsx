@@ -64,6 +64,11 @@ import {
 } from "@/lib/avatar-cache";
 import { agentResourceName, formatTimestamp } from "@/lib/command-status";
 import { describeError } from "@/lib/connect-errors";
+import {
+  foldCustomEnv,
+  stringifyConfigForComparison,
+  toOptionalBigInt,
+} from "@/lib/acp-config-draft";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
@@ -472,37 +477,6 @@ export function AgentProfilePage() {
   // they are gated on canEditAdminOnly to avoid offering a 403 to owners.
   const canEdit = agent.canEdit;
 
-  // Fold the key-value editor entries into a map, dropping entries with empty
-  // keys (empty-value entries are kept so a user can set FOO="").
-  function foldCustomEnv(
-    entries: { key: string; value: string }[]
-  ): Record<string, string> {
-    const customEnv: Record<string, string> = {};
-    for (const entry of entries) {
-      const key = entry.key.trim();
-      if (!key) continue;
-      customEnv[key] = entry.value;
-    }
-    return customEnv;
-  }
-
-  // toOptionalBigInt converts a non-negative token count from the number input
-  // into the proto int64 representation. Zero/negative means "unset"; fractional
-  // input is truncated so BigInt never receives a non-integer number.
-  function toOptionalBigInt(value: number): bigint | undefined {
-    if (!Number.isFinite(value) || value <= 0) return undefined;
-    return BigInt(Math.trunc(value));
-  }
-
-  // stringifyConfig serializes a config payload for dirty comparison. The
-  // default JSON.stringify throws on BigInt (proto int64 fields are bigint), so
-  // convert those to strings first.
-  function stringifyConfig(cfg: AgentACPConfigInput): string {
-    return JSON.stringify(cfg, (_key, value) =>
-      typeof value === "bigint" ? value.toString() : value
-    );
-  }
-
   // Build a full-replace config payload from the live draft, carrying the given
   // persona (the persisted persona for config auto-saves, so an unsaved persona
   // draft is never persisted by a config save).
@@ -715,7 +689,10 @@ export function AgentProfilePage() {
     const cfg = agentRef.current?.info?.acpConfig;
     const draft = buildFromDraft(configRef.current, cfg?.personaPrompt ?? "");
     const persisted = buildFromPersisted(cfg, cfg?.personaPrompt ?? "");
-    return stringifyConfig(draft) !== stringifyConfig(persisted);
+    return (
+      stringifyConfigForComparison(draft) !==
+      stringifyConfigForComparison(persisted)
+    );
   }
 
   function saveConfig() {
