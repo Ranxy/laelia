@@ -17,6 +17,7 @@ import {
 import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Card, Field } from "@/components/profile-common";
+import { TransferOwnershipDialog } from "@/components/shared/transfer-ownership-dialog";
 import { Alert } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -27,22 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { FieldRow } from "@/components/ui/field-row";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { persistedToInput } from "@/composables/use-acp-config-draft";
@@ -164,16 +150,11 @@ export function AgentProfilePage() {
   const [canManageMembersSaving, setCanManageMembersSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Ownership transfer state. The flow is deliberately two-step: the first
-  // dialog picks the target user (and optional audit reason), then a second
-  // AlertDialog confirms the risky, unilateral, immediately-effective transfer
-  // before it is sent.
+  // Ownership transfer: the two-step flow lives in the shared
+  // TransferOwnershipDialog (target + reason picker, then a confirm
+  // AlertDialog); the page only controls when it opens and supplies the
+  // store action plus its success/error side effects.
   const [transferOpen, setTransferOpen] = useState(false);
-  const [transferTarget, setTransferTarget] = useState("");
-  const [transferReason, setTransferReason] = useState("");
-  const [transferConfirmOpen, setTransferConfirmOpen] = useState(false);
-  const [transferBusy, setTransferBusy] = useState(false);
-  const [transferError, setTransferError] = useState("");
   const [stopOpen, setStopOpen] = useState(false);
   const [stopBusy, setStopBusy] = useState(false);
   const [stopError, setStopError] = useState("");
@@ -518,27 +499,16 @@ export function AgentProfilePage() {
     return users.find((u) => u.name === name)?.title || name;
   }
 
-  // Transfer flow: first dialog picks the target + reason, then the second
-  // AlertDialog confirms. On confirm, TransferAgentOwnership reassigns the owner
-  // immediately and unilaterally; the profile and roster are refetched so the
-  // new owner's authority (and the old owner's loss of it) reflects at once.
-  function openTransferPicker() {
-    setTransferTarget("");
-    setTransferReason("");
-    setTransferError("");
-    setTransferOpen(true);
-  }
-
-  async function handleTransfer() {
-    if (!agentName || !transferTarget) return;
-    setTransferBusy(true);
-    setTransferError("");
+  // Transfer flow (rendered by TransferOwnershipDialog): on confirm,
+  // TransferAgentOwnership reassigns the owner immediately and unilaterally;
+  // the profile and roster are refetched so the new owner's authority (and
+  // the old owner's loss of it) reflects at once. Re-throwing lets the dialog
+  // surface the error inline next to the toast.
+  async function handleTransfer(target: string, reason: string) {
     try {
       const transferAgentOwnership =
         useAppStore.getState().transferAgentOwnership;
-      await transferAgentOwnership(agentName, transferTarget, transferReason);
-      setTransferConfirmOpen(false);
-      setTransferOpen(false);
+      await transferAgentOwnership(agentName, target, reason);
       setAgent(await getAgent(agentName));
       fetchAgents({ pageSize: 100 }, { silent: true });
       toastManager.add({
@@ -546,10 +516,8 @@ export function AgentProfilePage() {
         title: t("agent.transfer-owner-success"),
       });
     } catch (err) {
-      setTransferError(describeError(err));
       void showErrorToast(err, t("agent.transfer-owner-failed"));
-    } finally {
-      setTransferBusy(false);
+      throw err;
     }
   }
 
@@ -629,7 +597,7 @@ export function AgentProfilePage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={openTransferPicker}
+                          onClick={() => setTransferOpen(true)}
                         >
                           {t("agent.transfer-owner")}
                         </Button>
@@ -1061,108 +1029,27 @@ export function AgentProfilePage() {
 
       {/* Ownership transfer: pick target + reason, then a second risky-action
           confirm. The transfer is unilateral and effective immediately. */}
-      <Dialog
+      <TransferOwnershipDialog
         open={transferOpen}
-        onOpenChange={(next) => !next && setTransferOpen(false)}
-      >
-        <DialogContent>
-          <DialogTitle>{t("agent.transfer-owner-title")}</DialogTitle>
-          <DialogDescription>
-            {t("agent.transfer-owner-description")}
-          </DialogDescription>
-          <div className="mt-4 flex flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">
-                {t("agent.transfer-owner-target")}
-              </label>
-              <Select
-                value={transferTarget}
-                onValueChange={(v) => v && setTransferTarget(v)}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={t("agent.transfer-owner-target-placeholder")}
-                  >
-                    {(v: string | null) => (v ? userTitle(v) : "")}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {users
-                    .filter((u) => u.name !== agent.owner)
-                    .map((u) => (
-                      <SelectItem key={u.name} value={u.name}>
-                        {u.title}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">
-                {t("agent.transfer-owner-reason")}
-              </label>
-              <Input
-                value={transferReason}
-                onChange={(e) => setTransferReason(e.target.value)}
-                placeholder={t("agent.transfer-owner-reason-placeholder")}
-              />
-            </div>
-            {transferError && (
-              <Alert variant="error" description={transferError} />
-            )}
-          </div>
-          <div className="mt-6 flex justify-end gap-2">
-            <DialogClose>
-              <Button variant="outline">{t("common.cancel")}</Button>
-            </DialogClose>
-            <Button
-              disabled={!transferTarget}
-              onClick={() => {
-                setTransferError("");
-                setTransferOpen(false);
-                setTransferConfirmOpen(true);
-              }}
-            >
-              {t("common.next")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog
-        open={transferConfirmOpen}
-        onOpenChange={(next) => !next && setTransferConfirmOpen(false)}
-      >
-        <AlertDialogContent>
-          <AlertDialogTitle>
-            {t("agent.transfer-owner-confirm-title")}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("agent.transfer-owner-confirm-description", {
-              target: userTitle(transferTarget),
-            })}
-          </AlertDialogDescription>
-          {transferError && (
-            <Alert variant="error" description={transferError} />
-          )}
-          <AlertDialogFooter>
-            <AlertDialogClose>
-              <Button variant="outline" disabled={transferBusy}>
-                {t("common.cancel")}
-              </Button>
-            </AlertDialogClose>
-            <Button
-              variant="destructive"
-              disabled={transferBusy}
-              onClick={() => void handleTransfer()}
-            >
-              {transferBusy
-                ? t("common.saving")
-                : t("agent.transfer-owner-confirm")}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onOpenChange={setTransferOpen}
+        users={users}
+        excludeUserName={agent.owner}
+        onTransfer={handleTransfer}
+        labels={{
+          pickerTitle: t("agent.transfer-owner-title"),
+          pickerDescription: t("agent.transfer-owner-description"),
+          targetLabel: t("agent.transfer-owner-target"),
+          targetPlaceholder: t("agent.transfer-owner-target-placeholder"),
+          reasonLabel: t("agent.transfer-owner-reason"),
+          reasonPlaceholder: t("agent.transfer-owner-reason-placeholder"),
+          confirmTitle: t("agent.transfer-owner-confirm-title"),
+          confirmDescription: (targetTitle) =>
+            t("agent.transfer-owner-confirm-description", {
+              target: targetTitle,
+            }),
+          confirmAction: t("agent.transfer-owner-confirm"),
+        }}
+      />
     </div>
   );
 }

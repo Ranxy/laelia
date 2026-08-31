@@ -4,31 +4,15 @@ import { Loader2, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
+import { TransferOwnershipDialog } from "@/components/shared/transfer-ownership-dialog";
 import { Alert } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   groupServiceClient,
   iamServiceClient,
@@ -100,15 +84,11 @@ export function MachineProfilePage() {
   const [selfProvidedKeysEnabled, setSelfProvidedKeysEnabled] = useState(false);
   const [listScrolled, setListScrolled] = useState(false);
 
-  // Ownership transfer state. The flow is deliberately two-step: the first
-  // dialog picks the target + reason, the second AlertDialog confirms the
-  // risky, unilateral, immediately-effective transfer.
+  // Ownership transfer: the two-step flow lives in the shared
+  // TransferOwnershipDialog (target + reason picker, then a confirm
+  // AlertDialog); the page only controls when it opens and supplies the
+  // store action plus its post-transfer reload.
   const [transferOpen, setTransferOpen] = useState(false);
-  const [transferTarget, setTransferTarget] = useState("");
-  const [transferReason, setTransferReason] = useState("");
-  const [transferConfirmOpen, setTransferConfirmOpen] = useState(false);
-  const [transferBusy, setTransferBusy] = useState(false);
-  const [transferError, setTransferError] = useState("");
 
   // Access (IAM) state: who may create agents on this machine. The policy and
   // its load/save flow stay page-level; the card + manage sheet rendering
@@ -266,9 +246,6 @@ export function MachineProfilePage() {
     [navigate]
   );
   const openTransferPicker = useCallback(() => {
-    setTransferTarget("");
-    setTransferReason("");
-    setTransferError("");
     setTransferOpen(true);
   }, []);
   const openAddAgent = useCallback(() => {
@@ -333,31 +310,19 @@ export function MachineProfilePage() {
     fetchMachines({ pageSize: 100 }, { silent: true });
   }, [machineName, reload, fetchMachines]);
 
-  // Transfer flow: first dialog picks the target + reason, then the second
-  // AlertDialog confirms. On confirm, TransferMachineOwnership reassigns the
-  // owner immediately and unilaterally; the profile is refetched so the new
-  // owner's authority (and the old owner's loss of it) reflects at once.
-  const handleTransfer = useCallback(async () => {
-    if (!machineName || !transferTarget) return;
-    setTransferBusy(true);
-    setTransferError("");
-    try {
+  // Transfer flow (rendered by TransferOwnershipDialog): on confirm,
+  // TransferMachineOwnership reassigns the owner immediately and unilaterally;
+  // the profile is refetched so the new owner's authority (and the old
+  // owner's loss of it) reflects at once.
+  const handleTransfer = useCallback(
+    async (target: string, reason: string) => {
       const transferMachineOwnership =
         useAppStore.getState().transferMachineOwnership;
-      await transferMachineOwnership(
-        machineName,
-        transferTarget,
-        transferReason
-      );
-      setTransferConfirmOpen(false);
-      setTransferOpen(false);
+      await transferMachineOwnership(machineName, target, reason);
       await reload();
-    } catch (err) {
-      setTransferError(describeError(err));
-    } finally {
-      setTransferBusy(false);
-    }
-  }, [machineName, transferTarget, reload]);
+    },
+    [machineName, reload]
+  );
 
   function openAccess() {
     accessInitializedRef.current = false;
@@ -652,112 +617,27 @@ export function MachineProfilePage() {
 
       {/* Ownership transfer: pick target + reason, then a second risky-action
           confirm. The transfer is unilateral and effective immediately. */}
-      <Dialog
+      <TransferOwnershipDialog
         open={transferOpen}
         onOpenChange={(next) => !next && setTransferOpen(false)}
-      >
-        <DialogContent>
-          <DialogTitle>{t("machine.transfer-owner-title")}</DialogTitle>
-          <DialogDescription>
-            {t("machine.transfer-owner-description")}
-          </DialogDescription>
-          <div className="mt-4 flex flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">
-                {t("machine.transfer-owner-target")}
-              </label>
-              <Select
-                value={transferTarget}
-                onValueChange={(v) => v && setTransferTarget(v)}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={t("machine.transfer-owner-target-placeholder")}
-                  >
-                    {(v: string | null) =>
-                      v ? users.find((u) => u.name === v)?.title || v : ""
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {users
-                    .filter((u) => u.name !== machine.createdBy)
-                    .map((u) => (
-                      <SelectItem key={u.name} value={u.name}>
-                        {u.title}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">
-                {t("machine.transfer-owner-reason")}
-              </label>
-              <Input
-                value={transferReason}
-                onChange={(e) => setTransferReason(e.target.value)}
-                placeholder={t("machine.transfer-owner-reason-placeholder")}
-              />
-            </div>
-            {transferError && (
-              <Alert variant="error" description={transferError} />
-            )}
-          </div>
-          <div className="mt-6 flex justify-end gap-2">
-            <DialogClose>
-              <Button variant="outline">{t("common.cancel")}</Button>
-            </DialogClose>
-            <Button
-              disabled={!transferTarget}
-              onClick={() => {
-                setTransferError("");
-                setTransferOpen(false);
-                setTransferConfirmOpen(true);
-              }}
-            >
-              {t("common.next")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog
-        open={transferConfirmOpen}
-        onOpenChange={(next) => !next && setTransferConfirmOpen(false)}
-      >
-        <AlertDialogContent>
-          <AlertDialogTitle>
-            {t("machine.transfer-owner-confirm-title")}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("machine.transfer-owner-confirm-description", {
-              target:
-                users.find((u) => u.name === transferTarget)?.title ||
-                transferTarget,
-            })}
-          </AlertDialogDescription>
-          {transferError && (
-            <Alert variant="error" description={transferError} />
-          )}
-          <AlertDialogFooter>
-            <AlertDialogClose>
-              <Button variant="outline" disabled={transferBusy}>
-                {t("common.cancel")}
-              </Button>
-            </AlertDialogClose>
-            <Button
-              variant="destructive"
-              disabled={transferBusy}
-              onClick={() => void handleTransfer()}
-            >
-              {transferBusy
-                ? t("common.saving")
-                : t("machine.transfer-owner-confirm")}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        users={users}
+        excludeUserName={machine.createdBy}
+        onTransfer={handleTransfer}
+        labels={{
+          pickerTitle: t("machine.transfer-owner-title"),
+          pickerDescription: t("machine.transfer-owner-description"),
+          targetLabel: t("machine.transfer-owner-target"),
+          targetPlaceholder: t("machine.transfer-owner-target-placeholder"),
+          reasonLabel: t("machine.transfer-owner-reason"),
+          reasonPlaceholder: t("machine.transfer-owner-reason-placeholder"),
+          confirmTitle: t("machine.transfer-owner-confirm-title"),
+          confirmDescription: (targetTitle) =>
+            t("machine.transfer-owner-confirm-description", {
+              target: targetTitle,
+            }),
+          confirmAction: t("machine.transfer-owner-confirm"),
+        }}
+      />
     </div>
   );
 }
