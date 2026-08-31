@@ -239,7 +239,6 @@ export function HumanDetailPage() {
     };
     // Depend on the user's resource name (stable across roster refetches) so a
     // description save that refreshes the roster does not re-fetch the policy.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canGetPolicy, user?.name]);
 
   if (!user) {

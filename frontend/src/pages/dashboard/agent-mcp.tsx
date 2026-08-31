@@ -73,7 +73,6 @@ export function AgentMcpPage() {
   useEffect(() => {
     if (!agentId) return;
     void loadAgent();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId, agentName, getAgent]);
 
   // Seed the selection once per agent so the refetch after a save does not
@@ -87,7 +86,6 @@ export function AgentMcpPage() {
     if (mcpServers.length === 0) {
       void fetchMcpServers({ pageSize: 100 }, { silent: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function saveMcpServers() {
