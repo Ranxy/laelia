@@ -149,6 +149,13 @@ export function LazyMarkdown({
     if (visible) return;
     const el = ref.current;
     if (!el) return;
+    // Environments without IntersectionObserver (jsdom) cannot defer the
+    // reveal: show the content directly instead of leaking an uncaught
+    // ReferenceError from the rAF callback.
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
     const root = scrollRoot?.current ?? findClosestScrollContainer(el);
     let io: IntersectionObserver | null = null;
     const raf = requestAnimationFrame(() => {
