@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { describeError } from "@/lib/connect-errors";
 import { useAppStore } from "@/stores";
+import { renderWithQueryClient } from "@/test/query";
 import { State } from "@/types/proto-es/v1/common_pb";
 import {
   type Group,
@@ -72,7 +73,7 @@ function user(overrides?: Partial<User>): User {
 }
 
 function renderPage() {
-  return render(<SettingsGroupsPage />);
+  return renderWithQueryClient(<SettingsGroupsPage />);
 }
 
 beforeEach(() => {
