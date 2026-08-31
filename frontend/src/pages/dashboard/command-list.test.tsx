@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import {
   createBrowserRouter,
@@ -105,7 +106,14 @@ describe("command row click navigation", () => {
 
   it("navigates to the canonical detail route without remounting members", async () => {
     const router = buildRealRouter();
-    render(<RouterProvider router={router} />);
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    );
 
     await waitFor(
       () => {
@@ -132,7 +140,14 @@ describe("command row click navigation", () => {
 
   it("back button returns to the canonical list route without remounting members", async () => {
     const router = buildRealRouter();
-    render(<RouterProvider router={router} />);
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    );
 
     await waitFor(
       () => {

@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -81,6 +82,11 @@ function seedStore() {
 }
 
 function renderPage() {
+  // The page renders conversation rows / member panels that read the presence
+  // map through useOnlineUsers (Query cache) — provide a provider, seeded empty.
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   const router = createMemoryRouter(
     [
       {
@@ -93,7 +99,11 @@ function renderPage() {
     ],
     { initialEntries: ["/members/channels/c1"] }
   );
-  return render(<RouterProvider router={router} />);
+  return render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
 }
 
 beforeEach(() => {
