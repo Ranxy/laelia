@@ -101,3 +101,8 @@ React UI components live in `src/components/ui/` and follow shadcn-style pattern
 - **Enum→label pills use `StatusBadge`** — shared `{variant, labelKey}` lookups go through `components/ui/status-badge.tsx`; keep per-domain tables in `lib/` and mount `StatusBadge` with thin glue.
 - **Overlays portal through layers** — floating UI always renders via `getLayerRoot(<family>)`; a new floating component must expose a portal capability itself.
 - **No `asChild`** — extend components through Base UI's `render` prop instead of introducing a Radix-style child API.
+
+## Store Write Surface
+
+- Only store slices (`src/stores/**`), the sanctioned unauthenticated-redirect interceptor in `src/connect/index.ts`, and tests may call `useAppStore.setState` directly; components and pages must update state through slice actions.
+- `pnpm --dir frontend check` runs `scripts/check-store-writes.mjs` first to enforce this. Like the layering scanner, it is a conservative textual guardrail, not full static analysis: aliased, indirection-heavy, or shadowed bindings may be missed, and passing the check does not permit bypassing the policy.
