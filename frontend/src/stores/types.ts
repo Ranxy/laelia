@@ -1,5 +1,4 @@
 import type { StoreApi } from "zustand";
-import type { ActivitySlice } from "./activity";
 import type { AgentSlice } from "./agent";
 import type { ApiProviderSlice } from "./api-provider";
 import type { AuthSlice } from "./auth";
@@ -10,9 +9,7 @@ import type { ImagePreviewSlice } from "./image-preview";
 import type { MachineSlice } from "./machine";
 import type { McpServerSlice } from "./mcp";
 import type { MembersSlice } from "./members";
-import type { PresenceSlice } from "./presence";
 import type { PreviewSlice } from "./preview";
-import type { ReminderSlice } from "./reminder";
 import type { SettingSlice } from "./setting";
 import type { TaskSlice } from "./task";
 import type { ThreadSlice } from "./thread";
@@ -35,13 +32,10 @@ export type AppStoreState = AuthSlice &
   ChannelSlice &
   ThreadSlice &
   TaskSlice &
-  ReminderSlice &
-  ActivitySlice &
   UserSlice &
   SettingSlice &
   PreviewSlice &
-  ImagePreviewSlice &
-  PresenceSlice & {
+  ImagePreviewSlice & {
     // reset restores every slice to its pristine initial state (clearing
     // watcher intervals first) so a logout can never leak one principal's
     // cached data to the next user signing in on the same tab.

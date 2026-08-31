@@ -11,14 +11,11 @@ import { createCommandSlice } from "./command";
 import { createChatSlice } from "./chat";
 import { createChannelSlice } from "./channel";
 import { createTaskSlice } from "./task";
-import { createReminderSlice } from "./reminder";
-import { createActivitySlice } from "./activity";
 import { createSettingSlice } from "./setting";
 import { createThreadSlice } from "./thread";
 import { createUserSlice } from "./user";
 import { createImagePreviewSlice } from "./image-preview";
 import { createPreviewSlice } from "./preview";
-import { createPresenceSlice } from "./presence";
 import { runCleanups } from "./cleanup-registry";
 
 export const useAppStore = create<AppStoreState>()((...args) => {
@@ -36,13 +33,10 @@ export const useAppStore = create<AppStoreState>()((...args) => {
     ...createChannelSlice(...args),
     ...createThreadSlice(...args),
     ...createTaskSlice(...args),
-    ...createReminderSlice(...args),
-    ...createActivitySlice(...args),
     ...createSettingSlice(...args),
     ...createUserSlice(...args),
     ...createPreviewSlice(...args),
     ...createImagePreviewSlice(...args),
-    ...createPresenceSlice(...args),
     reset: () => {
       // Unified cleanup registry (audit 05 B7): every module with file-scope
       // side effects (command recency, slice Query caches, avatar/image-blob
