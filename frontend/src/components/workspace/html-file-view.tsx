@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef } from "react";
-import { buildHtmlPreviewDoc, randomId } from "@/lib/html-file";
+import { useMemo } from "react";
+import { useHtmlPreviewBridge } from "@/components/preview/html-preview-bridge";
+import { buildHtmlPreviewDoc } from "@/lib/html-file";
 import { safeOpenExternal } from "@/lib/open-external";
 
 // HtmlFileView renders a workspace html file inline in a sandboxed iframe.
 // The bridge script inside intercepts link clicks (opened in a new tab) and
 // keeps the preview from navigating away; no comment plumbing here — the
-// workspace pane is read-only.
+// workspace pane is read-only. Parent-side message handling and the per-open
+// session secrets come from the shared useHtmlPreviewBridge hook.
 export function HtmlFileView({
   name,
   content,
@@ -13,57 +15,28 @@ export function HtmlFileView({
   name: string;
   content: string;
 }) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  // Per-open session secrets, stable for the life of this view.
-  const nonce = useMemo(() => randomId(), []);
-  const epoch = useMemo(() => randomId(), []);
-  const srcDoc = useMemo(
-    () => buildHtmlPreviewDoc(content, nonce),
-    [content, nonce]
-  );
-
-  useEffect(() => {
-    const onMessage = (e: MessageEvent) => {
-      const d = e.data;
-      if (!d || typeof d !== "object") return;
-      if (e.source !== iframeRef.current?.contentWindow) return;
-      if (
-        d.slockAcBridge !== 1 ||
-        d.nonce !== nonce ||
-        d.documentEpoch !== epoch
-      )
-        return;
-      if (d.type === "link-clicked") {
-        const href = String(d.href ?? "");
-        // Bridge payloads come from untrusted preview documents; only
-        // allow-listed schemes may reach window.open.
-        if (href && !safeOpenExternal(href)) {
-          console.warn("[html-file-view] blocked link with rejected scheme");
-        }
+  const bridge = useHtmlPreviewBridge({
+    onLinkClick: (href) => {
+      // Bridge payloads come from untrusted preview documents; only
+      // allow-listed schemes may reach window.open.
+      if (!safeOpenExternal(href)) {
+        console.warn("[html-file-view] blocked link with rejected scheme");
       }
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [nonce, epoch]);
+    },
+  });
+  const srcDoc = useMemo(
+    () => buildHtmlPreviewDoc(content, bridge.nonce),
+    [content, bridge.nonce]
+  );
 
   return (
     <iframe
-      ref={iframeRef}
+      ref={bridge.iframeRef}
       title={name}
       sandbox="allow-scripts"
       srcDoc={srcDoc}
       referrerPolicy="no-referrer"
-      onLoad={() =>
-        iframeRef.current?.contentWindow?.postMessage(
-          {
-            slockAcBridge: 1,
-            nonce,
-            documentEpoch: epoch,
-            type: "activate-document",
-          },
-          "*"
-        )
-      }
+      onLoad={bridge.activate}
       className="h-full w-full border-0 bg-white"
     />
   );

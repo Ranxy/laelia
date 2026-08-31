@@ -1,15 +1,9 @@
 import { Download, Loader2, X } from "lucide-react";
-import { useEffect } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import {
-  getLayerRoot,
-  LAYER_SURFACE_CLASS,
-  usePreserveHigherLayerAccess,
-} from "@/components/ui/layer";
 import { downloadAttachment } from "@/lib/file-download";
 import { useAppStore } from "@/stores";
+import { FilePreviewShell } from "./file-preview-shell";
 
 // ImagePreviewOverlay is the store-driven full-page lightbox for image
 // attachments. It portals into the overlay layer (z-2500). The top bar keeps
@@ -19,52 +13,41 @@ import { useAppStore } from "@/stores";
 // silhouette is visible regardless of image color. Esc closes, clicking the
 // dark stage closes, clicking the image does not (so it can be inspected).
 export function ImagePreviewOverlay() {
-  usePreserveHigherLayerAccess("overlay");
   const { t } = useTranslation();
   const active = useAppStore((s) => s.activeImage);
   const close = useAppStore((s) => s.closeImagePreview);
 
-  // Esc closes. Bound only while open.
-  useEffect(() => {
-    if (!active) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [active, close]);
-
   if (!active) return null;
   const { attachment, blobUrl, status } = active;
 
-  return createPortal(
-    <div className={`fixed inset-0 ${LAYER_SURFACE_CLASS} flex flex-col`}>
-      {/* Top bar — normal page surface. */}
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-control-border bg-background px-4">
-        <span className="truncate text-sm font-medium text-main">
-          {attachment.name}
-        </span>
-        <div className="flex-1" />
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => downloadAttachment(attachment)}
-          aria-label={t("preview.download")}
-          className="flex size-8 items-center justify-center p-0"
-        >
-          <Download className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={close}
-          aria-label={t("common.close")}
-          className="flex size-8 items-center justify-center p-0"
-        >
-          <X className="size-4" />
-        </Button>
-      </div>
-
+  return (
+    <FilePreviewShell
+      title={attachment.name}
+      barClassName="bg-background"
+      onEscape={close}
+      actions={
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => downloadAttachment(attachment)}
+            aria-label={t("preview.download")}
+            className="flex size-8 items-center justify-center p-0"
+          >
+            <Download className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={close}
+            aria-label={t("common.close")}
+            className="flex size-8 items-center justify-center p-0"
+          >
+            <X className="size-4" />
+          </Button>
+        </>
+      }
+    >
       {/* Image stage — dark translucent backdrop; click closes, image does not. */}
       <div
         className="flex min-h-0 flex-1 items-center justify-center bg-black/75 p-6"
@@ -85,7 +68,6 @@ export function ImagePreviewOverlay() {
           />
         )}
       </div>
-    </div>,
-    getLayerRoot("overlay")
+    </FilePreviewShell>
   );
 }

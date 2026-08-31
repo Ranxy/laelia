@@ -8,44 +8,28 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { formatBytes } from "@/components/chat/file-card";
 import { Button } from "@/components/ui/button";
-import {
-  getLayerRoot,
-  LAYER_SURFACE_CLASS,
-  usePreserveHigherLayerAccess,
-} from "@/components/ui/layer";
 import { downloadAttachment } from "@/lib/file-download";
 import {
   buildHtmlPreviewDoc,
   htmlAnchorForSelection,
   parseHtmlAnchor,
-  randomId,
 } from "@/lib/html-file";
 import type { CommentAnchor } from "@/lib/markdown-file";
 import { safeOpenExternal } from "@/lib/open-external";
 import { useAppStore } from "@/stores";
-import { HtmlCommentsAside, useHtmlComments } from "./html-comments-aside";
+import { usePreviewComments } from "./comments-panel";
+import { FilePreviewShell, PreviewPlaceholder } from "./file-preview-shell";
+import { HtmlCommentsAside } from "./html-comments-aside";
+import {
+  type HtmlPreviewDocState,
+  type HtmlPreviewRect,
+  useHtmlPreviewBridge,
+} from "./html-preview-bridge";
 
-interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-interface BridgeState {
-  scrollX: number;
-  scrollY: number;
-  docWidth: number;
-  docHeight: number;
-  viewportWidth: number;
-  viewportHeight: number;
-}
-
-const DEFAULT_STATE: BridgeState = {
+const DEFAULT_STATE: HtmlPreviewDocState = {
   scrollX: 0,
   scrollY: 0,
   docWidth: 0,
@@ -58,50 +42,33 @@ const DEFAULT_STATE: BridgeState = {
 // attachments: a sandboxed iframe (srcDoc, sandbox="allow-scripts") renders
 // the untrusted document with a bridge script inside. The parent and the
 // bridge talk only through postMessage; the parent validates source, nonce
-// and document epoch on every message. Phase 1 is preview-only (links open
-// in a new tab, Esc closes, scroll state drives the overlay markers); the
-// comment aside is Phase 2 and reuses the markdown comment plumbing
-// (Attachment sectionAnchor/sectionId/quotedText, thread replies).
+// and document epoch on every message (see useHtmlPreviewBridge). Phase 1 is
+// preview-only (links open in a new tab, Esc closes, scroll state drives the
+// overlay markers); the comment aside is Phase 2 and reuses the markdown
+// comment plumbing (Attachment sectionAnchor/sectionId/quotedText, thread
+// replies).
 export function HtmlPreviewOverlay() {
-  usePreserveHigherLayerAccess("overlay");
   const { t } = useTranslation();
   const active = useAppStore((s) => s.activePreview);
   const closeFilePreview = useAppStore((s) => s.closeFilePreview);
 
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const flashTimerRef = useRef<number | null>(null);
-  const locateCbsRef = useRef(new Map<string, (r: Rect | null) => void>());
 
   const [iframeReady, setIframeReady] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [scroll, setScroll] = useState<BridgeState>(DEFAULT_STATE);
+  const [scroll, setScroll] = useState<HtmlPreviewDocState>(DEFAULT_STATE);
   const [pendingAnchor, setPendingAnchor] = useState<CommentAnchor | null>(
     null
   );
-  const [pendingRect, setPendingRect] = useState<Rect | null>(null);
-  const [flash, setFlash] = useState<Rect | null>(null);
-  const [located, setLocated] = useState<Record<string, Rect>>({});
+  const [pendingRect, setPendingRect] = useState<HtmlPreviewRect | null>(null);
+  const [flash, setFlash] = useState<HtmlPreviewRect | null>(null);
+  const [located, setLocated] = useState<Record<string, HtmlPreviewRect>>({});
   const [composerFocusKey, setComposerFocusKey] = useState(0);
 
   const attachmentId = active?.attachment.id ?? "";
-  // nonce/epoch are per-open secrets: the bridge echoes them back, and the
-  // epoch is only issued after the iframe loads, so a document that
-  // navigates itself away can never speak for the original preview.
-  const nonce = useMemo(() => randomId(), [attachmentId]);
-  const epoch = useMemo(() => randomId(), [attachmentId]);
-  const srcDoc = useMemo(
-    () => buildHtmlPreviewDoc(active?.content ?? "", nonce),
-    [active?.content, nonce]
-  );
 
-  const comments = useHtmlComments(
-    active?.conversation ?? "",
-    active?.rootMessageId ?? "",
-    attachmentId,
-    commentsOpen
-  );
-
-  // Reset per-open state when a different file is previewed.
+  // Reset per-open state when a different file is previewed. The bridge's
+  // nonce/epoch reset runs from its own effect over the same key.
   useEffect(() => {
     setIframeReady(false);
     setCommentsOpen(false);
@@ -111,138 +78,60 @@ export function HtmlPreviewOverlay() {
     setLocated({});
   }, [attachmentId]);
 
-  const postToIframe = useCallback(
-    (msg: Record<string, unknown>) => {
-      iframeRef.current?.contentWindow?.postMessage(
-        { slockAcBridge: 1, nonce, documentEpoch: epoch, ...msg },
-        "*"
-      );
+  const comments = usePreviewComments(
+    active?.conversation ?? "",
+    active?.rootMessageId ?? "",
+    attachmentId,
+    commentsOpen
+  );
+
+  const bridge = useHtmlPreviewBridge(
+    {
+      onState: setScroll,
+      onSelection: (msg) => {
+        if (!commentsOpen) return;
+        const rect = { x: msg.x, y: msg.y, w: msg.w, h: msg.h };
+        const anchor = htmlAnchorForSelection(msg.text, rect.y + rect.h / 2);
+        if (anchor && Number.isFinite(rect.x)) {
+          setPendingAnchor(anchor);
+          setPendingRect(rect);
+        }
+      },
+      onSelectionCleared: () => {
+        setPendingAnchor(null);
+        setPendingRect(null);
+      },
+      onLinkClick: (href) => {
+        // Bridge payloads come from untrusted preview documents; only
+        // allow-listed schemes may reach window.open.
+        if (!safeOpenExternal(href)) {
+          console.warn("[html-preview] blocked link with rejected scheme");
+        }
+      },
+      onEscape: closeFilePreview,
     },
-    [nonce, epoch]
+    attachmentId
+  );
+  const { nonce, activate, scrollTo, locateQuote } = bridge;
+
+  const srcDoc = useMemo(
+    () => buildHtmlPreviewDoc(active?.content ?? "", nonce),
+    [active?.content, nonce]
   );
 
-  // locateQuote asks the bridge to find the content rect of `quote`,
-  // preferring the occurrence nearest to nearY. Used for jump targets and
-  // comment pins; times out so a poisoned document can't hang the UI.
-  const locateQuote = useCallback(
-    (quote: string, nearY: number | null): Promise<Rect | null> =>
-      new Promise((resolve) => {
-        const requestId = randomId();
-        locateCbsRef.current.set(requestId, resolve);
-        postToIframe({
-          type: "locate",
-          requestId,
-          quote: quote.slice(0, 500),
-          nearY: nearY ?? "",
-        });
-        window.setTimeout(() => {
-          if (locateCbsRef.current.delete(requestId)) resolve(null);
-        }, 3000);
-      }),
-    [postToIframe]
+  // F-B9: the flash timeout must not outlive the overlay.
+  useEffect(
+    () => () => {
+      if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+    },
+    []
   );
 
-  const scrollTo = useCallback(
-    (x: number, y: number) => postToIframe({ type: "scroll-to", x, y }),
-    [postToIframe]
-  );
-
-  const flashRect = useCallback((rect: Rect) => {
+  const flashRect = useCallback((rect: HtmlPreviewRect) => {
     setFlash(rect);
     if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
     flashTimerRef.current = window.setTimeout(() => setFlash(null), 2000);
   }, []);
-
-  const handleLoad = useCallback(() => {
-    setIframeReady(true);
-    postToIframe({ type: "activate-document" });
-  }, [postToIframe]);
-
-  // Bridge messages: validate source + nonce + epoch before trusting anything.
-  useEffect(() => {
-    if (!active) return;
-    const onMessage = (e: MessageEvent) => {
-      const d = e.data;
-      if (!d || typeof d !== "object") return;
-      if (e.source !== iframeRef.current?.contentWindow) return;
-      if (
-        d.slockAcBridge !== 1 ||
-        d.nonce !== nonce ||
-        d.documentEpoch !== epoch
-      )
-        return;
-      switch (d.type) {
-        case "state":
-          setScroll({
-            scrollX: Number(d.scrollX) || 0,
-            scrollY: Number(d.scrollY) || 0,
-            docWidth: Number(d.docWidth) || 0,
-            docHeight: Number(d.docHeight) || 0,
-            viewportWidth: Number(d.viewportWidth) || 0,
-            viewportHeight: Number(d.viewportHeight) || 0,
-          });
-          break;
-        case "selection": {
-          if (!commentsOpen) break;
-          const rect = {
-            x: Number(d.x),
-            y: Number(d.y),
-            w: Number(d.w),
-            h: Number(d.h),
-          };
-          const anchor = htmlAnchorForSelection(
-            String(d.text ?? ""),
-            rect.y + rect.h / 2
-          );
-          if (anchor && Number.isFinite(rect.x)) {
-            setPendingAnchor(anchor);
-            setPendingRect(rect);
-          }
-          break;
-        }
-        case "selection-cleared":
-          setPendingAnchor(null);
-          setPendingRect(null);
-          break;
-        case "located": {
-          const requestId = String(d.requestId ?? "");
-          const cb = locateCbsRef.current.get(requestId);
-          if (!cb) break;
-          locateCbsRef.current.delete(requestId);
-          const x = Number(d.x);
-          const y = Number(d.y);
-          cb(
-            x >= 0 ? { x, y, w: Number(d.w) || 0, h: Number(d.h) || 0 } : null
-          );
-          break;
-        }
-        case "link-clicked": {
-          const href = String(d.href ?? "");
-          // Bridge payloads come from untrusted preview documents; only
-          // allow-listed schemes may reach window.open.
-          if (href && !safeOpenExternal(href)) {
-            console.warn("[html-preview] blocked link with rejected scheme");
-          }
-          break;
-        }
-        case "esc":
-          closeFilePreview();
-          break;
-      }
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [active, nonce, epoch, commentsOpen, closeFilePreview]);
-
-  // Esc closes the overlay (parent keydown; iframe Esc comes via the bridge).
-  useEffect(() => {
-    if (!active) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeFilePreview();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [active, closeFilePreview]);
 
   // Cross-scenario anchor jump: the preview was opened from a comment's
   // anchor chip; locate the quote (nearest to the stored content-y) and
@@ -310,58 +199,54 @@ export function HtmlPreviewOverlay() {
   if (!active) return null;
   const { attachment } = active;
 
-  return createPortal(
-    <div
-      className={`fixed inset-0 ${LAYER_SURFACE_CLASS} flex flex-col bg-background`}
-    >
-      {/* Top bar */}
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-control-border px-4">
-        <FileText className="size-4 shrink-0 text-control-light" />
-        <span className="truncate text-sm font-medium text-main">
-          {attachment.name}
-        </span>
-        <span className="shrink-0 text-xs text-control-placeholder">
-          {formatBytes(attachment.sizeBytes)}
-        </span>
-        <div className="flex-1" />
-        {active.status === "ready" && (
+  return (
+    <FilePreviewShell
+      icon={<FileText className="size-4 shrink-0 text-control-light" />}
+      title={attachment.name}
+      meta={formatBytes(attachment.sizeBytes)}
+      className="bg-background"
+      onEscape={closeFilePreview}
+      actions={
+        <>
+          {active.status === "ready" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCommentsOpen((v) => !v)}
+              aria-pressed={commentsOpen}
+              aria-label={t("preview.comments")}
+              className="flex items-center gap-1.5 px-2.5 py-1.5"
+            >
+              <MessageSquare className="size-4" />
+              <span className="hidden sm:inline">{t("preview.comments")}</span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setCommentsOpen((v) => !v)}
-            aria-pressed={commentsOpen}
-            aria-label={t("preview.comments")}
-            className="flex items-center gap-1.5 px-2.5 py-1.5"
+            onClick={() => downloadAttachment(attachment)}
+            aria-label={t("preview.download")}
+            className="flex size-8 items-center justify-center p-0"
           >
-            <MessageSquare className="size-4" />
-            <span className="hidden sm:inline">{t("preview.comments")}</span>
+            <Download className="size-4" />
           </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => downloadAttachment(attachment)}
-          aria-label={t("preview.download")}
-          className="flex size-8 items-center justify-center p-0"
-        >
-          <Download className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={closeFilePreview}
-          aria-label={t("common.close")}
-          className="flex size-8 items-center justify-center p-0"
-        >
-          <X className="size-4" />
-        </Button>
-      </div>
-
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={closeFilePreview}
+            aria-label={t("common.close")}
+            className="flex size-8 items-center justify-center p-0"
+          >
+            <X className="size-4" />
+          </Button>
+        </>
+      }
+    >
       {/* Body */}
       <div className="flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1">
           {active.status === "loading" && (
-            <Placeholder
+            <PreviewPlaceholder
               icon={
                 <Loader2 className="size-5 animate-spin text-control-light" />
               }
@@ -369,10 +254,10 @@ export function HtmlPreviewOverlay() {
             />
           )}
           {active.status === "error" && (
-            <Placeholder text={t("preview.error")} />
+            <PreviewPlaceholder text={t("preview.error")} />
           )}
           {active.status === "too-large" && (
-            <Placeholder
+            <PreviewPlaceholder
               text={t("preview.too-large", {
                 size: formatBytes(attachment.sizeBytes),
               })}
@@ -392,12 +277,15 @@ export function HtmlPreviewOverlay() {
           {active.status === "ready" && (
             <>
               <iframe
-                ref={iframeRef}
+                ref={bridge.iframeRef}
                 title={attachment.name}
                 sandbox="allow-scripts"
                 srcDoc={srcDoc}
                 referrerPolicy="no-referrer"
-                onLoad={handleLoad}
+                onLoad={() => {
+                  setIframeReady(true);
+                  activate();
+                }}
                 className="absolute inset-0 h-full w-full border-0 bg-white"
               />
               {flash && <FlashRect rect={flash} scroll={scroll} />}
@@ -441,12 +329,17 @@ export function HtmlPreviewOverlay() {
           />
         )}
       </div>
-    </div>,
-    getLayerRoot("overlay")
+    </FilePreviewShell>
   );
 }
 
-function FlashRect({ rect, scroll }: { rect: Rect; scroll: BridgeState }) {
+function FlashRect({
+  rect,
+  scroll,
+}: {
+  rect: HtmlPreviewRect;
+  scroll: HtmlPreviewDocState;
+}) {
   return (
     <div
       className="pointer-events-none absolute z-10 border-2 border-accent bg-accent/15"
@@ -465,8 +358,8 @@ function CommentPin({
   scroll,
   onClick,
 }: {
-  rect: Rect;
-  scroll: BridgeState;
+  rect: HtmlPreviewRect;
+  scroll: HtmlPreviewDocState;
   onClick: () => void;
 }) {
   return (
@@ -483,23 +376,5 @@ function CommentPin({
     >
       <MapPin className="size-4 text-accent drop-shadow" />
     </button>
-  );
-}
-
-function Placeholder({
-  icon,
-  text,
-  action,
-}: {
-  icon?: React.ReactNode;
-  text: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-      {icon}
-      <p className="text-sm text-control">{text}</p>
-      {action}
-    </div>
   );
 }

@@ -117,4 +117,27 @@ describe("buildHtmlPreviewDoc", () => {
     expect(out.match(/<meta\s+charset/gi)?.length).toBe(1);
     expect(out.split('data-ac-bridge="1"').length).toBe(2);
   });
+
+  it("TestBuildHtmlPreviewDoc_CommentSpoofedTags: comment-hidden head/body tags fall back to fragment wrap", () => {
+    // The tags look real to the tag regexes but live inside an HTML comment,
+    // so a regex-injected bridge would never execute; the doc must be
+    // re-wrapped as a fragment with a live bridge in its real head.
+    const doc = "<!-- <html><head></head><body> --><p>hi</p>";
+    const out = buildHtmlPreviewDoc(doc, "nonce-spoof");
+    expect(out.startsWith("<!doctype html>")).toBe(true);
+    expect(out).toContain('data-ac-bridge="1"');
+    // Bridge sits in the injected head, before the untrusted content, and
+    // outside any HTML comment.
+    expect(out.indexOf('data-ac-bridge="1"')).toBeLessThan(out.indexOf("<!--"));
+  });
+
+  it("TestBuildHtmlPreviewDoc_CommentSpoofedHtmlNoHeadBody: spoofed <html> with no head/body still gets a bridge", () => {
+    // Previously this returned the content unchanged — bridge silently lost.
+    const doc = "<!-- <html> --><p>hi</p>";
+    const out = buildHtmlPreviewDoc(doc, "nonce-spoof2");
+    expect(out.startsWith("<!doctype html>")).toBe(true);
+    expect(out).toContain('data-ac-bridge="1"');
+    expect(out).toContain("<body><!-- <html> --><p>hi</p></body>");
+    expect(out.indexOf('data-ac-bridge="1"')).toBeLessThan(out.indexOf("<!--"));
+  });
 });

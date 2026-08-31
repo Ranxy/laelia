@@ -297,6 +297,11 @@ const htmlBridgeSource = `(function () {
 //   - fragments: wrapped in a minimal document;
 //   - a utf-8 charset meta is added when the document does not declare one so
 //     the sandboxed render matches the UTF-8 text we decoded.
+// The injection sites are found by tag regex, which untrusted content can
+// spoof from inside an HTML comment (e.g. "<!-- <html> -->"): a bridge
+// dropped into a comment never executes and the preview silently loses the
+// bridge. Each candidate is therefore asserted to carry the script outside
+// any comment before being accepted; otherwise the fragment wrap is used.
 export function buildHtmlPreviewDoc(content: string, nonce: string): string {
   const script = `<script data-ac-bridge="1">${htmlBridgeSource.replace(BRIDGE_NONCE_PLACEHOLDER, nonce)}</script>`;
   const charset = `<meta charset="utf-8">`;
@@ -306,13 +311,49 @@ export function buildHtmlPreviewDoc(content: string, nonce: string): string {
       // Keep the original tag casing when injecting after <head>.
       doc = doc.replace(/(<head[^>]*>)/i, (_m, tag) => `${tag}${charset}`);
     }
+    const candidates: string[] = [];
     if (/<\/head>/i.test(doc)) {
-      return doc.replace(/(<\/head>)/i, (m) => `${script}${m}`);
+      candidates.push(doc.replace(/(<\/head>)/i, (m) => `${script}${m}`));
     }
     if (/<body[\s>]/i.test(doc)) {
-      return doc.replace(/(<body[^>]*>)/i, (_m, tag) => `${script}${tag}`);
+      candidates.push(
+        doc.replace(/(<body[^>]*>)/i, (_m, tag) => `${script}${tag}`)
+      );
     }
-    return doc.replace(/(<html[^>]*>)/i, (_m, tag) => `${tag}${script}`);
+    candidates.push(
+      doc.replace(/(<html[^>]*>)/i, (_m, tag) => `${tag}${script}`)
+    );
+    for (const candidate of candidates) {
+      const at = candidate.indexOf(script);
+      // The script string embeds the per-open nonce, so it cannot pre-exist
+      // in the content; a match proves this candidate really injected it.
+      if (at !== -1 && !insideHtmlComment(candidate, at)) return candidate;
+    }
   }
   return `<!doctype html><html><head>${charset}${script}</head><body>${content}</body></html>`;
+}
+
+// insideHtmlComment reports whether the character at `index` sits inside an
+// HTML comment: an unmatched "<!--" before it. Pairing opens with "-->" is a
+// heuristic good enough to detect comment-spoofed tag injection (F-B10).
+function insideHtmlComment(doc: string, index: number): boolean {
+  const before = doc.slice(0, index);
+  let opens = 0;
+  for (
+    let i = before.indexOf("<!--");
+    i !== -1;
+    i = before.indexOf("<!--", i + 4)
+  ) {
+    opens++;
+  }
+  if (opens === 0) return false;
+  let closes = 0;
+  for (
+    let i = before.indexOf("-->");
+    i !== -1;
+    i = before.indexOf("-->", i + 3)
+  ) {
+    closes++;
+  }
+  return opens > closes;
 }
