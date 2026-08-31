@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { TwoPaneShell } from "@/components/ui/two-pane-shell";
+import { useOnlineUsers } from "@/composables/use-presence-heartbeat";
 import {
   avatarNameForAgentId,
   avatarNameForUserId,
@@ -352,7 +353,7 @@ function MemberRow({
   // Human presence reads the heartbeat map (refreshed by the dashboard
   // heartbeat tick); agent presence rides the ConnectionBadge like the
   // Agents page. Both surfaces render the same "Online"/"Offline" strings.
-  const onlineUsers = useAppStore((s) => s.onlineUsers);
+  const onlineUsers = useOnlineUsers();
   const userOnline = !isAgent && onlineUsers[member.name] === true;
 
   return (

@@ -41,6 +41,7 @@ import {
 import { commandServiceClient } from "@/connect";
 import { useAvatar } from "@/lib/avatar-cache";
 import "@/lib/markdown";
+import { useOnlineUsers } from "@/composables/use-presence-heartbeat";
 import { peerPresenceOnline } from "@/lib/presence";
 import { toastManager } from "@/lib/toast";
 import { useIsDesktop } from "@/lib/use-is-desktop";
@@ -229,7 +230,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // rail: agents from the roster's connection state, humans from the presence
   // heartbeat slice. Both are refreshed by ChatLayout's 30s tick.
   const agents = useAppStore((s) => s.agents);
-  const onlineUsers = useAppStore((s) => s.onlineUsers);
+  const onlineUsers = useOnlineUsers();
   const openThread = useAppStore((s) => s.openThread);
   const closeThread = useAppStore((s) => s.closeThread);
   const activeThreadRoot = useAppStore((s) => s.activeThreadRoot);

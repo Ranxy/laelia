@@ -1,6 +1,8 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PRESENCES_QUERY_KEY } from "@/composables/use-presence-heartbeat";
 import { useAppStore } from "@/stores";
 import type { MemberSummary } from "@/stores/ui-models";
 import type { Conversation } from "@/types/proto-es/v1/command_pb";
@@ -57,7 +59,15 @@ function seedStore() {
   });
 }
 
+// Human presence badges read the Query cache now (the dashboard heartbeat is
+// its only writer); presence tests seed it via presenceSeeds at render time.
+let presenceSeeds: Record<string, boolean> = {};
+
 function renderPage() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  client.setQueryData(PRESENCES_QUERY_KEY, { ...presenceSeeds });
   const router = createMemoryRouter(
     [
       {
@@ -75,7 +85,11 @@ function renderPage() {
     ],
     { initialEntries: ["/members"] }
   );
-  return render(<RouterProvider router={router} />);
+  return render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
 }
 
 function searchInput() {
@@ -221,11 +235,11 @@ describe("MembersPage channels roster", () => {
 describe("MembersPage presence badge", () => {
   afterEach(() => {
     document.body.innerHTML = "";
-    useAppStore.setState({ onlineUsers: {} });
+    presenceSeeds = {};
   });
 
   it("shows Online/Offline string badges for humans like the agents page", () => {
-    useAppStore.setState({ onlineUsers: { "users/1": true } });
+    presenceSeeds = { "users/1": true };
     renderPage();
 
     // Alice (users/1) heartbeated recently → Online badge; Bob has no
@@ -236,9 +250,7 @@ describe("MembersPage presence badge", () => {
   });
 
   it("leaves agent rows on the connection badge, not the presence one", () => {
-    useAppStore.setState({
-      onlineUsers: { "users/1": true, "agents/beta": true },
-    });
+    presenceSeeds = { "users/1": true, "agents/beta": true };
     renderPage();
 
     // The beta agent is ONLINE, but agent rows use the ConnectionBadge

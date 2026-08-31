@@ -1,6 +1,8 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PRESENCES_QUERY_KEY } from "@/composables/use-presence-heartbeat";
 import type { ChannelMember } from "@/types/proto-es/v1/command_pb";
 import { ChannelMembersPanel } from "./channel-members-panel";
 
@@ -70,6 +72,7 @@ const roster: ChannelMember[] = [
 ] as unknown as ChannelMember[];
 
 function seedStore(overrides: Record<string, unknown> = {}) {
+  presenceSeeds = { "users/alice": true, "users/bob": false };
   useAppStore.setState({
     channelMembersByConv: { "conversations/c1": roster },
     channelMembersLoading: {},
@@ -80,7 +83,6 @@ function seedStore(overrides: Record<string, unknown> = {}) {
       { name: "agents/online-agent", status: { state: 1 } }, // ONLINE
       { name: "agents/offline-agent", status: { state: 2 } }, // OFFLINE
     ] as never,
-    onlineUsers: { "users/alice": true, "users/bob": false },
     ...overrides,
   });
 }
@@ -93,19 +95,29 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-// The panel renders the member detail Sheet, which uses useNavigate.
+// The panel renders the member detail Sheet, which uses useNavigate. Human
+// presence badges read the Query cache now (the dashboard heartbeat is its
+// only writer), so the render seeds it from the presenceSeeds map.
+let presenceSeeds: Record<string, boolean> = {};
+
 function renderPanel(
   props?: Partial<Parameters<typeof ChannelMembersPanel>[0]>
 ) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  client.setQueryData(PRESENCES_QUERY_KEY, { ...presenceSeeds });
   return render(
-    <MemoryRouter>
-      <ChannelMembersPanel
-        conversationId="c1"
-        canManage={false}
-        membershipFixed={true}
-        {...props}
-      />
-    </MemoryRouter>
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <ChannelMembersPanel
+          conversationId="c1"
+          canManage={false}
+          membershipFixed={true}
+          {...props}
+        />
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 

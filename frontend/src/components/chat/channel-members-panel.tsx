@@ -9,6 +9,7 @@ import { ConnectionBadge } from "@/components/connection-badge";
 import { MemberPicker as IamMemberPicker } from "@/components/member-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useOnlineUsers } from "@/composables/use-presence-heartbeat";
 import { groupServiceClient, userServiceClient } from "@/connect";
 import {
   avatarNameForAgentId,
@@ -97,7 +98,7 @@ export function ChannelMembersPanel({
   // chat list: agents from the roster's connection state, humans from the
   // presence heartbeat slice (refreshed by the dashboard heartbeat tick).
   const agents = useAppStore((s) => s.agents);
-  const onlineUsers = useAppStore((s) => s.onlineUsers);
+  const onlineUsers = useOnlineUsers();
   const onlineAgentNames = useMemo(() => {
     const online = new Set<string>();
     for (const a of agents) {

@@ -1,5 +1,18 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// ChatConversationPage and ChannelConversationView read the presence map out
+// of the Query cache through useOnlineUsers — tests render under a fresh
+// provider (the badge data itself is covered by use-presence.test.tsx).
+function renderWithQuery(ui: React.ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>
+  );
+}
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -181,7 +194,7 @@ describe("ChatConversationPage init lifecycle", () => {
   });
 
   it("loads messages, members, read-mark and starts the watcher on mount; stops and closes on unmount", async () => {
-    const { unmount } = render(<ChatConversationPage />);
+    const { unmount } = renderWithQuery(<ChatConversationPage />);
 
     await waitFor(() => {
       expect(mockedActions.loadMessages).toHaveBeenCalledWith(CONV);
@@ -196,7 +209,7 @@ describe("ChatConversationPage init lifecycle", () => {
   });
 
   it("renders the message list from the store slice", async () => {
-    render(<ChatConversationPage />);
+    renderWithQuery(<ChatConversationPage />);
     expect(await screen.findByText("hello world")).toBeInTheDocument();
     expect(screen.getByText("second message")).toBeInTheDocument();
   });
@@ -217,7 +230,7 @@ describe("ChatConversationPage thread deep link", () => {
   });
 
   it("opens the thread panel for ?thread= and cleans the URL params", async () => {
-    render(<ChatConversationPage />);
+    renderWithQuery(<ChatConversationPage />);
 
     await waitFor(() => {
       expect(mockedActions.openThread).toHaveBeenCalledWith(
@@ -254,7 +267,7 @@ describe("ChatConversationPage agent-DM view-only", () => {
   });
 
   it("fetches the conversation metadata and replaces the composer with the view-only notice", async () => {
-    render(<ChatConversationPage />);
+    renderWithQuery(<ChatConversationPage />);
 
     await waitFor(() => {
       expect(mockClient.getChannel).toHaveBeenCalledWith({ name: CONV });
@@ -281,7 +294,7 @@ describe("ChannelConversationView embedded mode", () => {
   });
 
   it("uses the explicit conversationId prop over the route param", async () => {
-    render(<ChannelConversationView conversationId="c1" />);
+    renderWithQuery(<ChannelConversationView conversationId="c1" />);
 
     await waitFor(() => {
       expect(mockedActions.loadMessages).toHaveBeenCalledWith(CONV);

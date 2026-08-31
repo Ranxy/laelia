@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useOnlineUsers } from "@/composables/use-presence-heartbeat";
 import { useAvatar } from "@/lib/avatar-cache";
 import { formatConversationListTime } from "@/lib/command-status";
 import { isAgentOnline } from "@/lib/presence";
@@ -101,7 +102,7 @@ export function ConversationList() {
   // agent roster's connection state, humans from the presence heartbeat slice.
   // Both are refreshed by ChatLayout's 30s tick.
   const agents = useAppStore((s) => s.agents);
-  const onlineUsers = useAppStore((s) => s.onlineUsers);
+  const onlineUsers = useOnlineUsers();
   const isDesktop = useIsDesktop();
 
   const [createOpen, setCreateOpen] = useState(false);

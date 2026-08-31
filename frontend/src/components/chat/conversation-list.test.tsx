@@ -1,5 +1,7 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PRESENCES_QUERY_KEY } from "@/composables/use-presence-heartbeat";
 
 // ConversationList uses react-i18next (no provider in tests) and the app
 // store. Stub i18n with a key/count mapper so assertions read the keys, and
@@ -95,6 +97,20 @@ function channel(overrides: Record<string, unknown> = {}): Conversation {
   } as unknown as Conversation;
 }
 
+// Human presence badges read the Query cache now (the dashboard heartbeat is
+// its only writer), so tests seed it with the mock map at render time.
+function renderList() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  client.setQueryData(PRESENCES_QUERY_KEY, { ...mock.onlineUsers });
+  return render(
+    <QueryClientProvider client={client}>
+      <ConversationList />
+    </QueryClientProvider>
+  );
+}
+
 describe("ConversationList last-message preview", () => {
   afterEach(() => {
     document.body.innerHTML = "";
@@ -104,7 +120,7 @@ describe("ConversationList last-message preview", () => {
 
   it("does not render a member count after the channel name", () => {
     mock.channels = [channel()];
-    render(<ConversationList />);
+    renderList();
     expect(screen.getByText("Design")).toBeInTheDocument();
     // Member counts were removed from the chat list so long channel names can
     // use the full row width.
@@ -121,7 +137,7 @@ describe("ConversationList last-message preview", () => {
         lastMessagePrincipalId: "ran-user-1",
       }),
     ];
-    render(<ConversationList />);
+    renderList();
     expect(screen.getByText("chat.you: on my way")).toBeInTheDocument();
   });
 
@@ -133,7 +149,7 @@ describe("ConversationList last-message preview", () => {
         lastMessagePrincipalId: "bob-user-1",
       }),
     ];
-    render(<ConversationList />);
+    renderList();
     expect(screen.getByText("Bob: lgtm")).toBeInTheDocument();
   });
 
@@ -152,13 +168,13 @@ describe("ConversationList last-message preview", () => {
         },
       }),
     ];
-    render(<ConversationList />);
+    renderList();
     expect(screen.getByText("09:05")).toBeInTheDocument();
   });
 
   it("keeps the preview line for conversations with no messages yet", () => {
     mock.channels = [channel()];
-    render(<ConversationList />);
+    renderList();
     // The row still renders its title and no preview text or time appears.
     expect(screen.getByText("Design")).toBeInTheDocument();
     expect(screen.queryByText(/chat.you:|Alice:|Bob:/)).not.toBeInTheDocument();
@@ -175,7 +191,7 @@ describe("ConversationList filters", () => {
 
   it("renders the five desktop filter tags", () => {
     mock.channels = [channel()];
-    render(<ConversationList />);
+    renderList();
     expect(
       screen.getByRole("group", { name: "chat.filter-label" })
     ).toBeInTheDocument();
@@ -207,7 +223,7 @@ describe("ConversationList filters", () => {
       }),
     ];
     mock.unreadByConv = { "conversations/ch2": 2 };
-    render(<ConversationList />);
+    renderList();
     expect(screen.getByText("Channel")).toBeInTheDocument();
     expect(screen.getByText("Agent DM")).toBeInTheDocument();
 
@@ -232,7 +248,7 @@ describe("ConversationList filters", () => {
         peer: "users/alice",
       }),
     ];
-    render(<ConversationList />);
+    renderList();
     expect(screen.getByText("Group")).toBeInTheDocument();
     expect(screen.getByText("Agent")).toBeInTheDocument();
     expect(screen.getByText("Human")).toBeInTheDocument();
@@ -263,7 +279,7 @@ describe("ConversationList filters", () => {
         peer: "agents/agent-1",
       }),
     ];
-    render(<ConversationList />);
+    renderList();
 
     fireEvent.click(screen.getByRole("button", { name: "chat.filter-agents" }));
     expect(screen.queryByText("Group")).not.toBeInTheDocument();
@@ -284,7 +300,7 @@ describe("ConversationList filters", () => {
         peer: "agents/agent-1",
       }),
     ];
-    render(<ConversationList />);
+    renderList();
 
     fireEvent.click(screen.getByRole("button", { name: "chat.filter-agents" }));
     expect(screen.queryByText("Group")).not.toBeInTheDocument();
@@ -302,7 +318,7 @@ describe("ConversationList filters", () => {
 
   it("persists the selection to localStorage for the current account", () => {
     mock.channels = [channel()];
-    render(<ConversationList />);
+    renderList();
     fireEvent.click(screen.getByRole("button", { name: "chat.filter-groups" }));
     expect(localStorage.getItem("laelia-chat-filter:ran-user-1")).toBe(
       "groups"
@@ -320,7 +336,7 @@ describe("ConversationList filters", () => {
         peer: "users/user",
       }),
     ];
-    render(<ConversationList />);
+    renderList();
     expect(screen.queryByText("Group")).not.toBeInTheDocument();
     expect(screen.getByText("Human")).toBeInTheDocument();
   });
@@ -328,7 +344,7 @@ describe("ConversationList filters", () => {
   it("renders the filter chips on mobile and collapses via the funnel", () => {
     mock.useIsDesktop.mockReturnValue(false);
     mock.channels = [channel()];
-    render(<ConversationList />);
+    renderList();
     expect(
       screen.getByRole("group", { name: "chat.filter-label" })
     ).toBeInTheDocument();
@@ -357,7 +373,7 @@ describe("ConversationList filters", () => {
         peer: "users/alice",
       }),
     ];
-    render(<ConversationList />);
+    renderList();
     fireEvent.click(screen.getByRole("button", { name: "chat.filter-humans" }));
     expect(
       screen.getByText("chat.filter-notice:chat.filter-humans")
@@ -379,14 +395,14 @@ describe("ConversationList mobile create-channel FAB", () => {
   });
 
   it("renders the expanded pill (icon + label) by default", () => {
-    render(<ConversationList />);
+    renderList();
     const fab = screen.getByTestId("create-channel-fab");
     expect(fab).toBeInTheDocument();
     expect(screen.getByText("channel.fab-label")).toBeInTheDocument();
   });
 
   it("collapses to the bare icon while the list is scrolled down", () => {
-    render(<ConversationList />);
+    renderList();
     const list = screen.getByTestId("conversation-list-scroll");
     expect(screen.getByText("channel.fab-label")).toBeInTheDocument();
 
@@ -401,7 +417,7 @@ describe("ConversationList mobile create-channel FAB", () => {
   });
 
   it("opens the create dialog from the FAB", () => {
-    render(<ConversationList />);
+    renderList();
     fireEvent.click(screen.getByTestId("create-channel-fab"));
     expect(screen.getByText("channel.create-title")).toBeInTheDocument();
   });
@@ -421,7 +437,7 @@ describe("ConversationList close and context menu", () => {
 
   it("closes a conversation from the desktop context menu", () => {
     mock.channels = [channel()];
-    render(<ConversationList />);
+    renderList();
     fireEvent.contextMenu(screen.getByText("Design"));
     expect(screen.getByText("channel.pin")).toBeInTheDocument();
     expect(screen.getByText("chat.close")).toBeInTheDocument();
@@ -432,7 +448,7 @@ describe("ConversationList close and context menu", () => {
 
   it("offers an undo toast whose action reopens the conversation", () => {
     mock.channels = [channel()];
-    render(<ConversationList />);
+    renderList();
     fireEvent.contextMenu(screen.getByText("Design"));
     fireEvent.click(screen.getByText("chat.close"));
 
@@ -451,7 +467,7 @@ describe("ConversationList close and context menu", () => {
 
   it("pins and unpins from the desktop context menu", () => {
     mock.channels = [channel()];
-    render(<ConversationList />);
+    renderList();
     fireEvent.contextMenu(screen.getByText("Design"));
     fireEvent.click(screen.getByText("channel.pin"));
     expect(mock.setConversationPinned).toHaveBeenCalledWith("ch1", true);
@@ -459,7 +475,7 @@ describe("ConversationList close and context menu", () => {
 
   it("mutes and unmutes from the desktop context menu", () => {
     mock.channels = [channel()];
-    render(<ConversationList />);
+    renderList();
     fireEvent.contextMenu(screen.getByText("Design"));
     fireEvent.click(screen.getByText("channel.mute"));
     expect(mock.setConversationMuted).toHaveBeenCalledWith("ch1", true);
@@ -468,7 +484,7 @@ describe("ConversationList close and context menu", () => {
   it("shows both swipe actions on mobile and closes on the close tap", () => {
     mock.useIsDesktop.mockReturnValue(false);
     mock.channels = [channel()];
-    render(<ConversationList />);
+    renderList();
     // The two swipe buttons sit side by side behind the row.
     expect(screen.getByTestId("swipe-close")).toBeInTheDocument();
     expect(screen.getByTestId("swipe-pin")).toBeInTheDocument();
@@ -480,7 +496,7 @@ describe("ConversationList close and context menu", () => {
   it("does not mount the context menu trigger on mobile", () => {
     mock.useIsDesktop.mockReturnValue(false);
     mock.channels = [channel()];
-    render(<ConversationList />);
+    renderList();
     fireEvent.contextMenu(screen.getByText("Design"));
     expect(screen.queryByText("chat.close")).not.toBeInTheDocument();
   });
@@ -508,7 +524,7 @@ describe("ConversationList agent badge", () => {
         peer: "users/alice",
       }),
     ];
-    render(<ConversationList />);
+    renderList();
 
     // The mocked t returns keys, so the badge text is the chat.agent key.
     expect(screen.getAllByText("chat.agent")).toHaveLength(1);
@@ -549,7 +565,7 @@ describe("ConversationList presence badge", () => {
         peer: "agents/stopped-agent",
       }),
     ];
-    render(<ConversationList />);
+    renderList();
 
     // Exactly one green dot: the ONLINE agent's row.
     expect(screen.getAllByTestId("presence-badge")).toHaveLength(1);
@@ -571,7 +587,7 @@ describe("ConversationList presence badge", () => {
         peer: "users/bob",
       }),
     ];
-    render(<ConversationList />);
+    renderList();
 
     expect(screen.getAllByTestId("presence-badge")).toHaveLength(1);
   });
@@ -581,7 +597,7 @@ describe("ConversationList presence badge", () => {
     mock.channels = [
       channel({ name: "conversations/ch1", title: "Design", type: 2 }),
     ];
-    render(<ConversationList />);
+    renderList();
 
     expect(screen.queryByTestId("presence-badge")).not.toBeInTheDocument();
   });
