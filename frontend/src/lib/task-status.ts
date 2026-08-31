@@ -1,11 +1,5 @@
+import type { BadgeVariant } from "@/components/ui/badge";
 import { TaskStatus } from "@/types/proto-es/v1/command_pb";
-
-type BadgeVariant =
-  | "default"
-  | "secondary"
-  | "success"
-  | "warning"
-  | "destructive";
 
 // taskStatusToVariant picks a Badge color per task status. TODO is neutral,
 // IN_PROGRESS is an active amber, IN_REVIEW is the amber "pending human"

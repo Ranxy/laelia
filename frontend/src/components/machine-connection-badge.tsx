@@ -1,24 +1,37 @@
-import { useTranslation } from "react-i18next";
-import { Badge } from "@/components/ui/badge";
+import type { StatusBadgeEntry } from "@/components/ui/status-badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { MachineStatus_ConnectionState } from "@/types/proto-es/v1/machine_pb";
 
 // MachineConnectionBadge renders the machine's connection state. It mirrors
 // ConnectionBadge but for the machine-scoped MachineStatus_ConnectionState
 // enum (which adds a KICKED state).
+const machineConnectionEntry: Partial<
+  Record<MachineStatus_ConnectionState, StatusBadgeEntry>
+> = {
+  [MachineStatus_ConnectionState.ONLINE]: {
+    variant: "success",
+    labelKey: "machine.status-online",
+  },
+  [MachineStatus_ConnectionState.ERROR]: {
+    variant: "error",
+    labelKey: "machine.status-error",
+  },
+  [MachineStatus_ConnectionState.KICKED]: {
+    variant: "error",
+    labelKey: "machine.status-kicked",
+  },
+};
+
 export function MachineConnectionBadge({
   state,
 }: {
   state?: MachineStatus_ConnectionState;
 }) {
-  const { t } = useTranslation();
-  switch (state) {
-    case MachineStatus_ConnectionState.ONLINE:
-      return <Badge variant="success">{t("machine.status-online")}</Badge>;
-    case MachineStatus_ConnectionState.ERROR:
-      return <Badge variant="destructive">{t("machine.status-error")}</Badge>;
-    case MachineStatus_ConnectionState.KICKED:
-      return <Badge variant="destructive">{t("machine.status-kicked")}</Badge>;
-    default:
-      return <Badge variant="secondary">{t("machine.status-offline")}</Badge>;
-  }
+  return (
+    <StatusBadge
+      mapping={machineConnectionEntry}
+      status={state}
+      fallback={{ variant: "secondary", labelKey: "machine.status-offline" }}
+    />
+  );
 }

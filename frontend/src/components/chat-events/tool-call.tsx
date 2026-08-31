@@ -57,17 +57,17 @@ export function ChatToolCall({
         </span>
         {isFinished ? (
           <Badge
+            size="sm"
             variant={
               status === "completed" || status === "success"
                 ? "success"
                 : "secondary"
             }
-            className="text-[10px] px-1.5 py-0"
           >
             {t("chat.tool-finished")}
           </Badge>
         ) : (
-          <Badge variant="warning" className="text-[10px] px-1.5 py-0">
+          <Badge size="sm" variant="warning">
             {t("chat.tool-started")}
           </Badge>
         )}

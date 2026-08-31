@@ -1,29 +1,34 @@
-import { useTranslation } from "react-i18next";
-import { Badge } from "@/components/ui/badge";
+import type { StatusBadgeEntry } from "@/components/ui/status-badge";
+import { mergeStatusMapping, StatusBadge } from "@/components/ui/status-badge";
 import {
   reminderStatusToI18nKey,
   reminderStatusToVariant,
 } from "@/lib/reminder-status";
-import { cn } from "@/lib/utils";
 
-interface ReminderStatusBadgeProps {
-  status: number;
-  className?: string;
-}
+const reminderStatusEntry = mergeStatusMapping(
+  reminderStatusToVariant,
+  reminderStatusToI18nKey
+);
+const reminderStatusFallback: StatusBadgeEntry = {
+  variant: "default",
+  labelKey: "reminders.status-unknown",
+};
 
 // ReminderStatusBadge renders a colored status pill for a reminder, mirroring
 // CommandStatusBadge.
 export function ReminderStatusBadge({
   status,
   className,
-}: ReminderStatusBadgeProps) {
-  const { t } = useTranslation();
-  const variant = reminderStatusToVariant[status] ?? "default";
-  const labelKey =
-    reminderStatusToI18nKey[status] ?? "reminders.status-unknown";
+}: {
+  status: number;
+  className?: string;
+}) {
   return (
-    <Badge variant={variant} className={cn(className)}>
-      {t(labelKey)}
-    </Badge>
+    <StatusBadge
+      mapping={reminderStatusEntry}
+      status={status}
+      fallback={reminderStatusFallback}
+      className={className}
+    />
   );
 }

@@ -20,8 +20,6 @@ const buttonVariants = cva(
         link: "text-accent underline-offset-4 hover:underline",
       },
       size: {
-        // `default` is an alias for `md` — both render identically.
-        default: "h-9 px-3 text-sm leading-5",
         xs: "h-6 px-1.5 text-xs leading-4 gap-1.5",
         sm: "h-7 px-2 text-xs leading-4",
         md: "h-9 px-3 text-sm leading-5",
@@ -30,7 +28,7 @@ const buttonVariants = cva(
     },
     defaultVariants: {
       variant: "default",
-      size: "default",
+      size: "md",
     },
   }
 );

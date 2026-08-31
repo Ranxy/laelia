@@ -1,14 +1,8 @@
+import type { BadgeVariant } from "@/components/ui/badge";
 import {
   CommandEventType,
   CommandStatus,
 } from "@/types/proto-es/v1/command_pb";
-
-type BadgeVariant =
-  | "default"
-  | "secondary"
-  | "success"
-  | "warning"
-  | "destructive";
 
 const commandStatusToI18nKey: Record<CommandStatus, string> = {
   [CommandStatus.COMMAND_STATUS_UNSPECIFIED]: "command.status-unknown",
@@ -25,9 +19,9 @@ const commandStatusToVariant: Record<CommandStatus, BadgeVariant> = {
   [CommandStatus.PENDING]: "secondary",
   [CommandStatus.RUNNING]: "warning",
   [CommandStatus.COMPLETED]: "success",
-  [CommandStatus.FAILED]: "destructive",
-  [CommandStatus.CANCELLED]: "destructive",
-  [CommandStatus.TIMEOUT]: "destructive",
+  [CommandStatus.FAILED]: "error",
+  [CommandStatus.CANCELLED]: "error",
+  [CommandStatus.TIMEOUT]: "error",
 };
 
 const commandEventTypeToI18nKey: Partial<Record<CommandEventType, string>> = {
@@ -130,7 +124,6 @@ function commandIdFromName(name: string | undefined): string | undefined {
   return name.split("/").pop();
 }
 
-export type { BadgeVariant };
 export {
   agentResourceName,
   commandEventTypeToI18nKey,

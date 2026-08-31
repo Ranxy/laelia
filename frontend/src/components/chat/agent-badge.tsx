@@ -8,10 +8,7 @@ import { cn } from "@/lib/utils";
 export function AgentBadge({ className }: { className?: string }) {
   const { t } = useTranslation();
   return (
-    <Badge
-      variant="secondary"
-      className={cn("shrink-0 px-1.5 py-0 text-[10px] leading-4", className)}
-    >
+    <Badge size="sm" variant="secondary" className={cn("shrink-0", className)}>
       {t("chat.agent")}
     </Badge>
   );

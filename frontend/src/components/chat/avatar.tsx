@@ -2,6 +2,20 @@ import { useState } from "react";
 import { PixelAvatar } from "@/components/chat/pixel-avatar";
 import { cn } from "@/lib/utils";
 
+type AvatarSize = 6 | 7 | 8 | 10 | 12 | 14 | 16;
+
+// Explicit map: a `size-${size}` template string would only resolve if
+// Tailwind's scanner happened to catch the composed class names.
+const AVATAR_SIZE_CLASS: Record<AvatarSize, string> = {
+  6: "size-6",
+  7: "size-7",
+  8: "size-8",
+  10: "size-10",
+  12: "size-12",
+  14: "size-14",
+  16: "size-16",
+};
+
 // Shared by both chat pages (DM + channel), thread panels, and comment asides
 // so the avatar rendering stays in one place.
 //
@@ -29,14 +43,14 @@ export function Avatar({
   src?: string | null;
   seed: string;
   accent?: boolean;
-  size?: 6 | 7 | 8 | 10 | 12 | 14 | 16;
+  size?: AvatarSize;
   online?: boolean;
   // Tooltip carried by the badge wrapper (e.g. the localized "Online" label).
   title?: string;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = src && !imgFailed;
-  const sizeClass = `size-${size}`;
+  const sizeClass = AVATAR_SIZE_CLASS[size];
   const core = showImage ? (
     // alt is empty so screen readers skip the decorative avatar; the adjacent
     // header carries the sender's name.

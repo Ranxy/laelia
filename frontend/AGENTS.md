@@ -15,7 +15,7 @@ React UI components live in `src/components/ui/` and follow shadcn-style pattern
 
 ### Rules
 
-- **Use existing UI components first** — check `src/components/ui/` before writing custom markup. Use `Badge` not styled spans, `Alert` not custom callout divs, `Separator` not `<hr>` or `border-t` divs
+- **Use existing UI components first** — check `src/components/ui/` before writing custom markup. Use `Badge` not styled spans and `Alert` not custom callout divs. For horizontal dividers hand-write `border-t border-control-border` (semantic border token) — the `Separator` component was deleted and this divider form is the established convention; do not reintroduce a `Separator` component or a bare `<hr>`
 - **Use semantic color tokens** — `bg-accent`, `text-control`, `border-control-border`, `bg-error`, `text-warning`, etc. Never use raw color values like `bg-blue-500`, `text-gray-600`, or `bg-red-500`. Semantic tokens are defined as CSS custom properties in `src/assets/css/tailwind.css`
 - **Use `gap-*` not `space-x-*` / `space-y-*`** — always use `flex gap-*` or `grid gap-*` for spacing between children
 - **Use `size-*` for equal dimensions** — `size-4` not `w-4 h-4`
@@ -89,3 +89,15 @@ React UI components live in `src/components/ui/` and follow shadcn-style pattern
 - **Dialog/Sheet must have a Title** — required for accessibility. Use `className="sr-only"` if visually hidden
 - **Avatar must have a fallback** — for when the image fails to load
 - **TabsTrigger must be inside TabsList** — never render triggers directly in Tabs
+
+## Component API Conventions
+
+- **Named export function components** — every component is a `function` exported by name; the file name matches the component name.
+- **ref-as-prop** — destructure `ref` explicitly from props (React 19 style); do not add new `forwardRef` wrappers.
+- **cva variants stay module-private** — the `*Variants` object is never exported (unused variants die instead of growing public API).
+- **`cn()` composition** — `cn(cmpVariants({ variant, size, className }))`; `className` is always the last cva argument, never concatenated separately.
+- **Size vocabulary** — `xs | sm | md | lg`, plus `sm` on `Badge` for compact pills. No alias keys such as `default`.
+- **Tone vocabulary** — color variants use `default | secondary | success | warning | error | info` (Badge/Alert/Toast). `Button`'s `destructive` and `destructive-outline` are dangerous-action semantics, not tone words, and intentionally stay outside this vocabulary.
+- **Enum→label pills use `StatusBadge`** — shared `{variant, labelKey}` lookups go through `components/ui/status-badge.tsx`; keep per-domain tables in `lib/` and mount `StatusBadge` with thin glue.
+- **Overlays portal through layers** — floating UI always renders via `getLayerRoot(<family>)`; a new floating component must expose a portal capability itself.
+- **No `asChild`** — extend components through Base UI's `render` prop instead of introducing a Radix-style child API.

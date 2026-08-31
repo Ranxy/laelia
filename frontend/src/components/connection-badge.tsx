@@ -1,6 +1,23 @@
-import { useTranslation } from "react-i18next";
-import { Badge } from "@/components/ui/badge";
+import type { StatusBadgeEntry } from "@/components/ui/status-badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { AgentStatus_ConnectionState } from "@/types/proto-es/v1/agent_pb";
+
+const connectionStateEntry: Partial<
+  Record<AgentStatus_ConnectionState, StatusBadgeEntry>
+> = {
+  [AgentStatus_ConnectionState.STOPPED]: {
+    variant: "secondary",
+    labelKey: "agent.lifecycle.stopped",
+  },
+  [AgentStatus_ConnectionState.ONLINE]: {
+    variant: "success",
+    labelKey: "agent.status-online",
+  },
+  [AgentStatus_ConnectionState.ERROR]: {
+    variant: "error",
+    labelKey: "agent.status-error",
+  },
+};
 
 interface ConnectionBadgeProps {
   state?: AgentStatus_ConnectionState;
@@ -11,18 +28,17 @@ interface ConnectionBadgeProps {
 }
 
 function ConnectionBadge({ state, enabled }: ConnectionBadgeProps) {
-  const { t } = useTranslation();
-  if (enabled === false || state === AgentStatus_ConnectionState.STOPPED) {
-    return <Badge variant="secondary">{t("agent.lifecycle.stopped")}</Badge>;
-  }
-  switch (state) {
-    case AgentStatus_ConnectionState.ONLINE:
-      return <Badge variant="success">{t("agent.status-online")}</Badge>;
-    case AgentStatus_ConnectionState.ERROR:
-      return <Badge variant="destructive">{t("agent.status-error")}</Badge>;
-    default:
-      return <Badge variant="secondary">{t("agent.status-offline")}</Badge>;
-  }
+  const resolved =
+    enabled === false || state === AgentStatus_ConnectionState.STOPPED
+      ? AgentStatus_ConnectionState.STOPPED
+      : state;
+  return (
+    <StatusBadge
+      mapping={connectionStateEntry}
+      status={resolved}
+      fallback={{ variant: "secondary", labelKey: "agent.status-offline" }}
+    />
+  );
 }
 
 export { ConnectionBadge };

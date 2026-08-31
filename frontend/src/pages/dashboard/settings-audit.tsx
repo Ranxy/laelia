@@ -233,9 +233,7 @@ export function SettingsAuditPage() {
                   </TableCell>
                   <TableCell>
                     <Badge
-                      variant={
-                        log.status === "ok" ? "secondary" : "destructive"
-                      }
+                      variant={log.status === "ok" ? "secondary" : "error"}
                     >
                       {log.status}
                     </Badge>

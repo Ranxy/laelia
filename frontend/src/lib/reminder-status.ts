@@ -1,24 +1,18 @@
+import type { BadgeVariant } from "@/components/ui/badge";
 import { ReminderStatus } from "@/types/proto-es/v1/command_pb";
-
-type BadgeVariant =
-  | "default"
-  | "secondary"
-  | "success"
-  | "warning"
-  | "destructive";
 
 // reminderStatusToVariant picks a Badge color per reminder status. PENDING is
 // neutral, DUE is an active amber, COMPLETED is success green, MISSED is the
 // warning amber (a fire was skipped but the reminder may reschedule), and
-// CANCELLED/FAILED are destructive.
+// CANCELLED/FAILED are error.
 export const reminderStatusToVariant: Record<number, BadgeVariant> = {
   [ReminderStatus.UNSPECIFIED]: "default",
   [ReminderStatus.PENDING]: "secondary",
   [ReminderStatus.DUE]: "warning",
   [ReminderStatus.COMPLETED]: "success",
-  [ReminderStatus.CANCELLED]: "destructive",
+  [ReminderStatus.CANCELLED]: "error",
   [ReminderStatus.MISSED]: "warning",
-  [ReminderStatus.FAILED]: "destructive",
+  [ReminderStatus.FAILED]: "error",
 };
 
 // reminderStatusToI18nKey maps a ReminderStatus to its i18n key under reminders.
