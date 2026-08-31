@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { ThreadPanel } from "@/components/chat/thread-panel";
@@ -23,11 +23,15 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  isTerminal,
+  useCancelReminder,
+  useReminder,
+  useUpdateReminder,
+} from "@/composables/use-reminder-detail";
 import { formatTimestamp } from "@/lib/command-status";
-import { usePolling } from "@/lib/use-polling";
 import { useAppStore } from "@/stores";
 import type { Reminder } from "@/types/proto-es/v1/command_pb";
-import { ReminderStatus } from "@/types/proto-es/v1/command_pb";
 
 // Common IANA timezones offered in the edit sheet. The agent/user may also type
 // a custom zone; the manager validates it.
@@ -47,11 +51,6 @@ const COMMON_TZ = [
   "America/Sao_Paulo",
 ];
 
-// Detail-page re-fetch cadence. Terminal reminders (COMPLETED/CANCELLED/
-// FAILED) are immutable end states, so the 2s re-fetch loop is stopped once
-// the page observes a terminal status.
-const DETAIL_POLL_INTERVAL_MS = 2000;
-
 // toDatetimeLocal converts a reminder fire_at timestamp to the value a
 // <input type="datetime-local"> expects (local time, "YYYY-MM-DDTHH:MM").
 function toDatetimeLocal(ts: Reminder["fireAt"]): string {
@@ -63,7 +62,8 @@ function toDatetimeLocal(ts: Reminder["fireAt"]): string {
   )}:${pad(d.getMinutes())}`;
 }
 
-// fromDatetimeLocal parses a datetime-local string into a Date for the store.
+// fromDatetimeLocal parses a datetime-local string into a Date for the
+// reminder request.
 function fromDatetimeLocal(s: string): Date | undefined {
   if (!s) return undefined;
   const d = new Date(s);
@@ -87,20 +87,18 @@ export function ReminderDetailPage() {
     agentId: string;
     reminderId: string;
   }>();
-  const getReminder = useAppStore((s) => s.getReminder);
-  const updateReminder = useAppStore((s) => s.updateReminder);
-  const cancelReminder = useAppStore((s) => s.cancelReminder);
   const channels = useAppStore((s) => s.channels);
   const openThread = useAppStore((s) => s.openThread);
   const closeThread = useAppStore((s) => s.closeThread);
 
-  const [reminder, setReminder] = useState<Reminder | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
+  const name = `reminders/${reminderId}`;
+  const { reminder, initial } = useReminder(name);
+  const updateReminder = useUpdateReminder();
+  const cancelReminder = useCancelReminder();
+
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [actionError, setActionError] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
 
   // Edit-form state. Populated from the reminder when the sheet opens.
   const [taskContent, setTaskContent] = useState("");
@@ -108,34 +106,9 @@ export function ReminderDetailPage() {
   const [cronExpr, setCronExpr] = useState("");
   const [tz, setTz] = useState("UTC");
 
-  const name = `reminders/${reminderId}`;
-
-  const load = useCallback(async () => {
-    if (!reminderId) return;
-    const r = await getReminder(name);
-    if (r) setReminder(r);
-    setLoading(false);
-  }, [reminderId, name, getReminder]);
-
-  // Terminal reminders cannot be edited or cancelled.
-  const isTerminal =
-    reminder?.status === ReminderStatus.COMPLETED ||
-    reminder?.status === ReminderStatus.CANCELLED ||
-    reminder?.status === ReminderStatus.FAILED;
-
-  useEffect(() => {
-    void load();
-    // Initial load only — the re-fetch loop runs through usePolling below.
-  }, [load]);
-
-  // Terminal reminders cannot be edited or cancelled, so stop the poll loop
-  // (COMPLETED/CANCELLED/FAILED are immutable: polling would only burn
-  // requests). While the status is still active (or not yet loaded,
-  // `undefined` → not terminal) the loop keeps refreshing. Manual updates
-  // (edit/cancel actions) set the reminder directly. Visibility-gated via
-  // usePolling: a background tab stops re-fetching and returning to the
-  // foreground refreshes immediately.
-  usePolling(load, DETAIL_POLL_INTERVAL_MS, { enabled: !isTerminal });
+  // The mutations' isPending replaces the old saving/cancelling flags.
+  const saving = updateReminder.isPending;
+  const cancelling = cancelReminder.isPending;
 
   // Open the reminder's discussion thread so ThreadPanel has messages to
   // render. ThreadPanel reads threadByRoot[rootId], which is populated by
@@ -160,54 +133,45 @@ export function ReminderDetailPage() {
     setEditOpen(true);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!reminder) return;
-    setSaving(true);
     setActionError("");
-    try {
-      // For a one-shot reminder fire_at is required; for a recurring reminder
-      // it may be omitted and the manager computes the next cron fire.
-      const fireAt = fromDatetimeLocal(fireAtLocal);
-      if (!cronExpr && !fireAt) {
-        setActionError(t("reminders.edit-fire-required"));
-        setSaving(false);
-        return;
-      }
-      const updated = await updateReminder(reminder.name!, {
-        fireAt,
-        cronExpr,
-        tz,
-        taskContent,
-      });
-      if (updated) {
-        setReminder(updated);
-        setEditOpen(false);
-      } else {
-        setActionError(t("reminders.edit-failed"));
-      }
-    } finally {
-      setSaving(false);
+    // For a one-shot reminder fire_at is required; for a recurring reminder
+    // it may be omitted and the manager computes the next cron fire.
+    const fireAt = fromDatetimeLocal(fireAtLocal);
+    if (!cronExpr && !fireAt) {
+      setActionError(t("reminders.edit-fire-required"));
+      return;
     }
+    updateReminder.mutate(
+      {
+        name: reminder.name!,
+        fields: { fireAt, cronExpr, tz, taskContent },
+      },
+      {
+        // A successful update backfills the detail cache from the mutation's
+        // onSuccess, so closing the sheet shows the new state immediately
+        // (the old code's `setReminder(updated); setEditOpen(false)`).
+        onSuccess: () => setEditOpen(false),
+        // The old implementation let a rejected update escape as an unhandled
+        // rejection (store action threw); landing it in actionError is a
+        // deliberate small improvement.
+        onError: () => setActionError(t("reminders.edit-failed")),
+      }
+    );
   };
 
-  const handleCancel = async () => {
+  const handleCancel = () => {
     if (!reminder?.name) return;
-    setCancelling(true);
     setActionError("");
-    try {
-      const updated = await cancelReminder(reminder.name);
-      if (updated) {
-        setReminder(updated);
-        setCancelOpen(false);
-      } else {
-        setActionError(t("reminders.cancel-failed"));
-      }
-    } finally {
-      setCancelling(false);
-    }
+    cancelReminder.mutate(reminder.name, {
+      onSuccess: () => setCancelOpen(false),
+      // Same unhandled-rejection fix as handleSave.
+      onError: () => setActionError(t("reminders.cancel-failed")),
+    });
   };
 
-  if (loading) {
+  if (initial) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-control-light">
         {t("common.loading")}
@@ -215,6 +179,8 @@ export function ReminderDetailPage() {
     );
   }
 
+  // No data and not on the initial load — includes a failed RPC (the old
+  // getReminder caught errors and returned undefined, landing here too).
   if (!reminder) {
     return (
       <div className="flex h-full flex-col">
@@ -233,6 +199,8 @@ export function ReminderDetailPage() {
     );
   }
 
+  // Terminal reminders cannot be edited or cancelled.
+  const terminal = isTerminal(reminder);
   const convId = conversationId(reminder);
   const rootId = messageId(reminder);
   const channel = channels.find((c) => c.name.endsWith(`/${convId}`));
@@ -259,7 +227,7 @@ export function ReminderDetailPage() {
               </h1>
               <ReminderStatusBadge status={reminder.status} />
             </div>
-            {!isTerminal && (
+            {!terminal && (
               <div className="flex items-center gap-2 shrink-0">
                 <Button variant="outline" size="sm" onClick={openEdit}>
                   {t("reminders.edit")}

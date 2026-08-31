@@ -1,4 +1,12 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Conversation, Reminder } from "@/types/proto-es/v1/command_pb";
@@ -9,16 +17,25 @@ const mock = vi.hoisted(() => ({
   getReminder: vi.fn(),
   updateReminder: vi.fn(),
   cancelReminder: vi.fn(),
+  // Backstop: nothing on this page should call it, but the mocked client
+  // keeps any stray read off the real transport.
+  listAgents: vi.fn(),
   openThread: vi.fn(),
   closeThread: vi.fn(),
   channels: [] as Conversation[],
 }));
 
-vi.mock("@/stores", () => {
-  const state = {
+vi.mock("@/connect", () => ({
+  commandServiceClient: {
     getReminder: mock.getReminder,
     updateReminder: mock.updateReminder,
     cancelReminder: mock.cancelReminder,
+    listAgents: mock.listAgents,
+  },
+}));
+
+vi.mock("@/stores", () => {
+  const state = {
     openThread: mock.openThread,
     closeThread: mock.closeThread,
     get channels() {
@@ -65,30 +82,37 @@ function reminder(overrides?: Partial<Reminder>): Reminder {
 }
 
 function renderPage() {
-  return render(
-    <MemoryRouter initialEntries={["/members/agents/a1/reminders/r1"]}>
-      <Routes>
-        <Route
-          path="/members/agents/:agentId/reminders/:reminderId"
-          element={<ReminderDetailPage />}
-        />
-        <Route
-          path="/members/agents/:agentId/reminders"
-          element={<div data-testid="list" />}
-        />
-        <Route
-          path="/:conversationId"
-          element={<div data-testid="channel" />}
-        />
-      </Routes>
-    </MemoryRouter>
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const view = render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={["/members/agents/a1/reminders/r1"]}>
+        <Routes>
+          <Route
+            path="/members/agents/:agentId/reminders/:reminderId"
+            element={<ReminderDetailPage />}
+          />
+          <Route
+            path="/members/agents/:agentId/reminders"
+            element={<div data-testid="list" />}
+          />
+          <Route
+            path="/:conversationId"
+            element={<div data-testid="channel" />}
+          />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
+  return { client, ...view };
 }
 
 beforeEach(() => {
   mock.getReminder.mockReset();
   mock.updateReminder.mockReset();
   mock.cancelReminder.mockReset();
+  mock.listAgents.mockReset();
   mock.openThread.mockReset();
   mock.closeThread.mockReset();
   mock.channels = [];
@@ -103,8 +127,10 @@ describe("reminder-detail", () => {
     expect(screen.getByText("common.loading")).toBeInTheDocument();
   });
 
-  it("shows the not-found state with a back action", async () => {
-    mock.getReminder.mockResolvedValue(undefined);
+  it("shows the not-found state when the RPC fails", async () => {
+    // Old getReminder caught RPC errors and returned undefined; the mutation
+    // to TanStack Query surfaces the same failure as the not-found screen.
+    mock.getReminder.mockRejectedValue(new Error("rpc unavailable"));
 
     renderPage();
 
@@ -114,7 +140,7 @@ describe("reminder-detail", () => {
   });
 
   it("renders the reminder details and opens its thread", async () => {
-    mock.getReminder.mockResolvedValue(reminder());
+    mock.getReminder.mockResolvedValue({ reminder: reminder() });
     mock.channels = [
       { name: "conversations/c1", title: "General" } as Conversation,
     ];
@@ -133,11 +159,70 @@ describe("reminder-detail", () => {
     expect(props.rootMessageId).toBe("m1");
   });
 
-  it("saves edits through the update action", async () => {
-    mock.getReminder.mockResolvedValue(reminder());
-    mock.updateReminder.mockResolvedValue(
-      reminder({ taskContent: "Ship it now" })
-    );
+  it("stops the 2s poll loop once a terminal status is observed", async () => {
+    vi.useFakeTimers();
+    try {
+      mock.getReminder.mockResolvedValue({
+        reminder: reminder({ status: ReminderStatus.COMPLETED }),
+      });
+
+      renderPage();
+      expect(mock.getReminder).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      expect(screen.getByText("Ship the release")).toBeInTheDocument();
+
+      // Terminal reminders are immutable: the poll interval must not refetch.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(mock.getReminder).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps polling every 2s while the reminder is not terminal", async () => {
+    vi.useFakeTimers();
+    try {
+      mock.getReminder.mockResolvedValue({ reminder: reminder() });
+
+      renderPage();
+      expect(mock.getReminder).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      expect(screen.getByText("Ship the release")).toBeInTheDocument();
+
+      // The interval phase starts at mount, so nothing refetches until the
+      // clock reaches t=2000 (10ms were already advanced above).
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1989);
+      });
+      expect(mock.getReminder).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(mock.getReminder).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(mock.getReminder).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("saves edits through the mocked client and backfills the UI", async () => {
+    mock.getReminder.mockResolvedValue({ reminder: reminder() });
+    mock.updateReminder.mockResolvedValue({
+      reminder: reminder({ taskContent: "Ship it now" }),
+    });
 
     renderPage();
     fireEvent.click(
@@ -150,16 +235,25 @@ describe("reminder-detail", () => {
     fireEvent.click(screen.getByRole("button", { name: "common.save" }));
 
     await waitFor(() => expect(mock.updateReminder).toHaveBeenCalledTimes(1));
-    const [name, patch] = mock.updateReminder.mock.calls[0] as [
-      string,
-      { taskContent: string },
+    const [request] = mock.updateReminder.mock.calls[0] as [
+      { name: string; taskContent: string },
     ];
-    expect(name).toBe("reminders/r1");
-    expect(patch.taskContent).toBe("Ship it now");
+    expect(request.name).toBe("reminders/r1");
+    expect(request.taskContent).toBe("Ship it now");
+
+    // The mutation's onSuccess wrote the returned reminder into the detail
+    // cache, so the body shows the new content immediately and the sheet
+    // closes (old setReminder + setEditOpen behavior).
+    expect(await screen.findByText("Ship it now")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "common.save" })
+      ).not.toBeInTheDocument()
+    );
   });
 
   it("rejects saving an edit without a schedule", async () => {
-    mock.getReminder.mockResolvedValue(reminder());
+    mock.getReminder.mockResolvedValue({ reminder: reminder() });
 
     renderPage();
     fireEvent.click(
@@ -182,11 +276,32 @@ describe("reminder-detail", () => {
     expect(mock.updateReminder).not.toHaveBeenCalled();
   });
 
-  it("cancels the reminder after confirmation", async () => {
-    mock.getReminder.mockResolvedValue(reminder());
-    mock.cancelReminder.mockResolvedValue(
-      reminder({ status: ReminderStatus.CANCELLED })
+  it("shows the failure hint when the update RPC fails", async () => {
+    mock.getReminder.mockResolvedValue({ reminder: reminder() });
+    mock.updateReminder.mockRejectedValue(new Error("rpc unavailable"));
+
+    renderPage();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "reminders.edit" })
     );
+
+    const task = screen.getByText("reminders.field-task")
+      .nextElementSibling as HTMLTextAreaElement;
+    fireEvent.change(task, { target: { value: "Ship it now" } });
+    fireEvent.click(screen.getByRole("button", { name: "common.save" }));
+
+    // The old implementation escaped as an unhandled rejection; the mutation
+    // onError now lands it in the sheet's actionError slot.
+    expect(
+      await screen.findByText("reminders.edit-failed")
+    ).toBeInTheDocument();
+  });
+
+  it("cancels the reminder after confirmation", async () => {
+    mock.getReminder.mockResolvedValue({ reminder: reminder() });
+    mock.cancelReminder.mockResolvedValue({
+      reminder: reminder({ status: ReminderStatus.CANCELLED }),
+    });
 
     renderPage();
     fireEvent.click(
@@ -195,17 +310,33 @@ describe("reminder-detail", () => {
     expect(
       screen.getByText("reminders.cancel-confirm-title")
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "reminders.cancel" }));
-
-    await waitFor(() =>
-      expect(mock.cancelReminder).toHaveBeenCalledWith("reminders/r1")
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "reminders.cancel" })
     );
+
+    await waitFor(() => {
+      expect(mock.cancelReminder).toHaveBeenCalledTimes(1);
+      const [request] = mock.cancelReminder.mock.calls[0] as [{ name: string }];
+      expect(request.name).toBe("reminders/r1");
+    });
+
+    // The cached reminder flips to CANCELLED (terminal), so the edit and
+    // cancel actions disappear and the dialog closes.
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: "reminders.edit" })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("reminders.cancel-confirm-title")
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("hides edit and cancel for terminal reminders", async () => {
-    mock.getReminder.mockResolvedValue(
-      reminder({ status: ReminderStatus.COMPLETED })
-    );
+    mock.getReminder.mockResolvedValue({
+      reminder: reminder({ status: ReminderStatus.COMPLETED }),
+    });
 
     renderPage();
 
