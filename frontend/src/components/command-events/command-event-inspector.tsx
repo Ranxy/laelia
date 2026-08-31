@@ -344,6 +344,11 @@ function OutputPreview({ output }: { output: InspectorOutput }) {
         final
         smoothStreaming={false}
         fade
+        // Long merged ASSISTANT output can hit hundreds of KB; align the
+        // preview with the markdown overlay's rendering params so it does
+        // not synchronously mount the whole tree (08 F-P5).
+        batchRendering
+        deferNodesUntilVisible={false}
       />
     </div>
   );

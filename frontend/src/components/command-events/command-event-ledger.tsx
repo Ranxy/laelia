@@ -227,6 +227,13 @@ export function CommandEventLedger({
 }: CommandEventLedgerProps) {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Range dimming is O(1) per row: the prop arrives as an array from the
+  // timeline selection, so build the set once per change instead of the
+  // O(rows × keys) includes() inside the row render.
+  const rangeKeySet = useMemo(
+    () => (rangeKeys ? new Set(rangeKeys) : null),
+    [rangeKeys]
+  );
 
   useEffect(() => {
     if (!scrollToKey || !scrollRef.current) return;
@@ -412,7 +419,7 @@ export function CommandEventLedger({
                   "hover:bg-control-bg/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
                   selected &&
                     "bg-accent/5 shadow-[inset_3px_0_0_0_rgb(var(--color-accent))]",
-                  rangeKeys && !rangeKeys.includes(row.key) && "opacity-30"
+                  rangeKeySet && !rangeKeySet.has(row.key) && "opacity-30"
                 )}
               >
                 <td className="px-3 py-1.5 align-top">
