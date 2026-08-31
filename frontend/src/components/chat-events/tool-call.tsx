@@ -2,6 +2,8 @@ import { ChevronDown, ChevronRight, Wrench } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
+import { isToolCallError } from "@/lib/command-events-model";
+import { safeStringify } from "@/lib/safe-stringify";
 import { cn } from "@/lib/utils";
 import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
 
@@ -56,15 +58,16 @@ export function ChatToolCall({
           {title}
         </span>
         {isFinished ? (
+          // The one shared error predicate (08 F-R3): a failed tool call now
+          // renders as an error badge in chat too, instead of a grey
+          // "finished" pill that misrepresents the result.
           <Badge
             size="sm"
-            variant={
-              status === "completed" || status === "success"
-                ? "success"
-                : "secondary"
-            }
+            variant={isToolCallError(status) ? "error" : "success"}
           >
-            {t("chat.tool-finished")}
+            {isToolCallError(status)
+              ? t("chat.tool-error")
+              : t("chat.tool-finished")}
           </Badge>
         ) : (
           <Badge size="sm" variant="warning">
@@ -80,7 +83,7 @@ export function ChatToolCall({
                 {t("chat.tool-input")}
               </div>
               <pre className="text-[11px] font-mono text-control bg-background/50 rounded p-2 overflow-auto max-h-40 whitespace-pre-wrap break-all min-w-0">
-                {JSON.stringify(rawInput, null, 2)}
+                {safeStringify(rawInput)}
               </pre>
             </div>
           )}
@@ -104,7 +107,7 @@ export function ChatToolCall({
                   "text-[11px] font-mono text-control bg-background/50 rounded p-2 overflow-auto max-h-40 whitespace-pre-wrap break-all min-w-0"
                 )}
               >
-                {JSON.stringify(rawOutput, null, 2)}
+                {safeStringify(rawOutput)}
               </pre>
             </div>
           )}

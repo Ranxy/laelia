@@ -12,6 +12,7 @@ import {
   getOutputStreamKind,
   isToolCallError,
 } from "@/lib/command-events-model";
+import { safeStringify } from "@/lib/safe-stringify";
 import { cn } from "@/lib/utils";
 import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
 import { CommandEventType } from "@/types/proto-es/v1/command_pb";
@@ -92,16 +93,6 @@ function formatDurationMs(ms: number | undefined): string {
   if (ms < 1000) return `${Math.round(ms)} ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(1)} s`;
   return `${(ms / 60000).toFixed(1)} min`;
-}
-
-// JSON.stringify throws on BigInt (protobuf int64 fields are BigInt). Convert
-// them to strings so payloads containing e.g. token/context counts can render.
-function safeStringify(value: unknown): string {
-  return JSON.stringify(
-    value,
-    (_key, v) => (typeof v === "bigint" ? v.toString() : v),
-    2
-  );
 }
 
 function RawPayload({ event }: { event: CommandEvent }) {
