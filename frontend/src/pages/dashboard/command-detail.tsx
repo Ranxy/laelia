@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { CommandEventInspector } from "@/components/command-events/command-event-inspector";
-import { isVisibleEvent } from "@/components/command-events/command-event-kind";
 import {
   type CommandEventFilter,
   CommandEventLedger,
@@ -14,14 +13,12 @@ import { TokenUsageCard } from "@/components/token-usage-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
+import { isVisibleEvent, mergeOutputRuns } from "@/lib/command-events-model";
 import { formatDuration, formatTimestamp } from "@/lib/command-status";
 import { FinalSummary } from "@/lib/markdown";
 import { pairToolCallEvents, type ToolCallPair } from "@/lib/tool-call-events";
 import { useAppStore } from "@/stores";
-import type {
-  CommandEvent,
-  CommandOutput,
-} from "@/types/proto-es/v1/command_pb";
+import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
 import {
   CommandEventType,
   CommandStatus,
@@ -226,63 +223,15 @@ export function CommandDetailPage() {
     return m;
   }, [toolPairs]);
 
-  // Merge consecutive same-type output chunks (mirrors the ledger) so the
+  // Merge consecutive same-type output chunks (the shared implementation —
+  // same runs, same row keys as the ledger and the timeline overview) so the
   // inspector can show a full ASSISTANT message rather than one tiny chunk.
   // A tool/event between two chunks breaks the merge so each separate message
   // keeps its own row key and stays clickable.
-  const mergedOutputs = useMemo(() => {
-    const tsToMs = (ts: { seconds?: bigint; nanos?: number } | undefined) =>
-      ts?.seconds ? Number(ts.seconds) * 1000 + (ts.nanos ?? 0) / 1_000_000 : 0;
-    type Item =
-      | { kind: "output"; ts: number; output: CommandOutput }
-      | { kind: "break"; ts: number };
-    const items: Item[] = [];
-    for (const o of outputs) {
-      items.push({ kind: "output", ts: tsToMs(o.timestamp), output: o });
-    }
-    for (const ev of visibleEvents) {
-      if (
-        ev.type === CommandEventType.TEXT_DELTA ||
-        ev.type === CommandEventType.CONTEXT_USAGE_UPDATE ||
-        ev.type === CommandEventType.RAW_ACP ||
-        ev.type === CommandEventType.COMMAND_EVENT_TYPE_UNSPECIFIED
-      ) {
-        continue;
-      }
-      items.push({ kind: "break", ts: tsToMs(ev.timestamp) });
-    }
-    items.sort((a, b) => a.ts - b.ts);
-
-    const out: Array<{
-      key: string;
-      content: string;
-      startTs: number;
-      endTs: number;
-      type: number;
-    }> = [];
-    let current: (typeof out)[number] | null = null;
-    for (const item of items) {
-      if (item.kind === "break") {
-        current = null;
-        continue;
-      }
-      const ts = item.ts;
-      if (current && current.type === item.output.type && current.endTs <= ts) {
-        current.content += item.output.content;
-        current.endTs = ts;
-        continue;
-      }
-      current = {
-        key: `out-${item.output.seqNo}`,
-        content: item.output.content,
-        startTs: ts,
-        endTs: ts,
-        type: item.output.type,
-      };
-      out.push(current);
-    }
-    return out;
-  }, [outputs, visibleEvents]);
+  const mergedOutputs = useMemo(
+    () => mergeOutputRuns(outputs, visibleEvents),
+    [outputs, visibleEvents]
+  );
 
   // The event currently shown in the inspector, resolved from the unique row
   // key so outputs (out-*) and events (ev-*/tool-*) never get mixed up even

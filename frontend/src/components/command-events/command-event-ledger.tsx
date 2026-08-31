@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  formatEventTime,
+  formatRunTimeRange,
+  getCommandEventKind,
+  getOutputStreamKind,
+  isToolCallError,
+  mergeOutputRuns,
+  tsToMs,
+} from "@/lib/command-events-model";
 import { pairToolCallEvents, type ToolCallPair } from "@/lib/tool-call-events";
 import { cn } from "@/lib/utils";
 import type {
@@ -7,7 +16,6 @@ import type {
   CommandOutput,
 } from "@/types/proto-es/v1/command_pb";
 import { CommandEventType } from "@/types/proto-es/v1/command_pb";
-import { getCommandEventKind, getOutputStreamKind } from "./command-event-kind";
 
 export type CommandEventFilter =
   | "all"
@@ -57,7 +65,6 @@ function phaseOfEvent(event: CommandEvent): string {
 function phaseOfOutput(output: CommandOutput): string {
   return getOutputStreamKind(output.type).phase;
 }
-
 function matchesFilter(
   row: { phase: string },
   filter: CommandEventFilter
@@ -92,36 +99,6 @@ function matchesFilter(
 function matchesSearch(row: { searchText: string }, query: string): boolean {
   if (!query) return true;
   return row.searchText.toLowerCase().includes(query.toLowerCase());
-}
-
-function tsToMs(ts: { seconds?: bigint; nanos?: number } | undefined): number {
-  if (!ts?.seconds) return 0;
-  return Number(ts.seconds) * 1000 + (ts.nanos ?? 0) / 1_000_000;
-}
-
-function formatTime(ts: { seconds?: bigint } | undefined): string {
-  if (!ts?.seconds) return "";
-  return new Date(Number(ts.seconds) * 1000).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
-function formatTimeMs(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
-// Renders a merged output run as "HH:MM:SS" when it is a single chunk, or
-// "HH:MM:SS → HH:MM:SS" when it spans multiple chunks (start → end).
-function formatTimeRange(startTs: number, endTs: number): string {
-  if (!startTs) return "";
-  if (!endTs || endTs <= startTs) return formatTimeMs(startTs);
-  return `${formatTimeMs(startTs)} → ${formatTimeMs(endTs)}`;
 }
 
 function diffStats(
@@ -205,7 +182,7 @@ function ToolContent({ pair }: { pair: ToolCallPair }) {
     pair.finished?.payload.case === "toolCallFinished"
       ? pair.finished.payload.value.status
       : undefined;
-  const isError = status === "error" || status === "failed";
+  const isError = isToolCallError(status);
   const isFinished = !!pair.finished;
 
   return (
@@ -279,37 +256,39 @@ export function CommandEventLedger({
     const pairedFinished = new Set<number>();
     for (const p of pairs) if (p.finished) pairedFinished.add(p.finished.seqNo);
 
-    // Build a unified timeline of output chunks + events, ordered by timestamp.
-    const items: Array<{
+    // One shared merge implementation (lib/command-events-model.ts) builds
+    // the output runs, so the row-key space is identical to the overview and
+    // the inspector's merged outputs under any timestamp ordering. Merging
+    // happens BEFORE filtering: tool/event rows break a merge, so filtering
+    // later must NOT re-merge separate assistant messages into one giant row
+    // just because the events between them were filtered out.
+    const runs = mergeOutputRuns(outputs, events);
+
+    type Item = {
       ts: number;
-      row: LedgerRow;
       phase: string;
       searchText: string;
-    }> = [];
+      row: LedgerRow;
+    };
+    const items: Item[] = [];
 
-    for (const output of outputs) {
-      const phase = phaseOfOutput(output);
-      const ots = tsToMs(output.timestamp);
+    for (const run of runs) {
       items.push({
-        ts: ots,
-        phase,
-        searchText: output.content,
+        ts: run.startTs,
+        phase: phaseOfOutput(run.output),
+        searchText: run.content,
         row: {
           kind: "output",
-          output,
-          content: output.content,
-          startTs: ots,
-          endTs: ots,
-          key: `out-${output.seqNo}`,
+          output: run.output,
+          content: run.content,
+          startTs: run.startTs,
+          endTs: run.endTs,
+          key: run.key,
         },
       });
     }
 
     for (const event of events) {
-      // Context usage and raw ACP frames are internal detail, not ledger rows.
-      if (event.type === CommandEventType.CONTEXT_USAGE_UPDATE) continue;
-      if (event.type === CommandEventType.RAW_ACP) continue;
-
       if (event.type === CommandEventType.TOOL_CALL_STARTED) {
         const pair = pairs.find((p) => p.started.seqNo === event.seqNo);
         if (pair) {
@@ -347,42 +326,16 @@ export function CommandEventLedger({
       });
     }
 
-    items.sort((a, b) => a.ts - b.ts || 0);
-
-    // Merge consecutive same-type output chunks FIRST, on the natural timeline
-    // (tool/event rows break a merge). Filtering later must NOT re-merge
-    // separate assistant messages into one giant row just because the events
-    // between them were filtered out.
-    const merged: Array<{
-      ts: number;
-      row: LedgerRow;
-      phase: string;
-      searchText: string;
-    }> = [];
-    for (const item of items) {
-      const last = merged[merged.length - 1];
-      if (
-        last &&
-        last.row.kind === "output" &&
-        item.row.kind === "output" &&
-        last.row.output.type === item.row.output.type
-      ) {
-        last.row.content += item.row.output.content;
-        last.row.endTs = item.ts;
-        last.searchText += item.searchText;
-        continue;
-      }
-      merged.push(item);
-    }
+    items.sort((a, b) => a.ts - b.ts);
 
     const out: LedgerRow[] = [];
-    for (const item of merged) {
+    for (const item of items) {
       if (!matchesFilter(item, filter)) continue;
       if (!matchesSearch(item, searchQuery)) continue;
       out.push(item.row);
     }
     return out;
-  }, [outputs, events, filter, searchQuery, t]);
+  }, [outputs, events, filter, searchQuery]);
 
   if (rows.length === 0) {
     return (
@@ -486,8 +439,8 @@ export function CommandEventLedger({
                     </div>
                     <span className="shrink-0 pt-0.5 font-mono text-[9px] tabular-nums text-control-light/70">
                       {isOutput
-                        ? formatTimeRange(row.startTs, row.endTs)
-                        : formatTime(event?.timestamp)}
+                        ? formatRunTimeRange(row.startTs, row.endTs)
+                        : formatEventTime(event?.timestamp)}
                     </span>
                   </div>
                 </td>

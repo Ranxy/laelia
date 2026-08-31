@@ -6,10 +6,15 @@ import { ChatDiff } from "@/components/chat-events/diff-view";
 import { ChatWarning } from "@/components/chat-events/warning";
 import { ContextUsageBar } from "@/components/context-usage-bar";
 import { TokenUsageCard } from "@/components/token-usage-card";
+import {
+  formatClockTime,
+  getCommandEventKind,
+  getOutputStreamKind,
+  isToolCallError,
+} from "@/lib/command-events-model";
 import { cn } from "@/lib/utils";
 import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
 import { CommandEventType } from "@/types/proto-es/v1/command_pb";
-import { getCommandEventKind, getOutputStreamKind } from "./command-event-kind";
 
 export interface InspectorOutput {
   /** Merged content of the output run. */
@@ -80,14 +85,6 @@ function availableTabs(event: CommandEvent): TabId[] {
 function formatDateTime(ts: { seconds?: bigint } | undefined): string {
   if (!ts?.seconds) return "";
   return new Date(Number(ts.seconds) * 1000).toLocaleString();
-}
-
-function formatTimeMs(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
 }
 
 function formatDurationMs(ms: number | undefined): string {
@@ -183,6 +180,7 @@ function ToolOverview({
     finishedEvent?.payload.case === "toolCallFinished"
       ? finishedEvent.payload.value.status
       : undefined;
+  const isError = isToolCallError(status);
   const startedAt = startedEvent?.timestamp?.seconds
     ? Number(startedEvent.timestamp.seconds) * 1000
     : undefined;
@@ -199,16 +197,8 @@ function ToolOverview({
           dt={t("command.inspector-status")}
           dd={
             finishedEvent ? (
-              <span
-                className={
-                  status === "error" || status === "failed"
-                    ? "text-error"
-                    : "text-success"
-                }
-              >
-                {status === "error" || status === "failed"
-                  ? t("chat.tool-error")
-                  : t("chat.tool-finished")}
+              <span className={isError ? "text-error" : "text-success"}>
+                {isError ? t("chat.tool-error") : t("chat.tool-finished")}
               </span>
             ) : (
               <span className="text-warning">{t("chat.tool-started")}</span>
@@ -339,11 +329,11 @@ function OutputOverview({ output }: { output: InspectorOutput }) {
         />
         <OverviewRow
           dt={t("command.inspector-started")}
-          dd={formatTimeMs(output.startTs)}
+          dd={formatClockTime(output.startTs)}
         />
         <OverviewRow
           dt={t("command.inspector-finished")}
-          dd={formatTimeMs(output.endTs)}
+          dd={formatClockTime(output.endTs)}
         />
         <OverviewRow
           dt={t("command.inspector-duration")}
@@ -444,7 +434,7 @@ export function CommandEventInspector({
         )}
         <span className="ml-auto min-w-0 flex-1 truncate text-right text-[10px] text-control-light">
           {output
-            ? formatTimeMs(output.startTs)
+            ? formatClockTime(output.startTs)
             : formatDateTime(event.timestamp)}
         </span>
         {onClose && (
@@ -531,22 +521,18 @@ export function CommandEventInspector({
               )}
             {activeTab === "timing" && (
               <div className="p-3">
-                {isTool ? (
-                  <dl>
-                    <OverviewRow
-                      dt={t("command.inspector-started")}
-                      dd={formatDateTime(startedEvent?.timestamp)}
-                    />
-                    <OverviewRow
-                      dt={t("command.inspector-finished")}
-                      dd={formatDateTime(finishedEvent?.timestamp)}
-                    />
-                  </dl>
-                ) : (
-                  <p className="text-xs italic text-control-light">
-                    {t("command.event-no-timing")}
-                  </p>
-                )}
+                {/* The timing tab only exists for tool events, so render the
+                    dl directly (no unreachable placeholder branch). */}
+                <dl>
+                  <OverviewRow
+                    dt={t("command.inspector-started")}
+                    dd={formatDateTime(startedEvent?.timestamp)}
+                  />
+                  <OverviewRow
+                    dt={t("command.inspector-finished")}
+                    dd={formatDateTime(finishedEvent?.timestamp)}
+                  />
+                </dl>
               </div>
             )}
 

@@ -1,5 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  getCommandEventKind,
+  isToolCallError,
+  mergeOutputRuns,
+  tsToMs,
+} from "@/lib/command-events-model";
 import { pairToolCallEvents } from "@/lib/tool-call-events";
 import { cn } from "@/lib/utils";
 import type {
@@ -39,13 +45,18 @@ interface FractionRange {
 
 const LANE_LABELS = ["Output", "Tools", "System"] as const;
 
-function tsToMs(ts: { seconds?: bigint; nanos?: number } | undefined): number {
-  if (!ts?.seconds) return 0;
-  return Number(ts.seconds) * 1000 + (ts.nanos ?? 0) / 1_000_000;
-}
-
 function orderedRange(a: number, b: number): FractionRange {
   return a <= b ? { start: a, end: b } : { start: b, end: a };
+}
+
+// Lane assignment for standalone event spans: diff/warning/compaction events
+// render in the System lane; everything else lives in the Output lane. This
+// derives from the shared kind registry's phases so the two views cannot
+// classify the same event differently.
+function eventSpanLane(phase: string): 0 | 2 {
+  return phase === "diff" || phase === "warning" || phase === "compaction"
+    ? 2
+    : 0;
 }
 
 export function CommandEventTimelineOverview({
@@ -66,121 +77,63 @@ export function CommandEventTimelineOverview({
     const spans: Span[] = [];
     const pairs = pairToolCallEvents(events);
 
-    type Item =
-      | { kind: "output"; ts: number; output: CommandOutput }
-      | { kind: "tool"; ts: number; pair: (typeof pairs)[number] }
-      | { kind: "event"; ts: number; event: CommandEvent };
-    const items: Item[] = [];
-
-    for (const output of outputs) {
-      items.push({ kind: "output", ts: tsToMs(output.timestamp), output });
-    }
-    for (const pair of pairs) {
-      items.push({ kind: "tool", ts: tsToMs(pair.started.timestamp), pair });
-    }
-    for (const event of events) {
-      if (
-        event.type === CommandEventType.TOOL_CALL_STARTED ||
-        event.type === CommandEventType.TOOL_CALL_FINISHED ||
-        event.type === CommandEventType.CONTEXT_USAGE_UPDATE ||
-        event.type === CommandEventType.RAW_ACP
-      ) {
-        continue;
-      }
-      items.push({ kind: "event", ts: tsToMs(event.timestamp), event });
-    }
-    items.sort((a, b) => a.ts - b.ts);
-
-    let run: {
-      type: number;
-      start: number;
-      end: number;
-      seqNo: number;
-      key: string;
-    } | null = null;
-    const flushRun = () => {
-      if (!run) return;
+    // Output runs come from the shared merge implementation, so the span keys
+    // match the ledger rows and the inspector's merged outputs exactly. Push
+    // order (runs → tools → events) keeps the same tie-break at equal
+    // timestamps as the previous ts-interleaved construction.
+    for (const run of mergeOutputRuns(outputs, events)) {
       spans.push({
         lane: 0,
-        start: run.start,
-        end: Math.max(run.end, run.start + 1),
-        seqNo: run.seqNo,
+        start: run.startTs,
+        end: Math.max(run.endTs, run.startTs + 1),
+        seqNo: run.output.seqNo,
         kind: "output",
         source: "output",
         key: run.key,
       });
-      run = null;
-    };
+    }
 
-    for (const item of items) {
-      if (item.kind === "output") {
-        const ts = item.ts;
-        if (run && run.type === item.output.type && run.end <= ts) {
-          run.end = ts;
-          continue;
-        }
-        flushRun();
-        run = {
-          type: item.output.type,
-          start: ts,
-          end: ts,
-          seqNo: item.output.seqNo,
-          key: `out-${item.output.seqNo}`,
-        };
+    for (const pair of pairs) {
+      const start = tsToMs(pair.started.timestamp);
+      const end = pair.finished ? tsToMs(pair.finished.timestamp) : start + 1;
+      const status =
+        pair.finished?.payload.case === "toolCallFinished"
+          ? pair.finished.payload.value.status
+          : undefined;
+      spans.push({
+        lane: 1,
+        start,
+        end: Math.max(end, start + 1),
+        seqNo: pair.started.seqNo,
+        kind: "tool",
+        source: "tool",
+        key: `tool-${pair.started.seqNo}`,
+        error: isToolCallError(status),
+      });
+    }
+
+    for (const event of events) {
+      if (
+        event.type === CommandEventType.TOOL_CALL_STARTED ||
+        event.type === CommandEventType.TOOL_CALL_FINISHED
+      ) {
         continue;
       }
-
-      flushRun();
-
-      if (item.kind === "tool") {
-        const start = item.ts;
-        const end = item.pair.finished
-          ? tsToMs(item.pair.finished.timestamp)
-          : start + 1;
-        const status =
-          item.pair.finished?.payload.case === "toolCallFinished"
-            ? item.pair.finished.payload.value.status
-            : undefined;
-        spans.push({
-          lane: 1,
-          start,
-          end: Math.max(end, start + 1),
-          seqNo: item.pair.started.seqNo,
-          kind: "tool",
-          source: "tool",
-          key: `tool-${item.pair.started.seqNo}`,
-          error: status === "error" || status === "failed",
-        });
-        continue;
-      }
-
-      const ts = item.ts;
-      const lane: 0 | 1 | 2 =
-        item.event.type === CommandEventType.DIFF_EMITTED ||
-        item.event.type === CommandEventType.WARNING ||
-        item.event.type === CommandEventType.CONTEXT_COMPACTION_STARTED ||
-        item.event.type === CommandEventType.CONTEXT_COMPACTION_FINISHED
-          ? 2
-          : 0;
-      const kind: Span["kind"] =
-        item.event.type === CommandEventType.DIFF_EMITTED ||
-        item.event.type === CommandEventType.WARNING ||
-        item.event.type === CommandEventType.CONTEXT_COMPACTION_STARTED ||
-        item.event.type === CommandEventType.CONTEXT_COMPACTION_FINISHED
-          ? "system"
-          : "output";
+      const kind = getCommandEventKind(event.type);
+      const phase = kind.phase;
+      const lane = eventSpanLane(phase);
+      const ts = tsToMs(event.timestamp);
       spans.push({
         lane,
         start: ts,
         end: ts + 1,
-        seqNo: item.event.seqNo,
-        kind,
+        seqNo: event.seqNo,
+        kind: lane === 2 ? "system" : "output",
         source: "event",
-        key: `ev-${item.event.seqNo}`,
-        error: item.event.type === CommandEventType.WARNING,
+        key: `ev-${event.seqNo}`,
+        error: phase === "warning",
       });
     }
-    flushRun();
 
     return { spans };
   }, [outputs, events]);
