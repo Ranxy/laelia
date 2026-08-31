@@ -1,16 +1,14 @@
 import { Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { MemberPicker } from "@/components/member-picker";
-import { PermissionNotice, SettingsPage } from "@/components/settings-page";
+import { ConfirmActionDialog } from "@/components/settings/confirm-action-dialog";
+import { MemberEditor } from "@/components/settings/member-editor";
+import { ResourceSheet } from "@/components/settings/resource-sheet";
 import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  PageLoading,
+  PermissionNotice,
+  SettingsPage,
+} from "@/components/settings-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FieldRow } from "@/components/ui/field-row";
@@ -24,15 +22,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Sheet,
-  SheetBody,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
   Table,
   TableBody,
   TableCell,
@@ -40,6 +29,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useCrudDialog } from "@/composables/use-crud-dialog";
+import { useResourceQuery } from "@/composables/use-resource-query";
 import {
   apiProviderServiceClient,
   groupServiceClient,
@@ -48,6 +39,7 @@ import {
 import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
+import { invalidateApiProvidersCache } from "@/stores/api-provider";
 import { useHasPermission } from "@/stores/permissions";
 import type { PiModel } from "@/types/proto-es/v1/agent_pb";
 import type { ApiProvider } from "@/types/proto-es/v1/api_provider_service_pb";
@@ -106,84 +98,74 @@ function providerToForm(p: ApiProvider): ProviderForm {
   };
 }
 
-function memberLabel(member: string, users: User[], groups: Group[]): string {
-  if (member === "allUsers") return "allUsers";
-  if (member.startsWith("users/")) {
-    return users.find((u) => u.name === member)?.email ?? member;
-  }
-  if (member.startsWith("groups/")) {
-    const token = member.slice("groups/".length);
-    return (
-      groups.find((g) => g.email === token || g.name === `groups/${token}`)
-        ?.title ?? token
-    );
-  }
-  return member;
-}
-
 export function SettingsApiProvidersPage() {
   const { t } = useTranslation();
   const canList = useHasPermission("laelia.apiProviders.list");
   const canCreate = useHasPermission("laelia.apiProviders.create");
   const canUpdate = useHasPermission("laelia.apiProviders.update");
 
-  const [providers, setProviders] = useState<ApiProvider[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
+  const providersQuery = useResourceQuery<ApiProvider>({
+    enabled: canList,
+    queryKey: ["settings", "apiProviders"],
+    queryFn: async (signal) =>
+      (
+        await apiProviderServiceClient.listAPIProviders(
+          { pageSize: 1000 },
+          { signal }
+        )
+      ).apiProviders ?? [],
+    failureTitle: t("settings.api-providers.load-failed"),
+  });
+  // Workspace users/groups directories: shared with the other member-editor
+  // pages via the ["directory",…] entries (60s TTL), not refetched per visit.
+  const usersQuery = useResourceQuery<User>({
+    enabled: canList,
+    queryKey: ["directory", "users"],
+    queryFn: async (signal) =>
+      (await userServiceClient.listUsers({ pageSize: 1000 }, { signal }))
+        .users ?? [],
+    failureTitle: t("settings.directory.load-failed"),
+    staleTime: 60_000,
+  });
+  const groupsQuery = useResourceQuery<Group>({
+    enabled: canList,
+    queryKey: ["directory", "groups"],
+    queryFn: async (signal) =>
+      (await groupServiceClient.listGroups({ pageSize: 1000 }, { signal }))
+        .groups ?? [],
+    failureTitle: t("settings.directory.load-failed"),
+    staleTime: 60_000,
+  });
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState<ProviderForm>(emptyForm());
-  const [creating, setCreating] = useState(false);
+  const users = usersQuery.items;
 
-  const [editOpen, setEditOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<ApiProvider | null>(null);
-  const [editForm, setEditForm] = useState<ProviderForm>(emptyForm());
-  const [saving, setSaving] = useState(false);
+  const crud = useCrudDialog<ApiProvider>({
+    // Post-mutation refresh of the resource list plus an intentional cache
+    // invalidation (01-B9): settings CRUD must invalidate the apiProviders
+    // store slice that agent/machine forms read, so their dropdowns stop
+    // serving stale lists.
+    onChanged: () => {
+      void providersQuery.reload();
+      invalidateApiProvidersCache();
+    },
+  });
 
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<ApiProvider | null>(null);
-  const [deleting, setDeleting] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [providerRes, userRes, groupRes] = await Promise.all([
-        apiProviderServiceClient.listAPIProviders({ pageSize: 1000 }),
-        userServiceClient.listUsers({ pageSize: 1000 }),
-        groupServiceClient.listGroups({ pageSize: 1000 }),
-      ]);
-      setProviders(providerRes.apiProviders ?? []);
-      setUsers(userRes.users ?? []);
-      setGroups(groupRes.groups ?? []);
-    } catch (err) {
-      void showErrorToast(err, t("settings.api-providers.load-failed"));
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    if (canList) load();
-    else setLoading(false);
-  }, [canList, load]);
-
-  const create = async () => {
-    if (!createForm.title.trim()) {
+  const handleCreateForm = async (form: ProviderForm) => {
+    if (!form.title.trim()) {
       toastManager.add({
         type: "error",
         title: t("settings.api-providers.title-required"),
       });
       return;
     }
-    if (createForm.providerType === "custom" && !createForm.baseUrl.trim()) {
+    if (form.providerType === "custom" && !form.baseUrl.trim()) {
       toastManager.add({
         type: "error",
         title: t("settings.api-providers.base-url-required"),
       });
       return;
     }
-    for (const e of createForm.entries) {
+    for (const e of form.entries) {
       if (!e.model.trim() || !e.apiKey.trim()) {
         toastManager.add({
           type: "error",
@@ -192,56 +174,50 @@ export function SettingsApiProvidersPage() {
         return;
       }
     }
-    setCreating(true);
-    try {
-      await apiProviderServiceClient.createAPIProvider({
-        apiProvider: {
-          title: createForm.title.trim(),
-          providerType: createForm.providerType,
-          baseUrl:
-            createForm.providerType === "custom"
-              ? createForm.baseUrl.trim()
-              : "",
-          description: createForm.description.trim(),
-          members: createForm.members,
-          entries: createForm.entries.map((e) => ({
-            label: e.label.trim(),
-            model: e.model.trim(),
-            apiKey: e.apiKey.trim(),
-          })),
+    await crud.runCreate(
+      async () => {
+        await apiProviderServiceClient.createAPIProvider({
+          apiProvider: {
+            title: form.title.trim(),
+            providerType: form.providerType,
+            baseUrl: form.providerType === "custom" ? form.baseUrl.trim() : "",
+            description: form.description.trim(),
+            members: form.members,
+            entries: form.entries.map((e) => ({
+              label: e.label.trim(),
+              model: e.model.trim(),
+              apiKey: e.apiKey.trim(),
+            })),
+          },
+        });
+      },
+      {
+        successTitle: t("settings.api-providers.created"),
+        onError: (err) => {
+          void showErrorToast(err, t("settings.api-providers.create-failed"));
         },
-      });
-      toastManager.add({
-        type: "success",
-        title: t("settings.api-providers.created"),
-      });
-      setCreateOpen(false);
-      setCreateForm(emptyForm());
-      load();
-    } catch (err) {
-      void showErrorToast(err, t("settings.api-providers.create-failed"));
-    } finally {
-      setCreating(false);
-    }
+      }
+    );
   };
 
-  const save = async () => {
-    if (!editTarget) return;
-    if (!editForm.title.trim()) {
+  const handleSaveForm = async (form: ProviderForm) => {
+    const target = crud.editTarget;
+    if (!target) return;
+    if (!form.title.trim()) {
       toastManager.add({
         type: "error",
         title: t("settings.api-providers.title-required"),
       });
       return;
     }
-    if (editForm.providerType === "custom" && !editForm.baseUrl.trim()) {
+    if (form.providerType === "custom" && !form.baseUrl.trim()) {
       toastManager.add({
         type: "error",
         title: t("settings.api-providers.base-url-required"),
       });
       return;
     }
-    for (const e of editForm.entries) {
+    for (const e of form.entries) {
       if (!e.model.trim()) {
         toastManager.add({
           type: "error",
@@ -259,61 +235,53 @@ export function SettingsApiProvidersPage() {
         return;
       }
     }
-    setSaving(true);
-    try {
-      await apiProviderServiceClient.updateAPIProvider({
-        apiProvider: {
-          name: editTarget.name,
-          title: editForm.title.trim(),
-          providerType: editForm.providerType,
-          baseUrl:
-            editForm.providerType === "custom" ? editForm.baseUrl.trim() : "",
-          description: editForm.description.trim(),
-          members: editForm.members,
-          entries: editForm.entries.map((e) => ({
-            name: e.name || undefined,
-            label: e.label.trim(),
-            model: e.model.trim(),
-            apiKey: e.apiKey.trim(),
-          })),
+    await crud.runSave(
+      async () => {
+        await apiProviderServiceClient.updateAPIProvider({
+          apiProvider: {
+            name: target.name,
+            title: form.title.trim(),
+            providerType: form.providerType,
+            baseUrl: form.providerType === "custom" ? form.baseUrl.trim() : "",
+            description: form.description.trim(),
+            members: form.members,
+            entries: form.entries.map((e) => ({
+              name: e.name || undefined,
+              label: e.label.trim(),
+              model: e.model.trim(),
+              apiKey: e.apiKey.trim(),
+            })),
+          },
+          updateMask: {
+            paths: ["title", "base_url", "description", "entries", "members"],
+          },
+        });
+      },
+      {
+        successTitle: t("settings.api-providers.updated"),
+        onError: (err) => {
+          void showErrorToast(err, t("settings.api-providers.update-failed"));
         },
-        updateMask: {
-          paths: ["title", "base_url", "description", "entries", "members"],
-        },
-      });
-      toastManager.add({
-        type: "success",
-        title: t("settings.api-providers.updated"),
-      });
-      setEditOpen(false);
-      setEditTarget(null);
-      load();
-    } catch (err) {
-      void showErrorToast(err, t("settings.api-providers.update-failed"));
-    } finally {
-      setSaving(false);
-    }
+      }
+    );
   };
 
-  const remove = async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      await apiProviderServiceClient.deleteAPIProvider({
-        name: deleteTarget.name,
-      });
-      toastManager.add({
-        type: "success",
-        title: t("settings.api-providers.deleted"),
-      });
-      setDeleteOpen(false);
-      setDeleteTarget(null);
-      load();
-    } catch (err) {
-      void showErrorToast(err, t("settings.api-providers.delete-failed"));
-    } finally {
-      setDeleting(false);
-    }
+  const handleDelete = async () => {
+    const target = crud.deleteTarget;
+    if (!target) return;
+    await crud.runDelete(
+      async () => {
+        await apiProviderServiceClient.deleteAPIProvider({
+          name: target.name,
+        });
+      },
+      {
+        successTitle: t("settings.api-providers.deleted"),
+        onError: (err) => {
+          void showErrorToast(err, t("settings.api-providers.delete-failed"));
+        },
+      }
+    );
   };
 
   if (!canList) {
@@ -328,180 +296,175 @@ export function SettingsApiProvidersPage() {
       description={t("settings.api-providers.description")}
       actions={
         canCreate && (
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button onClick={crud.openCreate}>
             <Plus className="w-4 h-4" />
             {t("settings.api-providers.create")}
           </Button>
         )
       }
     >
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t("settings.api-providers.header-title")}</TableHead>
-            <TableHead>{t("settings.api-providers.header-type")}</TableHead>
-            <TableHead>{t("settings.api-providers.header-entries")}</TableHead>
-            <TableHead>{t("settings.api-providers.header-members")}</TableHead>
-            <TableHead />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {providers.map((p) => (
-            <TableRow key={p.name}>
-              <TableCell className="font-medium text-main">{p.title}</TableCell>
-              <TableCell>
-                <Badge variant="secondary">{p.providerType}</Badge>
-              </TableCell>
-              <TableCell>{p.entries?.length ?? 0}</TableCell>
-              <TableCell>{p.members?.length ?? 0}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex justify-end gap-2">
-                  {canUpdate && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditTarget(p);
-                          setEditForm(providerToForm(p));
-                          setEditOpen(true);
-                        }}
-                        aria-label={t("common.edit")}
-                        title={t("common.edit")}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-error"
-                        onClick={() => {
-                          setDeleteTarget(p);
-                          setDeleteOpen(true);
-                        }}
-                        aria-label={t("common.delete")}
-                        title={t("common.delete")}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-          {providers.length === 0 && !loading && (
+      {providersQuery.initialLoading ? (
+        <PageLoading />
+      ) : (
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell
-                colSpan={5}
-                className="text-center text-control-light py-8"
-              >
-                {t("settings.api-providers.no-providers")}
-              </TableCell>
+              <TableHead>{t("settings.api-providers.header-title")}</TableHead>
+              <TableHead>{t("settings.api-providers.header-type")}</TableHead>
+              <TableHead>
+                {t("settings.api-providers.header-entries")}
+              </TableHead>
+              <TableHead>
+                {t("settings.api-providers.header-members")}
+              </TableHead>
+              <TableHead />
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {providersQuery.items.map((p) => (
+              <TableRow key={p.name}>
+                <TableCell className="font-medium text-main">
+                  {p.title}
+                </TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{p.providerType}</Badge>
+                </TableCell>
+                <TableCell>{p.entries?.length ?? 0}</TableCell>
+                <TableCell>{p.members?.length ?? 0}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    {canUpdate && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => crud.openEdit(p)}
+                          aria-label={t("common.edit")}
+                          title={t("common.edit")}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-error"
+                          onClick={() => crud.openDelete(p)}
+                          aria-label={t("common.delete")}
+                          title={t("common.delete")}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {providersQuery.items.length === 0 &&
+              !providersQuery.refreshing && (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="text-center text-control-light py-8"
+                  >
+                    {t("settings.api-providers.no-providers")}
+                  </TableCell>
+                </TableRow>
+              )}
+          </TableBody>
+        </Table>
+      )}
 
-      <ProviderSheet
-        open={createOpen}
+      <ResourceSheet
+        open={crud.createOpen}
+        entity={null}
         title={t("settings.api-providers.create-title")}
         description={t("settings.api-providers.create-description")}
-        form={createForm}
-        users={users}
-        groups={groups}
-        submitting={creating}
-        onClose={() => setCreateOpen(false)}
-        onFormChange={setCreateForm}
-        onSubmit={create}
+        submitting={crud.creating}
+        onClose={crud.closeCreate}
+        renderForm={({ formId }) => (
+          <ProviderFormFields
+            entity={null}
+            formId={formId}
+            users={users}
+            groups={groupsQuery.items}
+            onSubmit={(form) => {
+              void handleCreateForm(form);
+            }}
+          />
+        )}
       />
 
-      <ProviderSheet
-        open={editOpen}
-        title={t("settings.api-providers.edit-title", {
-          title: editTarget?.title ?? "",
-        })}
+      <ResourceSheet
+        open={crud.editOpen}
+        entity={crud.editTarget}
+        title={(target) =>
+          t("settings.api-providers.edit-title", { title: target?.title ?? "" })
+        }
         description={t("settings.api-providers.edit-description")}
-        form={editForm}
-        users={users}
-        groups={groups}
-        submitting={saving}
-        onClose={() => setEditOpen(false)}
-        onFormChange={setEditForm}
-        onSubmit={save}
+        submitting={crud.saving}
+        onClose={crud.closeEdit}
+        renderForm={({ entity, formId }) =>
+          entity ? (
+            <ProviderFormFields
+              entity={entity}
+              formId={formId}
+              users={users}
+              groups={groupsQuery.items}
+              onSubmit={(form) => {
+                void handleSaveForm(form);
+              }}
+            />
+          ) : null
+        }
       />
 
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogTitle>
-            {t("settings.api-providers.delete-confirm-title")}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("settings.api-providers.delete-confirm-description", {
-              title: deleteTarget?.title ?? "",
-            })}
-          </AlertDialogDescription>
-          <AlertDialogFooter>
-            <AlertDialogClose>
-              <Button variant="outline" disabled={deleting}>
-                {t("common.cancel")}
-              </Button>
-            </AlertDialogClose>
-            <Button variant="destructive" disabled={deleting} onClick={remove}>
-              {deleting ? t("common.deleting") : t("common.delete")}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmActionDialog
+        open={crud.deleteOpen}
+        onClose={crud.closeDelete}
+        busy={crud.deleting}
+        title={t("settings.api-providers.delete-confirm-title")}
+        description={t("settings.api-providers.delete-confirm-description", {
+          title: crud.deleteTarget?.title ?? "",
+        })}
+        onConfirm={() => {
+          void handleDelete();
+        }}
+      />
     </SettingsPage>
   );
 }
 
-interface ProviderSheetProps {
-  open: boolean;
-  title: string;
-  description: string;
-  form: ProviderForm;
+interface ProviderFormFieldsProps {
+  // null seeds an empty create form; a provider seeds its edit form.
+  entity: ApiProvider | null;
+  formId: string;
   users: User[];
   groups: Group[];
-  submitting: boolean;
-  onClose: () => void;
-  onFormChange: (f: ProviderForm) => void;
-  onSubmit: () => void;
+  onSubmit: (form: ProviderForm) => void;
 }
 
-function ProviderSheet({
-  open,
-  title,
-  description,
-  form,
+// Inner form of the provider drawer. Mounts fresh per open (ResourceSheet keys
+// on the open sequence), so useState seeds read the current entity and the
+// form-local fetch state (fetch key / model list) resets per open without a
+// manual effect.
+function ProviderFormFields({
+  entity,
+  formId,
   users,
   groups,
-  submitting,
-  onClose,
-  onFormChange,
   onSubmit,
-}: ProviderSheetProps) {
+}: ProviderFormFieldsProps) {
   const { t } = useTranslation();
+  const [form, setForm] = useState<ProviderForm>(() =>
+    entity ? providerToForm(entity) : emptyForm()
+  );
 
   const [fetchKey, setFetchKey] = useState("");
   const [models, setModels] = useState<PiModel[]>([]);
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState("");
 
-  // The component stays mounted across open/close (only the Sheet's portal
-  // children unmount), so reset per-open fetch state to avoid leaking a
-  // previous provider's API key/model list into the next open sheet.
-  useEffect(() => {
-    if (open) {
-      setFetchKey("");
-      setModels([]);
-      setFetching(false);
-      setFetchError("");
-    }
-  }, [open]);
-
-  const usedMembers = useMemo(() => new Set(form.members), [form.members]);
   const addedModels = useMemo(
     () => new Set(form.entries.map((e) => e.model)),
     [form.entries]
@@ -534,16 +497,16 @@ function ProviderSheet({
 
   const toggleModel = (model: PiModel) => {
     if (addedModels.has(model.id)) {
-      onFormChange({
-        ...form,
-        entries: form.entries.filter((e) => e.model !== model.id),
-      });
+      setForm((f) => ({
+        ...f,
+        entries: f.entries.filter((e) => e.model !== model.id),
+      }));
       return;
     }
-    onFormChange({
-      ...form,
+    setForm((f) => ({
+      ...f,
       entries: [
-        ...form.entries,
+        ...f.entries,
         {
           name: "",
           label: "",
@@ -552,256 +515,210 @@ function ProviderSheet({
           apiKey: fetchKey.trim(),
         },
       ],
-    });
+    }));
   };
 
   const updateEntry = (index: number, patch: Partial<EntryForm>) => {
-    const next = { ...form, entries: [...form.entries] };
-    next.entries[index] = { ...next.entries[index], ...patch };
-    onFormChange(next);
-  };
-
-  const removeEntry = (index: number) => {
-    onFormChange({
-      ...form,
-      entries: form.entries.filter((_, j) => j !== index),
+    setForm((f) => {
+      const next = { ...f, entries: [...f.entries] };
+      next.entries[index] = { ...next.entries[index], ...patch };
+      return next;
     });
   };
 
-  return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>{title}</SheetTitle>
-          <SheetDescription>{description}</SheetDescription>
-        </SheetHeader>
-        <SheetBody className="flex flex-col gap-4">
-          <FieldRow label={t("settings.api-providers.field-title")} required>
-            <Input
-              value={form.title}
-              onChange={(e) => onFormChange({ ...form, title: e.target.value })}
-              placeholder={t("settings.api-providers.field-title-placeholder")}
-            />
-          </FieldRow>
-          <FieldRow label={t("settings.api-providers.field-type")} required>
-            <Select
-              value={form.providerType}
-              onValueChange={(v) =>
-                onFormChange({ ...form, providerType: v ?? "deepseek" })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PROVIDER_TYPE_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {t(o.labelKey)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FieldRow>
-          {form.providerType === "custom" && (
-            <FieldRow
-              label={t("settings.api-providers.field-base-url")}
-              hint={t("settings.api-providers.field-base-url-hint")}
-              required
-            >
-              <Input
-                value={form.baseUrl}
-                onChange={(e) =>
-                  onFormChange({ ...form, baseUrl: e.target.value })
-                }
-                placeholder={t(
-                  "settings.api-providers.field-base-url-placeholder"
-                )}
-                spellCheck={false}
-              />
-            </FieldRow>
-          )}
-          <FieldRow label={t("settings.api-providers.field-description")}>
-            <Input
-              value={form.description}
-              onChange={(e) =>
-                onFormChange({ ...form, description: e.target.value })
-              }
-              placeholder={t(
-                "settings.api-providers.field-description-placeholder"
-              )}
-            />
-          </FieldRow>
+  const removeEntry = (index: number) => {
+    setForm((f) => ({
+      ...f,
+      entries: f.entries.filter((_, j) => j !== index),
+    }));
+  };
 
-          {/* Entries */}
+  return (
+    <form
+      id={formId}
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(form);
+      }}
+    >
+      <FieldRow label={t("settings.api-providers.field-title")} required>
+        <Input
+          value={form.title}
+          onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+          placeholder={t("settings.api-providers.field-title-placeholder")}
+        />
+      </FieldRow>
+      <FieldRow label={t("settings.api-providers.field-type")} required>
+        <Select
+          value={form.providerType}
+          onValueChange={(v) =>
+            setForm((f) => ({ ...f, providerType: v ?? "deepseek" }))
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PROVIDER_TYPE_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {t(o.labelKey)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FieldRow>
+      {form.providerType === "custom" && (
+        <FieldRow
+          label={t("settings.api-providers.field-base-url")}
+          hint={t("settings.api-providers.field-base-url-hint")}
+          required
+        >
+          <Input
+            value={form.baseUrl}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, baseUrl: e.target.value }))
+            }
+            placeholder={t("settings.api-providers.field-base-url-placeholder")}
+            spellCheck={false}
+          />
+        </FieldRow>
+      )}
+      <FieldRow label={t("settings.api-providers.field-description")}>
+        <Input
+          value={form.description}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, description: e.target.value }))
+          }
+          placeholder={t(
+            "settings.api-providers.field-description-placeholder"
+          )}
+        />
+      </FieldRow>
+
+      {/* Entries */}
+      <div className="flex flex-col gap-2">
+        <FieldRow
+          label={t("settings.api-providers.field-entries")}
+          hint={t("settings.api-providers.field-entries-hint")}
+        >
           <div className="flex flex-col gap-2">
-            <FieldRow
-              label={t("settings.api-providers.field-entries")}
-              hint={t("settings.api-providers.field-entries-hint")}
-            >
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <SecretInput
-                      value={fetchKey}
-                      onChange={(e) => setFetchKey(e.target.value)}
-                      placeholder={t(
-                        "settings.api-providers.field-fetch-key-placeholder"
-                      )}
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={fetching}
-                    onClick={fetchModels}
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <SecretInput
+                  value={fetchKey}
+                  onChange={(e) => setFetchKey(e.target.value)}
+                  placeholder={t(
+                    "settings.api-providers.field-fetch-key-placeholder"
+                  )}
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={fetching}
+                onClick={fetchModels}
+              >
+                <RefreshCw className="w-4 h-4" />
+                {fetching
+                  ? t("settings.api-providers.fetching")
+                  : t("settings.api-providers.fetch-models")}
+              </Button>
+            </div>
+            {fetchError && <p className="text-xs text-error">{fetchError}</p>}
+            {models.length > 0 && (
+              <div className="max-h-40 overflow-y-auto flex flex-col gap-1">
+                {models.map((m) => {
+                  const enabled = addedModels.has(m.id);
+                  return (
+                    <label
+                      key={m.id}
+                      className="flex items-center justify-between gap-2 py-1 px-2 rounded-xs hover:bg-control-bg cursor-pointer"
+                    >
+                      <span className="text-sm truncate">{m.name || m.id}</span>
+                      <input
+                        type="checkbox"
+                        checked={enabled}
+                        onChange={() => toggleModel(m)}
+                        className="accent-accent"
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {form.entries.length > 0 && (
+              <div className="flex flex-col gap-2 border-t border-control-border pt-2">
+                {form.entries.map((e, i) => (
+                  <div
+                    key={e.name || `${e.model}-${i}`}
+                    className="flex flex-col gap-1.5 border border-control-border rounded-xs p-2"
                   >
-                    <RefreshCw className="w-4 h-4" />
-                    {fetching
-                      ? t("settings.api-providers.fetching")
-                      : t("settings.api-providers.fetch-models")}
-                  </Button>
-                </div>
-                {fetchError && (
-                  <p className="text-xs text-error">{fetchError}</p>
-                )}
-                {models.length > 0 && (
-                  <div className="max-h-40 overflow-y-auto flex flex-col gap-1">
-                    {models.map((m) => {
-                      const enabled = addedModels.has(m.id);
-                      return (
-                        <label
-                          key={m.id}
-                          className="flex items-center justify-between gap-2 py-1 px-2 rounded-xs hover:bg-control-bg cursor-pointer"
-                        >
-                          <span className="text-sm truncate">
-                            {m.name || m.id}
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={enabled}
-                            onChange={() => toggleModel(m)}
-                            className="accent-accent"
-                          />
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-                {form.entries.length > 0 && (
-                  <div className="flex flex-col gap-2 border-t border-control-border pt-2">
-                    {form.entries.map((e, i) => (
-                      <div
-                        key={e.name || `${e.model}-${i}`}
-                        className="flex flex-col gap-1.5 border border-control-border rounded-xs p-2"
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium truncate">
+                        {e.model}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-error"
+                        onClick={() => removeEntry(i)}
+                        aria-label={t("common.delete")}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium truncate">
-                            {e.model}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-error"
-                            onClick={() => removeEntry(i)}
-                            aria-label={t("common.delete")}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                        <Input
-                          value={e.label}
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <Input
+                      value={e.label}
+                      onChange={(ev) =>
+                        updateEntry(i, { label: ev.target.value })
+                      }
+                      placeholder={t(
+                        "settings.api-providers.entry-label-placeholder"
+                      )}
+                      className="h-8"
+                    />
+                    {e.name ? (
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-xs text-control-placeholder">
+                          {e.maskedApiKey ||
+                            t("settings.api-providers.entry-key-kept")}
+                        </span>
+                        <SecretInput
+                          value={e.apiKey}
                           onChange={(ev) =>
-                            updateEntry(i, { label: ev.target.value })
+                            updateEntry(i, { apiKey: ev.target.value })
                           }
                           placeholder={t(
-                            "settings.api-providers.entry-label-placeholder"
+                            "settings.api-providers.entry-key-replace-placeholder"
                           )}
                           className="h-8"
                         />
-                        {e.name ? (
-                          <div className="flex flex-col gap-1.5">
-                            <span className="text-xs text-control-placeholder">
-                              {e.maskedApiKey ||
-                                t("settings.api-providers.entry-key-kept")}
-                            </span>
-                            <SecretInput
-                              value={e.apiKey}
-                              onChange={(ev) =>
-                                updateEntry(i, { apiKey: ev.target.value })
-                              }
-                              placeholder={t(
-                                "settings.api-providers.entry-key-replace-placeholder"
-                              )}
-                              className="h-8"
-                            />
-                          </div>
-                        ) : (
-                          <span className="text-xs text-control-placeholder">
-                            {e.apiKey
-                              ? t("settings.api-providers.entry-key-set")
-                              : t("settings.api-providers.entry-key-required")}
-                          </span>
-                        )}
                       </div>
-                    ))}
+                    ) : (
+                      <span className="text-xs text-control-placeholder">
+                        {e.apiKey
+                          ? t("settings.api-providers.entry-key-set")
+                          : t("settings.api-providers.entry-key-required")}
+                      </span>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
-            </FieldRow>
+            )}
           </div>
+        </FieldRow>
+      </div>
 
-          {/* Members */}
-          <div className="flex flex-col gap-2">
-            <FieldRow
-              label={t("settings.api-providers.field-members")}
-              hint={t("settings.api-providers.field-members-hint")}
-            >
-              <div className="flex flex-col gap-2">
-                {form.members.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {form.members.map((m) => (
-                      <Badge key={m} variant="secondary" className="gap-1.5">
-                        {memberLabel(m, users, groups)}
-                        <button
-                          type="button"
-                          className="text-control-placeholder hover:text-error"
-                          onClick={() =>
-                            onFormChange({
-                              ...form,
-                              members: form.members.filter((x) => x !== m),
-                            })
-                          }
-                          aria-label={t("common.remove")}
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                <MemberPicker
-                  users={users}
-                  groups={groups}
-                  value=""
-                  allowAllUsers
-                  onSelect={(member) => {
-                    if (!member || usedMembers.has(member)) return;
-                    onFormChange({
-                      ...form,
-                      members: [...form.members, member],
-                    });
-                  }}
-                />
-              </div>
-            </FieldRow>
-          </div>
-        </SheetBody>
-        <SheetFooter>
-          <Button onClick={onSubmit} disabled={submitting}>
-            {submitting ? t("common.saving") : t("common.save")}
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+      {/* Members */}
+      <MemberEditor
+        members={form.members}
+        users={users}
+        groups={groups}
+        onChange={(members) => setForm((f) => ({ ...f, members }))}
+        label={t("settings.api-providers.field-members")}
+        hint={t("settings.api-providers.field-members-hint")}
+      />
+    </form>
   );
 }

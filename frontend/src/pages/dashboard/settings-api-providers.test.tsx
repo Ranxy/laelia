@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { describeError } from "@/lib/connect-errors";
 import { useAppStore } from "@/stores";
+import { renderWithQueryClient } from "@/test/query";
 import type { ApiProvider } from "@/types/proto-es/v1/api_provider_service_pb";
 import { SettingsApiProvidersPage } from "./settings-api-providers";
 
@@ -60,7 +61,7 @@ function provider(overrides?: Partial<ApiProvider>): ApiProvider {
 }
 
 function renderPage() {
-  return render(<SettingsApiProvidersPage />);
+  return renderWithQueryClient(<SettingsApiProvidersPage />);
 }
 
 beforeEach(() => {
