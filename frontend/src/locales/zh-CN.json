@@ -964,6 +964,9 @@
       "show-payload": "查看变更",
       "title": "审计日志"
     },
+    "directory": {
+      "load-failed": "加载工作区成员失败"
+    },
     "general": {
       "allow-signup": "允许自助注册",
       "allow-signup-description": "关闭后用户无法自行注册，只能由管理员创建。",

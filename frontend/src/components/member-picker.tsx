@@ -1,17 +1,10 @@
 import { Search, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { displayName, groupDisplayName } from "@/lib/members";
 import { cn } from "@/lib/utils";
 import { type Group } from "@/types/proto-es/v1/group_service_pb";
 import { type User } from "@/types/proto-es/v1/user_service_pb";
-
-function displayName(user: User): string {
-  return user.title || user.email || user.name || "";
-}
-
-function groupDisplayName(group: Group): string {
-  return group.title || group.email || group.name || "";
-}
 
 interface MemberPickerProps {
   users: User[];

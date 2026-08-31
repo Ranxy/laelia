@@ -964,6 +964,9 @@
       "show-payload": "Show change",
       "title": "Audit logs"
     },
+    "directory": {
+      "load-failed": "Failed to load workspace members"
+    },
     "general": {
       "allow-signup": "Allow self-service signup",
       "allow-signup-description": "When off, users cannot register themselves; only admins can create users.",
