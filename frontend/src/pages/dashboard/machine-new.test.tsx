@@ -14,9 +14,9 @@ vi.mock("@/components/copyable-command", () => ({
   CopyableCommand: () => <div />,
 }));
 
-import { MachineNewPage } from "./machine-new";
 import { useAppStore } from "@/stores";
 import type { MachineSummary } from "@/types/proto-es/v1/machine_pb";
+import { MachineNewPage } from "./machine-new";
 
 const mockedActions = vi.hoisted(() => ({
   fetchMachines: vi.fn(),
@@ -89,9 +89,7 @@ describe("MachineNewPage", () => {
     // The approval poll lands the new machine in the store.
     useAppStore.setState({ machines: [freshSummary("machines/m1", "m1")] });
 
-    expect(
-      (await screen.findAllByText("dev-box")).length
-    ).toBeGreaterThan(0);
+    expect((await screen.findAllByText("dev-box")).length).toBeGreaterThan(0);
     expect(mockedActions.getMachine).toHaveBeenCalledWith("machines/m1");
     expect(screen.getByLabelText("machine.new.name-label")).toBeInTheDocument();
   });

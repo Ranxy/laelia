@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { MemberPicker } from "@/components/member-picker";
-import { FieldRow } from "@/components/ui/field-row";
 import { Badge } from "@/components/ui/badge";
+import { FieldRow } from "@/components/ui/field-row";
 import { memberLabel } from "@/lib/members";
 import type { Group } from "@/types/proto-es/v1/group_service_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";

@@ -75,14 +75,14 @@ vi.mock("@/composables/useMentionTargets", () => ({
   targetToMention: (t: unknown) => t,
 }));
 
-import {
-  ChatConversationPage,
-  ChatEmptyState,
-  ChannelConversationView,
-} from "./chat-conversation";
 import { useAppStore } from "@/stores";
 import type { ChatMessageUI } from "@/stores/types";
 import type { Conversation } from "@/types/proto-es/v1/command_pb";
+import {
+  ChannelConversationView,
+  ChatConversationPage,
+  ChatEmptyState,
+} from "./chat-conversation";
 
 // Store action doubles: the page's init/watcher/read lifecycle is the
 // behavior under test, so the actions themselves are the observation points.
@@ -143,10 +143,7 @@ function seedStore(channel: Conversation | null) {
     } as never,
     channels: channel ? [channel] : [],
     chatMessages: {
-      [CONV]: [
-        message("m1", "hello world"),
-        message("m2", "second message"),
-      ],
+      [CONV]: [message("m1", "hello world"), message("m2", "second message")],
     },
     loadMessages: mockedActions.loadMessages,
     listChannelMembers: mockedActions.listChannelMembers,
@@ -272,7 +269,10 @@ describe("ChatConversationPage agent-DM view-only", () => {
 describe("ChannelConversationView embedded mode", () => {
   beforeEach(() => {
     seedStore(conversation());
-    Object.assign(mockRouter, { params: {}, searchParams: new URLSearchParams() });
+    Object.assign(mockRouter, {
+      params: {},
+      searchParams: new URLSearchParams(),
+    });
   });
 
   afterEach(() => {
