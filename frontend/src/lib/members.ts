@@ -13,19 +13,26 @@ export function groupDisplayName(group: Group): string {
   return group.title || group.email || group.name || "";
 }
 
-// Resolves a workspace member reference ("users/<id>" | "groups/<email>") to
-// a display label, falling back to the raw reference when the directory does
-// not contain the principal (deleted / cross-source members).
+// Resolves a workspace member reference to a display label — semantics of
+// the byte-identical copies formerly in the mcp-servers / api-providers
+// pages: user members show the email, group members the group title,
+// "allUsers" passes through. Falls back to the raw reference when the
+// directory does not contain the principal (deleted / cross-source members).
 export function memberLabel(
   member: string,
   users: User[],
   groups: Group[]
 ): string {
-  if (member.startsWith("groups/")) {
-    const email = member.slice("groups/".length);
-    const group = groups.find((g) => g.email === email || g.name === member);
-    return group ? groupDisplayName(group) : member;
+  if (member === "allUsers") return "allUsers";
+  if (member.startsWith("users/")) {
+    return users.find((u) => u.name === member)?.email ?? member;
   }
-  const user = users.find((u) => u.name === member);
-  return user ? displayName(user) : member;
+  if (member.startsWith("groups/")) {
+    const token = member.slice("groups/".length);
+    return (
+      groups.find((g) => g.email === token || g.name === `groups/${token}`)
+        ?.title ?? token
+    );
+  }
+  return member;
 }
