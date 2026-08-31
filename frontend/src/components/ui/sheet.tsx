@@ -4,9 +4,10 @@ import { X } from "lucide-react";
 import type { ComponentProps, ReactNode, Ref } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import { MODAL_DESCRIPTION_CLASS } from "./dialog";
 import {
   getLayerRoot,
-  LAYER_BACKDROP_CLASS,
+  LAYER_BACKDROP_SET,
   LAYER_SURFACE_CLASS,
   usePreserveHigherLayerAccess,
 } from "./layer";
@@ -34,7 +35,7 @@ function SheetOverlay({
     <BaseDialog.Backdrop
       ref={ref}
       className={cn(
-        `fixed inset-0 ${LAYER_BACKDROP_CLASS} bg-overlay/50`,
+        LAYER_BACKDROP_SET,
         "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
         "transition-opacity duration-200",
         className
@@ -201,7 +202,7 @@ function SheetDescription({
   return (
     <BaseDialog.Description
       ref={ref}
-      className={cn("text-sm text-control-light", className)}
+      className={cn(MODAL_DESCRIPTION_CLASS, className)}
       {...props}
     />
   );

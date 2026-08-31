@@ -1,9 +1,10 @@
 import { AlertDialog as BaseAlertDialog } from "@base-ui/react/alert-dialog";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
+import { MODAL_TITLE_CLASS } from "./dialog";
 import {
   getLayerRoot,
-  LAYER_BACKDROP_CLASS,
+  LAYER_BACKDROP_SET,
   LAYER_SURFACE_CLASS,
   usePreserveHigherLayerAccess,
 } from "./layer";
@@ -20,10 +21,7 @@ function AlertDialogOverlay({
   return (
     <BaseAlertDialog.Backdrop
       ref={ref}
-      className={cn(
-        `fixed inset-0 ${LAYER_BACKDROP_CLASS} bg-overlay/50`,
-        className
-      )}
+      className={cn(LAYER_BACKDROP_SET, className)}
       {...props}
     />
   );
@@ -64,7 +62,7 @@ function AlertDialogTitle({
   return (
     <BaseAlertDialog.Title
       ref={ref}
-      className={cn("text-lg font-semibold", className)}
+      className={cn(MODAL_TITLE_CLASS, className)}
       {...props}
     />
   );

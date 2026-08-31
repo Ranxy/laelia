@@ -1,7 +1,11 @@
 import { ContextMenu as BaseContextMenu } from "@base-ui/react/context-menu";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
-import { getLayerRoot, LAYER_SURFACE_CLASS } from "./layer";
+import { getLayerRoot } from "./layer";
+import {
+  POPUP_SURFACE_CLASS,
+  positionerSurfaceClass,
+} from "./positioned-popup";
 
 // ---- Root ----
 function ContextMenu(props: ComponentProps<typeof BaseContextMenu.Root>) {
@@ -20,11 +24,12 @@ function ContextMenuContent({
 }: ComponentProps<typeof BaseContextMenu.Popup>) {
   return (
     <BaseContextMenu.Portal container={getLayerRoot("overlay")}>
-      <BaseContextMenu.Positioner className={LAYER_SURFACE_CLASS}>
+      <BaseContextMenu.Positioner className={positionerSurfaceClass()}>
         <BaseContextMenu.Popup
           ref={ref}
           className={cn(
-            "min-w-[12rem] overflow-hidden rounded-sm border border-control-border bg-background py-1 shadow-md",
+            "min-w-[12rem] overflow-hidden",
+            POPUP_SURFACE_CLASS,
             "focus:outline-hidden",
             className
           )}

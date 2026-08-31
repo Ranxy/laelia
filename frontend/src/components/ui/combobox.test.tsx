@@ -20,7 +20,13 @@ function typeInto(input: HTMLInputElement, value: string) {
 }
 
 // A tiny harness that records the chosen value so tests can assert on it.
-function Harness({ initial = "" }: { initial?: string }) {
+function Harness({
+  initial = "",
+  portal,
+}: {
+  initial?: string;
+  portal?: boolean;
+}) {
   const [value, setValue] = useState(initial);
   (Harness as unknown as { value: string }).value = value;
   return (
@@ -32,6 +38,7 @@ function Harness({ initial = "" }: { initial?: string }) {
         { id: "deepseek-reasoner", name: "deepseek-reasoner" },
       ]}
       placeholder="pick a model"
+      portal={portal}
     />
   );
 }
@@ -74,6 +81,14 @@ describe("ModelCombobox", () => {
     const items = popupItems();
     expect(items.length).toBe(1);
     expect(items[0]?.textContent).toContain("deepseek-reasoner");
+
+    // Default is portal=true: the listbox mounts in the shared overlay layer
+    // root, never inside the trigger's DOM subtree.
+    const overlayRoot = document.getElementById("bb-react-layer-overlay");
+    expect(overlayRoot?.querySelector('[role="listbox"]')).toBeInstanceOf(
+      HTMLDivElement
+    );
+    expect(container.querySelector('[role="listbox"]')).toBeNull();
 
     // Picking the option commits the model id (not the display name).
     await act(async () => {
@@ -150,6 +165,43 @@ describe("ModelCombobox", () => {
         new MouseEvent("pointerdown", { bubbles: true })
       );
     });
+    expect(isPopupOpen()).toBe(false);
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  test("portal={false} keeps the popup anchored inside the local container", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Harness portal={false} />);
+    });
+
+    const input = container.querySelector("input") as HTMLInputElement;
+    await act(async () => {
+      input.focus();
+    });
+    expect(isPopupOpen()).toBe(true);
+
+    // The listbox renders inline under the input; nothing is portaled to the
+    // overlay layer root (it is not even mounted for this rendering path).
+    const localPopup = container.querySelector('[role="listbox"]');
+    expect(localPopup).toBeInstanceOf(HTMLDivElement);
+    expect(document.getElementById("bb-react-layer-overlay")).toBeNull();
+
+    // Picking from the local popup still commits the id and closes.
+    await act(async () => {
+      localPopup
+        ?.querySelector("button")
+        ?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    });
+    expect((Harness as unknown as { value: string }).value).toBe(
+      "deepseek-chat"
+    );
     expect(isPopupOpen()).toBe(false);
 
     await act(async () => {

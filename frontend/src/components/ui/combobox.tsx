@@ -1,10 +1,11 @@
 import { ChevronDown, Loader2 } from "lucide-react";
 import type { FocusEvent, KeyboardEvent } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Input } from "./input";
 import { getLayerRoot, LAYER_SURFACE_CLASS } from "./layer";
+import { POPUP_SURFACE_CLASS } from "./positioned-popup";
 
 export interface ModelComboboxOption {
   id: string;
@@ -20,6 +21,11 @@ export interface ModelComboboxProps {
   disabled?: boolean;
   emptyLabel?: string;
   className?: string;
+  // Default (true): the popup renders through the shared overlay layer root,
+  // so clipped/stacked ancestors (e.g. a SheetBody scroll container) cannot
+  // cut it off. false keeps the popup anchored locally under the input —
+  // the legacy in-container rendering for callers that must stay inline.
+  portal?: boolean;
 }
 
 // Keep in sync with the popup's `max-h-60`.
@@ -32,7 +38,9 @@ const POPUP_GAP_PX = 4;
 // by id/name (case-insensitive). Picking an option sets the value to its id;
 // typing a custom id the API did not return is also accepted (free-text
 // fallback). Keyboard: ArrowUp/Down to move, Enter to pick the highlighted
-// option (or commit the typed text), Escape to close.
+// option (or commit the typed text), Escape to close. The popup follows the
+// `portal` prop; dismissal uses outside-click (pointerdown) and focus leaving
+// the control — no deferred timers.
 export function ModelCombobox({
   value,
   onValueChange,
@@ -42,6 +50,7 @@ export function ModelCombobox({
   disabled = false,
   emptyLabel,
   className,
+  portal = true,
 }: ModelComboboxProps) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(-1);
@@ -50,14 +59,17 @@ export function ModelCombobox({
   const popupRef = useRef<HTMLDivElement>(null);
 
   const query = value.trim().toLowerCase();
-  const filtered =
-    query === ""
-      ? options
-      : options.filter(
-          (o) =>
-            o.id.toLowerCase().includes(query) ||
-            o.name.toLowerCase().includes(query)
-        );
+  const filtered = useMemo(
+    () =>
+      query === ""
+        ? options
+        : options.filter(
+            (o) =>
+              o.id.toLowerCase().includes(query) ||
+              o.name.toLowerCase().includes(query)
+          ),
+    [options, query]
+  );
 
   // Close when the press lands outside the trigger and the (portaled) popup.
   useEffect(() => {
@@ -75,11 +87,10 @@ export function ModelCombobox({
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
 
-  // The popup is portaled into the shared overlay layer, so no ancestor
-  // scroll container can clip it. Pin it under the trigger with fixed
-  // positioning recomputed on open, scroll (capture) and resize.
+  // Only the portal path is fixed-positioned against the viewport; the local
+  // (portal={false}) path flows under the input with plain `absolute` layout.
   useLayoutEffect(() => {
-    if (!open) return;
+    if (!open || !portal) return;
     const update = () => {
       const anchor = containerRef.current;
       const popup = popupRef.current;
@@ -113,7 +124,7 @@ export function ModelCombobox({
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [open]);
+  }, [open, portal]);
 
   function choose(option: ModelComboboxOption) {
     onValueChange(option.id);
@@ -162,6 +173,45 @@ export function ModelCombobox({
     }
   }
 
+  // Shared option-list body for the portal and local rendering paths.
+  function listboxBody() {
+    return loading ? (
+      <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-control-placeholder">
+        <Loader2 className="size-3.5 animate-spin" />
+      </div>
+    ) : filtered.length === 0 ? (
+      <div className="px-2 py-1.5 text-xs text-control-placeholder">
+        {emptyLabel ?? value}
+      </div>
+    ) : (
+      filtered.map((option, i) => (
+        <button
+          key={option.id}
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            choose(option);
+          }}
+          onMouseEnter={() => setHighlight(i)}
+          className={cn(
+            "flex w-full items-start gap-2 px-2 py-1.5 text-left text-sm",
+            i === highlight ? "bg-control-bg" : "hover:bg-control-bg"
+          )}
+          title={option.id}
+        >
+          <span className="min-w-0 flex-1 truncate text-main">
+            {option.name}
+          </span>
+          {option.name !== option.id && (
+            <span className="shrink-0 text-xs text-control-placeholder">
+              {option.id}
+            </span>
+          )}
+        </button>
+      ))
+    );
+  }
+
   return (
     <div ref={containerRef} className={cn("relative", className)}>
       <Input
@@ -182,53 +232,39 @@ export function ModelCombobox({
       />
       <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 opacity-50" />
       {open &&
-        createPortal(
+        (portal ? (
+          // Shared overlay portal: no ancestor scroll container can clip the
+          // popup; fixed position is pinned under the trigger by the effect.
+          createPortal(
+            <div
+              ref={popupRef}
+              className={cn(
+                "fixed max-h-60 overflow-auto",
+                POPUP_SURFACE_CLASS,
+                LAYER_SURFACE_CLASS
+              )}
+              role="listbox"
+            >
+              {listboxBody()}
+            </div>,
+            getLayerRoot("overlay")
+          )
+        ) : (
+          // Legacy in-container path: flows under the input inside the
+          // relative wrapper. LAYER_SURFACE_CLASS keeps the stacking local
+          // and policy-clean instead of the retired raw z-50.
           <div
             ref={popupRef}
             className={cn(
-              "fixed max-h-60 overflow-auto rounded-sm border border-control-border bg-background py-1 shadow-md",
+              "absolute mt-1 max-h-60 w-full overflow-auto",
+              POPUP_SURFACE_CLASS,
               LAYER_SURFACE_CLASS
             )}
             role="listbox"
           >
-            {loading ? (
-              <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-control-placeholder">
-                <Loader2 className="size-3.5 animate-spin" />
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="px-2 py-1.5 text-xs text-control-placeholder">
-                {emptyLabel ?? value}
-              </div>
-            ) : (
-              filtered.map((option, i) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    choose(option);
-                  }}
-                  onMouseEnter={() => setHighlight(i)}
-                  className={cn(
-                    "flex w-full items-start gap-2 px-2 py-1.5 text-left text-sm",
-                    i === highlight ? "bg-control-bg" : "hover:bg-control-bg"
-                  )}
-                  title={option.id}
-                >
-                  <span className="min-w-0 flex-1 truncate text-main">
-                    {option.name}
-                  </span>
-                  {option.name !== option.id && (
-                    <span className="shrink-0 text-xs text-control-placeholder">
-                      {option.id}
-                    </span>
-                  )}
-                </button>
-              ))
-            )}
-          </div>,
-          getLayerRoot("overlay")
-        )}
+            {listboxBody()}
+          </div>
+        ))}
     </div>
   );
 }

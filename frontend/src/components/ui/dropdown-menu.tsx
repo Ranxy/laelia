@@ -1,7 +1,11 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
-import { getLayerRoot, LAYER_SURFACE_CLASS } from "./layer";
+import { getLayerRoot } from "./layer";
+import {
+  POPUP_SURFACE_CLASS,
+  positionerSurfaceClass,
+} from "./positioned-popup";
 
 // ---- Root ----
 function DropdownMenu({
@@ -37,12 +41,13 @@ function DropdownMenuContent({
         side={side}
         sideOffset={sideOffset}
         align={align}
-        className={LAYER_SURFACE_CLASS}
+        className={positionerSurfaceClass()}
       >
         <BaseMenu.Popup
           ref={ref}
           className={cn(
-            "min-w-[12rem] overflow-hidden rounded-sm border border-control-border bg-background py-1 shadow-md",
+            "min-w-[12rem] overflow-hidden",
+            POPUP_SURFACE_CLASS,
             "focus:outline-hidden",
             className
           )}
@@ -72,12 +77,13 @@ function DropdownMenuSubmenuContent({
         side="right"
         sideOffset={sideOffset}
         align={align}
-        className={LAYER_SURFACE_CLASS}
+        className={positionerSurfaceClass()}
       >
         <BaseMenu.Popup
           ref={ref}
           className={cn(
-            "min-w-[10rem] overflow-hidden rounded-sm border border-control-border bg-background py-1 shadow-md",
+            "min-w-[10rem] overflow-hidden",
+            POPUP_SURFACE_CLASS,
             "focus:outline-hidden",
             className
           )}

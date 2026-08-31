@@ -3,7 +3,11 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { Check, ChevronDown } from "lucide-react";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
-import { getLayerRoot, LAYER_SURFACE_CLASS } from "./layer";
+import { getLayerRoot } from "./layer";
+import {
+  POPUP_SURFACE_CLASS,
+  positionerSurfaceClass,
+} from "./positioned-popup";
 
 // ---- Root ----
 const Select = BaseSelect.Root;
@@ -87,13 +91,14 @@ function SelectContent({
         align={align}
         alignItemWithTrigger={alignItemWithTrigger}
         sideOffset={sideOffset}
-        className={cn(LAYER_SURFACE_CLASS, positionerClassName)}
+        className={positionerSurfaceClass(positionerClassName)}
         {...restPositionerProps}
       >
         <BaseSelect.Popup
           ref={ref}
           className={cn(
-            "min-w-(--anchor-width) max-h-60 overflow-auto rounded-sm border border-control-border bg-background py-1 shadow-md",
+            "min-w-(--anchor-width) max-h-60 overflow-auto",
+            POPUP_SURFACE_CLASS,
             className
           )}
           {...props}

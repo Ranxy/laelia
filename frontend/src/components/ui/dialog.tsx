@@ -3,10 +3,16 @@ import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 import {
   getLayerRoot,
-  LAYER_BACKDROP_CLASS,
+  LAYER_BACKDROP_SET,
   LAYER_SURFACE_CLASS,
   usePreserveHigherLayerAccess,
 } from "./layer";
+
+// Typography shared verbatim across the modal shells: Dialog and AlertDialog
+// use both, Sheet reuses the description. Extend (never re-list) these when a
+// shell needs an extra class so the shells cannot drift apart.
+export const MODAL_TITLE_CLASS = "text-lg font-semibold";
+export const MODAL_DESCRIPTION_CLASS = "text-sm text-control-light";
 
 // ---- Root ----
 const Dialog = BaseDialog.Root;
@@ -23,10 +29,7 @@ function DialogOverlay({
   return (
     <BaseDialog.Backdrop
       ref={ref}
-      className={cn(
-        `fixed inset-0 ${LAYER_BACKDROP_CLASS} bg-overlay/50`,
-        className
-      )}
+      className={cn(LAYER_BACKDROP_SET, className)}
       {...props}
     />
   );
@@ -74,7 +77,7 @@ function DialogTitle({
   return (
     <BaseDialog.Title
       ref={ref}
-      className={cn("text-lg font-semibold", className)}
+      className={cn(MODAL_TITLE_CLASS, className)}
       {...props}
     />
   );
@@ -89,7 +92,7 @@ function DialogDescription({
   return (
     <BaseDialog.Description
       ref={ref}
-      className={cn("text-sm text-control-light", className)}
+      className={cn(MODAL_DESCRIPTION_CLASS, className)}
       {...props}
     />
   );

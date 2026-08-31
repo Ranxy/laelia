@@ -144,3 +144,9 @@ export const usePreserveHigherLayerAccess = (family: LayerFamily) => {
 // child popup above child backdrop.
 export const LAYER_SURFACE_CLASS = "z-10";
 export const LAYER_BACKDROP_CLASS = "z-10";
+
+// Composite scrim set for the modal shells (Dialog / AlertDialog / Sheet):
+// one fixed, full-viewport tinted backdrop carrying the shared intra-family
+// stacking slot. Composed from the building blocks above so the shells cannot
+// drift away from the layer policy.
+export const LAYER_BACKDROP_SET = `fixed inset-0 ${LAYER_BACKDROP_CLASS} bg-overlay/50`;

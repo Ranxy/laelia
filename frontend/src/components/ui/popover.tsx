@@ -1,7 +1,11 @@
 import { Popover as BasePopover } from "@base-ui/react/popover";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
-import { getLayerRoot, LAYER_SURFACE_CLASS } from "./layer";
+import { getLayerRoot } from "./layer";
+import {
+  POPUP_SURFACE_CLASS,
+  positionerSurfaceClass,
+} from "./positioned-popup";
 
 // ---- Root ----
 const Popover = BasePopover.Root;
@@ -32,12 +36,14 @@ function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         anchor={anchor}
-        className={LAYER_SURFACE_CLASS}
+        className={positionerSurfaceClass()}
       >
         <BasePopover.Popup
           ref={ref}
           className={cn(
-            "rounded-sm border border-control-border bg-background p-3 shadow-md text-sm text-control",
+            POPUP_SURFACE_CLASS,
+            // p-3 (not the shared py-1): a popover pads all around its body.
+            "p-3 text-sm text-control",
             "focus:outline-hidden",
             className
           )}
