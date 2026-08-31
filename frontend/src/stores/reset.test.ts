@@ -2,6 +2,43 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { queryClient } from "@/lib/query-client";
 import { registerCleanup } from "./cleanup-registry";
 import { useAppStore } from "./index";
+import type { AppStoreState } from "./types";
+
+// Seeds a sentinel guaranteed to differ from one key's pristine initial
+// value: array -> ["sentinel"], Record -> { __sentinel__: 1 }, string ->
+// "__sentinel__", boolean -> flipped, number/bigint -> +1, null/undefined
+// -> "sentinel". Cast as never when written: AppStoreState is a big
+// intersection of slices, so generic sentinels never type-match a field.
+function sentinelFor(key: keyof AppStoreState, pristine: AppStoreState) {
+  // reset() aborts/stops watcher entries, so those two keys need valid
+  // handles instead of generic sentinels.
+  if (key === "channelWatchers") {
+    return {
+      "conversations/1": {
+        ctrl: new AbortController(),
+        badge: { stop: () => {} },
+      },
+    };
+  }
+  if (key === "threadWatchers") {
+    return { "conversations/1": { ctrl: new AbortController() } };
+  }
+  const value: unknown = pristine[key];
+  if (Array.isArray(value)) return ["sentinel"];
+  if (value !== null && typeof value === "object") return { __sentinel__: 1 };
+  switch (typeof value) {
+    case "string":
+      return "__sentinel__";
+    case "boolean":
+      return !value;
+    case "number":
+      return value + 1;
+    case "bigint":
+      return value + 1n;
+    default:
+      return "sentinel";
+  }
+}
 
 describe("store reset", () => {
   afterEach(() => {
@@ -9,32 +46,30 @@ describe("store reset", () => {
   });
 
   it("restores every slice to its pristine initial state on logout", () => {
-    const store = useAppStore;
-    // Simulate the accumulated per-user state a logged-in session leaves behind.
-    store.setState({
-      currentUser: { name: "users/1" } as never,
-      isLoggedIn: true,
-      sessionLoaded: true,
-      agents: [{ name: "agents/1", title: "a" }] as never,
-      chatMessages: { "conversations/1": [] },
-      unreadByConv: { "conversations/1": 3 },
-      reminders: [{ name: "reminders/1" }] as never,
-      activities: [{ name: "activities/1" }] as never,
-      channelMembersByConv: { "conversations/1": [] },
-    });
+    // Table-driven: derive the assertion surface from getInitialState()
+    // itself so a new slice's forgotten cleanup can never escape this test
+    // hand-picking fields. Its action closures are same-function after
+    // reset (they stay bound to the live set/get), so excluding functions
+    // — which also drops `reset` itself — leaves exactly the data slices.
+    const pristine = useAppStore.getInitialState();
+    const dataKeys = (Object.keys(pristine) as (keyof AppStoreState)[]).filter(
+      (key) => typeof pristine[key] !== "function"
+    );
+    expect(dataKeys.length).toBeGreaterThan(0);
 
-    store.getState().reset();
+    // Mutate every data key away from pristine, then reset.
+    const seed: Partial<AppStoreState> = {};
+    for (const key of dataKeys) seed[key] = sentinelFor(key, pristine) as never;
+    useAppStore.setState(seed);
+    useAppStore.getState().reset();
 
-    const s = store.getState();
-    expect(s.currentUser).toBeNull();
-    expect(s.isLoggedIn).toBe(false);
-    expect(s.sessionLoaded).toBe(false);
-    expect(s.agents).toEqual([]);
-    expect(s.chatMessages).toEqual({});
-    expect(s.unreadByConv).toEqual({});
-    expect(s.reminders).toEqual([]);
-    expect(s.activities).toEqual([]);
-    expect(s.channelMembersByConv).toEqual({});
+    const state = useAppStore.getState();
+    for (const key of dataKeys) {
+      expect(
+        state[key],
+        `slice "${key}" must be restored to its pristine initial state`
+      ).toEqual(pristine[key]);
+    }
   });
 
   it("stops channel and thread watcher loops before wiping state", () => {
