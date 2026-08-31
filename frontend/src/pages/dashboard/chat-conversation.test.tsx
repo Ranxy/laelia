@@ -76,7 +76,7 @@ vi.mock("@/composables/useMentionTargets", () => ({
 }));
 
 import { useAppStore } from "@/stores";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 import type { Conversation } from "@/types/proto-es/v1/command_pb";
 import {
   ChannelConversationView,

@@ -1,10 +1,25 @@
 import { equals } from "@bufbuild/protobuf";
 import { apiProviderServiceClient } from "@/connect";
 import { queryClient } from "@/lib/query-client";
+import type { ApiProvider } from "@/types/proto-es/v1/api_provider_service_pb";
 import { ApiProviderSchema } from "@/types/proto-es/v1/api_provider_service_pb";
 import { registerCleanup } from "./cleanup-registry";
 import { sameList } from "./list-equals";
-import type { ApiProviderSlice, AppSliceCreator } from "./types";
+import type { AppSliceCreator } from "./types";
+
+// ApiProviderSlice owns the global LLM API provider roster. The backend
+// handler-gates ListApiProviders: admins/managers see every provider, other
+// callers see only the providers they may use, so the same list feeds both the
+// settings page and the agent create/edit form dropdowns.
+export interface ApiProviderSlice {
+  apiProviders: ApiProvider[];
+  apiProvidersLoading: boolean;
+
+  fetchApiProviders: (
+    params?: { pageSize?: number; pageToken?: string },
+    opts?: { silent?: boolean }
+  ) => Promise<{ nextPageToken: string } | undefined>;
+}
 
 // Query cache key for this slice (ADR-1: query keys live with the slice that
 // fetches them). staleTime: 0 keeps "action call == one explicit fetch"

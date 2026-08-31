@@ -1,12 +1,45 @@
 import { create } from "@bufbuild/protobuf";
 import { commandServiceClient } from "@/connect";
+import type {
+  Command,
+  CommandEvent,
+  CommandOutput,
+} from "@/types/proto-es/v1/command_pb";
 import {
   CancelCommandRequestSchema,
   SteerCommandRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { registerCleanup } from "./cleanup-registry";
 import { sleep } from "./polling";
-import type { AppSliceCreator, CommandSlice } from "./types";
+import type { AppSliceCreator } from "./types";
+
+export interface CommandSlice {
+  commands: Command[];
+  commandsLoading: boolean;
+  activeOutputs: Record<string, CommandOutput[]>;
+  activeEvents: Record<string, CommandEvent[]>;
+
+  cancelCommand: (name: string) => Promise<Command>;
+  // steerCommand injects a follow-up message into the in-flight turn of a
+  // running command. Best-effort: executors without mid-turn steering ignore
+  // it. Throws when the command is not running or the agent is unreachable.
+  steerCommand: (name: string, text: string) => Promise<Command>;
+  listCommands: (
+    agent: string,
+    params?: { pageSize?: number; pageToken?: string; status?: number }
+  ) => Promise<{ commands: Command[]; nextPageToken: string } | undefined>;
+  getCommand: (name: string) => Promise<Command | undefined>;
+  // watchCommand/watchCommandEvents resolve with true when the server closed
+  // the stream normally (e.g. the command finished), false when the stream was
+  // aborted by the caller or failed with an error.
+  watchCommand: (name: string, signal?: AbortSignal) => Promise<boolean>;
+  watchCommandEvents: (name: string, signal?: AbortSignal) => Promise<boolean>;
+  // releaseCommand drops the cached output/events for one command so a long
+  // session cannot accumulate every visited command's full stdout in memory.
+  // Command detail pages call it on unmount; the LRU cap in the slice is the
+  // wider safety net.
+  releaseCommand: (name: string) => void;
+}
 
 // Cached command runtime data (outputs + events) is bounded: a full stdout
 // stream can be several MB, and without a cap a long session accumulates

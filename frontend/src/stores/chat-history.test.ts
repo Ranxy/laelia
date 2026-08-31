@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "./index";
-import type { ChatMessageUI } from "./types";
+import type { ChatMessageUI } from "./ui-models";
 
 const mocks = vi.hoisted(() => ({
   listConversationMessages: vi.fn(),

@@ -1,5 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { commandServiceClient } from "@/connect";
+import type { ChatMessage } from "@/types/proto-es/v1/command_pb";
 import {
   AddReactionRequestSchema,
   GetOrCreateConversationRequestSchema,
@@ -9,7 +10,80 @@ import {
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { appendNewMessages, toUiMessage } from "./chat-helpers";
-import type { AppSliceCreator, ChatMessageUI, ChatSlice } from "./types";
+import type { AppSliceCreator } from "./types";
+import type { ChatMessageUI } from "./ui-models";
+
+export interface ChatSlice {
+  conversations: Record<string, string>;
+  chatMessages: Record<string, ChatMessageUI[]>;
+  chatLoading: Record<string, boolean>;
+  // Last-seen conversation.current_version per conversation, keyed by
+  // conversation name. Captured by loadMessages and advanced by the channel
+  // watcher; used as the afterVersion cursor so the watcher polls only for
+  // messages newer than what it has already seen instead of re-fetching the
+  // whole list every tick.
+  chatCurrentVersion: Record<string, bigint>;
+  // Bidirectional history-window state, shared by the normal latest window
+  // and a file-drawer jump window. chatJumpByConv holds the active jump anchor
+  // (null in the normal window); chatHasOlder/Newer tell the UI whether more
+  // history is available in each direction for incremental loading.
+  // chatJumpLoading guards the in-flight page load for either direction (the
+  // name is historical).
+  chatJumpByConv: Record<
+    string,
+    { messageId: string; roomVersion: bigint } | null
+  >;
+  chatJumpLoading: Record<string, boolean>;
+  chatHasOlderByConv: Record<string, boolean>;
+  chatHasNewerByConv: Record<string, boolean>;
+
+  getOrCreateConversation: (agent: string) => Promise<string>;
+  // getOrCreateUserUserDM opens (or reuses) the 1:1 DM between the calling
+  // user and a peer user (resource name "users/{id}"). Returns the
+  // conversation name "conversations/{id}".
+  getOrCreateUserUserDM: (peerUser: string) => Promise<string>;
+  loadMessages: (conversation: string) => Promise<void>;
+  sendChatMessage: (
+    agent: string,
+    instruction: string,
+    conversationId?: string
+  ) => Promise<ChatMessage>;
+  // toggleReaction adds (or, if the caller already reacted, removes) the
+  // caller's emoji reaction on a message in a conversation, then updates the
+  // local message's reactions from the server's response. Lightweight: it
+  // never bumps the room version or wakes agents.
+  toggleReaction: (
+    conversation: string,
+    messageId: string,
+    emoji: string
+  ) => Promise<void>;
+  // jumpToMessage replaces the conversation's message list with a focused
+  // window around the given message (the file's carrying position) so the user
+  // can jump to an old message without loading the whole history. Older/newer
+  // pages are loaded incrementally via loadOlderMessages / loadNewerMessages.
+  jumpToMessage: (
+    conversation: string,
+    messageId: string,
+    roomVersion: bigint
+  ) => Promise<void>;
+  loadOlderMessages: (conversation: string) => Promise<void>;
+  loadNewerMessages: (conversation: string) => Promise<void>;
+  // clearJump exits jump mode and reloads the latest messages for the
+  // conversation.
+  clearJump: (conversation: string) => Promise<void>;
+
+  // Optimistic message mutations for the chat composer (top-level channel/DM
+  // sends). append/patch/remove keep the slice's invariants (id dedup via
+  // appendNewMessages, same-reference bail-outs) out of the component: the
+  // composer calls these instead of inlining useAppStore.setState surgery.
+  appendChatMessage: (conversation: string, msg: ChatMessageUI) => void;
+  patchChatMessage: (
+    conversation: string,
+    messageId: string,
+    patch: Partial<ChatMessageUI>
+  ) => void;
+  removeChatMessage: (conversation: string, messageId: string) => void;
+}
 
 // Max pages the incremental delta fetch will follow. The backend caps each
 // after_version page at 100 (pageSize 200 is clamped), so a burst of >100 new

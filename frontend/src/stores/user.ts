@@ -3,6 +3,10 @@ import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 import { userServiceClient } from "@/connect";
 import { queryClient } from "@/lib/query-client";
 import { State } from "@/types/proto-es/v1/common_pb";
+import type {
+  ChatPreferences,
+  User,
+} from "@/types/proto-es/v1/user_service_pb";
 import {
   CreateUserRequestSchema,
   DeleteUserRequestSchema,
@@ -13,7 +17,53 @@ import {
   UserType,
 } from "@/types/proto-es/v1/user_service_pb";
 import { sameList } from "./list-equals";
-import type { AppSliceCreator, UserSlice } from "./types";
+import type { AppSliceCreator } from "./types";
+
+// UserSlice owns the workspace user roster (active + recycled) and the
+// user-management mutations. It wraps userServiceClient; permission gating for
+// mutating RPCs is enforced server-side (laelia.users.update/delete) and the UI
+// hides the controls for callers lacking `laelia.users.update` (see
+// useHasPermission in stores/permissions).
+export interface UserSlice {
+  users: User[];
+  usersLoading: boolean;
+  deletedUsers: User[];
+  deletedUsersLoading: boolean;
+
+  fetchUsers: (
+    params?: {
+      pageSize?: number;
+      pageToken?: string;
+      showDeleted?: boolean;
+      filter?: string;
+      /** Include the internal SYSTEM_BOT account; only the settings user
+       *  directory opts in. Defaults to false everywhere else. */
+      includeSystemBot?: boolean;
+    },
+    opts?: { silent?: boolean }
+  ) => Promise<{ nextPageToken: string } | undefined>;
+  createUser: (input: {
+    email: string;
+    title: string;
+    password: string;
+    phone?: string;
+    description?: string;
+  }) => Promise<User>;
+  updateUser: (
+    name: string,
+    fields: {
+      title?: string;
+      email?: string;
+      phone?: string;
+      description?: string;
+      chatPreferences?: ChatPreferences;
+    },
+    maskPaths: string[]
+  ) => Promise<User>;
+  resetPassword: (name: string, newPassword: string) => Promise<User>;
+  deleteUser: (name: string) => Promise<void>;
+  undeleteUser: (name: string) => Promise<User>;
+}
 
 // Query cache key family for this slice (ADR-1: query keys live with the slice
 // that fetches them). The key carries every parameter that selects a different

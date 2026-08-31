@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Conversation } from "@/types/proto-es/v1/command_pb";
 import { applyChannelThreadSummaries } from "./channel";
 import { useAppStore } from "./index";
-import type { ChatMessageUI } from "./types";
+import type { ChatMessageUI } from "./ui-models";
 
 // Mock @/connect so fetchMyChannels/fetchChannels talk to a controllable
 // listChannels instead of the network.

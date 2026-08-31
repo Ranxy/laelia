@@ -11,7 +11,24 @@ import {
 } from "@/types/proto-es/v1/agent_pb";
 import type { MachineWorkspaceSummary } from "@/types/proto-es/v1/machine_pb";
 import { ListMachineWorkspacesRequestSchema } from "@/types/proto-es/v1/machine_pb";
-import type { AppSliceCreator, WorkspaceSlice } from "./types";
+import type { AppSliceCreator } from "./types";
+
+// WorkspaceSlice exposes the workspace browser RPCs (agent file tree + file
+// preview, machine workspace list + delete). Authorization is handler-gated
+// server-side; the UI additionally hides the workspace tabs without
+// canEdit/canManage.
+export interface WorkspaceSlice {
+  listAgentWorkspaceDir: (
+    name: string,
+    dirPath: string,
+    includeHidden: boolean
+  ) => Promise<WorkspaceEntry[]>;
+  readAgentWorkspaceFile: (
+    name: string,
+    path: string
+  ) => Promise<WorkspaceReadResponse>;
+  listMachineWorkspaces: (name: string) => Promise<MachineWorkspaceSummary[]>;
+}
 
 // createWorkspaceSlice exposes the workspace browser RPCs. Authorization is
 // handler-gated server-side (agent owner/admin, machine creator/admin); the

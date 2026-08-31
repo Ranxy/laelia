@@ -17,7 +17,7 @@ import {
 } from "@/lib/avatar-cache";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
-import type { MemberSummary } from "@/stores/types";
+import type { MemberSummary } from "@/stores/ui-models";
 import type { Conversation } from "@/types/proto-es/v1/command_pb";
 
 // MembersPage is the two-column workspace directory. The left rail lists

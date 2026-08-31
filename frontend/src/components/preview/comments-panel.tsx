@@ -13,7 +13,7 @@ import {
 import type { CommentAnchor } from "@/lib/markdown-file";
 import { useAppStore } from "@/stores";
 import { isOwnUserMessage } from "@/stores/chat-helpers";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
 import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
 import { AttachmentCommentCard } from "./attachment-comment-card";

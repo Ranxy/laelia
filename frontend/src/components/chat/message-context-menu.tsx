@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/context-menu";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { useHasPermission } from "@/stores/permissions";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 
 export interface MessageContextMenuProps {
   // The message the menu acts on. Actions are conditionally available based on

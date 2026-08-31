@@ -26,7 +26,7 @@ import { create } from "@bufbuild/protobuf";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MessageRow } from "@/components/chat/message-row";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
 
 function imageAttachment() {

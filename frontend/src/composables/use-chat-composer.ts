@@ -14,7 +14,7 @@ import { useTranslation } from "react-i18next";
 import { MAX_UPLOAD_BYTES, uploadFileToConversation } from "@/lib/file-upload";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
 import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
 import { detectMention } from "./useMentionDetect";

@@ -9,7 +9,7 @@ import { useHistorySentinel } from "@/lib/use-history-sentinel";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 
 export interface TasksPanelProps {
   channelId: string;

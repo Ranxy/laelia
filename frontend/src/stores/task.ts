@@ -1,5 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { commandServiceClient } from "@/connect";
+import type { ChatMessage } from "@/types/proto-es/v1/command_pb";
 import {
   AssignTaskRequestSchema,
   ConvertMessageToTaskRequestSchema,
@@ -9,7 +10,69 @@ import {
   UpdateTaskStatusRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { toUiMessage } from "./chat-helpers";
-import type { AppSliceCreator, TaskSlice } from "./types";
+import type { AppSliceCreator } from "./types";
+import type { ChatMessageUI } from "./ui-models";
+
+// TaskSlice owns the channel task board panel: per-conversation task listings
+// (cached as ChatMessageUI so they reuse MessageRow's task badge), panel open
+// state, and the convert-message-to-task mutation. Tasks live in the same
+// chatMessages flow as regular messages (a task IS a message with metadata);
+// this slice is only the panel's separate view onto the task subset.
+export interface TaskCountsUI {
+  todo: number;
+  inProgress: number;
+  inReview: number;
+  done: number;
+}
+
+export interface TaskSlice {
+  tasksByConv: Record<string, ChatMessageUI[]>;
+  // nextPageToken per conversation: "" means no more (older) pages to load.
+  tasksNextPageToken: Record<string, string>;
+  // Per-status totals per conversation, from ListTaskCounts, so the board
+  // summary stays accurate regardless of how many tasks the paginated list has
+  // loaded into tasksByConv.
+  taskCountsByConv: Record<string, TaskCountsUI>;
+  tasksLoading: Record<string, boolean>;
+  tasksPanelOpen: Record<string, boolean>;
+
+  toggleTasksPanel: (conversationId: string) => void;
+  closeTasksPanel: (conversationId: string) => void;
+  loadTasks: (conversationId: string, statusFilter?: number[]) => Promise<void>;
+  // loadMoreTasks appends the next (older) page to tasksByConv; a no-op when
+  // there is no next page or a load is already in flight.
+  loadMoreTasks: (conversationId: string) => Promise<void>;
+  loadTaskCounts: (conversationId: string) => Promise<void>;
+  convertMessageToTask: (
+    conversationId: string,
+    messageId: string
+  ) => Promise<void>;
+  // updateTaskStatus moves a task to any of the four statuses. The caller's
+  // thread root is patched with the authoritative response and the board +
+  // counts reload; throws on failure so the UI can surface the error.
+  updateTaskStatus: (
+    conversationId: string,
+    rootMessageId: string,
+    status: number
+  ) => Promise<void>;
+  // assignTask assigns a task to a channel member (user or agent). The caller's
+  // thread root is patched with the authoritative response and the board +
+  // counts reload; throws on failure so the UI can surface the error.
+  assignTask: (
+    conversationId: string,
+    rootMessageId: string,
+    memberType: number,
+    memberId: string
+  ) => Promise<void>;
+  // patchTaskThreadAndRefresh patches the open thread's root with the
+  // authoritative task message returned by a task mutation, then reloads the
+  // board + counts. Shared by updateTaskStatus / assignTask.
+  patchTaskThreadAndRefresh: (
+    conversationId: string,
+    rootMessageId: string,
+    res: { message?: ChatMessage }
+  ) => Promise<void>;
+}
 
 // Page size for the task board. The panel loads the newest TASKS_PAGE_SIZE
 // tasks first, then appends older pages on scroll-to-bottom (loadMoreTasks).

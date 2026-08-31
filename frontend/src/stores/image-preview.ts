@@ -1,5 +1,21 @@
 import { commandServiceClient } from "@/connect";
-import type { AppSliceCreator, ImagePreviewSlice } from "./types";
+import type { Attachment } from "@/types/proto-es/v1/command_pb";
+import type { AppSliceCreator } from "./types";
+
+// ImagePreviewSlice owns the image lightbox overlay: the active image (file +
+// decoded blob URL + status) and the actions to open/close it. The overlay is
+// mounted once at the dashboard layout and reads `activeImage`. The blob URL
+// is created on open and revoked on close so we don't leak object URLs.
+export interface ImagePreviewSlice {
+  activeImage: {
+    attachment: Attachment;
+    blobUrl: string | null;
+    status: "loading" | "ready" | "error";
+  } | null;
+
+  openImagePreview: (attachment: Attachment) => Promise<void>;
+  closeImagePreview: () => void;
+}
 
 // createImagePreviewSlice owns the image lightbox overlay state. Opening the
 // lightbox fetches the file bytes via downloadFile, wraps them in a Blob, and

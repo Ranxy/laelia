@@ -28,7 +28,7 @@ import { createRoot } from "react-dom/client";
 import { Avatar, formatTime } from "@/components/chat/avatar";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MessageRow } from "@/components/chat/message-row";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 import {
   AttachmentSchema,
   MentionSchema,

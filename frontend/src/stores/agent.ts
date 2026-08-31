@@ -3,9 +3,13 @@ import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 import { agentServiceClient } from "@/connect";
 import { queryClient } from "@/lib/query-client";
 import type {
+  Agent,
   AgentModelOption,
   AgentSummary,
+  CreateAgentResponse,
   PiModel,
+  RotateAgentTokenResponse,
+  TransferAgentOwnershipResponse,
 } from "@/types/proto-es/v1/agent_pb";
 import {
   AgentACPConfigSchema,
@@ -26,7 +30,99 @@ import {
   UpdateAgentMcpConfigRequestSchema,
   UpdateAgentRequestSchema,
 } from "@/types/proto-es/v1/agent_pb";
-import type { AgentACPConfigInput, AgentSlice, AppSliceCreator } from "./types";
+import type { AppSliceCreator } from "./types";
+import type { AgentACPConfigInput } from "./ui-models";
+
+export interface AgentSlice {
+  agents: AgentSummary[];
+  agentsLoading: boolean;
+
+  fetchAgents: (
+    params?: {
+      pageSize?: number;
+      pageToken?: string;
+    },
+    opts?: { silent?: boolean }
+  ) => Promise<{ nextPageToken: string } | undefined>;
+  getAgent: (name: string) => Promise<Agent | undefined>;
+  // createAgent binds a new agent to a machine. The machine app picks the agent
+  // up automatically over its MachineChannel — no bootstrap token is returned
+  // (CreateAgentResponse.bootstrapToken is empty under the machine-hosts-many
+  // model). acpConfig optionally sets the agent's provider/model/persona/env at
+  // creation time so the agent is fully configured without a second visit to the
+  // agent profile; when omitted the agent is created with the server default.
+  // allowAddToChannel controls whether other users may add this agent to a
+  // channel; when false (default) only the agent's owner or a workspace admin
+  // may add it. description is the public agent intro shown to other
+  // users/agents (not injected into the agent's own prompt).
+  createAgent: (
+    title: string,
+    machine: string,
+    acpConfig?: AgentACPConfigInput,
+    labels?: Record<string, string>,
+    allowAddToChannel?: boolean,
+    description?: string
+  ) => Promise<CreateAgentResponse>;
+  // updateAgent patches the agent's mutable fields (allow_add_to_channel,
+  // follow_owner_permissions, can_manage_channel_members, description); only the
+  // keys present in `fields` are sent. Authorized server-side for the agent's
+  // owner or a workspace admin.
+  updateAgent: (
+    name: string,
+    fields: {
+      allowAddToChannel?: boolean;
+      followOwnerPermissions?: boolean;
+      canManageChannelMembers?: boolean;
+      description?: string;
+    }
+  ) => Promise<Agent>;
+  deleteAgent: (name: string) => Promise<void>;
+  // stopAgent stops an agent: its machine runner is torn down and it processes
+  // no session messages until startAgent. The agent row is preserved.
+  stopAgent: (name: string) => Promise<void>;
+  // startAgent resumes a stopped agent so it processes messages again.
+  startAgent: (name: string) => Promise<void>;
+  // restartAgent force-cold-restarts an agent: it ends the agent's current
+  // LLM session and clears its persisted session state so the next turn
+  // starts from a fresh cold start.
+  restartAgent: (name: string) => Promise<void>;
+  rotateAgentToken: (
+    name: string,
+    reason?: string
+  ) => Promise<RotateAgentTokenResponse>;
+  revokeAgentToken: (name: string, reason?: string) => Promise<void>;
+  updateAgentACPConfig: (
+    name: string,
+    acpConfig: AgentACPConfigInput
+  ) => Promise<void>;
+  // updateAgentMcpConfig replaces the MCP servers enabled on an agent. Only
+  // servers the caller may use are accepted server-side.
+  updateAgentMcpConfig: (name: string, mcpServers: string[]) => Promise<void>;
+  // transferAgentOwnership reassigns the agent's owner to another user.
+  // Unilateral and immediately effective (the target user does not accept);
+  // authorized server-side for the current owner or a workspace admin.
+  transferAgentOwnership: (
+    name: string,
+    newOwner: string,
+    reason?: string
+  ) => Promise<TransferAgentOwnershipResponse>;
+  // listPiModels proxies an LLM API provider's model-listing API through the
+  // manager (CORS + key hygiene). Fetched dynamically so the model list is never
+  // hardcoded. apiKey is required for deepseek and custom; ignored for
+  // openrouter. apiBaseUrl is required for custom.
+  listPiModels: (
+    apiProvider: string,
+    apiKey: string,
+    apiBaseUrl?: string
+  ) => Promise<PiModel[]>;
+  // refreshAgentModels probes one provider's models on the agent's machine with
+  // the given (possibly unsaved) custom_env, so the model picker reflects an
+  // agent's custom env (e.g. CODEX_HOME) before saving. Session-only.
+  refreshAgentModels: (
+    name: string,
+    acpConfig: AgentACPConfigInput
+  ) => Promise<AgentModelOption[]>;
+}
 
 // Query cache key for this slice (ADR-1: query keys live with the slice that
 // fetches them). The list request has no filter beyond paging, so a single

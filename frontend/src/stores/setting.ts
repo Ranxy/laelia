@@ -1,6 +1,14 @@
 import { create } from "@bufbuild/protobuf";
 import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 import { settingServiceClient } from "@/connect";
+import type {
+  LlmAgentConfigSetting,
+  PasswordRestrictionSetting,
+  S3ConfigSetting,
+  SMTPSetting,
+  UserMcpConfigSetting,
+  WorkspaceProfileSetting,
+} from "@/types/proto-es/store/setting_pb";
 import {
   LlmAgentConfigSettingSchema,
   PasswordRestrictionSettingSchema,
@@ -14,7 +22,55 @@ import {
   SettingValueSchema,
   UpdateSettingRequestSchema,
 } from "@/types/proto-es/v1/setting_pb";
-import type { AppSliceCreator, SettingSlice } from "./types";
+import type { AppSliceCreator } from "./types";
+
+// SettingSlice owns the workspace-level settings (workspace profile, SMTP, S3,
+// LLM agent, user MCP, password restriction). Configs are cached as full proto
+// messages after fetch; update methods merge only the mask-listed paths into
+// the stored value server-side (bytebase-style field-level update) and refresh
+// the cache from the authoritative response.
+export interface SettingSlice {
+  workspaceProfile?: WorkspaceProfileSetting;
+  smtpConfig?: SMTPSetting;
+  s3Config?: S3ConfigSetting;
+  llmAgentConfig?: LlmAgentConfigSetting;
+  userMcpConfig?: UserMcpConfigSetting;
+  passwordRestriction?: PasswordRestrictionSetting;
+
+  fetchWorkspaceProfile: () => Promise<WorkspaceProfileSetting | undefined>;
+  fetchSmtpConfig: () => Promise<SMTPSetting | undefined>;
+  fetchS3Config: () => Promise<S3ConfigSetting | undefined>;
+  fetchLlmAgentConfig: () => Promise<LlmAgentConfigSetting | undefined>;
+  fetchUserMcpConfig: () => Promise<UserMcpConfigSetting | undefined>;
+  fetchPasswordRestriction: () => Promise<
+    PasswordRestrictionSetting | undefined
+  >;
+
+  updateWorkspaceProfile: (
+    patch: Partial<WorkspaceProfileSetting>,
+    paths: string[]
+  ) => Promise<WorkspaceProfileSetting | undefined>;
+  updateSmtpConfig: (
+    patch: Partial<SMTPSetting>,
+    paths: string[]
+  ) => Promise<SMTPSetting | undefined>;
+  updateS3Config: (
+    patch: Partial<S3ConfigSetting>,
+    paths: string[]
+  ) => Promise<S3ConfigSetting | undefined>;
+  updateLlmAgentConfig: (
+    patch: Partial<LlmAgentConfigSetting>,
+    paths: string[]
+  ) => Promise<LlmAgentConfigSetting | undefined>;
+  updateUserMcpConfig: (
+    patch: Partial<UserMcpConfigSetting>,
+    paths: string[]
+  ) => Promise<UserMcpConfigSetting | undefined>;
+  updatePasswordRestriction: (
+    patch: Partial<PasswordRestrictionSetting>,
+    paths: string[]
+  ) => Promise<PasswordRestrictionSetting | undefined>;
+}
 
 // Update-mask path lists (bytebase-style full paths, e.g.
 // "value.workspace_profile.disallow_signup"). The backend only writes the

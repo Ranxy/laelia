@@ -45,7 +45,7 @@ import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
-import type { AgentACPConfigInput } from "@/stores/types";
+import type { AgentACPConfigInput } from "@/stores/ui-models";
 import {
   type Agent,
   type AgentModelOption,

@@ -1,10 +1,24 @@
 import { equals } from "@bufbuild/protobuf";
 import { mcpServerServiceClient, settingServiceClient } from "@/connect";
 import { queryClient } from "@/lib/query-client";
+import type { McpServer } from "@/types/proto-es/v1/mcp_pb";
 import { McpServerSchema } from "@/types/proto-es/v1/mcp_pb";
 import { registerCleanup } from "./cleanup-registry";
 import { sameList } from "./list-equals";
-import type { AppSliceCreator, McpServerSlice } from "./types";
+import type { AppSliceCreator } from "./types";
+
+// McpServerSlice owns the workspace MCP server roster. The backend
+// handler-gates ListMcpServers: admins/managers see every server, other
+// callers see only the servers they may use.
+export interface McpServerSlice {
+  mcpServers: McpServer[];
+  mcpServersLoading: boolean;
+
+  fetchMcpServers: (
+    params?: { pageSize?: number; pageToken?: string },
+    opts?: { silent?: boolean }
+  ) => Promise<{ nextPageToken: string } | undefined>;
+}
 
 // Query cache key for this slice (ADR-1). The personal-MCP enable flag is
 // read from settings INSIDE the queryFn, so a single key covers the merged

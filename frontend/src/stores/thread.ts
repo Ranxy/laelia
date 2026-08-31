@@ -1,12 +1,64 @@
 import { create } from "@bufbuild/protobuf";
 import { commandServiceClient } from "@/connect";
+import type {
+  Attachment,
+  ChatMessage,
+  Mention,
+} from "@/types/proto-es/v1/command_pb";
 import {
   ListThreadMessagesRequestSchema,
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { appendNewMessages, toUiMessage } from "./chat-helpers";
 import { LONG_POLL_MS, startLongPollLoop } from "./chat-watcher";
-import type { AppSliceCreator, ChatMessageUI, ThreadSlice } from "./types";
+import type { AppSliceCreator } from "./types";
+import type { ChatMessageUI } from "./ui-models";
+
+// ThreadSlice owns the right-side thread panel state: per-thread cached
+// messages + current_version, the active thread root (which thread panel is
+// open), and the per-thread polling watchers. Thread roots/reply ids are bare
+// UUIDs (the backend uses chat_message.id, not a resource name). The active
+// thread panel is scoped to one conversation at a time (activeThreadConversation).
+export interface ThreadSlice {
+  threadByRoot: Record<
+    string,
+    { messages: ChatMessageUI[]; currentVersion: bigint; loading: boolean }
+  >;
+  activeThreadRoot: string | null;
+  activeThreadConversation: string | null;
+  // Active per-thread long-poll watchers, keyed by thread root id. Each
+  // handle owns the AbortController that cancels the in-flight request.
+  threadWatchers: Record<string, { ctrl: AbortController }>;
+
+  openThread: (conversation: string, rootMessageId: string) => Promise<void>;
+  closeThread: () => void;
+  // Loads a thread snapshot into threadByRoot without opening the thread
+  // panel or starting a watcher (used by the preview comment aside).
+  loadThreadMessages: (
+    conversation: string,
+    rootMessageId: string
+  ) => Promise<void>;
+  sendThreadMessage: (
+    conversationId: string,
+    rootMessageId: string,
+    content: string,
+    mentions?: Mention[],
+    attachments?: Attachment[],
+    optimisticId?: string
+  ) => Promise<ChatMessage>;
+
+  // Optimistic message mutations for the thread composer's optimistic send
+  // pipeline (same contract as ChatSlice.appendChatMessage, scoped to one
+  // thread snapshot; the thread snapshot is created on demand when a send
+  // races ahead of openThread's initial load).
+  appendThreadMessage: (rootMessageId: string, msg: ChatMessageUI) => void;
+  patchThreadMessage: (
+    rootMessageId: string,
+    messageId: string,
+    patch: Partial<ChatMessageUI>
+  ) => void;
+  removeThreadMessage: (rootMessageId: string, messageId: string) => void;
+}
 
 // Bounded thread cache: each cached thread holds up to 200 messages, so an
 // unbounded map grows with every thread the user ever opened. Eviction is

@@ -17,7 +17,7 @@ import { toastManager } from "@/lib/toast";
 import { useHistorySentinel } from "@/lib/use-history-sentinel";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { useAppStore } from "@/stores";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
 
 const EMPTY_THREAD: ChatMessageUI[] = [];

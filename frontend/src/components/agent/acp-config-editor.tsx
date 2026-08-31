@@ -32,7 +32,7 @@ import {
 import { usePiModelOptions } from "@/composables/use-pi-model-options";
 import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
-import type { AgentACPConfigInput } from "@/stores/types";
+import type { AgentACPConfigInput } from "@/stores/ui-models";
 import type {
   AgentACPConfig,
   AgentModelOption,

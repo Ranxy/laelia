@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAcpConfigDraft } from "@/composables/use-acp-config-draft";
 import { describeError } from "@/lib/connect-errors";
 import { useAppStore } from "@/stores";
-import type { AgentACPConfigInput } from "@/stores/types";
+import type { AgentACPConfigInput } from "@/stores/ui-models";
 import type {
   AgentModelOption,
   AgentProviderInfo,

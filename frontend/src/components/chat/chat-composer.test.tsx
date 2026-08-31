@@ -65,7 +65,7 @@ vi.mock("@/lib/file-upload", () => ({
 
 import { create } from "@bufbuild/protobuf";
 import { useAppStore } from "@/stores";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 import { ChannelMemberSchema } from "@/types/proto-es/v1/command_pb";
 import { ThreadPanel } from "./thread-panel";
 

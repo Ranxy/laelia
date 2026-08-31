@@ -4,7 +4,10 @@ import { commandServiceClient } from "@/connect";
 import type {
   AgentActivity,
   Attachment,
+  ChannelMember,
+  ChatMessage,
   Conversation,
+  Mention,
 } from "@/types/proto-es/v1/command_pb";
 import {
   AddChannelMemberInputSchema,
@@ -28,6 +31,7 @@ import {
 } from "@/types/proto-es/v1/command_pb";
 import { fetchConversationDelta } from "./chat";
 import { appendNewMessages, toUiMessage } from "./chat-helpers";
+import type { BadgeIntervalHandle } from "./chat-watcher";
 import {
   BADGE_INTERVAL_MS,
   LONG_POLL_MS,
@@ -35,7 +39,114 @@ import {
   startLongPollLoop,
 } from "./chat-watcher";
 import { sameList, sameUnreadMap } from "./list-equals";
-import type { AppSliceCreator, ChannelSlice, ChatMessageUI } from "./types";
+import type { AppSliceCreator } from "./types";
+import type { ChatMessageUI } from "./ui-models";
+
+// ChannelSlice owns channel conversations: the channel roster, per-conversation
+// member rosters, agent activity polling, and the persistent per-conversation
+// message watchers. It shares chatMessages/chatLoading with ChatSlice (both DM
+// and channel messages live in those maps, keyed by conversation name).
+export interface ChannelSlice {
+  channels: Conversation[];
+  channelsLoading: boolean;
+  // Every real channel (type 2) the user joined or created, including closed
+  // ones, for the members page roster. Kept separate from `channels` (the
+  // left-rail list, which hides closed conversations and includes DMs) so the
+  // two views never overwrite each other; fetched on demand instead of
+  // polled.
+  myChannels: Conversation[];
+  myChannelsLoading: boolean;
+  channelMembersByConv: Record<string, ChannelMember[]>;
+  channelMembersLoading: Record<string, boolean>;
+  agentActivities: Record<string, AgentActivity[]>;
+  // Unread message counts per conversation, keyed by conversation name
+  // (`conversations/{id}`). Populated by fetchChannels from the backend and
+  // cleared locally by markConversationRead; drives the left-rail badges.
+  unreadByConv: Record<string, number>;
+  // Active per-conversation message watchers, keyed by conversation name.
+  // Each handle owns the AbortController that cancels the in-flight long poll
+  // and the 5s badge/activity interval. Held in store state (not a module-level
+  // registry) so it is testable and survives HMR without leaking timers.
+  channelWatchers: Record<
+    string,
+    { ctrl: AbortController; badge: BadgeIntervalHandle }
+  >;
+  // Channels an agent is a member of, keyed by agent resource name
+  // (`agents/{id}`). Populated by fetchChannelsForAgent for the agent detail
+  // page's Chat tab; unread is always 0 here (the backend does not compute a
+  // per-agent unread for this view).
+  agentChannelsByAgent: Record<string, Conversation[]>;
+  agentChannelsLoading: boolean;
+
+  fetchChannels: () => Promise<void>;
+  // Fetches the user's channel roster (type 2 only, closed included) for the
+  // members page. silent suppresses the loading flag so a cached refresh does
+  // not flash the spinner.
+  fetchMyChannels: (opts?: { silent?: boolean }) => Promise<void>;
+  fetchChannelsForAgent: (agentName: string) => Promise<void>;
+  createChannel: (title: string) => Promise<Conversation>;
+  markConversationRead: (conversationId: string) => Promise<void>;
+  // Pin or unpin a conversation for the current user. Pinned channels/DMs sort
+  // to the top of the left-rail list and stay there regardless of last message
+  // time. Optimistically reorders the local channel list; refetches on error.
+  setConversationPinned: (
+    conversationId: string,
+    pinned: boolean
+  ) => Promise<void>;
+  // Close or reopen a conversation for the current user. Closing hides the
+  // channel/DM from the left-rail list (the conversation and its messages are
+  // untouched); the backend clears the flag on the next main-channel message,
+  // so a closed chat reappears automatically on new activity. Optimistically
+  // removes the row locally; reopening refetches so the row lands at its
+  // server position.
+  setConversationClosed: (
+    conversationId: string,
+    closed: boolean
+  ) => Promise<void>;
+  // Mute or unmute a conversation for the current user. Muting suppresses the
+  // user's activity-feed items and Web Push notifications for new messages in
+  // the conversation, except when the user is @mentioned directly. Unread
+  // counts and the left-rail row are unaffected. Optimistically flips the
+  // local flag; refetches on error.
+  setConversationMuted: (
+    conversationId: string,
+    muted: boolean
+  ) => Promise<void>;
+  // Archive or unarchive a channel (owner-only). Archiving hides the channel
+  // from the members-page roster and freezes it (no new messages); it stays in
+  // the left-rail chat list until the user closes it, and its messages remain
+  // searchable. Unarchiving restores normal membership visibility and posting.
+  setChannelArchived: (
+    conversationId: string,
+    archived: boolean
+  ) => Promise<void>;
+  sendChannelMessage: (
+    conversationId: string,
+    content: string,
+    mentions?: Mention[],
+    attachments?: Attachment[],
+    asTask?: boolean,
+    optimisticId?: string
+  ) => Promise<ChatMessage>;
+  fetchConversationActivity: (conversationId: string) => Promise<void>;
+  startWatchingChannel: (conversationName: string) => void;
+  stopWatchingChannel: (conversationName: string) => void;
+  listChannelMembers: (conversationId: string) => Promise<ChannelMember[]>;
+  addChannelMember: (
+    conversationId: string,
+    memberType: number,
+    memberIds: string[]
+  ) => Promise<ChannelMember[]>;
+  addChannelGroup: (
+    conversationId: string,
+    groupName: string
+  ) => Promise<ChannelMember[]>;
+  removeChannelMember: (
+    conversationId: string,
+    memberType: number,
+    memberId: string
+  ) => Promise<void>;
+}
 
 // agentActivitiesEqual reports whether two activity arrays are visually
 // identical (the fields AgentStatusBar renders: id + display name + status).

@@ -49,7 +49,7 @@ import { useWindowedMessageRange } from "@/lib/use-windowed-message-range";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { senderKeyForMessage } from "@/stores/chat-helpers";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 import type {
   AgentActivity,
   Attachment,

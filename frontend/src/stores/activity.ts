@@ -9,7 +9,30 @@ import {
   ListActivitiesRequestSchema,
   MarkActivityDoneRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
-import type { ActivitySlice, AppSliceCreator } from "./types";
+import type { AppSliceCreator } from "./types";
+
+export interface ActivitySlice {
+  activities: Activity[];
+  activitiesLoading: boolean;
+  // nextPageToken for the current filter. "" means the server has no more pages.
+  activitiesNextPageToken: string;
+
+  listActivities: (params?: {
+    filter?: ActivityCategory[];
+    readStateFilter?: ActivityState;
+    pageSize?: number;
+    pageToken?: string;
+    silent?: boolean;
+  }) => Promise<{ activities: Activity[]; nextPageToken: string } | undefined>;
+  // loadMoreActivities appends the next page to the current filtered list. It is
+  // a no-op when there is no next page or a load is already in flight.
+  loadMoreActivities: (params: {
+    filter?: ActivityCategory[];
+    readStateFilter?: ActivityState;
+    pageSize?: number;
+  }) => Promise<void>;
+  markActivityDone: (name: string) => Promise<Activity | undefined>;
+}
 
 // timestampEqual compares two protobuf Timestamps (seconds + nanos), treating
 // both-missing as equal.

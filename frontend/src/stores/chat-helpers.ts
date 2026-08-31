@@ -1,6 +1,6 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { type ChatMessage, SenderType } from "@/types/proto-es/v1/command_pb";
-import type { ChatMessageUI } from "./types";
+import type { ChatMessageUI } from "./ui-models";
 
 // toUiMessage is the single mapper from a backend ChatMessage to the UI shape.
 // It always populates mentions/attachments (previously omitted by three of the

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ThreadTaskControls } from "@/components/chat/thread-task-controls";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { useAppStore } from "@/stores";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 
 // ---------------------------------------------------------------------------
 // ThreadHeader — the thread panel's title bar: back-to-tasks drill-in, title,

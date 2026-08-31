@@ -1,5 +1,16 @@
 import { commandServiceClient } from "@/connect";
-import type { AppSliceCreator, PresenceSlice } from "./types";
+import type { AppSliceCreator } from "./types";
+
+// PresenceSlice owns the chat page's human online state, keyed by the user's
+// resource name ("users/<handle>"). Populated by the 30s SyncPresence
+// heartbeat tick in ChatLayout; agents are not tracked here (their online
+// signal is the agents slice's connection state).
+export interface PresenceSlice {
+  onlineUsers: Record<string, boolean>;
+  // syncPresence records the signed-in user's heartbeat and refreshes the
+  // online state of the given DM peers. Non-"users/" names are ignored.
+  syncPresence: (names: string[]) => Promise<void>;
+}
 
 // maxSyncNames mirrors the server's per-request cap on SyncPresence names.
 const MAX_SYNC_NAMES = 200;

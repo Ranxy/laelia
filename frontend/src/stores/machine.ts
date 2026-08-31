@@ -6,7 +6,7 @@ import type {
   AgentProviderInfo,
   AgentSummary,
 } from "@/types/proto-es/v1/agent_pb";
-import type { MachineSummary } from "@/types/proto-es/v1/machine_pb";
+import type { Machine, MachineSummary } from "@/types/proto-es/v1/machine_pb";
 import {
   DeleteMachineRequestSchema,
   ForceDisconnectMachineRequestSchema,
@@ -18,11 +18,45 @@ import {
   UpdateMachineRequestSchema,
   UpgradeMachineRequestSchema,
 } from "@/types/proto-es/v1/machine_pb";
-import type {
-  AgentACPConfigInput,
-  AppSliceCreator,
-  MachineSlice,
-} from "./types";
+import type { AppSliceCreator } from "./types";
+import type { AgentACPConfigInput } from "./ui-models";
+
+// MachineSlice owns the machine roster and the machine-management mutations.
+// A machine authenticates via the device-code flow (no bootstrap token) and
+// hosts every agent bound to it; rename/transfer, revoke and provider
+// discovery are machine-scoped.
+export interface MachineSlice {
+  machines: MachineSummary[];
+  machinesLoading: boolean;
+
+  fetchMachines: (
+    params?: {
+      pageSize?: number;
+      pageToken?: string;
+      showDeleted?: boolean;
+    },
+    opts?: { silent?: boolean }
+  ) => Promise<{ nextPageToken: string } | undefined>;
+  getMachine: (name: string) => Promise<Machine | undefined>;
+  updateMachine: (name: string, title: string) => Promise<Machine>;
+  transferMachineOwnership: (
+    name: string,
+    newOwner: string,
+    reason?: string
+  ) => Promise<void>;
+  deleteMachine: (name: string) => Promise<void>;
+  revokeMachineToken: (name: string, reason?: string) => Promise<void>;
+  forceDisconnectMachine: (name: string, reason?: string) => Promise<void>;
+  refreshMachineProviders: (name: string) => Promise<AgentProviderInfo[]>;
+  // refreshMachineModels probes one provider's models on the machine with the
+  // given (possibly unsaved) custom_env, for the add-agent form. Session-only.
+  refreshMachineModels: (
+    name: string,
+    acpConfig: AgentACPConfigInput
+  ) => Promise<AgentModelOption[]>;
+  upgradeMachine: (name: string, reason?: string) => Promise<void>;
+  listMachineAgents: (name: string) => Promise<AgentSummary[]>;
+}
 
 // Query cache key family for this slice (ADR-1: query keys live with the slice
 // that fetches them). showDeleted selects a different server view (active vs

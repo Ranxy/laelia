@@ -1,4 +1,23 @@
-import type { AppSliceCreator, MembersSlice } from "./types";
+import type { AppSliceCreator } from "./types";
+import type { MemberSummary } from "./ui-models";
+
+// MembersSlice owns the flat workspace directory that merges the user roster
+// and the agent roster into a single contacts list (not grouped by machine).
+export interface MembersSlice {
+  members: MemberSummary[];
+  membersLoading: boolean;
+  // membersError is set when either source roster fetch failed; the Members page
+  // shows an error + retry instead of an empty list.
+  membersError: boolean;
+
+  fetchMembers: (params?: { silent?: boolean }) => Promise<
+    | {
+        usersNextPageToken: string;
+        agentsNextPageToken: string;
+      }
+    | undefined
+  >;
+}
 
 // Page cap for the roster drain loop: guards against a runaway server cursor
 // (or a bug that never returns an empty nextPageToken) consuming the UI thread.

@@ -1,5 +1,5 @@
 import type { CommentAnchor } from "@/lib/markdown-file";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
 import { CommentsPanel } from "./comments-panel";
 

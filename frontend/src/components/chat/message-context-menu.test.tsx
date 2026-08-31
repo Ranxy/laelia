@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 import { MessageContextMenu } from "./message-context-menu";
 
 // MessageContextMenu uses react-i18next, the context-menu UI (base-ui), and the

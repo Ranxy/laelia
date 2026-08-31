@@ -7,7 +7,33 @@ import {
   ListRemindersRequestSchema,
   UpdateReminderRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
-import type { AppSliceCreator, ReminderSlice } from "./types";
+import type { AppSliceCreator } from "./types";
+
+export interface ReminderSlice {
+  reminders: Reminder[];
+  remindersLoading: boolean;
+
+  listReminders: (
+    agent: string,
+    params?: {
+      pageSize?: number;
+      pageToken?: string;
+      statusFilter?: number[];
+      silent?: boolean;
+    }
+  ) => Promise<{ reminders: Reminder[]; nextPageToken: string } | undefined>;
+  getReminder: (name: string) => Promise<Reminder | undefined>;
+  updateReminder: (
+    name: string,
+    fields: {
+      fireAt?: Date;
+      cronExpr?: string;
+      tz?: string;
+      taskContent?: string;
+    }
+  ) => Promise<Reminder | undefined>;
+  cancelReminder: (name: string) => Promise<Reminder | undefined>;
+}
 
 // remindersEqual returns true when two reminder arrays have the same names in
 // the same order and each reminder is shallow-equal on its fields. Used to

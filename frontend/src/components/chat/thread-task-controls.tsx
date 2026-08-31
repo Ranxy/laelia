@@ -11,7 +11,7 @@ import { agentTeamServiceClient } from "@/connect";
 import { taskStatusLabel } from "@/lib/task-status";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 import type { AgentTeam } from "@/types/proto-es/v1/agent_team_service_pb";
 import { TaskStatus } from "@/types/proto-es/v1/command_pb";
 

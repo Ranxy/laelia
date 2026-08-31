@@ -5,7 +5,7 @@ import {
   stringifyConfigForComparison,
   toOptionalBigInt,
 } from "@/lib/acp-config-draft";
-import type { AgentACPConfigInput } from "@/stores/types";
+import type { AgentACPConfigInput } from "@/stores/ui-models";
 import type {
   AgentACPConfig,
   AgentProviderInfo,

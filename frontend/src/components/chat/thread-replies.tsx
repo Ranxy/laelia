@@ -5,7 +5,7 @@ import { MentionBadge } from "@/components/chat/mention-badge";
 import { MessageRow } from "@/components/chat/message-row";
 import { EmptyState } from "@/components/chat/states";
 import { senderKeyForMessage } from "@/stores/chat-helpers";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
 
 // ThreadReplies renders the beginning-of-replies divider + the reply list. It

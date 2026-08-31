@@ -2,7 +2,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MessageRow } from "@/components/chat/message-row";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 
 // MessageRow pulls react-i18next (no provider in the test environment) and
 // markstream-react (full markdown renderer). Stub both so the test isolates

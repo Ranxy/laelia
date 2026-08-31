@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { useAppStore } from "./index";
-import type { ChatMessageUI } from "./types";
+import type { ChatMessageUI } from "./ui-models";
 
 // Regressions for the optimistic composer store actions (batch 4): the
 // composer's optimistic send pipeline now routes through these slice actions

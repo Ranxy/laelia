@@ -37,7 +37,7 @@ import { pairToolCallEvents } from "@/lib/tool-call-events";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { isOwnUserMessage } from "@/stores/chat-helpers";
-import type { ChatMessageUI } from "@/stores/types";
+import type { ChatMessageUI } from "@/stores/ui-models";
 import type { Attachment, CommandEvent } from "@/types/proto-es/v1/command_pb";
 import { CommandEventType, SenderType } from "@/types/proto-es/v1/command_pb";
 

@@ -6,12 +6,35 @@ import {
   ResendVerificationEmailRequestSchema,
   VerifyEmailRequestSchema,
 } from "@/types/proto-es/v1/auth_service_pb";
+import type { User } from "@/types/proto-es/v1/user_service_pb";
 import {
   CreateUserRequestSchema,
   UserSchema,
   UserType,
 } from "@/types/proto-es/v1/user_service_pb";
-import type { AppSliceCreator, AuthSlice } from "./types";
+import type { AppSliceCreator } from "./types";
+
+export interface AuthSlice {
+  currentUser: User | null;
+  // `isLoggedIn` is an explicit flag consumed by the router guard and the
+  // unauthenticated-redirect path (see `router/guard.ts`, `router/auth-redirect.ts`).
+  // It is kept as stored state rather than derived from `currentUser !== null`
+  // because the routing tests and redirect hook assert against it directly.
+  isLoggedIn: boolean;
+  sessionLoaded: boolean;
+
+  login: (
+    email: string,
+    password: string,
+    idp?: { idpName: string; code: string }
+  ) => Promise<void>;
+  logout: () => Promise<void>;
+  register: (email: string, title: string, password: string) => Promise<void>;
+  verifyEmail: (token: string) => Promise<void>;
+  resendVerificationEmail: (email: string) => Promise<void>;
+  fetchCurrentUser: () => Promise<void>;
+  loadSession: () => Promise<void>;
+}
 
 export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
   currentUser: null,

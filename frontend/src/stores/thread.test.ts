@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { useAppStore } from "./index";
-import type { ChatMessageUI } from "./types";
+import type { ChatMessageUI } from "./ui-models";
 
 // Thread cache pruning is sync store logic (closeThread path), so these
 // tests only need the store — no RPC is hit.
