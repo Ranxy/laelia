@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { describeError } from "@/lib/connect-errors";
 import { useAppStore } from "@/stores";
+import { renderWithQueryClient } from "@/test/query";
 import { type McpServer, McpServerScope } from "@/types/proto-es/v1/mcp_pb";
 import { SettingsMcpServersPage } from "./settings-mcp-servers";
 
@@ -60,7 +61,7 @@ function server(overrides?: Partial<McpServer>): McpServer {
 }
 
 function renderPage() {
-  return render(<SettingsMcpServersPage />);
+  return renderWithQueryClient(<SettingsMcpServersPage />);
 }
 
 beforeEach(() => {
