@@ -1,10 +1,10 @@
 # 前端数据层深度审查报告:`src/stores` + `src/composables`
 
-> **⚙ 实施进度标注(批 7 收口后)**
+> **⚙ 实施进度标注(批 8 收口后,全章完工)**
 - ✅ 已完成:ADR-1 五 slice 纵切(user/agent/machine/api-provider/mcp,`b95c530`/`9c9c353`/`e7aca3a`,新增 17+3 测试);equal-bailout 六列表(`c9fe388`);chat shim 删除(`b95c530`);无界缓存 LRU + releaseCommand(`5efb461`);全局冻结拆除(`d4774c3`);cleanup 注册表(`e440ba0`,reset/logout 手工清单归零);批 4(`bc65511`)后 avatar/image-blob 清理注册迁回 lib 自注册。
 - ✅ 批 4:ChatGateway(`4085c66`,channel/thread watcher 合一 + 统一可见性门控 + badge 同节拍,chat-stream 竞态基线保持全绿);乐观发送编排下沉(`5c6665c`,useChatComposer + ChatSlice/ThreadSlice 的 append/patch/remove action,组件内联 setState 清零)。
 - ✅ 批 7(stores 收尾):**types.ts 拆分**(903 行契约上帝文件 → 共享 UI 模型入 `stores/ui-models.ts`、19 个 slice 接口与实现同文件、51 行组合点,`2d4f224`);**写入面收敛**(SliceSet 重载类型收窄 set,四条跨 slice 写入授予注册表:channel watcher→chat 共享消息 map、thread 回复数→chatMessages、task 突变→threadByRoot、members 排水→user/agent 花名册;直接字面量越权写入编译期 TS2769 拦截,arrow updater 受 TS 字面量新鲜度限制已在注释言明,`8e9d952`);**conversations 私有化**(ChatSlice 字段→module 级缓存 + cleanup registry 注册,reset 即清,+4 测试 `8276c90`);**polling.ts 更名 delay.ts**(`eebb11e`);**reset 测试表驱动化**(覆盖面从 getInitialState 派生,随 slice 自动补全 `3ab2e2b`);**store 写入面守卫** `check-store-writes.mjs` 入 check 门禁首位 + AGENTS.md「Store Write Surface」章节(`4dad293`)。
-- ⏳ 未完成:presence/activity/reminder 数据源迁 Query(已先经 usePolling 收敛,`bc65511`)——05 章账面的最后一项。
+- ✅ 批 8(presence/activity/reminder 数据源迁 Query,`b7a3799`~`53b9cc3`,**05 章账面清零**):presence 心跳保留但在线 map 入 Query `["presences"]`(结构共享替代手写 bailout、refetchInterval 可见性门控、cleanup 注册清缓存,消费端经 `useOnlineUsers()` 只读);reminder 列表/详情迁 `["reminders",...]` per-key 查询(终态停轮、keepPreviousData 翻页、外包装+内体 key 化重置);activity 走 per-(filter,pageToken) 查询 + useQueries、markDone 乐观移除全部缓存页,detail 兜底改 QueryCache 订阅扫描;三个 slice 退役(`53b9cc3`,store 组合 19→16)。
 
 > **决策状态更新**:本报告 §7.1 的 TanStack Query 建议已由总报告 **ADR-1 拍板:引入**(`@tanstack/react-query@5`;`useResourceList` 作为列表特化薄壳;迁移按 §7.3 七步执行)。§4 B3 的全局 set 冻结由总报告 **ADR-2 拍板:旧预览体系整体退役**——`use-preview-routes.tsx` 删除、`setSuppressLoadingFlags` 删除、swipe-back 改 CSS 转场(保留手势识别与 sentinel)。其余内容不变。
 > 审查对象:React 19.2 + Zustand 5.0.14 + ConnectRPC(proto-es) + Tailwind 4 单页应用,自定义 Zustand 单 store 承担全部数据获取与轮询。
