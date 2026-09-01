@@ -1,8 +1,8 @@
 # Laelia Frontend 深度审查报告:基础设施 / connect / router / app 布局层
 
 > **⚙ 实施进度标注(批 3 收口后)**
-- ✅ 已完成:P0 首项(冻结删除)+ Rt-05(UNSAFE_RouteContext 退役,`d4774c3`);错误映射单点化 connect/toast-errors(`389ce97`);agent-token 并入 machine-token、command-status 部分拆解、4 个死导出清理(`b0499db`);chat-layout/machines/machine-profile 轮询转 usePolling(`acb701d`);AGENTS.md 幽灵引用修正;tsconfig 覆盖 sw/vitest(批 6 `d8c8e46`);**Biome hooks 正确性规则启用 + 存量全清偿 + 幽灵 overrides(批 11)**。
-- ⏳ 未完成:lib 整形余项(command-status 拆 format/resource、三缓存合一、toast.ts 去 Base UI 私有接口);路由名 satisfies 缝合与 handle.permission;useEdgeDragToClose 手势合并;resolvePath→generatePath。
+- ✅ 已完成:P0 首项(冻结删除)+ Rt-05(UNSAFE_RouteContext 退役,`d4774c3`);错误映射单点化 connect/toast-errors(`389ce97`);agent-token 并入 machine-token、command-status 部分拆解、4 个死导出清理(`b0499db`);chat-layout/machines/machine-profile 轮询转 usePolling(`acb701d`);AGENTS.md 幽灵引用修正;tsconfig 覆盖 sw/vitest(批 6 `d8c8e46`);**Biome hooks 正确性规则启用 + 存量全清偿 + 幽灵 overrides(批 11)**;**批 12(`d839784`~`83c38ad`)**:R-02 落地(command-status 拆 time-format/resource,死导出 commandEventTypeToI18nKey/formatTimeOfDay/commandResourceName 清除)、R-03 落地(async-memo-cache 统一原语,avatar/image 两站接入)、B-02/B-03/B-09 三缓存竞态全修、路由名 satisfies 缝合(RouteName 联合 + ROUTE_INFO 穷尽 + handle satisfies + backTo 改路由名,routeNameForPath 反查删除)。toast.ts 去 Base UI 私有接口实为批 6 `9655606` 已修(本行原为过期清单)。
+- ⏳ 未完成:路由名 handle.permission 权限守卫;useEdgeDragToClose 手势合并;resolvePath→generatePath;tailwind.config.js 迁 @theme(E-01)。
 
 > **决策状态更新**:本报告 P0 首项(废除 `suppressLoadingFlags` 全局冻结)与 Rt-05(UNSAFE_RouteContext)已由总报告 **ADR-2 拍板**:`use-preview-routes.tsx` 整体退役、冻结删除、swipe-back 保留手势识别仅重写提交阶段(复核 `replace: true` 历史语义,Rt-05/B-04/B-01 一并解决);错误映射单点化(connect/errors.ts)维持 P0 不变。
 
@@ -44,11 +44,13 @@ grep 统计的"被引用文件数"(不含 lib 自身与测试):
 - 问题:17 个文件依赖它,但内容横跨 5 个不相干职责:CommandStatus/EventType → i18n key + Badge variant 映射、4 个互不复用的时间格式化器(`formatDuration`/`formatTimestamp`/`formatTimeOfDay`/`formatActivityListTime` 与 `formatConversationListTime` 各写一套"/分"拼接逻辑)、以及资源名工具(`agentResourceName`/`commandResourceName`/`roleIDFromName`)。
 - 证据:`command-status.ts:95-109` 手写 `HH:MM` / `M/D` / `YYYY/M/D` 三段格式;`command-status.ts:111-131` 是纯资源名函数,与命令状态无关。
 - 建议:拆为 `lib/format/time.ts`(统一全部时间格式化,含 locale 策略)与 `lib/resource.ts`(AIP 资源名解析,与 `avatarNameForUserId` 等合并);状态→variant 映射保留。
+- **✅ 批 12 已修**(`d839784`):拆为 `lib/time-format.ts`(formatDuration/formatTimestamp/formatActivityListTime/formatConversationListTime)与 `lib/resource.ts`(agentResourceName/roleIDFromName/commandIdFromName + avatar-cache 的两个 avatarName 构造并入;settings-profile 内联 `users/{id}/avatar` 改用 avatarNameForUserId;command-list 采纳 commandIdFromName 替代裸 `split("/").pop()`);command-status.ts 仅余状态两张表。顺带清除三处死导出:`commandEventTypeToI18nKey`/`formatTimeOfDay`/`commandResourceName`(grep 全仓 0 引用)。
 
 **【中】R-03 三个同构模块级缓存,三套实现**
 - 位置:`src/lib/avatar-cache.ts:23-40`、`src/lib/image-blob-cache.ts:10-54`、`src/router/use-preview-routes.tsx:17-51`
 - 问题:三者都是 "Map 缓存 + inflight 去重 + 失效广播",但失效通知机制各不相同(avatar 用 epoch+`useSyncExternalStore`、image-blob 无通知、preview 用 version+listener)。每个都自带 FIFO/全清逻辑,边界行为不一致(竞态差异见 B-02/B-03)。
 - 建议:沉淀一个 `createAsyncMemoCache<T>(fetcher)` 工具(inflight 去重 + invalidate + 失效订阅),三个站点各 10 行接入。
+- **✅ 批 12 已修**(`74691e0`):`lib/async-memo-cache.ts` 统一原语落地(inflight 去重 + 世代号守卫 + invalidate 广播 + FIFO 容量 + onDrop 回调);avatar/image-blob 两站接入,公共 API 不变。注:第三站 preview 缓存(`use-preview-routes.tsx`)已随 ADR-2(批 6 `d4774c3`)整体删除,"三合一"实际为两站合一。
 
 **【中】R-04 hooks 目录二义:`lib/` 与 `composables/` 并存、命名风格混杂**
 - 位置:`src/lib/use-*.ts`(6 个 kebab-case)vs `src/composables/`(4 个文件:`useAvatarEditor.ts`、`useMentionDetect.ts`、`useMentionTargets.ts`、`use-presence-heartbeat.ts`——3 个 camelCase + 1 个 kebab-case)
@@ -271,10 +273,12 @@ grep 统计的"被引用文件数"(不含 lib 自身与测试):
 - avatar:`src/lib/avatar-cache.ts:73-96` —— fetch 完成虽有 `inflight.delete` + 写 `blobUrls`,但若中途 `invalidateAvatar(name)`(上传新头像后触发)已清掉 entry,旧 promise 完成时仍 `blobUrls.set(name, oldUrl)`,把旧头像写回 → 头像回跳,配合 B-03 是"上传新头像后显示旧头像"的可见 bug。
 - image-cache:`image-blob-cache.ts:30-47` + `invalidateImageBlobs:51-54`(logout 调用,stores/auth.ts:79)——logout 时 in-flight 下载完成后 `cacheImageBlob` 把**前一个 principal 的图片字节**重新写回刚清空的缓存(跨会话数据残留,安全语义被打破)。
 - 建议:promise 持有"世代号",完成时校验世代一致才落缓存;或在缓存工具(R-03 抽象)内建 per-entry cancel。
+- **✅ 批 12 已修**(`74691e0`):`async-memo-cache` 内建世代守卫——invalidate 后完成的 in-flight fetch 仍返回给原调用方但**不再落缓存**;`async-memo-cache.test.ts` 以专案钉死。
 
 **【中】B-03 `useAvatar` 切换 name 时不清 stale URL**
 - 位置:`avatar-cache.ts:164-188` —— effect 里 `!name` 分支 setUrl(null),但 `name` A→B 且 B 未缓存时不重置,继续显示 A 的头像直到 B 的 fetch resolve(快速切换 DM 对象时可见串头像)。
 - 建议:effect 开头对未命中缓存的名字先 `setUrl(null)`(或改用 `useSyncExternalStore` 直接映射缓存态)。
+- **✅ 批 12 已修**(`74691e0`):useAvatar effect 改为无条件 `setUrl(cached ?? null)` 先行复位再拉取;`avatar-cache.test.tsx` 以"切换成员即清屏"专案钉死。
 
 **【中】B-04 route 级手势 commit 用 `replace: true` 改写历史**
 - 位置:`use-swipe-back.ts:248`(`navigate(target, { replace: true })`)
@@ -294,6 +298,7 @@ grep 统计的"被引用文件数"(不含 lib 自身与测试):
 
 **【低】B-09 avatar 缓存无上限**
 - 位置:`avatar-cache.ts:23`(`blobUrls` Map 永久增长;对比 `image-blob-cache.ts:10` 有 MAX_CACHED_IMAGES=100 FIFO)。在有几百成员的 workspace,长驻 PWA 会累积等量 object URL。建议:接入 R-03 的带容量缓存;logout 全清已具备(stores/auth.ts:78)。
+- **✅ 批 12 已修**(`74691e0`):avatar 缓存接入 500 条会话上限(FIFO);invalidate 释放 object URL,容量淘汰**故意不 revoke**(值可能仍在展示,泄漏以 500 为界)。
 
 ---
 
@@ -370,14 +375,14 @@ src/
 |---|---|---|---|---|
 | **P0** | 废除 `suppressLoadingFlags` 全局 store 冻结,统一改 `silent` fetch 约定(项目内已有先例) | 高 | 消灭最大竞态源,方案已在库内存在;中工作量、低风险 | stores/index.ts:37-56、use-swipe-back.ts:135,192 |
 | **P0** | 错误映射单点化:`connect/errors.ts` 建立 错误码→i18n/重试/dedupe,`describeError` i18n 化并迁入 | 高 | 新增 feature 时的最高复用点;146 个调用点可渐进迁移 | connect-errors.ts、146 处 toastManager.add |
-| **P1** | 修复 avatar/image 缓存三竞态:invalidate 后写回、useAvatar stale URL、加容量上限 | 中 | 用户可见 bug(串头像/跨会话残留)+ 顺带引入统一 cache 工具 | avatar-cache.ts:73-96,164-188;image-blob-cache.ts:30-47 |
-| **P1** | lib 目录整形:agent-token 并入 machine-token、command-status 拆 format/resource、hooks 合并到单一目录、toast 去 Base UI 私有接口依赖 | 中 | 纯机械重构;为"真正的 lib"立规(禁 import stores) | agent-token/command-status/toast/composables |
-| **P1** | 路由名三合一:handles + dashboard.handle + ROUTE_INFO 用 `satisfies` 缝合,backTo 改名常量;handle 加 permission 权限守卫 | 中 | 防以后每次加页面的双份维护;低风险 | handles.ts、route-info.ts、routes/dashboard.tsx |
+| **P1** | 修复 avatar/image 缓存三竞态:invalidate 后写回、useAvatar stale URL、加容量上限 | 中 | 用户可见 bug(串头像/跨会话残留)+ 顺带引入统一 cache 工具 | avatar-cache.ts:73-96,164-188;image-blob-cache.ts:30-47 | ✅ 批 12 `74691e0` |
+| **P1** | lib 目录整形:agent-token 并入 machine-token、command-status 拆 format/resource、hooks 合并到单一目录、toast 去 Base UI 私有接口依赖 | 中 | 纯机械重构;为"真正的 lib"立规(禁 import stores) | agent-token/command-status/toast/composables | ✅ 批 12 `d839784`(agent-token 批 0、toast 批 6;hooks 目录合并仍开放) |
+| **P1** | 路由名三合一:handles + dashboard.handle + ROUTE_INFO 用 `satisfies` 缝合,backTo 改名常量;handle 加 permission 权限守卫 | 中 | 防以后每次加页面的双份维护;低风险 | handles.ts、route-info.ts、routes/dashboard.tsx | ✅ 批 12 `e393232`(handle.permission 仍开放) |
 | **P1** | 开启 Biome React 正确性规则(useExhaustiveDependencies 等),同步清理 4 处 no-op eslint-disable | 中 | 当前 deps 数组类 bug 零防护;一次性修复量可控 | biome.json:24-67 | ✅ 批 11 |
 | **P2** | 手势收敛:`useEdgeDragToClose` 合并 use-swipe-back(thread 模式)与 use-swipe-to-close-sheet;决策是否退役 preview 克隆(UNSAFE_RouteContext) | 中 | -900 行复杂度;可与 P0 联动 | use-swipe-back.ts、use-swipe-to-close-sheet.ts、use-preview-routes.tsx |
 | **P2** | 布局适配单点:useAppShell(desktop/mobile 壳),收敛 21 文件 useIsDesktop + 2 处断点定义 | 中 | 断点语义漂移防患;渐进可行 | use-is-desktop.ts、tailwind.css:10-16 |
 | **P2** | 工程清障:tailwind.config.js 迁 @theme 删除、tsconfig 补 sw/vitest 覆盖、biome.json 幽灵条目+schema 对齐、allowedHosts 进 env | 高(配置债)| 一次 PR 解决,后续自文档化 | tailwind.config.js、sw/sw.ts、biome.json:203-212、vite.config.ts:95 |
-| **P3** | 死代码清扫:4 个死导出、双 member-picker、双 slugify、2 处 raw 色、package.json 脚本 dup、`user-scalable=no` | 低 | 纯删除;随手可做 | 见第七章表格 | ✅ 脚本 dup 批 11 |
+| **P3** | 死代码清扫:4 个死导出、双 member-picker、双 slugify、2 处 raw 色、package.json 脚本 dup、`user-scalable=no` | 低 | 纯删除;随手可做 | 见第七章表格 | ✅ 脚本 dup 批 11;死导出余量随批 12 `d839784` 清除(commandEventTypeToI18nKey/formatTimeOfDay/commandResourceName;agent-token/slugify 已在批 0/5 收敛) |
 | **P3** | PWA reload 加用户可见性护栏(编辑态延后)+ push suppressedRoute 多 tab 语义 | 中 | 低频但伤信任;改动小 | pwa.ts:38-44、sw/sw.ts:62-80 |
 
 ---

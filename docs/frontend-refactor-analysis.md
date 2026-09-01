@@ -6,9 +6,9 @@
 
 ---
 
-## ⚡ 实施进度总览(更新于重构执行批 0~批 11 后)
+## ⚡ 实施进度总览(更新于重构执行批 0~批 12 后)
 
-重构已执行 **93 个提交、12 个批次(含批次间 docs 收口提交)**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **120 文件 / 800 用例**,全量 vitest 干净退出(exit 0;预存的 jsdom IntersectionObserver unhandled 随重构消失)。各章文件头部已附加对应的"进度标注"块。
+重构已执行 **99 个提交、13 个批次(含批次间 docs 收口提交)**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **121 文件 / 809 用例**,全量 vitest 干净退出(exit 0;预存的 jsdom IntersectionObserver unhandled 随重构消失)。各章文件头部已附加对应的"进度标注"块。
 
 | 批次 | 提交范围 | 内容 | 状态 |
 |---|---|---|---|
@@ -24,8 +24,9 @@
 | 批 9(tool_call_id 全栈贯通)| `68e53a6`~`baf4167`(3 提交)| **proto 契约**(ToolCallStarted/FinishedPayload 增可选 `tool_call_id`,Go/proto-es/grpc-doc 重生成)、**后端全链路透传**(ToolCallSink 接口带 id,ACP 三帧、acp2 thread executor、pi executor 全部发射点透传 runtime id,interleaved/pi 测试钉死契约)、**前端配对 ID 优先 + FIFO 兜底**(并发交错不再错配,断线缝隙/legacy 仍事件序兜底,pair 按 started 顺序输出)| ✅ 完成(3 个提交)|
 | 批 10(activity 双分页收敛,08 F-S8)| `29be54e`(1 提交)| **统一无限滚动**(产品拍板):activity-list 桌面 Prev/Next 分页栈/翻页脚手架/lastRowsRef 退役,桌面/移动共用 token 栈 + IntersectionObserver sentinel(316→235 行);5s 轮询统一骑第 0 页(`useActivityPages` 去 `intervalIndex`,newest-first offset 分页下唯一稳定窗口,顺带修掉轮询可见 offset 页的行漂移隐患);`activity.page/prev/next` 死键删除;测试改写为 scroll-append/加载中保留行/耗尽即止 三案| ✅ 完成(1 个提交)|
 | 批 11(hooks 门禁 + 杂项清偿包,06 E-03/P1 + 08 杂项 + 07 杂项)| `96963cc`(1 提交)| **Biome hooks 正确性规则启用**:`useExhaustiveDependencies` + `useHookAtTopLevel` 上线,25 处存量清偿(6 处真漏依赖补齐、惯用法 reset/keyed effect 以带理由 `biome-ignore` 固化、`AcpConfigEditor` 退役 `memo(forwardRef)` 转回 ref-as-prop、comments-panel 条件 hook 上移)、profile 页 5 处 no-op `eslint-disable` 全删、biome.json 幽灵 overrides 清理 + `biome:lint` 重复脚本去重;**08 杂项**:inspector WARNING 游离块收进 summary tab(F-B6)+ 回归用例、html overlay locate `.then` 补 unmount/换代防护(F-B9 尾款)、F-B10 注入断言核实批 6 已修;**07 杂项**:`ui/spinner.tsx` 共享 Spinner(F-D6,4 处点名消费端)、MobileTabBar→RouterLink、member-picker 行 memo + joined 徽章归一 Badge size="sm"| ✅ 完成(1 个提交)|
+| 批 12(数据层与 lib 收尾清偿,05 终局 + 06 P1 + 01 尾巴)| `d839784`~`bf39872`(6 提交)| **useResourceList 退役(05 章终局)**:最后消费者 command-list 迁 `composables/use-command-list.ts`(one query per (agent,status,pageToken) + scoped placeholderData 翻页保持),CommandSlice 死缓存(`commands`/`commandsLoading` 零读者)与 `listCommands` 退役,`lib/use-resource-list.ts` 删除;**缓存统一 + 三竞态修复(06 R-03/B-02/B-03/B-09)**:`lib/async-memo-cache.ts` 共享原语(世代号守卫 + invalidate 广播 + FIFO 容量),avatar/image 两站接入——invalidate 后 in-flight 不再写回、useAvatar 切换即清屏、avatar 获 500 条上限;**lib 整形(06 R-02/B-08)**:command-status 拆 `time-format.ts` + `resource.ts`(avatarName 构造并入),死导出 ×3 清除;**路由名缝合(06 P1)**:RouteName 联合 + `Record<RouteName, RouteInfo>` 穷尽 + 37 处 handle `satisfies RouteHandle` + backTo 改路由名(routeNameForPath 反查删除;顺带补齐 machine.new/channel.detail 的移动端标题缺口);**01 尾巴**:B10(groups owner 校验 + set 语义 dirty)、B13(profile 表单脏保护种子)、B15(死 `??`)+ 回归用例;agent-mcp 满载 flake 超时放宽(承 `d1301ba`)| ✅ 完成(6 个提交)|
 
-**当前数据层状态**:Query 已纵切 12 个读族 + 应用级单例与 Provider(api-provider/mcp/user/agent/machine/settings 目录/iam-policy/presence/reminder/activity);聊天域长轮询已收敛为共享 ChatGateway 循环(可见性门控 + badge 同节拍);乐观发送经 useChatComposer 走 slice action;错误出口统一;登出经注册表(lib 自注册 + 三个新 Query 域各自 registerCleanup 清缓存)。**批 8 收官 = 05 章账面清零**:presence/activity/reminder 三 slice 退役,store 组合收缩至 16 slice,`useResourceList` 仅剩 command-list 一个消费者。**批 11 = hooks 正确性零黑洞**:`useExhaustiveDependencies`/`useHookAtTopLevel` 已随门禁启用,存量清偿完毕,后续 hooks 依赖漂移在 lint 阶段即被拦截。(产品拍板项已全部清零:流式管线拆除批 6、tool_call_id 批 9、activity 双分页批 10。)
+**当前数据层状态**:Query 已纵切 12 个读族 + 应用级单例与 Provider(api-provider/mcp/user/agent/machine/settings 目录/iam-policy/presence/reminder/activity/command-list);聊天域长轮询已收敛为共享 ChatGateway 循环(可见性门控 + badge 同节拍);乐观发送经 useChatComposer 走 slice action;错误出口统一;登出经注册表(lib 自注册 + 各 Query 域 registerCleanup 清缓存)。**批 8 收官 = 05 章账面清零**:presence/activity/reminder 三 slice 退役,store 组合收缩至 16 slice。**批 12 = 05 章真正终局**:`useResourceList` 退役(全部列表域直奔 Query),CommandSlice 死缓存与手写分页薄壳删除;同批 avatar/image 缓存统一到 `async-memo-cache` 原语并修复三处竞态。**批 11 = hooks 正确性零黑洞**:`useExhaustiveDependencies`/`useHookAtTopLevel` 已随门禁启用,存量清偿完毕,后续 hooks 依赖漂移在 lint 阶段即被拦截。(产品拍板项已全部清零:流式管线拆除批 6、tool_call_id 批 9、activity 双分页批 10。)
 
 ---
 
@@ -264,7 +265,7 @@ src/
 
 ### 贯穿全程的规则(部分已落地)
 - ✅ AGENTS.md 幽灵引用修正(`b0499db`);✅ 组件直连 `useAppStore.setState` 禁令已入 check 门禁(`check-store-writes.mjs`,批 7 `4dad293`;设置域 *ServiceClient 直连收敛余量仍在 09 章 §2 清单);
-- ✅ tsconfig 已覆盖 vite.config 与 sw(`d8c8e46`,type-check 现跑双工程);✅ **Biome `useExhaustiveDependencies` + `useHookAtTopLevel` 已启用**(批 11 `96963cc`:25 处存量清偿后上线,惯用法以带理由 biome-ignore 固化;5 处 profile 页 no-op eslint-disable 全删);
+- ✅ tsconfig 已覆盖 vite.config 与 sw(`d8c8e46`,type-check 现跑双工程);✅ **Biome `useExhaustiveDependencies` + `useHookAtTopLevel` 已启用**(批 11 `96963cc`:25 处存量清偿后上线,惯用法以带理由 biome-ignore 固化;5 处 profile 页 no-op eslint-disable 全删);✅ **路由名单一真相已缝合**(批 12 `e393232`:RouteName 联合 + ROUTE_INFO 穷尽 + handle satisfies + backTo 改路由名,新增页面漏配移动端 chrome 即编译失败);
 - ✅ `frontend/AGENTS.md` 已补:组件 API 约定与 Separator 决策(批 6 `5fdf8fb`)、Store Write Surface 写入面策略(批 7 `4dad293`)。
 
 ---
@@ -283,6 +284,7 @@ src/
 | tool_call_id 全栈贯通(批 9)| ✅ 完成(3 提交)| proto 两 payload 增 `tool_call_id`(Go/proto-es/grpc-doc 重生成)、ToolCallSink 接口 + 后端全部发射点透传、前端配对 ID 优先 + FIFO 兜底(并发交错根治);后端 6 包测试全绿,全量 120 文件/798 用例 |
 | activity 双分页收敛(批 10)| ✅ 完成(1 提交)| 08 F-S8 产品拍板统一无限滚动:桌面分页栈退役、双端一套 token 栈 + sentinel(316→235 行),5s 轮询统一骑第 0 页(offset 分页稳定窗口),i18n 死键清理;全量 120 文件/799 用例双跑 exit 0 |
 | hooks 门禁 + 杂项清偿包(批 11)| ✅ 完成(1 提交)| Biome hooks 正确性规则上线(25 处存量清偿、AcpConfigEditor 转 ref-as-prop、死 eslint-disable/幽灵 overrides/重复脚本清理)+ 08 杂项(F-B6 inspector WARNING 收进 summary tab、F-B9 overlay `.then` 防护、F-B10 核实批 6 已修)+ 07 杂项(共享 Spinner、MobileTabBar→RouterLink、member-picker 行 memo + 徽章归一);全量 120 文件/800 用例双跑 exit 0 |
+| 数据层与 lib 收尾清偿(批 12)| ✅ 完成(6 提交)| useResourceList 退役(05 章终局:command-list 迁 Query、CommandSlice 死缓存删除)+ `async-memo-cache` 缓存统一与 B-02/B-03/B-09 三竞态修复 + command-status 拆 time-format/resource(死导出 ×3)+ 路由名 RouteName 缝合(backTo 改名、反查删除)+ settings B10/B13/B15;全量 121 文件/809 用例双跑 exit 0 |
 
 **已完成部分的实际收益(截至批 3)**:四道门禁全绿的测试规模 95→103 文件 / 611→686 用例;高危 bug 十项中**七项已修**(余三项在聊天域收拢内解决);错误呈现 5 种→1 种出口 + 2 处记录在案;轮询策略收敛(可见性门控、终态停轮、重连退避);预存竞态(fetchChannels 族)与三处无界缓存根治;swipe-back 的 UNSAFE_API + 冻结 hack 全部拆除。
 
