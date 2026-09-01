@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { describeError } from "@/lib/connect-errors";
 import { clearOAuthState, retrieveOAuthState } from "@/lib/oauth";
+import { sanitizeRedirect } from "@/router/auth-redirect";
 import { useAppStore } from "@/stores";
 export function OAuthCallbackPage() {
   const { t } = useTranslation();
@@ -35,8 +36,10 @@ export function OAuthCallbackPage() {
           idpName: stored.idpName,
           code,
         });
-        const target =
-          stored.redirect && stored.redirect !== "/" ? stored.redirect : "/";
+        // stored.redirect comes from localStorage (written by the sign-in
+        // page, but re-validated here so a tampered entry cannot become an
+        // off-site navigate target).
+        const target = sanitizeRedirect(stored.redirect);
         navigate(target, { replace: true });
       } catch (err) {
         setError(describeError(err));

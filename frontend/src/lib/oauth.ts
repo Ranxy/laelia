@@ -1,3 +1,4 @@
+import { sanitizeRedirect } from "@/router/auth-redirect";
 import type { IdentityProvider } from "@/types/proto-es/v1/idp_service_pb";
 import { IdentityProviderType } from "@/types/proto-es/v1/idp_service_pb";
 
@@ -91,7 +92,9 @@ export function startOAuthLogin(
   storeOAuthState({
     token,
     idpName: provider.name,
-    redirect,
+    // Sanitize at storage time too: the callback re-validates on consume, but
+    // never persist an off-site target in the first place.
+    redirect: redirect ? sanitizeRedirect(redirect) : undefined,
     timestamp: Date.now(),
   });
   const redirectUri = `${window.location.origin}/oauth/callback`;

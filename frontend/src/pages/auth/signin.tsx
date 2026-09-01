@@ -8,6 +8,7 @@ import { identityProviderServiceClient, settingServiceClient } from "@/connect";
 import { startOAuthLogin } from "@/lib/oauth";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
+import { sanitizeRedirect } from "@/router/auth-redirect";
 import { useAppStore } from "@/stores";
 import type { IdentityProvider } from "@/types/proto-es/v1/idp_service_pb";
 import { IdentityProviderType } from "@/types/proto-es/v1/idp_service_pb";
@@ -59,7 +60,7 @@ export function SignInPage() {
     };
   }, []);
 
-  const redirectTo = searchParams.get("redirect") ?? "/";
+  const redirectTo = sanitizeRedirect(searchParams.get("redirect"));
   const allowSubmit = email.length > 0 && password.length > 0 && !loading;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {

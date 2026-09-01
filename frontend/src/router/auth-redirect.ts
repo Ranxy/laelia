@@ -18,6 +18,21 @@ export function isAuthPath(pathname: string): boolean {
   return pathname.startsWith("/auth/");
 }
 
+/**
+ * Guards a user-supplied `redirect` target. Only same-app absolute paths are
+ * honored; anything else (empty, external URL, protocol-relative `//evil.com`)
+ * falls back to `/`. SPA navigation never leaves the site today, but every
+ * consumer of the `redirect` param must pass through this so a future
+ * `window.location.assign` call site cannot turn the param into an open
+ * redirect.
+ */
+export function sanitizeRedirect(raw: string | null | undefined): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) {
+    return "/";
+  }
+  return raw;
+}
+
 // isPublicPath reports whether a route is reachable by both logged-in and
 // logged-out users. The device-login approval page (/login/device) is public:
 // a logged-out user must be able to open the URL from the machine's terminal
@@ -58,7 +73,7 @@ export function resolveAuthRedirect(input: AuthRedirectInput): string | null {
       return null;
     }
     const params = new URLSearchParams(search);
-    return params.get("redirect") ?? "/";
+    return sanitizeRedirect(params.get("redirect"));
   }
 
   // Logged out: auth pages are reachable, everything else redirects to sign-in.

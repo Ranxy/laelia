@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isAuthPath, isPublicPath, resolveAuthRedirect } from "./auth-redirect";
+import {
+  isAuthPath,
+  isPublicPath,
+  resolveAuthRedirect,
+  sanitizeRedirect,
+} from "./auth-redirect";
 
 describe("resolveAuthRedirect", () => {
   it("does not redirect while the session is still loading", () => {
@@ -58,6 +63,17 @@ describe("resolveAuthRedirect", () => {
     ).toBe("/agents/y/chat");
   });
 
+  it("falls back to '/' for a protocol-relative redirect param", () => {
+    expect(
+      resolveAuthRedirect({
+        sessionLoaded: true,
+        isLoggedIn: true,
+        pathname: "/auth/signin",
+        search: `?redirect=${encodeURIComponent("//evil.com")}`,
+      })
+    ).toBe("/");
+  });
+
   it("lets a logged-in user stay on a protected route", () => {
     expect(
       resolveAuthRedirect({
@@ -113,5 +129,24 @@ describe("isPublicPath", () => {
   it("rejects other paths", () => {
     expect(isPublicPath("/auth/signin")).toBe(false);
     expect(isPublicPath("/machines")).toBe(false);
+  });
+});
+
+describe("sanitizeRedirect", () => {
+  it("keeps same-site absolute paths", () => {
+    expect(sanitizeRedirect("/agents/x/chat")).toBe("/agents/x/chat");
+    expect(sanitizeRedirect("/")).toBe("/");
+  });
+
+  it("falls back to '/' for external and protocol-relative targets", () => {
+    expect(sanitizeRedirect("//evil.com")).toBe("/");
+    expect(sanitizeRedirect("https://evil.com")).toBe("/");
+    expect(sanitizeRedirect("javascript:alert(1)")).toBe("/");
+  });
+
+  it("falls back to '/' for empty or missing values", () => {
+    expect(sanitizeRedirect(null)).toBe("/");
+    expect(sanitizeRedirect(undefined)).toBe("/");
+    expect(sanitizeRedirect("")).toBe("/");
   });
 });
