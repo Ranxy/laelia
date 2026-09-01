@@ -190,12 +190,12 @@ const MessageList = memo(function MessageList({
               currentPrincipalId={currentPrincipalId}
               scrollRoot={scrollRoot}
               onToggleReaction={onToggleReaction}
-              // For small/medium chats, render markdown synchronously on first
-              // paint so entering the conversation doesn't flash as each visible
-              // row swaps its inline raw-text placeholder for block markdown a
-              // frame later. Large histories keep the lazy gate so off-screen
-              // rows stay cheap to mount.
-              eager={messages.length <= 40}
+              // Rows inside the active light-window are already close enough
+              // to the viewport that showing a fallback first only creates a
+              // visible raw-text -> Markdown flash while scrolling. Rows
+              // outside the window remain height-only placeholders, so this
+              // does not bring back the full-history render cost.
+              eager={messages.length <= 40 || (idx >= start && idx < end)}
             />
           </div>
         );

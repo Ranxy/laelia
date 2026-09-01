@@ -18,7 +18,13 @@
 // keeps owning anchors, jumps and pagination locks; this hook only decides
 // which indices mount.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 // Window margins in viewport units: rows start degrading two viewports above
 // the visible band and three viewports below (the bottom margin also keeps
@@ -138,12 +144,15 @@ export function useWindowedMessageRange(
     return () => observer.disconnect();
   }, [containerRef, recompute]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset keyed on the head row id — a shifted window must re-engage from scratch.
-  useEffect(() => {
-    setEngaged(false);
-    heightsRef.current = new Map();
-    setRange({ start: 0, end: Number.MAX_SAFE_INTEGER });
-  }, [rowIds[0]]);
+  // Recompute before paint when pagination replaces the message window. Do
+  // not clear the height cache or fall back to full rendering: doing so makes
+  // prepend briefly mount a different DOM tree and can flash before the range
+  // settles again.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rerun only when the head row changes; the callback and container ref are stable.
+  useLayoutEffect(() => {
+    if (!engaged) return;
+    recompute();
+  }, [rowIds[0], engaged]);
 
   const rowRef = useCallback((id: string) => {
     // Stable per-id callback: a fresh closure every render would make React

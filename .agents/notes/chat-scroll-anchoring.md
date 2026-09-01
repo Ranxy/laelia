@@ -11,18 +11,30 @@ three features that all affect scroll position:
 
 When these features are changed independently, the chat list can jump, get stuck,
 or flicker while the user scrolls through history. This note records the root
-causes and the rules to follow when touching any of them.
+causes and the rules to follow when touching any of them. The important distinction
+is between a scroll-position jump and a one-frame flash: a jump is usually an
+incorrect `scrollTop`, while a flash is usually a real intermediate DOM/layout
+state being painted before the next correction runs.
 
-## Rule 1: Never disable native scroll anchoring globally
+## Rule 1: Let one owner control layout-shift anchoring
 
-`overflow-anchor: none` on the message scroller disables the browser's ability to
-absorb ordinary layout shifts, including lazy-markdown fallback -> markdown swaps.
+The message scroller has a dedicated `ResizeObserver`-based stabilizer in
+`use-message-scroller.ts`. It disables native `overflow-anchor` while mounted,
+measures message rows in scroller-content coordinates, and compensates height
+changes itself. This is intentional: native anchoring and manual compensation
+must not run at the same time, or both can adjust the same layout shift.
 
-- Keep the scroller's native `overflow-anchor` enabled by default.
-- Only disable it for the exact duration of a history-page transaction, and
-  re-enable it immediately after the manual restore has been laid out.
-- Do not key the suppression off `hasOlder || hasNewer`; that is effectively
-  permanent for any paginated conversation.
+- The stabilizer is the owner of ordinary Markdown/image/layout-shift
+  compensation. Do not re-enable native anchoring underneath it.
+- History pagination still temporarily suppresses native anchoring through its
+  transaction guard, but the stabilizer's suppression takes precedence and
+  keeps it disabled until the stabilizer is torn down.
+- Keep the stabilizer's snapshots and `scrollTop` baseline synchronized after
+  every compensation and after user scroll events. Otherwise the next
+  `ResizeObserver` callback can interpret a user scroll as an automatic shift.
+- Do not add a second `scrollTop` correction in a `requestAnimationFrame` after
+  the observer callback. That paints an intermediate frame and is the source of
+  the short flash this note is intended to prevent.
 
 ## Rule 2: Pagination must use a deterministic manual anchor
 
@@ -39,10 +51,14 @@ The correct pattern is:
 2. Temporarily set `scroller.style.overflowAnchor = "none"`.
 3. After the new page commits, restore the captured message's offset in a
    `useLayoutEffect` (before paint).
-4. Re-enable native anchoring on the next animation frame.
+4. Request native anchoring to be re-enabled on the next animation frame only
+   when the stabilizer is not active. In the normal chat list the stabilizer
+   remains the owner, so this request must not overwrite `overflow-anchor: none`.
 
 This keeps the rows the user is reading stationary regardless of whether the
-browser has a usable anchor node.
+browser has a usable anchor node. The manual pagination restore and the
+ResizeObserver stabilizer must still update the same snapshots/baselines so the
+next layout change is measured from the restored position.
 
 ## Rule 3: Drive paging from scroll position, not IntersectionObserver transitions
 
@@ -106,7 +122,42 @@ rendered and the browser has compensated for the height change.
 
 Do not remove this exclusion without replacing it with an equivalent guarantee.
 
-## Checklist for future changes
+## Rule 7: Complete automatic positioning before paint
+
+The live-tail auto-stick path must use `useLayoutEffect`, not `useEffect`. A
+passive effect runs after the browser paints, so a new message or a Markdown
+height change can expose one frame at the old `scrollTop` before the list moves
+to the bottom. The same rule applies to any correction that is required to make
+the committed DOM and its scroll position appear atomically:
+
+- Use `useLayoutEffect` for automatic bottom-following and pagination anchor
+  restoration.
+- Apply `ResizeObserver` height compensation synchronously in its callback;
+  do not defer the correction to `requestAnimationFrame`.
+- Keep `requestAnimationFrame` for non-visual guards, such as clearing the
+  programmatic-scroll flag after the browser has delivered its scroll event.
+
+## Rule 8: Windowing must not create an intermediate render state
+
+Light-windowing replaces distant message rows with fixed-height placeholders.
+That optimization must not briefly replace the whole list with real rows during
+pagination or swap a visible row through a fallback while scrolling:
+
+- Preserve measured row heights and the current window when `rowIds` changes;
+  do not reset to full rendering and then window again.
+- Recompute a changed window in a `useLayoutEffect` so the range is settled
+  before paint.
+- Rows inside the active light-window should render Markdown eagerly. Rows
+  outside it can remain height-only placeholders. If a mounted row becomes part
+  of the active window, promote its lazy Markdown state in a layout effect so
+  the user does not see a raw-text fallback for one frame.
+- Keep window margins and overscan large enough that ordinary scrolling does
+  not repeatedly mount/unmount rows at the viewport edge.
+
+The goal is not only stable geometry; it is a single visually coherent commit.
+A layout that is corrected on the next frame may still feel like a flash even
+when the final `scrollTop` is correct.
+
 
 - Does the scroller keep native `overflow-anchor` enabled outside history-page
   transactions?

@@ -104,6 +104,12 @@ export function LazyMarkdown({
 }: LazyMarkdownProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(eager);
+  // A row can remain mounted while the light-window moves over it. When it
+  // enters the active window, promote it before paint instead of showing the
+  // fallback for one frame and then replacing it with Markdown.
+  useLayoutEffect(() => {
+    if (eager && !visible) setVisible(true);
+  }, [eager, visible]);
   // The message-row wrapper that contains this markdown. While the row is still
   // showing the raw-text fallback its height is not final, so it must not be
   // chosen as the browser's scroll-anchor node: if it were, the fallback→markdown

@@ -81,9 +81,125 @@ export function useMessageScroller({
   scrollToReadVersion = 0n,
 }: UseMessageScrollerOptions): MessageScroller {
   const scrollRef = useRef<HTMLDivElement>(null);
+  // The message rows can change height after their initial commit. Streamdown
+  // may finish code highlighting or replace a lazy fallback on a later frame,
+  // so native scroll anchoring alone is not reliable across browsers. The
+  // stabilizer below owns those layout shifts and this flag keeps pagination
+  // from re-enabling native anchoring while the stabilizer is active.
+  const scrollHeightStabilizerActiveRef = useRef(false);
+  const stabilizerAdjustingRef = useRef(false);
+  const rowSnapshotsRef = useRef(
+    new Map<string, { element: HTMLElement; top: number; height: number }>()
+  );
+  const listHeightRef = useRef<number | null>(null);
+  const listScrollTopRef = useRef(0);
+  const wasNearBottomRef = useRef(true);
   // Latest messages for the scroll handler without re-creating the handler
   // every time the watcher appends a message.
   const messagesRef = useRef(messages);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rebind the observer when the rendered message set changes; all other inputs are held in refs.
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller || typeof ResizeObserver === "undefined") return;
+
+    const previousOverflowAnchor = scroller.style.overflowAnchor;
+    const content = scroller.firstElementChild;
+    if (!content) return;
+
+    const readRows = () => {
+      const scrollerRect = scroller.getBoundingClientRect();
+      const rows = new Map<
+        string,
+        { element: HTMLElement; top: number; height: number }
+      >();
+      scroller.querySelectorAll<HTMLElement>("[data-msg-id]").forEach((row) => {
+        const id = row.dataset.msgId;
+        if (!id) return;
+        const rect = row.getBoundingClientRect();
+        rows.set(id, {
+          element: row,
+          top: rect.top - scrollerRect.top + scroller.scrollTop,
+          height: row.getBoundingClientRect().height,
+        });
+      });
+      return rows;
+    };
+
+    scrollHeightStabilizerActiveRef.current = true;
+    scroller.style.overflowAnchor = "none";
+    rowSnapshotsRef.current = readRows();
+    listHeightRef.current = scroller.scrollHeight;
+    listScrollTopRef.current = scroller.scrollTop;
+    wasNearBottomRef.current =
+      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 100;
+
+    const observer = new ResizeObserver(() => {
+      const currentRows = readRows();
+      const previousRows = rowSnapshotsRef.current;
+      const previousHeight = listHeightRef.current;
+      const previousScrollTop = listScrollTopRef.current;
+      const currentHeight = scroller.scrollHeight;
+      const currentScrollTop = scroller.scrollTop;
+      const wasNearBottom = wasNearBottomRef.current;
+      let delta = 0;
+
+      // If the scroll position already moved with the content, the page's
+      // bottom-follow effect has handled that growth. Only compensate the
+      // remaining layout delta; otherwise this would double-adjust the tail.
+      if (
+        wasNearBottom &&
+        previousHeight !== null &&
+        Math.abs(currentScrollTop - previousScrollTop) < 1
+      ) {
+        delta = currentHeight - previousHeight;
+      } else if (!wasNearBottom) {
+        const viewportTop = scroller.scrollTop;
+        const viewportBottom = viewportTop + scroller.clientHeight;
+        // Anchor to the first row currently intersecting the viewport. If a
+        // row above the viewport grows, this row moves and the displacement
+        // must be compensated. If the anchored row itself grows, its top is
+        // unchanged, so the user's reading position remains stable.
+        let anchor: { element: HTMLElement; top: number } | null = null;
+        for (const previous of previousRows.values()) {
+          if (previous.top + previous.height > viewportTop + 1) {
+            anchor = previous;
+            break;
+          }
+          if (previous.top >= viewportBottom) break;
+        }
+        if (anchor) {
+          const current = currentRows.get(anchor.element.dataset.msgId ?? "");
+          if (current) delta = current.top - anchor.top;
+        }
+      }
+
+      if (Math.abs(delta) > 0.5) {
+        stabilizerAdjustingRef.current = true;
+        scroller.scrollTop += delta;
+        stabilizerAdjustingRef.current = false;
+      }
+
+      rowSnapshotsRef.current = readRows();
+      listHeightRef.current = scroller.scrollHeight;
+      listScrollTopRef.current = scroller.scrollTop;
+      wasNearBottomRef.current =
+        scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <
+        100;
+    });
+    observer.observe(content);
+    scroller
+      .querySelectorAll<HTMLElement>("[data-msg-id]")
+      .forEach((row) => observer.observe(row));
+
+    return () => {
+      observer.disconnect();
+      rowSnapshotsRef.current.clear();
+      listHeightRef.current = null;
+      scrollHeightStabilizerActiveRef.current = false;
+      scroller.style.overflowAnchor = previousOverflowAnchor;
+    };
+  }, [messages.length]);
   // Scroll anchor captured before an incremental history load. After the new
   // page is committed we restore the anchor's viewport offset so prepending
   // older messages (or appending newer ones) never yanks the rows the user is
@@ -303,6 +419,13 @@ export function useMessageScroller({
   const reenableNativeScrollAnchor = useCallback(() => {
     if (!scrollRef.current) return;
     const token = nativeScrollAnchorSuppressTokenRef.current;
+    // The height stabilizer owns scroll anchoring while it is mounted. Do not
+    // let a completed pagination transaction turn native anchoring back on
+    // underneath it, which would apply both corrections to the same layout.
+    if (scrollHeightStabilizerActiveRef.current) {
+      nativeScrollAnchorSuppressedRef.current = false;
+      return;
+    }
     // The restore above runs in a layout effect, before the browser lays out
     // and paints the prepended rows. By the next animation frame that layout
     // has already happened, so native anchoring can be turned back on without
@@ -401,11 +524,12 @@ export function useMessageScroller({
     }
   }, [jumpTarget]);
 
-  // Auto-stick to the bottom only when the user is already viewing the latest
-  // messages. When they have scrolled up to read history, new polling updates
-  // must not yank them back down.
+  // Auto-stick before the browser paints. Using a passive effect here leaves
+  // one frame at the previous scroll position after a new message or a
+  // Markdown height change, which looks like a brief flash of different
+  // content even though the final scroll position is correct.
   // biome-ignore lint/correctness/useExhaustiveDependencies: auto-stick is keyed on messages/jumpTarget changes; the body reads none of them.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (scrollRef.current && stickToBottomRef.current && !jumpTarget) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
@@ -423,7 +547,12 @@ export function useMessageScroller({
     if (!jumpTarget) {
       stickToBottomRef.current = nearBottom;
     }
+    wasNearBottomRef.current = nearBottom;
     setShowScrollDown(!nearBottom);
+
+    // Ignore the scroll event emitted by the height stabilizer's own
+    // correction. It is not a user gesture and must not page history.
+    if (stabilizerAdjustingRef.current) return;
 
     // History paging is driven by scroll position rather than IntersectionObserver
     // transitions. IO only fires when a sentinel crosses the root boundary; after
@@ -493,7 +622,10 @@ export function useMessageScroller({
     nativeScrollAnchorSuppressedRef.current = false;
     restoringHistoryScrollRef.current = false;
     lastScrollTopRef.current = 0;
-    if (scrollRef.current) scrollRef.current.style.overflowAnchor = "";
+    if (scrollRef.current) {
+      scrollRef.current.style.overflowAnchor =
+        scrollHeightStabilizerActiveRef.current ? "none" : "";
+    }
     stickToBottomRef.current = true;
   }, []);
 
