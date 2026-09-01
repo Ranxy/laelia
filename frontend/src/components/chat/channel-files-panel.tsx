@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/context-menu";
 import { SearchInput } from "@/components/ui/search-input";
 import { commandServiceClient } from "@/connect";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { downloadAttachment } from "@/lib/file-download";
 import { isHtmlAttachment, MAX_HTML_PREVIEW_BYTES } from "@/lib/html-file";
 import { isImageAttachment } from "@/lib/image-file";
@@ -30,7 +31,6 @@ import {
   isMarkdownAttachment,
   MAX_MARKDOWN_PREVIEW_BYTES,
 } from "@/lib/markdown-file";
-import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import type {
   Attachment,

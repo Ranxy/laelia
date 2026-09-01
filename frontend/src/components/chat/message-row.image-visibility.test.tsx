@@ -12,7 +12,7 @@ vi.mock("markstream-react", () => ({
 }));
 
 const mockUseIsDesktop = vi.hoisted(() => vi.fn(() => true));
-vi.mock("@/lib/use-is-desktop", () => ({
+vi.mock("@/hooks/use-is-desktop", () => ({
   useIsDesktop: mockUseIsDesktop,
 }));
 

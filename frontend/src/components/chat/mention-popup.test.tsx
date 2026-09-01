@@ -7,7 +7,7 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-import type { MentionTarget } from "@/composables/useMentionTargets";
+import type { MentionTarget } from "@/hooks/use-mention-targets";
 import { MentionPopup } from "./mention-popup";
 
 const targets: MentionTarget[] = [

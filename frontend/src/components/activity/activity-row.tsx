@@ -8,8 +8,8 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { formatActivityListTime, formatTimestamp } from "@/lib/time-format";
-import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import type { Activity } from "@/types/proto-es/v1/command_pb";
 import {

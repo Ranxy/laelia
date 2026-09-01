@@ -14,6 +14,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { agentServiceClient, userServiceClient } from "@/connect";
+import { useEdgeDragToClose } from "@/hooks/use-edge-drag-to-close";
 import { useAvatar } from "@/lib/avatar-cache";
 import {
   agentResourceName,
@@ -21,7 +22,6 @@ import {
   avatarNameForUserId,
 } from "@/lib/resource";
 import { toastManager } from "@/lib/toast";
-import { useEdgeDragToClose } from "@/lib/use-edge-drag-to-close";
 import { useAppStore } from "@/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";

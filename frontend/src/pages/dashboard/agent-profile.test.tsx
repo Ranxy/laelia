@@ -40,7 +40,7 @@ vi.mock("@/lib/avatar-cache", () => ({
   deleteAgentAvatar: mock.deleteAgentAvatar,
 }));
 
-vi.mock("@/composables/useAvatarEditor", () => ({
+vi.mock("@/hooks/use-avatar-editor", () => ({
   useAvatarEditor: () => ({
     busy: false,
     onChange: mock.avatarChange,

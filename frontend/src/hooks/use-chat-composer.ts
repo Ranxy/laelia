@@ -17,8 +17,8 @@ import { useAppStore } from "@/stores";
 import type { ChatMessageUI } from "@/stores/ui-models";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
 import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
-import { detectMention } from "./useMentionDetect";
-import { type MentionTarget, targetToMention } from "./useMentionTargets";
+import { detectMention } from "./use-mention-detect";
+import { type MentionTarget, targetToMention } from "./use-mention-targets";
 
 // UploadItem tracks a file currently being uploaded so the composer can render
 // a real progress bar instead of a generic spinner.

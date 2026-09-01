@@ -28,8 +28,8 @@ import {
   type AcpConfigDraft,
   draftFromPersisted,
   useAcpConfigDraft,
-} from "@/composables/use-acp-config-draft";
-import { usePiModelOptions } from "@/composables/use-pi-model-options";
+} from "@/hooks/use-acp-config-draft";
+import { usePiModelOptions } from "@/hooks/use-pi-model-options";
 import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
 import type { AgentACPConfigInput } from "@/stores/ui-models";

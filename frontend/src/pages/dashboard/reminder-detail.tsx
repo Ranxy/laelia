@@ -28,7 +28,7 @@ import {
   useCancelReminder,
   useReminder,
   useUpdateReminder,
-} from "@/composables/use-reminder-detail";
+} from "@/hooks/use-reminder-detail";
 import { formatTimestamp } from "@/lib/time-format";
 import { useAppStore } from "@/stores";
 import type { Reminder } from "@/types/proto-es/v1/command_pb";

@@ -53,7 +53,7 @@ vi.mock("@/components/chat/remote-image", () => ({
 // Desktop by default (the composer chrome is identical in both modes here);
 // mobile tests opt out via mockUseIsDesktop.mockReturnValue(false).
 const mockUseIsDesktop = vi.hoisted(() => vi.fn(() => true));
-vi.mock("@/lib/use-is-desktop", () => ({
+vi.mock("@/hooks/use-is-desktop", () => ({
   useIsDesktop: mockUseIsDesktop,
 }));
 

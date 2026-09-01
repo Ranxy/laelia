@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   type MentionTarget,
   mentionLabelResolver,
-} from "@/composables/useMentionTargets";
+} from "@/hooks/use-mention-targets";
 
 const targets: MentionTarget[] = [
   { type: "user", id: "u-1", handle: "ran-user-1", name: "Ran" },

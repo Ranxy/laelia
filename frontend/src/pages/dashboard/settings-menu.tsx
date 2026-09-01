@@ -43,8 +43,8 @@ import {
   useDebugConfig,
   useLogout,
 } from "@/components/user-menu";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { LOCALES, setLocale } from "@/lib/i18n";
-import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";

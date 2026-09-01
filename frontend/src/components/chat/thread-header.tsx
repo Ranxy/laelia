@@ -1,7 +1,7 @@
 import { ArrowLeft, ExternalLink, Maximize2, Minimize2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ThreadTaskControls } from "@/components/chat/thread-task-controls";
-import { useIsDesktop } from "@/lib/use-is-desktop";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { useAppStore } from "@/stores";
 import type { ChatMessageUI } from "@/stores/ui-models";
 

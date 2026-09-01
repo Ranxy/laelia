@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PRESENCES_QUERY_KEY } from "@/composables/use-presence-heartbeat";
+import { PRESENCES_QUERY_KEY } from "@/hooks/use-presence-heartbeat";
 import { useAppStore } from "@/stores";
 import type { MemberSummary } from "@/stores/ui-models";
 import type { Conversation } from "@/types/proto-es/v1/command_pb";

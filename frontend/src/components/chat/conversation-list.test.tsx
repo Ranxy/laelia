@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PRESENCES_QUERY_KEY } from "@/composables/use-presence-heartbeat";
+import { PRESENCES_QUERY_KEY } from "@/hooks/use-presence-heartbeat";
 
 // ConversationList uses react-i18next (no provider in tests) and the app
 // store. Stub i18n with a key/count mapper so assertions read the keys, and
@@ -67,7 +67,7 @@ vi.mock("@/lib/toast", () => ({
 
 // Default to desktop (context menu) so the mobile-swipe tests can opt out
 // with mock.useIsDesktop.mockReturnValue(false).
-vi.mock("@/lib/use-is-desktop", () => ({
+vi.mock("@/hooks/use-is-desktop", () => ({
   useIsDesktop: mock.useIsDesktop,
 }));
 

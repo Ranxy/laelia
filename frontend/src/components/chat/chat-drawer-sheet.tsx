@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { useEdgeDragToClose } from "@/lib/use-edge-drag-to-close";
+import { useEdgeDragToClose } from "@/hooks/use-edge-drag-to-close";
 
 interface ChatDrawerSheetProps {
   open: boolean;

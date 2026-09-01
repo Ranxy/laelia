@@ -16,12 +16,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useResourceQuery } from "@/composables/use-resource-query";
 import {
   groupServiceClient,
   roleServiceClient,
   userServiceClient,
 } from "@/connect";
+import { useResourceQuery } from "@/hooks/use-resource-query";
 import { roleIDFromName } from "@/lib/resource";
 import { cn } from "@/lib/utils";
 import {

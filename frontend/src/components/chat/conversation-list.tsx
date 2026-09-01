@@ -31,12 +31,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useOnlineUsers } from "@/composables/use-presence-heartbeat";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { useOnlineUsers } from "@/hooks/use-presence-heartbeat";
 import { useAvatar } from "@/lib/avatar-cache";
 import { isAgentOnline } from "@/lib/presence";
 import { formatConversationListTime } from "@/lib/time-format";
 import { toastManager } from "@/lib/toast";
-import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 

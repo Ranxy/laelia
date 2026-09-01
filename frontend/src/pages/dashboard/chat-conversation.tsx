@@ -30,23 +30,23 @@ import { TasksPanel } from "@/components/chat/tasks-panel";
 import { ThreadPanel } from "@/components/chat/thread-panel";
 import { Button } from "@/components/ui/button";
 import { SheetBody, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { commandServiceClient } from "@/connect";
 import {
   type ComposerDraft,
   type ComposerDraftsRef,
-} from "@/composables/use-chat-composer";
+} from "@/hooks/use-chat-composer";
 import {
   useMentionLabelResolver,
   useMentionTargets,
-} from "@/composables/useMentionTargets";
-import { commandServiceClient } from "@/connect";
+} from "@/hooks/use-mention-targets";
 import { useAvatar } from "@/lib/avatar-cache";
 import "@/lib/markdown";
-import { useOnlineUsers } from "@/composables/use-presence-heartbeat";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { useMessageScroller } from "@/hooks/use-message-scroller";
+import { useOnlineUsers } from "@/hooks/use-presence-heartbeat";
+import { useWindowedMessageRange } from "@/hooks/use-windowed-message-range";
 import { peerPresenceOnline } from "@/lib/presence";
 import { toastManager } from "@/lib/toast";
-import { useIsDesktop } from "@/lib/use-is-desktop";
-import { useMessageScroller } from "@/lib/use-message-scroller";
-import { useWindowedMessageRange } from "@/lib/use-windowed-message-range";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { senderKeyForMessage } from "@/stores/chat-helpers";

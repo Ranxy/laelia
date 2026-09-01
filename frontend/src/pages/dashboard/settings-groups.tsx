@@ -27,9 +27,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useCrudDialog } from "@/composables/use-crud-dialog";
-import { useResourceQuery } from "@/composables/use-resource-query";
 import { groupServiceClient, userServiceClient } from "@/connect";
+import { useCrudDialog } from "@/hooks/use-crud-dialog";
+import { useResourceQuery } from "@/hooks/use-resource-query";
 import { describeError } from "@/lib/connect-errors";
 import { displayName } from "@/lib/members";
 import { toastManager } from "@/lib/toast";

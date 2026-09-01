@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useReminderPage } from "@/composables/use-reminder-list";
+import { useReminderPage } from "@/hooks/use-reminder-list";
 import { agentResourceName } from "@/lib/resource";
 import { formatTimestamp } from "@/lib/time-format";
 import type { Reminder } from "@/types/proto-es/v1/command_pb";

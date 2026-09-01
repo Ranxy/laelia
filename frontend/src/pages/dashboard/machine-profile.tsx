@@ -18,9 +18,9 @@ import {
   iamServiceClient,
   settingServiceClient,
 } from "@/connect";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { usePolling } from "@/hooks/use-polling";
 import { describeError } from "@/lib/connect-errors";
-import { useIsDesktop } from "@/lib/use-is-desktop";
-import { usePolling } from "@/lib/use-polling";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import {

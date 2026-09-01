@@ -10,7 +10,7 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-vi.mock("@/lib/use-is-desktop", () => ({
+vi.mock("@/hooks/use-is-desktop", () => ({
   useIsDesktop: () => isDesktopState.value,
 }));
 

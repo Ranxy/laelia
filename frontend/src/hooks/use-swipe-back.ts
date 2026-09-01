@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { platformOwnsEdgeSwipe } from "@/lib/platform-edge-swipe";
 import { resolvePath } from "@/router/route-index";
 import { ROUTE_INFO } from "@/router/route-info";
 import { useCurrentRoute } from "@/router/use-current-route";
 import { useAppStore } from "@/stores";
-import { platformOwnsEdgeSwipe } from "./platform-edge-swipe";
 import { useIsDesktop } from "./use-is-desktop";
 
 // iOS-style interactive back gesture for mobile: drag from the left edge of

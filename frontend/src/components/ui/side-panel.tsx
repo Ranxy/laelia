@@ -1,8 +1,8 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useEdgeDragToClose } from "@/lib/use-edge-drag-to-close";
-import { useIsDesktop } from "@/lib/use-is-desktop";
+import { useEdgeDragToClose } from "@/hooks/use-edge-drag-to-close";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "./sheet";
 

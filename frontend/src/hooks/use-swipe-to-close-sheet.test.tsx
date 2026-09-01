@@ -6,7 +6,7 @@ const mock = vi.hoisted(() => ({
   useIsDesktop: vi.fn(() => false),
 }));
 
-vi.mock("@/lib/use-is-desktop", () => ({
+vi.mock("@/hooks/use-is-desktop", () => ({
   useIsDesktop: mock.useIsDesktop,
 }));
 

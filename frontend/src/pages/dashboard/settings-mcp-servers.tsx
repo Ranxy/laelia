@@ -27,14 +27,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
-import { useCrudDialog } from "@/composables/use-crud-dialog";
-import { useResourceQuery } from "@/composables/use-resource-query";
 import {
   groupServiceClient,
   mcpServerServiceClient,
   settingServiceClient,
   userServiceClient,
 } from "@/connect";
+import { useCrudDialog } from "@/hooks/use-crud-dialog";
+import { useResourceQuery } from "@/hooks/use-resource-query";
 import { memberLabel } from "@/lib/members";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";

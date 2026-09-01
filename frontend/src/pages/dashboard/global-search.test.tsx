@@ -21,7 +21,7 @@ vi.mock("react-router-dom", () => ({
 // Desktop/mobile chrome is driven by the hook; tests flip this flag.
 const desktopFlag = vi.hoisted(() => ({ value: true }));
 
-vi.mock("@/lib/use-is-desktop", () => ({
+vi.mock("@/hooks/use-is-desktop", () => ({
   useIsDesktop: () => desktopFlag.value,
 }));
 

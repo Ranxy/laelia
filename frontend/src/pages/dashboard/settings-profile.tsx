@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useAvatarEditor } from "@/composables/useAvatarEditor";
 import { notificationServiceClient, userServiceClient } from "@/connect";
+import { useAvatarEditor } from "@/hooks/use-avatar-editor";
 import { useAvatar } from "@/lib/avatar-cache";
 import { describeError } from "@/lib/connect-errors";
 import { resizeImageFile } from "@/lib/image-resize";

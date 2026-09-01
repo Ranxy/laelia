@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { getLayerRoot, LAYER_SURFACE_CLASS } from "@/components/ui/layer";
-import type { MentionTarget } from "@/composables/useMentionTargets";
+import type { MentionTarget } from "@/hooks/use-mention-targets";
 
 interface MentionPopupProps {
   id: string;

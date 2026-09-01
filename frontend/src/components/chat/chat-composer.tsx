@@ -5,15 +5,12 @@ import { MentionPopup } from "@/components/chat/mention-popup";
 import { RemoteImage } from "@/components/chat/remote-image";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  type ComposerDraft,
-  useChatComposer,
-} from "@/composables/use-chat-composer";
-import { type MentionTarget } from "@/composables/useMentionTargets";
+import { type ComposerDraft, useChatComposer } from "@/hooks/use-chat-composer";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { type MentionTarget } from "@/hooks/use-mention-targets";
 import { getCaretCoordinates } from "@/lib/caret-position";
 import { filesFromClipboard } from "@/lib/clipboard-file";
 import { isImageAttachment } from "@/lib/image-file";
-import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";

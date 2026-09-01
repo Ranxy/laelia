@@ -15,7 +15,7 @@ const mock = vi.hoisted(() => ({
   platformOwnsEdgeSwipe: vi.fn(() => false),
 }));
 
-vi.mock("@/lib/use-is-desktop", () => ({
+vi.mock("@/hooks/use-is-desktop", () => ({
   useIsDesktop: mock.useIsDesktop,
 }));
 vi.mock("@/lib/platform-edge-swipe", () => ({

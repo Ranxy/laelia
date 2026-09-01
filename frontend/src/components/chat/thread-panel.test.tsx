@@ -64,7 +64,7 @@ vi.mock("@/components/chat/remote-image", () => ({
   RemoteImage: () => <div />,
 }));
 
-vi.mock("@/composables/useMentionDetect", () => ({
+vi.mock("@/hooks/use-mention-detect", () => ({
   detectMention: () => null,
 }));
 
@@ -74,7 +74,7 @@ const mockMentionLabelResolver = vi.hoisted(() => ({
   fn: undefined as ((handle: string) => string | undefined) | undefined,
 }));
 
-vi.mock("@/composables/useMentionTargets", () => ({
+vi.mock("@/hooks/use-mention-targets", () => ({
   useMentionTargets: () => [],
   useMentionLabelResolver: () =>
     mockMentionLabelResolver.fn ?? (() => undefined),
@@ -83,7 +83,7 @@ vi.mock("@/composables/useMentionTargets", () => ({
 
 // Desktop by default; mobile tests opt out with mockUseIsDesktop.mockReturnValue(false).
 const mockUseIsDesktop = vi.hoisted(() => vi.fn(() => true));
-vi.mock("@/lib/use-is-desktop", () => ({
+vi.mock("@/hooks/use-is-desktop", () => ({
   useIsDesktop: mockUseIsDesktop,
 }));
 

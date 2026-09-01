@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { commandServiceClient } from "@/connect";
+import { usePolling } from "@/hooks/use-polling";
 import { queryClient } from "@/lib/query-client";
-import { usePolling } from "@/lib/use-polling";
 import { useAppStore } from "@/stores";
 import { registerCleanup } from "@/stores/cleanup-registry";
 

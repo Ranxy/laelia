@@ -82,7 +82,7 @@ vi.mock("@/components/chat/chat-composer", () => ({
   ChatComposer: () => <div data-testid="composer" />,
 }));
 
-vi.mock("@/composables/useMentionTargets", () => ({
+vi.mock("@/hooks/use-mention-targets", () => ({
   useMentionTargets: () => [],
   useMentionLabelResolver: () => () => undefined,
   targetToMention: (t: unknown) => t,

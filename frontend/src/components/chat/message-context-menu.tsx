@@ -7,7 +7,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { useIsDesktop } from "@/lib/use-is-desktop";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { useHasPermission } from "@/stores/permissions";
 import type { ChatMessageUI } from "@/stores/ui-models";
 

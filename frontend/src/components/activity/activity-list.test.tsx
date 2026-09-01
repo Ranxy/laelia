@@ -22,7 +22,7 @@ const mock = vi.hoisted(() => ({
   markActivityDone: vi.fn(),
 }));
 
-vi.mock("@/lib/use-is-desktop", () => ({
+vi.mock("@/hooks/use-is-desktop", () => ({
   useIsDesktop: () => mock.isDesktop,
 }));
 

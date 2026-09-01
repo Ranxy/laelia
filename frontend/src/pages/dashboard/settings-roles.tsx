@@ -32,9 +32,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { useCrudDialog } from "@/composables/use-crud-dialog";
-import { useResourceQuery } from "@/composables/use-resource-query";
 import { roleServiceClient } from "@/connect";
+import { useCrudDialog } from "@/hooks/use-crud-dialog";
+import { useResourceQuery } from "@/hooks/use-resource-query";
 import { describeError } from "@/lib/connect-errors";
 import {
   ALL_PERMISSIONS,

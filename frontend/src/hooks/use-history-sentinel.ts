@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { platformOwnsEdgeSwipe } from "./platform-edge-swipe";
+import { platformOwnsEdgeSwipe } from "@/lib/platform-edge-swipe";
 
 // Marks the duplicate history entry an overlay pushes while it is open (see
 // useHistorySentinel). The value is a per-push token so several stacked

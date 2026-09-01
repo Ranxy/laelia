@@ -8,14 +8,14 @@ import { MessageRow } from "@/components/chat/message-row";
 import { LoadingState } from "@/components/chat/states";
 import { ThreadHeader } from "@/components/chat/thread-header";
 import { ThreadReplies } from "@/components/chat/thread-replies";
-import { type ComposerDraft } from "@/composables/use-chat-composer";
+import { type ComposerDraft } from "@/hooks/use-chat-composer";
+import { useHistorySentinel } from "@/hooks/use-history-sentinel";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
 import {
   useMentionLabelResolver,
   useMentionTargets,
-} from "@/composables/useMentionTargets";
+} from "@/hooks/use-mention-targets";
 import { toastManager } from "@/lib/toast";
-import { useHistorySentinel } from "@/lib/use-history-sentinel";
-import { useIsDesktop } from "@/lib/use-is-desktop";
 import { useAppStore } from "@/stores";
 import type { ChatMessageUI } from "@/stores/ui-models";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";

@@ -6,13 +6,13 @@ import { CopyableCommand } from "@/components/copyable-command";
 import { Card, Field } from "@/components/profile-common";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { usePolling } from "@/hooks/use-polling";
 import { describeError } from "@/lib/connect-errors";
 import {
   buildMachineInstallCommand,
   buildMachineSetupCommand,
   type MachineInstallOS,
 } from "@/lib/machine-token";
-import { usePolling } from "@/lib/use-polling";
 import { useAppStore } from "@/stores";
 import type { MachineSummary } from "@/types/proto-es/v1/machine_pb";
 

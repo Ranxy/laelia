@@ -1,4 +1,4 @@
-import type { MentionTarget } from "./useMentionTargets";
+import type { MentionTarget } from "./use-mention-targets";
 
 export interface MentionState {
   active: boolean;

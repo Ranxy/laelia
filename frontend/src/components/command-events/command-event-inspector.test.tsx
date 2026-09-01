@@ -14,7 +14,7 @@ vi.mock("markstream-react", () => ({
 
 // The inspector's SidePanel shells into a mobile Sheet when the viewport is
 // not desktop; pin desktop so these tests exercise the plain aside.
-vi.mock("@/lib/use-is-desktop", () => ({
+vi.mock("@/hooks/use-is-desktop", () => ({
   useIsDesktop: () => true,
 }));
 

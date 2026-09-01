@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useAcpConfigDraft } from "@/composables/use-acp-config-draft";
+import { useAcpConfigDraft } from "@/hooks/use-acp-config-draft";
 import { describeError } from "@/lib/connect-errors";
 import { useAppStore } from "@/stores";
 import type { AgentACPConfigInput } from "@/stores/ui-models";

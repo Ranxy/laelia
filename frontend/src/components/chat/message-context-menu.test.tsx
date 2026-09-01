@@ -18,7 +18,7 @@ vi.mock("@/stores/permissions", () => ({
   useHasPermission: mockHasPermission,
 }));
 
-vi.mock("@/lib/use-is-desktop", () => ({
+vi.mock("@/hooks/use-is-desktop", () => ({
   useIsDesktop: mockUseIsDesktop,
 }));
 

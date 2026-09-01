@@ -31,9 +31,9 @@ import { Button } from "@/components/ui/button";
 import { FieldRow } from "@/components/ui/field-row";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { persistedToInput } from "@/composables/use-acp-config-draft";
-import { useAvatarEditor } from "@/composables/useAvatarEditor";
 import { settingServiceClient } from "@/connect";
+import { persistedToInput } from "@/hooks/use-acp-config-draft";
+import { useAvatarEditor } from "@/hooks/use-avatar-editor";
 import {
   deleteAgentAvatar,
   uploadAgentAvatar,

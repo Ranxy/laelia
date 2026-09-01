@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { platformOwnsEdgeSwipe } from "./platform-edge-swipe";
+import { platformOwnsEdgeSwipe } from "@/lib/platform-edge-swipe";
 import { useHistorySentinel } from "./use-history-sentinel";
 import { useSwipeToCloseSheet } from "./use-swipe-to-close-sheet";
 

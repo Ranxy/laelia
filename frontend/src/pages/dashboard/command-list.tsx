@@ -26,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   COMMAND_LIST_QUERY_ROOT,
   useCommandListPage,
-} from "@/composables/use-command-list";
+} from "@/hooks/use-command-list";
 import { FinalSummary } from "@/lib/markdown";
 import { agentResourceName, commandIdFromName } from "@/lib/resource";
 import { formatDuration, formatTimestamp } from "@/lib/time-format";

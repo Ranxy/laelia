@@ -7,8 +7,8 @@ import { EmptyState, LoadingState } from "@/components/chat/states";
 import {
   useActivityPages,
   useMarkActivityDone,
-} from "@/composables/use-activity-feed";
-import { useIsDesktop } from "@/lib/use-is-desktop";
+} from "@/hooks/use-activity-feed";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { cn } from "@/lib/utils";
 import type { Activity } from "@/types/proto-es/v1/command_pb";
 import {

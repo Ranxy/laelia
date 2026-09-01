@@ -37,7 +37,7 @@ vi.mock("@/lib/i18n", () => ({
   setLocale: mock.setLocale,
 }));
 
-vi.mock("@/lib/use-is-desktop", () => ({
+vi.mock("@/hooks/use-is-desktop", () => ({
   useIsDesktop: () => mock.isDesktop,
 }));
 

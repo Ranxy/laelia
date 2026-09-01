@@ -17,13 +17,13 @@ import { ConnectionBadge } from "@/components/connection-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useAvatarEditor } from "@/composables/useAvatarEditor";
 import {
   groupServiceClient,
   iamServiceClient,
   roleServiceClient,
   userServiceClient,
 } from "@/connect";
+import { useAvatarEditor } from "@/hooks/use-avatar-editor";
 import { useAvatar } from "@/lib/avatar-cache";
 import { resizeImageFile } from "@/lib/image-resize";
 import { avatarNameForAgentId } from "@/lib/resource";

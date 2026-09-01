@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Outlet, useParams } from "react-router-dom";
 import { ConversationList } from "@/components/chat/conversation-list";
 import { TwoPaneShell } from "@/components/ui/two-pane-shell";
-import { usePolling } from "@/lib/use-polling";
+import { usePolling } from "@/hooks/use-polling";
 import { useAppStore } from "@/stores";
 
 // Left-rail list refresh cadence. The right pane long-polls the open
