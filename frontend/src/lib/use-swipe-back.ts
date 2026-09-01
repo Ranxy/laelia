@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { resolvePath } from "@/router/route-index";
 import { ROUTE_INFO } from "@/router/route-info";
 import { useCurrentRoute } from "@/router/use-current-route";
 import { useAppStore } from "@/stores";
@@ -83,9 +84,11 @@ export function useSwipeBack(): SwipeBackState {
   const pendingResetRef = useRef(false);
 
   const backTargetRef = useRef<string | null>(null);
-  backTargetRef.current = currentRoute.name
-    ? (ROUTE_INFO[currentRoute.name]?.backTo ?? null)
-    : null;
+  // backTo is a route name; the gesture commits its navigation by path.
+  const currentBackTo = currentRoute.name
+    ? ROUTE_INFO[currentRoute.name]?.backTo
+    : undefined;
+  backTargetRef.current = currentBackTo ? resolvePath(currentBackTo) : null;
   const threadActiveRef = useRef(false);
   threadActiveRef.current = activeThreadRoot != null;
   const tasksPanelConvRef = useRef<string | null>(null);

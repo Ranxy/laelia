@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { resolvePath } from "@/router/route-index";
 import { ROUTE_INFO } from "@/router/route-info";
 import { useCurrentRoute } from "@/router/use-current-route";
 
@@ -24,7 +25,11 @@ export function MobileHeader({ previewTitleKey }: MobileHeaderProps) {
     }
     const info = currentRoute.name ? ROUTE_INFO[currentRoute.name] : undefined;
     if (info) {
-      return { title: t(info.titleKey), backPath: info.backTo };
+      return {
+        title: t(info.titleKey),
+        // backTo is a route name; the button navigates by path.
+        backPath: info.backTo ? resolvePath(info.backTo) : undefined,
+      };
     }
     return { title: t("sidebar.home"), backPath: undefined };
   }, [previewTitleKey, currentRoute.name, t]);

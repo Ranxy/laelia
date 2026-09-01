@@ -39,6 +39,7 @@ import {
   SETTINGS_ROUTE_STORAGE,
   SETTINGS_ROUTE_USERS,
 } from "../handles";
+import type { RouteHandle } from "../route-info";
 
 // AgentRouteRedirect preserves the legacy /agents/:agentId/** deep links
 // (thread-panel, command-list, reminder-detail, machine-profile, etc.) by
@@ -62,7 +63,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
     children: [
       {
         index: true,
-        handle: { name: CHAT_ROUTE },
+        handle: { name: CHAT_ROUTE } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/chat-conversation").then((m) => ({
             Component: m.ChatEmptyState,
@@ -70,7 +71,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: ":conversationId",
-        handle: { name: CHAT_ROUTE_DETAIL },
+        handle: { name: CHAT_ROUTE_DETAIL } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/chat-conversation").then((m) => ({
             Component: m.ChatConversationPage,
@@ -80,7 +81,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
   },
   {
     path: "search",
-    handle: { name: SEARCH_ROUTE },
+    handle: { name: SEARCH_ROUTE } satisfies RouteHandle,
     lazy: () =>
       import("@/pages/dashboard/global-search").then((m) => ({
         Component: m.GlobalSearchPage,
@@ -88,7 +89,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
   },
   {
     path: "activity",
-    handle: { name: ACTIVITY_ROUTE },
+    handle: { name: ACTIVITY_ROUTE } satisfies RouteHandle,
     lazy: () =>
       import("@/pages/dashboard/activity-layout").then((m) => ({
         Component: m.ActivityLayout,
@@ -96,7 +97,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
     children: [
       {
         path: ":messageId",
-        handle: { name: ACTIVITY_ROUTE_DETAIL },
+        handle: { name: ACTIVITY_ROUTE_DETAIL } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/activity-detail").then((m) => ({
             Component: m.ActivityDetail,
@@ -113,7 +114,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
     // stays within Members. Defined before the legacy /agents redirect
     // so the index (first-registration-wins) picks these paths.
     path: "members",
-    handle: { name: MEMBERS_ROUTE },
+    handle: { name: MEMBERS_ROUTE } satisfies RouteHandle,
     lazy: () =>
       import("@/pages/dashboard/members").then((m) => ({
         Component: m.MembersPage,
@@ -121,7 +122,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
     children: [
       {
         index: true,
-        handle: { name: MEMBERS_ROUTE },
+        handle: { name: MEMBERS_ROUTE } satisfies RouteHandle,
         lazy: () =>
           import("@/components/selection-empty-state").then((m) => ({
             element: (
@@ -138,7 +139,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         children: [
           {
             index: true,
-            handle: { name: AGENT_ROUTE_PROFILE },
+            handle: { name: AGENT_ROUTE_PROFILE } satisfies RouteHandle,
             lazy: () =>
               import("@/pages/dashboard/agent-profile").then((m) => ({
                 Component: m.AgentProfilePage,
@@ -146,7 +147,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
           },
           {
             path: "commands",
-            handle: { name: COMMAND_ROUTE_LIST },
+            handle: { name: COMMAND_ROUTE_LIST } satisfies RouteHandle,
             lazy: () =>
               import("@/pages/dashboard/command-list").then((m) => ({
                 Component: m.CommandListPage,
@@ -154,7 +155,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
           },
           {
             path: "commands/:commandId",
-            handle: { name: COMMAND_ROUTE_DETAIL },
+            handle: { name: COMMAND_ROUTE_DETAIL } satisfies RouteHandle,
             lazy: () =>
               import("@/pages/dashboard/command-detail").then((m) => ({
                 Component: m.CommandDetailPage,
@@ -162,7 +163,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
           },
           {
             path: "reminders",
-            handle: { name: REMINDER_ROUTE_LIST },
+            handle: { name: REMINDER_ROUTE_LIST } satisfies RouteHandle,
             lazy: () =>
               import("@/pages/dashboard/reminder-list").then((m) => ({
                 Component: m.ReminderListPage,
@@ -170,7 +171,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
           },
           {
             path: "reminders/:reminderId",
-            handle: { name: REMINDER_ROUTE_DETAIL },
+            handle: { name: REMINDER_ROUTE_DETAIL } satisfies RouteHandle,
             lazy: () =>
               import("@/pages/dashboard/reminder-detail").then((m) => ({
                 Component: m.ReminderDetailPage,
@@ -178,7 +179,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
           },
           {
             path: "chat",
-            handle: { name: AGENT_ROUTE_CHAT },
+            handle: { name: AGENT_ROUTE_CHAT } satisfies RouteHandle,
             lazy: () =>
               import("@/pages/dashboard/agent-chat").then((m) => ({
                 Component: m.AgentChatPage,
@@ -186,7 +187,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
           },
           {
             path: "mcp",
-            handle: { name: AGENT_ROUTE_MCP },
+            handle: { name: AGENT_ROUTE_MCP } satisfies RouteHandle,
             lazy: () =>
               import("@/pages/dashboard/agent-mcp").then((m) => ({
                 Component: m.AgentMcpPage,
@@ -194,7 +195,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
           },
           {
             path: "workspace",
-            handle: { name: AGENT_ROUTE_WORKSPACE },
+            handle: { name: AGENT_ROUTE_WORKSPACE } satisfies RouteHandle,
             lazy: () =>
               import("@/pages/dashboard/agent-workspace").then((m) => ({
                 Component: m.AgentWorkspacePage,
@@ -204,7 +205,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "users/:userId",
-        handle: { name: HUMAN_ROUTE_DETAIL },
+        handle: { name: HUMAN_ROUTE_DETAIL } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/human-detail").then((m) => ({
             Component: m.HumanDetailPage,
@@ -212,7 +213,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "users/:userId/teams/:teamId",
-        handle: { name: HUMAN_TEAM_ROUTE },
+        handle: { name: HUMAN_TEAM_ROUTE } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/team-detail").then((m) => ({
             Component: m.TeamDetailPage,
@@ -220,7 +221,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "channels/:channelId",
-        handle: { name: CHANNEL_ROUTE_DETAIL },
+        handle: { name: CHANNEL_ROUTE_DETAIL } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/channel-detail").then((m) => ({
             Component: m.ChannelDetailPage,
@@ -237,7 +238,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
     children: [
       {
         index: true,
-        handle: { name: MACHINE_ROUTE_LIST },
+        handle: { name: MACHINE_ROUTE_LIST } satisfies RouteHandle,
         lazy: () =>
           import("@/components/selection-empty-state").then((m) => ({
             element: (
@@ -249,7 +250,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         // Must be declared before :machineId so "new" is not captured as a
         // machine resource id.
         path: "new",
-        handle: { name: MACHINE_ROUTE_NEW },
+        handle: { name: MACHINE_ROUTE_NEW } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/machine-new").then((m) => ({
             Component: m.MachineNewPage,
@@ -264,7 +265,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         children: [
           {
             index: true,
-            handle: { name: MACHINE_ROUTE_PROFILE },
+            handle: { name: MACHINE_ROUTE_PROFILE } satisfies RouteHandle,
             lazy: () =>
               import("@/pages/dashboard/machine-profile").then((m) => ({
                 Component: m.MachineProfilePage,
@@ -272,7 +273,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
           },
           {
             path: "workspace",
-            handle: { name: MACHINE_ROUTE_WORKSPACE },
+            handle: { name: MACHINE_ROUTE_WORKSPACE } satisfies RouteHandle,
             lazy: () =>
               import("@/pages/dashboard/machine-workspace").then((m) => ({
                 Component: m.MachineWorkspacePage,
@@ -304,7 +305,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
     children: [
       {
         index: true,
-        handle: { name: SETTINGS_ROUTE },
+        handle: { name: SETTINGS_ROUTE } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-menu").then((m) => ({
             Component: m.SettingsIndex,
@@ -312,7 +313,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "agents",
-        handle: { name: SETTINGS_ROUTE_AGENTS },
+        handle: { name: SETTINGS_ROUTE_AGENTS } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-agents").then((m) => ({
             Component: m.SettingsAgentsPage,
@@ -320,7 +321,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "general",
-        handle: { name: SETTINGS_ROUTE_GENERAL },
+        handle: { name: SETTINGS_ROUTE_GENERAL } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-general").then((m) => ({
             Component: m.SettingsGeneralPage,
@@ -328,7 +329,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "smtp",
-        handle: { name: SETTINGS_ROUTE_SMTP },
+        handle: { name: SETTINGS_ROUTE_SMTP } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-smtp").then((m) => ({
             Component: m.SettingsSmtpPage,
@@ -336,7 +337,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "profile",
-        handle: { name: SETTINGS_ROUTE_PROFILE },
+        handle: { name: SETTINGS_ROUTE_PROFILE } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-profile").then((m) => ({
             Component: m.SettingsProfilePage,
@@ -344,7 +345,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "storage",
-        handle: { name: SETTINGS_ROUTE_STORAGE },
+        handle: { name: SETTINGS_ROUTE_STORAGE } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-storage").then((m) => ({
             Component: m.SettingsStoragePage,
@@ -352,7 +353,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "notifications",
-        handle: { name: SETTINGS_ROUTE_NOTIFICATIONS },
+        handle: { name: SETTINGS_ROUTE_NOTIFICATIONS } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-notifications").then((m) => ({
             Component: m.SettingsNotificationsPage,
@@ -360,7 +361,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "users",
-        handle: { name: SETTINGS_ROUTE_USERS },
+        handle: { name: SETTINGS_ROUTE_USERS } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/user-list").then((m) => ({
             Component: m.UserListPage,
@@ -368,7 +369,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "roles",
-        handle: { name: SETTINGS_ROUTE_ROLES },
+        handle: { name: SETTINGS_ROUTE_ROLES } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-roles").then((m) => ({
             Component: m.SettingsRolesPage,
@@ -376,7 +377,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "iam",
-        handle: { name: SETTINGS_ROUTE_IAM },
+        handle: { name: SETTINGS_ROUTE_IAM } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-iam").then((m) => ({
             Component: m.SettingsIamPage,
@@ -384,7 +385,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "groups",
-        handle: { name: SETTINGS_ROUTE_GROUPS },
+        handle: { name: SETTINGS_ROUTE_GROUPS } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-groups").then((m) => ({
             Component: m.SettingsGroupsPage,
@@ -392,7 +393,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "api-providers",
-        handle: { name: SETTINGS_ROUTE_API_PROVIDERS },
+        handle: { name: SETTINGS_ROUTE_API_PROVIDERS } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-api-providers").then((m) => ({
             Component: m.SettingsApiProvidersPage,
@@ -400,7 +401,9 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "identity-providers",
-        handle: { name: SETTINGS_ROUTE_IDENTITY_PROVIDERS },
+        handle: {
+          name: SETTINGS_ROUTE_IDENTITY_PROVIDERS,
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-identity-providers").then((m) => ({
             Component: m.SettingsIdentityProvidersPage,
@@ -408,7 +411,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "mcp-servers",
-        handle: { name: SETTINGS_ROUTE_MCP_SERVERS },
+        handle: { name: SETTINGS_ROUTE_MCP_SERVERS } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-mcp-servers").then((m) => ({
             Component: m.SettingsMcpServersPage,
@@ -416,7 +419,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "audit",
-        handle: { name: SETTINGS_ROUTE_AUDIT },
+        handle: { name: SETTINGS_ROUTE_AUDIT } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-audit").then((m) => ({
             Component: m.SettingsAuditPage,

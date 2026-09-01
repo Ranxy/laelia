@@ -16,7 +16,6 @@ import { usePresenceHeartbeat } from "@/composables/use-presence-heartbeat";
 import { toastManager } from "@/lib/toast";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { reconcilePushSubscription, suppressRoute } from "@/lib/web-push";
-import { routeNameForPath } from "@/router/route-index";
 import { ROUTE_INFO } from "@/router/route-info";
 import { useCurrentRoute } from "@/router/use-current-route";
 import { useAppStore } from "@/stores";
@@ -97,14 +96,13 @@ export function DashboardLayout() {
 
   // Peek title for the static swipe-back surface: the back-target page's
   // title resolved from route metadata (the target route is NOT mounted —
-  // see the preview-retirement decision).
+  // see the preview-retirement decision). backTo is a route name, so the
+  // title is a direct table lookup.
   const peekTitleKey = useMemo(() => {
     const backTo = currentRoute.name
       ? ROUTE_INFO[currentRoute.name]?.backTo
       : undefined;
-    if (!backTo) return undefined;
-    const targetName = routeNameForPath(backTo);
-    return targetName ? ROUTE_INFO[targetName]?.titleKey : undefined;
+    return backTo ? ROUTE_INFO[backTo]?.titleKey : undefined;
   }, [currentRoute.name]);
 
   const toggleCollapsed = useCallback(() => {

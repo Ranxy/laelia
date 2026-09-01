@@ -1,7 +1,11 @@
 import { useLocation, useMatches, useParams } from "react-router-dom";
+import type { RouteName } from "./route-info";
 
 export interface ReactRoute {
-  name?: string;
+  // The leaf route's handle name. Sourced from the route tree whose handles
+  // are `satisfies RouteHandle`, so it is a known route name (or undefined
+  // for routes without a handle, e.g. the legacy redirect stubs).
+  name?: RouteName;
   fullPath: string;
   hash: string;
   params: Record<string, string | string[] | undefined>;
@@ -13,7 +17,7 @@ function assembleRoute(
   matches: ReturnType<typeof useMatches>,
   params: ReturnType<typeof useParams>
 ): ReactRoute {
-  const leafHandle = matches.at(-1)?.handle as { name?: string } | undefined;
+  const leafHandle = matches.at(-1)?.handle as { name?: RouteName } | undefined;
   return {
     name: leafHandle?.name,
     fullPath: `${location.pathname}${location.search}${location.hash}`,
