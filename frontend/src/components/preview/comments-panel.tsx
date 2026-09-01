@@ -5,12 +5,9 @@ import { useTranslation } from "react-i18next";
 import { Avatar, formatTime } from "@/components/chat/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  avatarNameForAgentId,
-  avatarNameForUserId,
-  useAvatar,
-} from "@/lib/avatar-cache";
+import { useAvatar } from "@/lib/avatar-cache";
 import type { CommentAnchor } from "@/lib/markdown-file";
+import { avatarNameForAgentId, avatarNameForUserId } from "@/lib/resource";
 import { useAppStore } from "@/stores";
 import { isOwnUserMessage } from "@/stores/chat-helpers";
 import type { ChatMessageUI } from "@/stores/ui-models";

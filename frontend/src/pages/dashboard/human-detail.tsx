@@ -24,8 +24,9 @@ import {
   roleServiceClient,
   userServiceClient,
 } from "@/connect";
-import { avatarNameForAgentId, useAvatar } from "@/lib/avatar-cache";
+import { useAvatar } from "@/lib/avatar-cache";
 import { resizeImageFile } from "@/lib/image-resize";
+import { avatarNameForAgentId } from "@/lib/resource";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";

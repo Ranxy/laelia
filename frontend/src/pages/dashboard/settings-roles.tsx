@@ -35,13 +35,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCrudDialog } from "@/composables/use-crud-dialog";
 import { useResourceQuery } from "@/composables/use-resource-query";
 import { roleServiceClient } from "@/connect";
-import { roleIDFromName } from "@/lib/command-status";
 import { describeError } from "@/lib/connect-errors";
 import {
   ALL_PERMISSIONS,
   PERMISSION_GROUPS,
   permissionLabel,
 } from "@/lib/permissions";
+import { roleIDFromName } from "@/lib/resource";
 import { slugify } from "@/lib/slug";
 import { showErrorToast } from "@/lib/toast-errors";
 import { useHasPermission } from "@/stores/permissions";

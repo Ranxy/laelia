@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatTimestamp } from "@/lib/command-status";
+import { formatTimestamp } from "@/lib/time-format";
 import { MACHINE_ROUTE_PROFILE } from "@/router/handles";
 import { resolvePath } from "@/router/route-index";
 import { useAppStore } from "@/stores";

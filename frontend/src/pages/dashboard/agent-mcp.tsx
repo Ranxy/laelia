@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { Card } from "@/components/profile-common";
 import { Button } from "@/components/ui/button";
-import { agentResourceName } from "@/lib/command-status";
+import { agentResourceName } from "@/lib/resource";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";

@@ -8,7 +8,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { formatActivityListTime, formatTimestamp } from "@/lib/command-status";
+import { formatActivityListTime, formatTimestamp } from "@/lib/time-format";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import type { Activity } from "@/types/proto-es/v1/command_pb";

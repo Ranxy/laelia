@@ -14,12 +14,12 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { agentServiceClient, userServiceClient } from "@/connect";
+import { useAvatar } from "@/lib/avatar-cache";
 import {
+  agentResourceName,
   avatarNameForAgentId,
   avatarNameForUserId,
-  useAvatar,
-} from "@/lib/avatar-cache";
-import { agentResourceName } from "@/lib/command-status";
+} from "@/lib/resource";
 import { toastManager } from "@/lib/toast";
 import { useEdgeDragToClose } from "@/lib/use-edge-drag-to-close";
 import { useAppStore } from "@/stores";

@@ -5,11 +5,8 @@ import { useTranslation } from "react-i18next";
 import { Avatar } from "@/components/chat/avatar";
 import { getLayerRoot, LAYER_SURFACE_CLASS } from "@/components/ui/layer";
 import { userServiceClient } from "@/connect";
-import {
-  avatarNameForAgentId,
-  avatarNameForUserId,
-  useAvatar,
-} from "@/lib/avatar-cache";
+import { useAvatar } from "@/lib/avatar-cache";
+import { avatarNameForAgentId, avatarNameForUserId } from "@/lib/resource";
 import { buildUserFilter } from "@/lib/user-filter";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";

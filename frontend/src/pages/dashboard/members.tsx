@@ -11,11 +11,8 @@ import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { TwoPaneShell } from "@/components/ui/two-pane-shell";
 import { useOnlineUsers } from "@/composables/use-presence-heartbeat";
-import {
-  avatarNameForAgentId,
-  avatarNameForUserId,
-  useAvatar,
-} from "@/lib/avatar-cache";
+import { useAvatar } from "@/lib/avatar-cache";
+import { avatarNameForAgentId, avatarNameForUserId } from "@/lib/resource";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { MemberSummary } from "@/stores/ui-models";

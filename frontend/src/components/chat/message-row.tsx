@@ -22,17 +22,14 @@ import { ChatToolCall } from "@/components/chat-events/tool-call";
 import { ChatWarning } from "@/components/chat-events/warning";
 import { CommandStatusBadge } from "@/components/command-status-badge";
 import { AttachmentCommentCard } from "@/components/preview/attachment-comment-card";
-import {
-  avatarNameForAgentId,
-  avatarNameForUserId,
-  useAvatar,
-} from "@/lib/avatar-cache";
+import { useAvatar } from "@/lib/avatar-cache";
 import { isHtmlAttachment, MAX_HTML_PREVIEW_BYTES } from "@/lib/html-file";
 import { isImageAttachment } from "@/lib/image-file";
 import {
   isMarkdownAttachment,
   MAX_MARKDOWN_PREVIEW_BYTES,
 } from "@/lib/markdown-file";
+import { avatarNameForAgentId, avatarNameForUserId } from "@/lib/resource";
 import { pairToolCallEvents } from "@/lib/tool-call-events";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";

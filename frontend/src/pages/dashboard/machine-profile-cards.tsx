@@ -26,13 +26,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { formatTimestamp } from "@/lib/command-status";
 import { describeError } from "@/lib/connect-errors";
 import {
   buildMachineInstallCommand,
   buildMachineSetupCommand,
   machineInstallOSFromInfo,
 } from "@/lib/machine-token";
+import { formatTimestamp } from "@/lib/time-format";
 import { cn } from "@/lib/utils";
 import type {
   AgentProviderInfo,

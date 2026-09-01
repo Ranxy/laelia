@@ -15,8 +15,6 @@ vi.mock("react-i18next", () => ({
 // useAvatar would hit the avatar RPCs; stub it so rows render the pixel
 // fallback without network noise.
 vi.mock("@/lib/avatar-cache", () => ({
-  avatarNameForAgentId: (id: string) => `agents/${id}/avatar`,
-  avatarNameForUserId: (id: string) => `users/${id}/avatar`,
   useAvatar: () => null,
 }));
 

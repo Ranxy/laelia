@@ -29,6 +29,7 @@ import { notificationServiceClient, userServiceClient } from "@/connect";
 import { useAvatar } from "@/lib/avatar-cache";
 import { describeError } from "@/lib/connect-errors";
 import { resizeImageFile } from "@/lib/image-resize";
+import { avatarNameForUserId } from "@/lib/resource";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
 import {
@@ -100,7 +101,7 @@ export function SettingsProfilePage() {
     ? (currentUser.name.split("/")[1] ?? "")
     : "";
   const avatarName =
-    currentUser?.avatar || (userId ? `users/${userId}/avatar` : undefined);
+    currentUser?.avatar || (userId ? avatarNameForUserId(userId) : undefined);
   const avatarSrc = useAvatar(avatarName);
 
   const {
@@ -108,7 +109,7 @@ export function SettingsProfilePage() {
     onChange: handleAvatarChange,
     onRemove: handleAvatarRemove,
   } = useAvatarEditor({
-    avatarName: userId ? `users/${userId}/avatar` : null,
+    avatarName: userId ? avatarNameForUserId(userId) : null,
     upload: async (file) => {
       const { data, mimeType } = await resizeImageFile(file, 256, 0.9);
       await userServiceClient.uploadAvatar(

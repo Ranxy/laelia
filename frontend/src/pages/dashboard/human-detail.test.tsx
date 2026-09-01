@@ -32,7 +32,6 @@ vi.mock("@/connect", () => ({
 }));
 
 vi.mock("@/lib/avatar-cache", () => ({
-  avatarNameForAgentId: (id: string) => `agents/${id}/avatar`,
   useAvatar: () => "avatar-url",
 }));
 

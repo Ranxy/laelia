@@ -2,7 +2,7 @@ import { Bot, Hash, Users } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { agentResourceName } from "@/lib/command-status";
+import { agentResourceName } from "@/lib/resource";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { Conversation } from "@/types/proto-es/v1/command_pb";

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatConversationListTime } from "./command-status";
+import { formatConversationListTime } from "./time-format";
 
 // formatConversationListTime renders relative to the live clock, so pin it:
 // 2026-08-11 15:30 local time.

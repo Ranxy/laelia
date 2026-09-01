@@ -17,8 +17,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { roleIDFromName } from "@/lib/command-status";
 import { describeError } from "@/lib/connect-errors";
+import { roleIDFromName } from "@/lib/resource";
 import { toastManager } from "@/lib/toast";
 import type { IamPolicyState } from "@/pages/dashboard/use-iam-policy";
 import {

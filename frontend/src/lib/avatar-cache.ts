@@ -11,6 +11,8 @@ import { DownloadAvatarRequestSchema } from "@/types/proto-es/v1/user_service_pb
 
 // avatar-cache memoizes avatar image blob URLs by their resource name
 // (users/{id}/avatar or agents/{id}/avatar) for the lifetime of the page.
+// Resource-name construction lives in lib/resource.ts; this module owns the
+// blob-URL cache, the on-demand fetch, and the invalidation broadcast.
 // Avatars are fetched on demand via the matching DownloadAvatar RPC and cached
 // so a channel full of messages from the same members fetches each avatar at
 // most once per session. Names that 404 (no uploaded avatar / stale roster
@@ -46,18 +48,6 @@ export function getCachedAvatarUrl(name: string): string | null {
 
 export function isAvatarKnownMissing(name: string): boolean {
   return missing.has(name);
-}
-
-// avatarNameForUserId builds the avatar resource name for a user from their
-// mention handle (the {user} segment of "users/{user}").
-export function avatarNameForUserId(handle: string): string {
-  return `users/${handle}/avatar`;
-}
-
-// avatarNameForAgentId builds the avatar resource name for an agent from its
-// resource id (the {agent} segment of "agents/{agent}").
-export function avatarNameForAgentId(agentResourceId: string): string {
-  return `agents/${agentResourceId}/avatar`;
 }
 
 // fetchAvatarUrl returns a blob URL for the avatar, or null when the member has

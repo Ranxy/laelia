@@ -11,12 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useOnlineUsers } from "@/composables/use-presence-heartbeat";
 import { groupServiceClient, userServiceClient } from "@/connect";
-import {
-  avatarNameForAgentId,
-  avatarNameForUserId,
-  useAvatar,
-} from "@/lib/avatar-cache";
+import { useAvatar } from "@/lib/avatar-cache";
 import { isAgentOnline } from "@/lib/presence";
+import { avatarNameForAgentId, avatarNameForUserId } from "@/lib/resource";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";

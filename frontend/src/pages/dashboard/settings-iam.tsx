@@ -22,7 +22,7 @@ import {
   roleServiceClient,
   userServiceClient,
 } from "@/connect";
-import { roleIDFromName } from "@/lib/command-status";
+import { roleIDFromName } from "@/lib/resource";
 import { cn } from "@/lib/utils";
 import {
   AssignRolesSheet,

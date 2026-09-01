@@ -41,8 +41,8 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { formatTimestamp } from "@/lib/command-status";
 import { describeError } from "@/lib/connect-errors";
+import { formatTimestamp } from "@/lib/time-format";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
 import { buildUserFilter } from "@/lib/user-filter";

@@ -39,8 +39,9 @@ import {
   uploadAgentAvatar,
   useAvatar,
 } from "@/lib/avatar-cache";
-import { agentResourceName, formatTimestamp } from "@/lib/command-status";
 import { describeError } from "@/lib/connect-errors";
+import { agentResourceName } from "@/lib/resource";
+import { formatTimestamp } from "@/lib/time-format";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";

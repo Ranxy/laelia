@@ -14,7 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { avatarNameForAgentId, useAvatar } from "@/lib/avatar-cache";
+import { useAvatar } from "@/lib/avatar-cache";
+import { avatarNameForAgentId } from "@/lib/resource";
 import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
 import { AgentTeamRole } from "@/types/proto-es/v1/agent_team_service_pb";
 

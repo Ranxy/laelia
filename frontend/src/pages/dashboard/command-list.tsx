@@ -22,12 +22,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  agentResourceName,
-  formatDuration,
-  formatTimestamp,
-} from "@/lib/command-status";
 import { FinalSummary } from "@/lib/markdown";
+import { agentResourceName, commandIdFromName } from "@/lib/resource";
+import { formatDuration, formatTimestamp } from "@/lib/time-format";
 import { useResourceList } from "@/lib/use-resource-list";
 import { useAppStore } from "@/stores";
 import type { Command } from "@/types/proto-es/v1/command_pb";
@@ -95,9 +92,9 @@ export function CommandListPage() {
 
   function handleRowClick(cmd: Command) {
     if (!cmd.name) return;
-    navigate(
-      `/members/agents/${agentId}/commands/${cmd.name.split("/").pop()}`
-    );
+    const commandId = commandIdFromName(cmd.name);
+    if (!commandId) return;
+    navigate(`/members/agents/${agentId}/commands/${commandId}`);
   }
 
   return (
