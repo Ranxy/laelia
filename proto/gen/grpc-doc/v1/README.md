@@ -5828,6 +5828,7 @@ runtime did not report usage.
 | ----- | ---- | ----- | ----------- |
 | status | [string](#string) |  |  |
 | raw_output | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
+| tool_call_id | [string](#string) |  | tool_call_id mirrors the id carried by the matching STARTED event; empty in events persisted before the field existed. |
 
 
 
@@ -5844,6 +5845,7 @@ runtime did not report usage.
 | ----- | ---- | ----- | ----------- |
 | title | [string](#string) |  |  |
 | raw_input | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
+| tool_call_id | [string](#string) |  | tool_call_id correlates this STARTED with its matching FINISHED event when the runtime executes tool calls concurrently. Runtimes that never reported an id leave it empty; consumers fall back to pairing by event order then. |
 
 
 

@@ -185,11 +185,18 @@ message TextDeltaPayload {
 message ToolCallStartedPayload {
   string title = 1;
   google.protobuf.Struct raw_input = 2;
+  // tool_call_id correlates this STARTED with its matching FINISHED event when
+  // the runtime executes tool calls concurrently. Runtimes that never reported
+  // an id leave it empty; consumers fall back to pairing by event order then.
+  string tool_call_id = 3;
 }
 
 message ToolCallFinishedPayload {
   string status = 1;
   google.protobuf.Struct raw_output = 2;
+  // tool_call_id mirrors the id carried by the matching STARTED event; empty
+  // in events persisted before the field existed.
+  string tool_call_id = 3;
 }
 
 message DiffEmittedPayload {

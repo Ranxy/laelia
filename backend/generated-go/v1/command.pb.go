@@ -1351,9 +1351,13 @@ func (x *TextDeltaPayload) GetContent() string {
 }
 
 type ToolCallStartedPayload struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Title         string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
-	RawInput      *structpb.Struct       `protobuf:"bytes,2,opt,name=raw_input,json=rawInput,proto3" json:"raw_input,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Title    string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
+	RawInput *structpb.Struct       `protobuf:"bytes,2,opt,name=raw_input,json=rawInput,proto3" json:"raw_input,omitempty"`
+	// tool_call_id correlates this STARTED with its matching FINISHED event when
+	// the runtime executes tool calls concurrently. Runtimes that never reported
+	// an id leave it empty; consumers fall back to pairing by event order then.
+	ToolCallId    string `protobuf:"bytes,3,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1402,10 +1406,20 @@ func (x *ToolCallStartedPayload) GetRawInput() *structpb.Struct {
 	return nil
 }
 
+func (x *ToolCallStartedPayload) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
+	}
+	return ""
+}
+
 type ToolCallFinishedPayload struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	RawOutput     *structpb.Struct       `protobuf:"bytes,2,opt,name=raw_output,json=rawOutput,proto3" json:"raw_output,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Status    string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	RawOutput *structpb.Struct       `protobuf:"bytes,2,opt,name=raw_output,json=rawOutput,proto3" json:"raw_output,omitempty"`
+	// tool_call_id mirrors the id carried by the matching STARTED event; empty
+	// in events persisted before the field existed.
+	ToolCallId    string `protobuf:"bytes,3,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1452,6 +1466,13 @@ func (x *ToolCallFinishedPayload) GetRawOutput() *structpb.Struct {
 		return x.RawOutput
 	}
 	return nil
+}
+
+func (x *ToolCallFinishedPayload) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
+	}
+	return ""
 }
 
 type DiffEmittedPayload struct {
@@ -12471,14 +12492,18 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x10TextDeltaPayload\x12\x1f\n" +
 	"\vstream_type\x18\x01 \x01(\tR\n" +
 	"streamType\x12\x18\n" +
-	"\acontent\x18\x02 \x01(\tR\acontent\"d\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\"\x86\x01\n" +
 	"\x16ToolCallStartedPayload\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x124\n" +
-	"\traw_input\x18\x02 \x01(\v2\x17.google.protobuf.StructR\brawInput\"i\n" +
+	"\traw_input\x18\x02 \x01(\v2\x17.google.protobuf.StructR\brawInput\x12 \n" +
+	"\ftool_call_id\x18\x03 \x01(\tR\n" +
+	"toolCallId\"\x8b\x01\n" +
 	"\x17ToolCallFinishedPayload\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x126\n" +
 	"\n" +
-	"raw_output\x18\x02 \x01(\v2\x17.google.protobuf.StructR\trawOutput\"^\n" +
+	"raw_output\x18\x02 \x01(\v2\x17.google.protobuf.StructR\trawOutput\x12 \n" +
+	"\ftool_call_id\x18\x03 \x01(\tR\n" +
+	"toolCallId\"^\n" +
 	"\x12DiffEmittedPayload\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x19\n" +
 	"\bold_text\x18\x02 \x01(\tR\aoldText\x12\x19\n" +

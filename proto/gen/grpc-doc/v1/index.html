@@ -14418,6 +14418,14 @@ the agent&#39;s processed_version for this conversation. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>tool_call_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>tool_call_id mirrors the id carried by the matching STARTED event; empty
+in events persisted before the field existed. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -14447,6 +14455,15 @@ the agent&#39;s processed_version for this conversation. </p></td>
                   <td><a href="#google.protobuf.Struct">google.protobuf.Struct</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>tool_call_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>tool_call_id correlates this STARTED with its matching FINISHED event when
+the runtime executes tool calls concurrently. Runtimes that never reported
+an id leave it empty; consumers fall back to pairing by event order then. </p></td>
                 </tr>
               
             </tbody>

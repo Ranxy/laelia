@@ -438,6 +438,15 @@ export declare type ToolCallStartedPayload = Message<"laelia.v1.ToolCallStartedP
    * @generated from field: google.protobuf.Struct raw_input = 2;
    */
   rawInput?: JsonObject | undefined;
+
+  /**
+   * tool_call_id correlates this STARTED with its matching FINISHED event when
+   * the runtime executes tool calls concurrently. Runtimes that never reported
+   * an id leave it empty; consumers fall back to pairing by event order then.
+   *
+   * @generated from field: string tool_call_id = 3;
+   */
+  toolCallId: string;
 };
 
 /**
@@ -459,6 +468,14 @@ export declare type ToolCallFinishedPayload = Message<"laelia.v1.ToolCallFinishe
    * @generated from field: google.protobuf.Struct raw_output = 2;
    */
   rawOutput?: JsonObject | undefined;
+
+  /**
+   * tool_call_id mirrors the id carried by the matching STARTED event; empty
+   * in events persisted before the field existed.
+   *
+   * @generated from field: string tool_call_id = 3;
+   */
+  toolCallId: string;
 };
 
 /**
