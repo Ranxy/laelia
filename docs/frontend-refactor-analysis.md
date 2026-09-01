@@ -6,9 +6,9 @@
 
 ---
 
-## ⚡ 实施进度总览(更新于重构执行批 0~批 10 后)
+## ⚡ 实施进度总览(更新于重构执行批 0~批 11 后)
 
-重构已执行 **91 个提交、11 个批次(含批次间 docs 收口提交)**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **120 文件 / 799 用例**,全量 vitest 干净退出(exit 0;预存的 jsdom IntersectionObserver unhandled 随重构消失)。各章文件头部已附加对应的"进度标注"块。
+重构已执行 **93 个提交、12 个批次(含批次间 docs 收口提交)**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **120 文件 / 800 用例**,全量 vitest 干净退出(exit 0;预存的 jsdom IntersectionObserver unhandled 随重构消失)。各章文件头部已附加对应的"进度标注"块。
 
 | 批次 | 提交范围 | 内容 | 状态 |
 |---|---|---|---|
@@ -23,8 +23,9 @@
 | 批 8(05 章收官:presence/activity/reminder 迁 Query)| `b7a3799`~`53b9cc3`(6 提交)| **presence 心跳保留、数据入 Query**(`["presences"]` 唯一 fetcher 挂 dashboard 布局,结构共享替代手写 bailout,空名单仍发心跳,消费端 `useOnlineUsers()` 只读,reset 清缓存)、**reminder 列表/详情迁 per-key 查询**(终态停轮、keepPreviousData 翻页、外包装+内体 key 化重置、list/detail 双 composable)、**activity per-(filter,pageToken) 查询 + useQueries**(requestSeq/手写 equal/首屏 merge hack 消解,markDone 乐观移除全部缓存页,detail 兜底 QueryCache 订阅扫描)、**三 slice 退役**(19→16 组合,手写 equal ×3、silent 样板 ×3 随之消失)| ✅ 完成(6 个提交)|
 | 批 9(tool_call_id 全栈贯通)| `68e53a6`~`baf4167`(3 提交)| **proto 契约**(ToolCallStarted/FinishedPayload 增可选 `tool_call_id`,Go/proto-es/grpc-doc 重生成)、**后端全链路透传**(ToolCallSink 接口带 id,ACP 三帧、acp2 thread executor、pi executor 全部发射点透传 runtime id,interleaved/pi 测试钉死契约)、**前端配对 ID 优先 + FIFO 兜底**(并发交错不再错配,断线缝隙/legacy 仍事件序兜底,pair 按 started 顺序输出)| ✅ 完成(3 个提交)|
 | 批 10(activity 双分页收敛,08 F-S8)| `29be54e`(1 提交)| **统一无限滚动**(产品拍板):activity-list 桌面 Prev/Next 分页栈/翻页脚手架/lastRowsRef 退役,桌面/移动共用 token 栈 + IntersectionObserver sentinel(316→235 行);5s 轮询统一骑第 0 页(`useActivityPages` 去 `intervalIndex`,newest-first offset 分页下唯一稳定窗口,顺带修掉轮询可见 offset 页的行漂移隐患);`activity.page/prev/next` 死键删除;测试改写为 scroll-append/加载中保留行/耗尽即止 三案| ✅ 完成(1 个提交)|
+| 批 11(hooks 门禁 + 杂项清偿包,06 E-03/P1 + 08 杂项 + 07 杂项)| `96963cc`(1 提交)| **Biome hooks 正确性规则启用**:`useExhaustiveDependencies` + `useHookAtTopLevel` 上线,25 处存量清偿(6 处真漏依赖补齐、惯用法 reset/keyed effect 以带理由 `biome-ignore` 固化、`AcpConfigEditor` 退役 `memo(forwardRef)` 转回 ref-as-prop、comments-panel 条件 hook 上移)、profile 页 5 处 no-op `eslint-disable` 全删、biome.json 幽灵 overrides 清理 + `biome:lint` 重复脚本去重;**08 杂项**:inspector WARNING 游离块收进 summary tab(F-B6)+ 回归用例、html overlay locate `.then` 补 unmount/换代防护(F-B9 尾款)、F-B10 注入断言核实批 6 已修;**07 杂项**:`ui/spinner.tsx` 共享 Spinner(F-D6,4 处点名消费端)、MobileTabBar→RouterLink、member-picker 行 memo + joined 徽章归一 Badge size="sm"| ✅ 完成(1 个提交)|
 
-**当前数据层状态**:Query 已纵切 12 个读族 + 应用级单例与 Provider(api-provider/mcp/user/agent/machine/settings 目录/iam-policy/presence/reminder/activity);聊天域长轮询已收敛为共享 ChatGateway 循环(可见性门控 + badge 同节拍);乐观发送经 useChatComposer 走 slice action;错误出口统一;登出经注册表(lib 自注册 + 三个新 Query 域各自 registerCleanup 清缓存)。**批 8 收官 = 05 章账面清零**:presence/activity/reminder 三 slice 退役,store 组合收缩至 16 slice,`useResourceList` 仅剩 command-list 一个消费者。**遗留:Biome `useExhaustiveDependencies` 启用与穿插清理**(产品拍板项已全部清零:流式管线拆除批 6、tool_call_id 批 9、activity 双分页批 10)。
+**当前数据层状态**:Query 已纵切 12 个读族 + 应用级单例与 Provider(api-provider/mcp/user/agent/machine/settings 目录/iam-policy/presence/reminder/activity);聊天域长轮询已收敛为共享 ChatGateway 循环(可见性门控 + badge 同节拍);乐观发送经 useChatComposer 走 slice action;错误出口统一;登出经注册表(lib 自注册 + 三个新 Query 域各自 registerCleanup 清缓存)。**批 8 收官 = 05 章账面清零**:presence/activity/reminder 三 slice 退役,store 组合收缩至 16 slice,`useResourceList` 仅剩 command-list 一个消费者。**批 11 = hooks 正确性零黑洞**:`useExhaustiveDependencies`/`useHookAtTopLevel` 已随门禁启用,存量清偿完毕,后续 hooks 依赖漂移在 lint 阶段即被拦截。(产品拍板项已全部清零:流式管线拆除批 6、tool_call_id 批 9、activity 双分页批 10。)
 
 ---
 
@@ -74,7 +75,7 @@
 
 - hooks 总量:useState 547 / useEffect 155 / useMemo 76 / useCallback 102;前两名 chat-conversation(12 effect)、global-search(8)。
 - 组件直连 RPC:pages/ 中 **60 处**(settings-* 7 页 + human-detail + global-search + team-detail 等集中),components/ 5 处 + 1 处裸 fetch;stores/ 115 处(分层健康的核心域);composables/ 0。
-- 类型纪律好:`as any`/`@ts-ignore` 全库仅 5 处;但 `useExhaustiveDependencies` 未启用 —— **15+ 处 `exhaustive-deps` 黑洞目前零守卫**,且 4 处 `eslint-disable` 注释因 linter 是 Biome 而是无效 no-op。
+- 类型纪律好:`as any`/`@ts-ignore` 全库仅 5 处;~~`useExhaustiveDependencies` 未启用~~ → ✅ 批 11 已启用并清偿 25 处存量,4 处 no-op `eslint-disable` 注释随批删除(余 2 处在生成代码,不参与 lint)。
 - 测试:行为断言为主、零快照,store 竞态测试(chat-stream/chat-history)是重构最值钱的安全网;但 **38 个 ≥150 行的文件无测试**,包括最复杂的 chat-conversation(2166 行)与 global-search(1011 行)。
 - 安全:无 token 进 localStorage,会话 HttpOnly cookie,OAuth state 一次性消费——基本面好;唯二的口子在 iframe 桥 `window.open(href)` 无 scheme 校验(ch08 F-S1)与 auth redirect 参数未拒 protocol-relative(ch09 A-6)。
 
@@ -263,7 +264,7 @@ src/
 
 ### 贯穿全程的规则(部分已落地)
 - ✅ AGENTS.md 幽灵引用修正(`b0499db`);✅ 组件直连 `useAppStore.setState` 禁令已入 check 门禁(`check-store-writes.mjs`,批 7 `4dad293`;设置域 *ServiceClient 直连收敛余量仍在 09 章 §2 清单);
-- ✅ tsconfig 已覆盖 vite.config 与 sw(`d8c8e46`,type-check 现跑双工程);❌ Biome `useExhaustiveDependencies` 等正确性规则仍未启用(15+ 存量黑洞待修,启用前需先批量清偿;4 处 eslint-disable no-op 已删 2 处,余 4 处在 profile 页);
+- ✅ tsconfig 已覆盖 vite.config 与 sw(`d8c8e46`,type-check 现跑双工程);✅ **Biome `useExhaustiveDependencies` + `useHookAtTopLevel` 已启用**(批 11 `96963cc`:25 处存量清偿后上线,惯用法以带理由 biome-ignore 固化;5 处 profile 页 no-op eslint-disable 全删);
 - ✅ `frontend/AGENTS.md` 已补:组件 API 约定与 Separator 决策(批 6 `5fdf8fb`)、Store Write Surface 写入面策略(批 7 `4dad293`)。
 
 ---
@@ -281,6 +282,7 @@ src/
 | 05 章收官(批 8)| ✅ 完成(6 提交)| presence/reminder/activity 数据源全部迁 Query(refetchInterval 可见性门控 + 结构共享;手写 equal ×3、requestSeq、首屏 merge hack 消解),三 slice 退役 19→16 组合;心跳 hook 保留;全量 120 文件/797 用例双跑 exit 0 |
 | tool_call_id 全栈贯通(批 9)| ✅ 完成(3 提交)| proto 两 payload 增 `tool_call_id`(Go/proto-es/grpc-doc 重生成)、ToolCallSink 接口 + 后端全部发射点透传、前端配对 ID 优先 + FIFO 兜底(并发交错根治);后端 6 包测试全绿,全量 120 文件/798 用例 |
 | activity 双分页收敛(批 10)| ✅ 完成(1 提交)| 08 F-S8 产品拍板统一无限滚动:桌面分页栈退役、双端一套 token 栈 + sentinel(316→235 行),5s 轮询统一骑第 0 页(offset 分页稳定窗口),i18n 死键清理;全量 120 文件/799 用例双跑 exit 0 |
+| hooks 门禁 + 杂项清偿包(批 11)| ✅ 完成(1 提交)| Biome hooks 正确性规则上线(25 处存量清偿、AcpConfigEditor 转 ref-as-prop、死 eslint-disable/幽灵 overrides/重复脚本清理)+ 08 杂项(F-B6 inspector WARNING 收进 summary tab、F-B9 overlay `.then` 防护、F-B10 核实批 6 已修)+ 07 杂项(共享 Spinner、MobileTabBar→RouterLink、member-picker 行 memo + 徽章归一);全量 120 文件/800 用例双跑 exit 0 |
 
 **已完成部分的实际收益(截至批 3)**:四道门禁全绿的测试规模 95→103 文件 / 611→686 用例;高危 bug 十项中**七项已修**(余三项在聊天域收拢内解决);错误呈现 5 种→1 种出口 + 2 处记录在案;轮询策略收敛(可见性门控、终态停轮、重连退避);预存竞态(fetchChannels 族)与三处无界缓存根治;swipe-back 的 UNSAFE_API + 冻结 hack 全部拆除。
 

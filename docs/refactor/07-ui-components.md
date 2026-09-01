@@ -2,7 +2,8 @@
 
 > **⚙ 实施进度标注(批 6 收口后)**
 - ✅ 已完成:死代码清单全部删除(tooltip/separator/command-timeline/CommandTerminal/MobileSidebar/variants 导出/Sheet 六档,`b0499db`);ModelCombobox portal 化(`75d844b`);text-danger ×13 + 裸色语义化(`4c2d37c`);TableHead 排序/resize 竞态与 Checkbox 冗余分支(`5bc9f90`)。
-- ✅ 批 6 完成:StatusBadge 五胞胎收敛为范型 + Badge 色调 `destructive`→`error` + `size="sm"`(词典与 Button size 清理 `5fdf8fa`);modal 壳层共享 `LAYER_BACKDROP_SET` + Title/Description 常量、弹层四复制收敛 positioned-popup、ModelCombobox portal prop(`da3f234`);Spinner 共享组件未做(F-D6);tabbar RouterLink 未做(F-2.6);Separator 决策落地——组件保持删除、`border-t border-control-border` 为成文惯例(AGENTS.md 已含组件 API 约定 9 条)。
+- ✅ 批 6 完成:StatusBadge 五胞胎收敛为范型 + Badge 色调 `destructive`→`error` + `size="sm"`(词典与 Button size 清理 `5fdf8fa`);modal 壳层共享 `LAYER_BACKDROP_SET` + Title/Description 常量、弹层四复制收敛 positioned-popup、ModelCombobox portal prop(`da3f234`);Separator 决策落地——组件保持删除、`border-t border-control-border` 为成文惯例(AGENTS.md 已含组件 API 约定 9 条)。
+- ✅ 批 11 完成:**Spinner 共享组件落地**(F-D6,`ui/spinner.tsx` cva size 词典 xs/sm/md/lg + 4 处点名消费端替换);MobileTabBar 换 RouterLink(F-2.6,语义锚点 + aria-current);member-picker 行 memo 化 + "joined" 手写徽章归一为 `Badge size="sm"`(F-D5 的 SearchInput 复用在更早批次已先行完成)。
 
 > 审查范围:`frontend/src/components/ui/` 全部 29 个源文件 + 10 个测试文件(ui 源码实计 2349 行),以及 `frontend/src/components/` 根目录全部 22 个 .tsx(2078 行,含 sidebar.tsx 514 行)。所有引用结论均在全仓库 grep 验证(含 pages/、app/、lib/、components/ 子目录)。技术栈:React 19.2 / Zustand 5 / @base-ui/react 1.3 / Tailwind 4 / Biome。
 
@@ -152,6 +153,7 @@ ui 目录是标准 shadcn 演化路径(Base UI 原语 + cva + cn),但内部分�
 
 **F-D6|低|Spinner 无共享组件**
 - `Loader2 + animate-spin` 独立出现在 `settings-page.tsx:16`、`agent-status-bar.tsx:87`、`ui/combobox.tsx:129`、`chat/member-picker.tsx`,size/色各异。建议 ui 增 `<Spinner size="sm|md">`。
+- ✅ 批 11 已修:`ui/spinner.tsx`(cva,`xs|sm|md|lg`,className 透传);四处点名消费端已替换,其余 40+ 处 `Loader2` 静态图标用法保持原样(非 spinner 语义,不属本项)。
 
 ---
 
@@ -234,7 +236,7 @@ asChild : 不引入(Radix 概念)。等价能力直接透传 Base UI 的 render 
 | 6 | **Checkbox 移除 onClick wrapper 分支** | 0.5h | 零(无消费方) | 消除 API 陷阱 |
 | 7 | **TableHead 排序/resize 竞态修复** | 0.5h | 低 | 消除可复现交互 bug |
 | 8 | **语义 token 清理**(bg-white/text-black/dark:;dark-bg/matrix-green 进 @theme;text-danger codemod ×13) | 2h | 低 | dark mode 正确性 |
-| 9 | **MobileTabBar 换 RouterLink**;member-picker 复用 SearchInput + 行 memo | 2h | 低 | a11y + 一致性 |
+| 9 | **MobileTabBar 换 RouterLink**;member-picker 复用 SearchInput + 行 memo | 2h | 低 | a11y + 一致性 |  ✅ 批 11(SearchInput 在更早批次;行 memo + 徽章归一随批)|
 | 10 | **Separator 去留决策**(删 vs 落实 20 处 border-t 替换) | 0.5h 决策 | 低 | 与 AGENTS.md 对齐 |
 
 > 分支切分建议:第 1、3、5、6、8、10 项纯机械替换可合并为单 PR;第 2、4 项动 portal 骨架,独立 PR 并手测三个嵌套场景(Dialog in Sheet / Select in Sheet / Combobox in Sheet)。

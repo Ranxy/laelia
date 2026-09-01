@@ -5,7 +5,8 @@
 - ✅ 批 6 完成:TimelineModel 归一(`b3c2644`:`lib/command-events-model.ts` 唯一 merge/kind/时间与状态语义,行键漂移根治,`command-event-kind.ts` 删除);preview 收敛(`16a10c8`:CommentsPanel 双胞胎合并 + FilePreviewShell + useHtmlPreviewBridge + F-B9/F-S2/F-S3/F-B10);ledger 虚拟化 + 100KB 截断 + 搜索防抖(`38f78af`);workspace 树扁平化虚拟化 + role=tree + 树内搜索(`a4dcabf`);activity 魔数(F-B7)与 workspace-file-panel t 依赖(F-B8)已修;inspector timing 死分支(F-D7)随迁。
 - ✅ 批 9 完成:proto `tool_call_id` 契约 + 全链路透传(`68e53a6`/`69396f8`:两个 ToolCall*Payload 增可选 `tool_call_id`;ToolCallSink 接口与 ACP 三帧、acp2 thread executor、pi executor 全部发射点透传 runtime id;interleaved/pi 测试钉死 ID 契约),前端配对改 ID 优先 + FIFO 兜底(`baf4167`:并发交错不再错配,断线缝隙丢 START、legacy 无 ID 仍走事件序兜底,pair 按 started 顺序输出)。
 - ✅ 批 10 完成:F-S8 双分页收敛(`29be54e`,产品拍板统一无限滚动)——activity-list 桌面 Prev/Next 分页栈退役,桌面/移动共用一套 token 栈 + IntersectionObserver sentinel;`useActivityPages` 去 `intervalIndex`,5s 轮询统一骑第 0 页(newest-first offset 分页下唯一稳定窗口,修掉轮询可见 offset 页的漂移隐患);`activity.page/prev/next` 三死键删除,测试改写为无限滚动三案。
-- ⏳ 未完成(留待后续):overview 真实时间轴与 span 上限(F-P4,依赖 model 后续演进);inspector WARNING 游离 tab 之外(F-B6);SidePanel 壳统一(F-S5);AgentSelect→Combobox(12 项)。
+- ✅ 批 11 完成:inspector WARNING 游离块收敛进 summary tab(F-B6,`activeTab === "summary"` 门控 + 回归用例);html overlay 两处 locate `.then` 补 unmount/换代防护(F-B9 尾款,桥内 drain 与 flash 清理批 6 已落);buildHtmlPreviewDoc 注入断言核实为批 6 `16a10c8` 已修(候选断言 + fragment 兜底 + 两个 spoof 单测)。
+- ⏳ 未完成(留待后续):overview 真实时间轴与 span 上限(F-P4,依赖 model 后续演进);SidePanel 壳统一(F-S5);AgentSelect→Combobox(12 项)。
 
 > 范围:`command-events/`(5 文件 1750 行)、`preview/`(6 文件 1470 行)、`agent/`(4 文件 796 行)、`activity/`(2 文件 575 行)、`workspace/`(3 文件 474 行)、`chat-events/`(3 文件 214 行),并对照 `components/chat/message-row.tsx`、`components/command-timeline.tsx`、`components/command-terminal.tsx`、`pages/dashboard/command-detail.tsx`(主消费者)、`stores/{command,preview,image-preview,activity,workspace}.ts`、`lib/{tool-call-events,html-file,command-status}.ts` 与 proto 契约 `proto/v1/v1/command.proto`。全部文件已完整阅读,未抽样;所有"无人引用"结论均经全仓 grep + git 历史验证。
 
@@ -206,6 +207,7 @@
 ### F-B6 【中】inspector 的 WARNING 条游离于 tab 机制之外,每个 tab 都重复渲染
 - **位置**:`command-event-inspector.tsx:553-557`:该块位于 tab 内容 switch 之外,WARNING 事件的 summary 与 raw tab 底部都会再出现一条告警横幅。
 - **建议**:作为 summary tab 的固定 section(类似 UsageOverview 的结构),或并入 `availableTabs` 的类型分支。
+- ✅ **批 11 已修**:块收敛为 `activeTab === "summary"` 门控,横幅只随 summary tab 呈现;inspector 用例新增"summary 显示/raw 不重复"回归。
 
 ### F-B7 【中】`activity-row.tsx:61` 魔数状态判断
 - **证据**:`const isDone = activity.state === 3; // ActivityState.DONE` —— 同文件开头已经在用 `Number(ActivityCategory.X)`(19-22),枚举就在 import 范围内却写了裸数字。
@@ -219,10 +221,12 @@
 - **位置**:`html-preview-overlay.tsx:126-142`(每次 locateQuote 挂 3s `setTimeout`,无 unmount 清理;`locateCbsRef` Map 不清空);`:287-298` `jumpToComment` 的 `.then` 无 cancelled 防护;`:149-153` flash 定时器同样无 unmount cleanup。
 - **后果**:卸载后偶发 setState(React 18+ 无害但脆弱);极端情况下跨文件预览的 locate 回调映射到新 document 的 epoch 校验上(由于 F-S3,同附件重开时 nonce/epoch 复用,老定时器解析出的 rect 会写入新会话的 `located`)。
 - **建议**:effect 式清理(一个 `useEffect` 管理挂起的 Map,卸载时逐个 resolve(null) 并 clear 所有 timer);jumpToComment 加本地 cancelled。
+- ✅ **批 11 收口**(主体批 6 `16a10c8` 已随桥收敛完成):桥内 drain(卸载/resetKey 换代时 resolve(null) + 清 timer)、flash 定时器卸载清理、aside 定位 cancelled 均已在桥/文件层;本批补 overlay 侧尾款——锚点跳转与 `jumpToComment` 的 `.then` 分别加 cancelled 与 mountedRef 防护。
 
 ### F-B10 【低】`buildHtmlPreviewDoc` 注入点可被注释欺骗,桥静默失效
 - **位置**:`lib/html-file.ts:308-325`:`/<html[\s>]/i.test(content)` 对 `<!-- <html> -->` 这类内容误判为完整文档;若同时无 `</head>`/`<body>`,script 被注入到第一处匹配(即注释内)→ 注释里的脚本不执行 → 预览静默丢失桥能力(无选中评论/无链接拦截)。
 - **建议**:注入后断言 `doc.includes(script)`(或对 regex 注入结果做 `data-ac-bridge` 存在性检查),失败时回退到 fragment 包裹分支;补该 case 的单测。
+- ✅ **批 6 已修**(`16a10c8`):候选注入逐个断言"script 落在注释之外"(`insideHtmlComment`),否则回退 fragment 包裹;`TestBuildHtmlPreviewDoc_CommentSpoofedTags`/`_CommentSpoofedHtmlNoHeadBody` 两个单测钉死该 case。批 11 复核确认无需追加。
 
 ### F-B11 【低】`tool-call.tsx` 的 `JSON.stringify` 无 BigInt 保护
 - **位置**:`chat-events/tool-call.tsx:83,107`;inspector 已为同类问题写了 `safeStringify`(`command-event-inspector.tsx:100-108`,注释明说 protobuf int64 是 BigInt)。
@@ -306,7 +310,7 @@
 | 8 | **ledger 虚拟化 + 输出行截断 + 搜索 debounce/索引** | command-event-ledger.tsx + toolbar | ~200 行 | 长会话可用性关键 | 性价比最高的性能项 |
 | 9 | **overview 改真实时间轴 + span 上限**(≥500 截断) | command-event-timeline-overview.tsx | ~120 行 | 修语义失真 + DOM 规模 | 依赖 #4 |
 | 10 | **workspace 树虚拟化 + a11y + 树内搜索** | workspace-tree.tsx | ~150 行 | 大工作区可用性 | 中等规模收益 |
-| 11 | **杂项修复包**:activity 魔数/可见性/双分页收敛(✅ 批 6 F-B7 + 批 8 迁 Query + 批 10 `29be54e` 收敛)、workspace-file-panel `t` 依赖(✅ 批 6 F-B8)、inspector WARNING 游离块、buildHtmlPreviewDoc 注入断言、locate 定时器清理 | §5 各条 | ~80 行 | 各自独立小修 | 批量清偿 |
+| 11 | **杂项修复包**:activity 魔数/可见性/双分页收敛(✅ 批 6 F-B7 + 批 8 迁 Query + 批 10 `29be54e` 收敛)、workspace-file-panel `t` 依赖(✅ 批 6 F-B8)、inspector WARNING 游离块(✅ 批 11)、buildHtmlPreviewDoc 注入断言(✅ 批 6 `16a10c8`)、locate 定时器清理(✅ 批 6 桥内 drain + 批 11 overlay `.then` 防护) | §5 各条 | ~80 行 | 各自独立小修 | ✅ 全部清偿 |
 | 12 | **AgentSelect → Combobox;toolbar → SearchInput;SidePanel 壳统一** | agent-team-form.tsx、toolbar、inspector/aside | ~200 行 | 规范对齐 + a11y | 视 UI 改版档期 |
 
 **不建议做的**:为 activity 桌面分页补齐更多能力(✅ 已被批 10 收敛取代:统一无限滚动,分页方案不复存在);给 chat 侧 message-row 大改(其 memo 结构已较成熟,属另一章范围)。

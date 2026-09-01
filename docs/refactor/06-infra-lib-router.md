@@ -1,8 +1,8 @@
 # Laelia Frontend 深度审查报告:基础设施 / connect / router / app 布局层
 
 > **⚙ 实施进度标注(批 3 收口后)**
-- ✅ 已完成:P0 首项(冻结删除)+ Rt-05(UNSAFE_RouteContext 退役,`d4774c3`);错误映射单点化 connect/toast-errors(`389ce97`);agent-token 并入 machine-token、command-status 部分拆解、4 个死导出清理(`b0499db`);chat-layout/machines/machine-profile 轮询转 usePolling(`acb701d`);AGENTS.md 幽灵引用修正。
-- ⏳ 未完成:lib 整形余项(command-status 拆 format/resource、三缓存合一、toast.ts 去 Base UI 私有接口);路由名 satisfies 缝合与 handle.permission;Biome 正确性规则;tsconfig 覆盖 sw;PWA reload 护栏;useEdgeDragToClose 手势合并;resolvePath→generatePath。
+- ✅ 已完成:P0 首项(冻结删除)+ Rt-05(UNSAFE_RouteContext 退役,`d4774c3`);错误映射单点化 connect/toast-errors(`389ce97`);agent-token 并入 machine-token、command-status 部分拆解、4 个死导出清理(`b0499db`);chat-layout/machines/machine-profile 轮询转 usePolling(`acb701d`);AGENTS.md 幽灵引用修正;tsconfig 覆盖 sw/vitest(批 6 `d8c8e46`);**Biome hooks 正确性规则启用 + 存量全清偿 + 幽灵 overrides(批 11)**。
+- ⏳ 未完成:lib 整形余项(command-status 拆 format/resource、三缓存合一、toast.ts 去 Base UI 私有接口);路由名 satisfies 缝合与 handle.permission;useEdgeDragToClose 手势合并;resolvePath→generatePath。
 
 > **决策状态更新**:本报告 P0 首项(废除 `suppressLoadingFlags` 全局冻结)与 Rt-05(UNSAFE_RouteContext)已由总报告 **ADR-2 拍板**:`use-preview-routes.tsx` 整体退役、冻结删除、swipe-back 保留手势识别仅重写提交阶段(复核 `replace: true` 历史语义,Rt-05/B-04/B-01 一并解决);错误映射单点化(connect/errors.ts)维持 P0 不变。
 
@@ -227,6 +227,7 @@ grep 统计的"被引用文件数"(不含 lib 自身与测试):
 - 位置:`biome.json:203-212`(overrides 指向 `src/shims-3rd-party.d.ts` 与 `vite-plugin-export-csp-hashes.ts`,两文件均已不存在;实际遗留的是 `src/shims-css.d.ts` 未列入)
 - 另:`biome.json:2` schema 版本 2.5.0 高于 devDependency `@biomejs/biome ^2.4.14`;`linter.preset: "none"` 显式 opt-in 30+ 规则但**漏掉了 `useExhaustiveDependencies`/hooks 系列正确性规则**(与 R-06 呼应;`avatar-cache.ts:187`、`use-auto-scroll.ts:17`、`thread-panel.tsx:1186` 等依赖数组 hack 全部无守卫)。
 - 建议:schema 与版本对齐;overrides 清单巡检;开启 biome 的 hooks 系列正确性规则(需要先修复存量)。
+- ✅ **批 11 已修**:ts/tsx override 开启 `useExhaustiveDependencies` + `useHookAtTopLevel`,25 处存量当场清偿(真漏依赖 6 处补齐;惯用法 reset/keyed effect 以单行 `biome-ignore` 带理由固化;`AcpConfigEditor` 的 `memo(forwardRef(fn))` 退役为 ref-as-prop,连带 comments-panel 一处条件 hook 正本清源);profile 页 5 处 no-op `eslint-disable` 全删;overrides 幽灵条目删除、`shims-css.d.ts` 补入;`package.json` 的 `biome:lint`/`lint` 重复脚本去重。核查更正:schema 2.5.0 与实装 biome 2.5.0 本就一致(audit 时读的是 ^2.4.14 范围)。
 
 **【中】E-04 PWA 更新策略的已知坑(质量总评良好,两处易忽视的风险)**
 - 位置:`sw/sw.ts:31-57`(precache 顺序注释正确,network-first navigation)+ `pwa.ts:36-55`
@@ -372,11 +373,11 @@ src/
 | **P1** | 修复 avatar/image 缓存三竞态:invalidate 后写回、useAvatar stale URL、加容量上限 | 中 | 用户可见 bug(串头像/跨会话残留)+ 顺带引入统一 cache 工具 | avatar-cache.ts:73-96,164-188;image-blob-cache.ts:30-47 |
 | **P1** | lib 目录整形:agent-token 并入 machine-token、command-status 拆 format/resource、hooks 合并到单一目录、toast 去 Base UI 私有接口依赖 | 中 | 纯机械重构;为"真正的 lib"立规(禁 import stores) | agent-token/command-status/toast/composables |
 | **P1** | 路由名三合一:handles + dashboard.handle + ROUTE_INFO 用 `satisfies` 缝合,backTo 改名常量;handle 加 permission 权限守卫 | 中 | 防以后每次加页面的双份维护;低风险 | handles.ts、route-info.ts、routes/dashboard.tsx |
-| **P1** | 开启 Biome React 正确性规则(useExhaustiveDependencies 等),同步清理 4 处 no-op eslint-disable | 中 | 当前 deps 数组类 bug 零防护;一次性修复量可控 | biome.json:24-67 |
+| **P1** | 开启 Biome React 正确性规则(useExhaustiveDependencies 等),同步清理 4 处 no-op eslint-disable | 中 | 当前 deps 数组类 bug 零防护;一次性修复量可控 | biome.json:24-67 | ✅ 批 11 |
 | **P2** | 手势收敛:`useEdgeDragToClose` 合并 use-swipe-back(thread 模式)与 use-swipe-to-close-sheet;决策是否退役 preview 克隆(UNSAFE_RouteContext) | 中 | -900 行复杂度;可与 P0 联动 | use-swipe-back.ts、use-swipe-to-close-sheet.ts、use-preview-routes.tsx |
 | **P2** | 布局适配单点:useAppShell(desktop/mobile 壳),收敛 21 文件 useIsDesktop + 2 处断点定义 | 中 | 断点语义漂移防患;渐进可行 | use-is-desktop.ts、tailwind.css:10-16 |
 | **P2** | 工程清障:tailwind.config.js 迁 @theme 删除、tsconfig 补 sw/vitest 覆盖、biome.json 幽灵条目+schema 对齐、allowedHosts 进 env | 高(配置债)| 一次 PR 解决,后续自文档化 | tailwind.config.js、sw/sw.ts、biome.json:203-212、vite.config.ts:95 |
-| **P3** | 死代码清扫:4 个死导出、双 member-picker、双 slugify、2 处 raw 色、package.json 脚本 dup、`user-scalable=no` | 低 | 纯删除;随手可做 | 见第七章表格 |
+| **P3** | 死代码清扫:4 个死导出、双 member-picker、双 slugify、2 处 raw 色、package.json 脚本 dup、`user-scalable=no` | 低 | 纯删除;随手可做 | 见第七章表格 | ✅ 脚本 dup 批 11 |
 | **P3** | PWA reload 加用户可见性护栏(编辑态延后)+ push suppressedRoute 多 tab 语义 | 中 | 低频但伤信任;改动小 | pwa.ts:38-44、sw/sw.ts:62-80 |
 
 ---
