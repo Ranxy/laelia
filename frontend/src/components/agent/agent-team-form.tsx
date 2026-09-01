@@ -1,5 +1,4 @@
-import { ChevronDown, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Avatar } from "@/components/chat/avatar";
 import { Card } from "@/components/profile-common";
@@ -290,6 +289,10 @@ function EditMemberRow({
   );
 }
 
+// AgentSelect is the member row's agent picker: a plain single-select over a
+// known list, so it builds on the shared Select primitive (portal, outside
+// click, keyboard and ARIA wiring) instead of a hand-rolled popup. The row's
+// own agent stays selectable while the other rows' agents are excluded.
 function AgentSelect({
   agents,
   value,
@@ -302,90 +305,66 @@ function AgentSelect({
   onChange: (agentName: string) => void;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: MouseEvent) {
-      if (!containerRef.current?.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [open]);
-
-  const selected = agents.find((a) => `agents/${a.handle}` === value);
   const available = agents.filter(
     (a) =>
       !exclude.includes(`agents/${a.handle}`) || `agents/${a.handle}` === value
   );
 
   return (
-    <div ref={containerRef} className="relative min-w-0 flex-1">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full min-w-0 items-center gap-2 rounded-md border border-control-border bg-transparent px-3 py-2 text-left text-sm hover:bg-control-bg"
-      >
-        {selected ? (
-          <AgentOptionContent agent={selected} />
+    <Select value={value} onValueChange={(v) => v && onChange(v)}>
+      <SelectTrigger className="w-full">
+        <SelectValue>
+          {(current: string | null) => {
+            const selected = agents.find(
+              (a) => `agents/${a.handle}` === current
+            );
+            return selected ? (
+              <AgentNameContent agent={selected} />
+            ) : (
+              <span className="text-control-placeholder">
+                {t("settings.agentTeams.select-agent")}
+              </span>
+            );
+          }}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {available.length === 0 ? (
+          <p className="px-3 py-2 text-xs text-control-placeholder">
+            {t("settings.agentTeams.no-agents")}
+          </p>
         ) : (
-          <span className="text-control-placeholder">
-            {t("settings.agentTeams.select-agent")}
-          </span>
+          available.map((agent) => (
+            <SelectItem key={agent.name} value={`agents/${agent.handle}`}>
+              <AgentOptionRow agent={agent} />
+            </SelectItem>
+          ))
         )}
-        <ChevronDown className="ml-auto size-4 shrink-0 text-control-light" />
-      </button>
-      {open && (
-        <div className="absolute left-0 right-0 z-30 mt-1 max-h-60 overflow-auto rounded-lg border border-control-border bg-background py-1 shadow-md">
-          {available.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-control-placeholder">
-              {t("settings.agentTeams.no-agents")}
-            </div>
-          ) : (
-            available.map((agent) => (
-              <AgentOption
-                key={agent.name}
-                agent={agent}
-                selected={`agents/${agent.handle}` === value}
-                onSelect={() => {
-                  onChange(`agents/${agent.handle}`);
-                  setOpen(false);
-                }}
-              />
-            ))
-          )}
-        </div>
-      )}
-    </div>
+      </SelectContent>
+    </Select>
   );
 }
 
-function AgentOption({
-  agent,
-  selected,
-  onSelect,
-}: {
-  agent: AgentSummary;
-  selected: boolean;
-  onSelect: () => void;
-}) {
+function AgentNameContent({ agent }: { agent: AgentSummary }) {
+  const avatarSrc = useAvatar(avatarNameForAgentId(agent.handle || ""));
+  return (
+    <span className="flex min-w-0 items-center gap-3">
+      <span className="size-6 shrink-0">
+        <Avatar seed={agent.handle || agent.name} src={avatarSrc} size={6} />
+      </span>
+      <span className="truncate text-main">{agent.title || agent.handle}</span>
+    </span>
+  );
+}
+
+function AgentOptionRow({ agent }: { agent: AgentSummary }) {
   const { t } = useTranslation();
   const avatarSrc = useAvatar(avatarNameForAgentId(agent.handle || ""));
   return (
-    <button
-      type="button"
-      onMouseDown={(e) => {
-        e.preventDefault();
-        onSelect();
-      }}
-      className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-control-bg"
-    >
-      <div className="size-6 shrink-0">
+    <span className="flex min-w-0 items-center gap-3">
+      <span className="size-6 shrink-0">
         <Avatar seed={agent.handle || agent.name} src={avatarSrc} size={6} />
-      </div>
+      </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-main">
           {agent.title || agent.handle}
@@ -396,22 +375,9 @@ function AgentOption({
           </span>
         )}
       </span>
-      {selected && <X className="size-3.5 shrink-0 text-control-light" />}
       <span className="shrink-0 rounded bg-control-bg px-1.5 py-0.5 text-[10px] font-medium text-control">
         {t("chat.agent")}
       </span>
-    </button>
-  );
-}
-
-function AgentOptionContent({ agent }: { agent: AgentSummary }) {
-  const avatarSrc = useAvatar(avatarNameForAgentId(agent.handle || ""));
-  return (
-    <span className="flex min-w-0 items-center gap-3">
-      <div className="size-6 shrink-0">
-        <Avatar seed={agent.handle || agent.name} src={avatarSrc} size={6} />
-      </div>
-      <span className="truncate text-main">{agent.title || agent.handle}</span>
     </span>
   );
 }
