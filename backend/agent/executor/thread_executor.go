@@ -488,8 +488,9 @@ func (e *ThreadExecutor) handleEvent(ev acp2.Event) bool {
 			Type:    v1pb.CommandEventType_TOOL_CALL_STARTED,
 			Summary: title,
 			ToolCallStarted: &v1pb.ToolCallStartedPayload{
-				Title:    title,
-				RawInput: toolPayloadStruct(ev.ToolCall.Input),
+				ToolCallId: ev.ToolCall.ID,
+				Title:      title,
+				RawInput:   toolPayloadStruct(ev.ToolCall.Input),
 			},
 		})
 	case acp2.EventToolCallFinished:
@@ -499,8 +500,9 @@ func (e *ThreadExecutor) handleEvent(ev acp2.Event) bool {
 			Type:    v1pb.CommandEventType_TOOL_CALL_FINISHED,
 			Summary: ev.ToolCall.Status,
 			ToolCallFinished: &v1pb.ToolCallFinishedPayload{
-				Status:    ev.ToolCall.Status,
-				RawOutput: toolPayloadStruct(ev.ToolCall.Output),
+				ToolCallId: ev.ToolCall.ID,
+				Status:     ev.ToolCall.Status,
+				RawOutput:  toolPayloadStruct(ev.ToolCall.Output),
 			},
 		})
 	case acp2.EventWarning:

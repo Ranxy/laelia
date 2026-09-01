@@ -14,12 +14,14 @@ type ToolCallSink interface {
 	// title recorded at the create and ok=true; ok=false if a STARTED was
 	// already emitted (subsequent updates must not re-emit).
 	BeginStarted(id string) (storedTitle string, ok bool)
-	// EmitStarted emits a TOOL_CALL_STARTED event. source is the originating
-	// frame ("create"/"update"/"status_update") for debug logging only.
-	EmitStarted(title string, rawIn *structpb.Struct, source string)
-	// EmitFinished emits a TOOL_CALL_FINISHED event with the terminal status
-	// and raw output.
-	EmitFinished(status string, rawOut *structpb.Struct)
+	// EmitStarted emits a TOOL_CALL_STARTED event. id is the runtime tool call
+	// id carried into the payload so the frontend can pair it with the matching
+	// FINISHED; source is the originating frame ("create"/"update"/
+	// "status_update") for debug logging only.
+	EmitStarted(id, title string, rawIn *structpb.Struct, source string)
+	// EmitFinished emits a TOOL_CALL_FINISHED event with the runtime tool call
+	// id, terminal status, and raw output.
+	EmitFinished(id, status string, rawOut *structpb.Struct)
 	// Payload converts an ACP RawInput/RawOutput value into the protobuf Struct
 	// stored on the event, or nil when the value is empty/{}.
 	Payload(in any) *structpb.Struct
@@ -64,7 +66,7 @@ func (DefaultAdapter) OnCreate(s ToolCallSink, call *acp.SessionUpdateToolCall) 
 		return
 	}
 	if _, ok := s.BeginStarted(string(call.ToolCallId)); ok {
-		s.EmitStarted(call.Title, rawIn, "create")
+		s.EmitStarted(string(call.ToolCallId), call.Title, rawIn, "create")
 	}
 }
 
@@ -84,7 +86,7 @@ func (DefaultAdapter) OnContentUpdate(s ToolCallSink, upd *acp.SessionToolCallUp
 	if upd.Title != nil && *upd.Title != "" {
 		title = *upd.Title
 	}
-	s.EmitStarted(title, rawIn, "update")
+	s.EmitStarted(string(upd.ToolCallId), title, rawIn, "update")
 }
 
 func (DefaultAdapter) OnStatusUpdate(s ToolCallSink, upd *acp.SessionToolCallUpdate) {
@@ -100,10 +102,10 @@ func (DefaultAdapter) OnStatusUpdate(s ToolCallSink, upd *acp.SessionToolCallUpd
 		if upd.Title != nil && *upd.Title != "" {
 			title = *upd.Title
 		}
-		s.EmitStarted(title, s.Payload(upd.RawInput), "status_update")
+		s.EmitStarted(string(upd.ToolCallId), title, s.Payload(upd.RawInput), "status_update")
 	}
 	if isTerminalStatus(status) {
-		s.EmitFinished(status, s.Payload(upd.RawOutput))
+		s.EmitFinished(string(upd.ToolCallId), status, s.Payload(upd.RawOutput))
 	}
 }
 

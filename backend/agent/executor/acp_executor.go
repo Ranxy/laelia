@@ -244,19 +244,20 @@ func (e *ACPExecutor) BeginStarted(id string) (string, bool) { return e.beginToo
 
 // EmitStarted emits a TOOL_CALL_STARTED event. provider.ToolCallSink wrapper
 // over emitToolCallStarted.
-func (e *ACPExecutor) EmitStarted(title string, rawIn *structpb.Struct, source string) {
-	e.emitToolCallStarted(title, rawIn, source)
+func (e *ACPExecutor) EmitStarted(id, title string, rawIn *structpb.Struct, source string) {
+	e.emitToolCallStarted(id, title, rawIn, source)
 }
 
-// EmitFinished emits a TOOL_CALL_FINISHED event with the terminal status and
-// raw output. provider.ToolCallSink wrapper.
-func (e *ACPExecutor) EmitFinished(status string, rawOut *structpb.Struct) {
+// EmitFinished emits a TOOL_CALL_FINISHED event with the runtime tool call id,
+// terminal status, and raw output. provider.ToolCallSink wrapper.
+func (e *ACPExecutor) EmitFinished(id, status string, rawOut *structpb.Struct) {
 	e.sendEvent(Event{
 		Type:    v1pb.CommandEventType_TOOL_CALL_FINISHED,
 		Summary: status,
 		ToolCallFinished: &v1pb.ToolCallFinishedPayload{
-			Status:    status,
-			RawOutput: rawOut,
+			ToolCallId: id,
+			Status:     status,
+			RawOutput:  rawOut,
 		},
 	})
 }
@@ -747,17 +748,18 @@ func (e *ACPExecutor) beginToolCallStarted(id string) (title string, ok bool) {
 // emitToolCallStarted emits one TOOL_CALL_STARTED event for the given tool call
 // and (when debug logging is on) records the source frame and the captured
 // input so the deferred-emission logic is observable from the agent logs.
-func (e *ACPExecutor) emitToolCallStarted(title string, rawIn *structpb.Struct, source string) {
+func (e *ACPExecutor) emitToolCallStarted(id, title string, rawIn *structpb.Struct, source string) {
 	e.toolCallCount.Add(1)
 	if debugToolCalls {
-		slog.Info("acp tool_call_started emitted", "source", source, "title", title, "rawInput", toJSONString(rawIn))
+		slog.Info("acp tool_call_started emitted", "source", source, "id", id, "title", title, "rawInput", toJSONString(rawIn))
 	}
 	e.sendEvent(Event{
 		Type:    v1pb.CommandEventType_TOOL_CALL_STARTED,
 		Summary: title,
 		ToolCallStarted: &v1pb.ToolCallStartedPayload{
-			Title:    title,
-			RawInput: rawIn,
+			ToolCallId: id,
+			Title:      title,
+			RawInput:   rawIn,
 		},
 	})
 }

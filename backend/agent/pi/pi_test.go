@@ -542,6 +542,9 @@ done:
 	assert.Equal(t, "echo hi", events[0].ToolCallStarted.Title)
 	assert.Equal(t, v1pb.CommandEventType_TOOL_CALL_FINISHED, events[1].Type)
 	assert.Equal(t, "success", events[1].ToolCallFinished.Status)
+	// The runtime tool call id must reach both payloads for id-based pairing.
+	assert.Equal(t, "tc-1", events[0].ToolCallStarted.ToolCallId)
+	assert.Equal(t, "tc-1", events[1].ToolCallFinished.ToolCallId)
 	require.Len(t, outputs, 1, "buffered text_delta flushed as one STDOUT chunk")
 	assert.Equal(t, v1pb.CommandOutput_STDOUT, outputs[0].StreamType)
 	assert.Equal(t, "hello", outputs[0].Content)

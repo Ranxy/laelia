@@ -509,8 +509,9 @@ func (e *PiExecutor) handleToolStart(ev *event) {
 		Type:    v1pb.CommandEventType_TOOL_CALL_STARTED,
 		Summary: title,
 		ToolCallStarted: &v1pb.ToolCallStartedPayload{
-			Title:    title,
-			RawInput: rawJSONToStruct(ev.Args),
+			ToolCallId: ev.ToolCallID,
+			Title:      title,
+			RawInput:   rawJSONToStruct(ev.Args),
 		},
 	})
 }
@@ -528,8 +529,9 @@ func (e *PiExecutor) handleToolEnd(ev *event) {
 		Type:    v1pb.CommandEventType_TOOL_CALL_FINISHED,
 		Summary: status,
 		ToolCallFinished: &v1pb.ToolCallFinishedPayload{
-			Status:    status,
-			RawOutput: rawJSONToStruct(ev.Result),
+			ToolCallId: ev.ToolCallID,
+			Status:     status,
+			RawOutput:  rawJSONToStruct(ev.Result),
 		},
 	})
 }
