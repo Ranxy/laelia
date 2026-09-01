@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildRouteNameIndex,
   resolvePath,
@@ -41,5 +41,28 @@ describe("dashboard route-name index", () => {
     expect(
       resolvePath("reminder.detail", { agentId: "abc", reminderId: "7" })
     ).toBe("/members/agents/abc/reminders/7");
+  });
+
+  it("encodes params and appends the query string", () => {
+    expect(
+      resolvePath(
+        "command.detail",
+        { agentId: "agents/x", commandId: "a/b" },
+        { tab: "summary", q: "a b" }
+      )
+    ).toBe("/members/agents/agents%2Fx/commands/a%2Fb?tab=summary&q=a+b");
+  });
+
+  it("falls back to / for an unregistered name", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(resolvePath("no.such.route")).toBe("/");
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
+  it("throws when a required param is missing instead of leaving :id in the URL", () => {
+    expect(() => resolvePath("command.detail", { agentId: "abc" })).toThrow(
+      /Missing ":commandId" param/
+    );
   });
 });

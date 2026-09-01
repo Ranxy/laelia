@@ -1,4 +1,4 @@
-import type { RouteObject } from "react-router-dom";
+import { generatePath, type RouteObject } from "react-router-dom";
 
 let nameIndex = new Map<string, string>();
 
@@ -69,14 +69,16 @@ export function resolvePath(
   }
   let path = pattern;
   if (params) {
+    // generatePath is react-router's native pattern compiler (06 Rt-03):
+    // unlike the hand-rolled :param regex it supports splat and optional
+    // segments, and fails loudly (instead of leaving ":id" in the URL) when a
+    // required param is missing.
+    const single: Record<string, string> = {};
     for (const [key, value] of Object.entries(params)) {
       if (value === undefined) continue;
-      const single = Array.isArray(value) ? (value[0] ?? "") : value;
-      path = path.replace(
-        new RegExp(`:${key}(?![A-Za-z0-9_])`, "g"),
-        encodeURIComponent(single)
-      );
+      single[key] = Array.isArray(value) ? (value[0] ?? "") : value;
     }
+    path = generatePath(pattern, single);
   }
   if (query) {
     const qs = buildSearchString(query);
