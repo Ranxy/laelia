@@ -1,10 +1,50 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/forms";
 
-/*
-  Colors for dark theme
-  Only used by Web Terminal now
-*/
-@config "../../../tailwind.config.js";
+/* App semantic colors and the font stack, migrated from the v3-era
+   tailwind.config.js (audit 06 E-01 — the config file and its @config load
+   are gone; half of that file was already dead v3 syntax). Token values
+   reference the raw RGB triplets defined in :root below, so hand-written CSS
+   can still compose alpha directly via rgb(var(--rgb-x) / a); utilities get
+   full colors and use color-mix for opacity modifiers. */
+@theme {
+  --color-accent: rgb(var(--rgb-accent));
+  --color-accent-disabled: rgb(var(--rgb-accent-disabled));
+  --color-accent-hover: rgb(var(--rgb-accent-hover));
+  --color-accent-text: rgb(var(--rgb-accent-text));
+  --color-main: rgb(var(--rgb-main));
+  --color-main-hover: rgb(var(--rgb-main-hover));
+  --color-main-text: rgb(var(--rgb-main-text));
+  --color-control: rgb(var(--rgb-control));
+  --color-control-hover: rgb(var(--rgb-control-hover));
+  --color-control-light: rgb(var(--rgb-control-light));
+  --color-control-light-hover: rgb(var(--rgb-control-light-hover));
+  --color-control-bg: rgb(var(--rgb-control-bg));
+  --color-control-bg-hover: rgb(var(--rgb-control-bg-hover));
+  --color-control-placeholder: rgb(var(--rgb-control-placeholder));
+  --color-control-border: rgb(var(--rgb-control-border));
+  --color-block-border: rgb(var(--rgb-block-border));
+  --color-info: rgb(var(--rgb-info));
+  --color-info-hover: rgb(var(--rgb-info-hover));
+  --color-warning: rgb(var(--rgb-warning));
+  --color-warning-hover: rgb(var(--rgb-warning-hover));
+  --color-error: rgb(var(--rgb-error));
+  --color-error-hover: rgb(var(--rgb-error-hover));
+  --color-success: rgb(var(--rgb-success));
+  --color-success-hover: rgb(var(--rgb-success-hover));
+  --color-link-hover: rgb(var(--rgb-link-hover));
+  --color-background: rgb(var(--rgb-background));
+  --color-overlay: rgb(var(--rgb-overlay));
+  /* Web Terminal surface (used by the context usage bar). */
+  --color-dark-bg: rgb(var(--rgb-dark-bg));
+
+  /* Tailwind v3's default sans stack — the v3 config pinned it explicitly,
+     so keep the same families now that the config is gone. */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
 
 /* Installed PWA windows can be narrower than the desktop breakpoint even on
    desktop hardware. Treat a standalone app on a desktop-class device (fine
@@ -131,80 +171,75 @@
 @layer base {
   :root {
     /* indigo-600 */
-    --color-accent: 79 70 229; /* #4f46e5 */
+    --rgb-accent: 79 70 229; /* #4f46e5 */
     /* indigo-300 */
-    --color-accent-disabled: 165 180 252; /* #a5b4fc */
+    --rgb-accent-disabled: 165 180 252; /* #a5b4fc */
     /* indigo-800 */
-    --color-accent-hover: 55 48 163; /* #3730a3 */
+    --rgb-accent-hover: 55 48 163; /* #3730a3 */
     /* white */
-    --color-accent-text: 255 255 255; /* #ffffff */
+    --rgb-accent-text: 255 255 255; /* #ffffff */
 
     /* gray-900 */
-    --color-main: 24 24 27; /* #18181b */
+    --rgb-main: 24 24 27; /* #18181b */
     /* gray-700 */
-    --color-main-hover: 63 63 70; /* #3f3f46 */
+    --rgb-main-hover: 63 63 70; /* #3f3f46 */
     /* white */
-    --color-main-text: 255 255 255; /* #ffffff */
+    --rgb-main-text: 255 255 255; /* #ffffff */
 
     /* gray-700 */
-    --color-control: 82 82 91; /* #52525b */
+    --rgb-control: 82 82 91; /* #52525b */
     /* gray-900 */
-    --color-control-hover: 24 24 27; /* #18181b */
+    --rgb-control-hover: 24 24 27; /* #18181b */
 
     /* gray-500 */
-    --color-control-light: 113 113 122; /* #71717a */
+    --rgb-control-light: 113 113 122; /* #71717a */
     /* gray-600 */
-    --color-control-light-hover: 82 82 91; /* #52525b */
+    --rgb-control-light-hover: 82 82 91; /* #52525b */
 
     /* gray-100 */
-    --color-control-bg: 243 244 246; /* #f3f4f6 */
+    --rgb-control-bg: 243 244 246; /* #f3f4f6 */
     /* gray-200 */
-    --color-control-bg-hover: 229 231 235; /* #e5e7eb */
+    --rgb-control-bg-hover: 229 231 235; /* #e5e7eb */
 
     /* gray-400 */
-    --color-control-placeholder: 161 161 170; /* #a1a1aa */
+    --rgb-control-placeholder: 161 161 170; /* #a1a1aa */
 
     /* blue-600 */
-    --color-info: 37 99 235; /* #2563eb */
+    --rgb-info: 37 99 235; /* #2563eb */
     /* blue-700 */
-    --color-info-hover: 29 78 216; /* #1d4ed8 */
+    --rgb-info-hover: 29 78 216; /* #1d4ed8 */
 
     /* yellow-500 */
-    --color-warning: 245 158 11; /* #f59e0b */
+    --rgb-warning: 245 158 11; /* #f59e0b */
     /* yellow-700 */
-    --color-warning-hover: 180 83 9; /* #b45309 */
+    --rgb-warning-hover: 180 83 9; /* #b45309 */
 
     /* red-600 */
-    --color-error: 220 38 38; /* #dc2626 */
+    --rgb-error: 220 38 38; /* #dc2626 */
     /* red-700 */
-    --color-error-hover: 185 28 28; /* #b91c1c */
+    --rgb-error-hover: 185 28 28; /* #b91c1c */
 
     /* green-600 */
-    --color-success: 22 163 74; /* #16a34a */
+    --rgb-success: 22 163 74; /* #16a34a */
     /* green-700 */
-    --color-success-hover: 21 128 61; /* #15803d */
+    --rgb-success-hover: 21 128 61; /* #15803d */
 
     /* gray-200 */
-    --color-link-hover: 229 231 235; /* #e5e7eb */
+    --rgb-link-hover: 229 231 235; /* #e5e7eb */
 
     /* gray-200 */
-    --color-block-border: 229 231 235; /* #e5e7eb */
+    --rgb-block-border: 229 231 235; /* #e5e7eb */
     /* gray-300 */
-    --color-control-border: 209 213 219; /* #d1d5db */
+    --rgb-control-border: 209 213 219; /* #d1d5db */
 
     /* white - page/card/panel background */
-    --color-background: 255 255 255; /* #ffffff */
+    --rgb-background: 255 255 255; /* #ffffff */
     /* black - overlay backdrop, use with opacity e.g. bg-overlay/50 */
-    --color-overlay: 0 0 0; /* #000000 */
+    --rgb-overlay: 0 0 0; /* #000000 */
   }
   :root {
     /* same as vs-dark theme's bg, not pure black. */
-    --color-dark-bg: 30 30 30; /* #1e1e1e */
-
-    /* The Matrix green */
-    --color-matrix-green: 0 204 0; /* #00cc00 */
-    /* The matrix green lighter */
-    --color-matrix-green-hover: 136 255 136; /* #88ff88 */
+    --rgb-dark-bg: 30 30 30; /* #1e1e1e */
   }
   :root {
     /* Mobile native-app shell dimensions. */
@@ -516,7 +551,7 @@ body[data-bb-screenshot-active] [data-screenshot-hide] {
 }
 .markstream-chat code {
   font-size: 0.85em;
-  background: rgb(var(--color-control-bg-hover));
+  background: var(--color-control-bg-hover);
   padding: 0.15em 0.35em;
   border-radius: 4px;
   font-family: ui-monospace, monospace;
@@ -532,10 +567,10 @@ body[data-bb-screenshot-active] [data-screenshot-hide] {
   font-size: 0.85em;
 }
 .markstream-chat blockquote {
-  border-left: 3px solid rgb(var(--color-control-border));
+  border-left: 3px solid var(--color-control-border);
   margin: 0.5em 0;
   padding: 0.25em 0 0.25em 1em;
-  color: rgb(var(--color-control-light));
+  color: var(--color-control-light);
 }
 .markstream-chat table {
   width: 100%;
@@ -545,16 +580,16 @@ body[data-bb-screenshot-active] [data-screenshot-hide] {
 }
 .markstream-chat th,
 .markstream-chat td {
-  border: 1px solid rgb(var(--color-control-border));
+  border: 1px solid var(--color-control-border);
   padding: 0.4em 0.65em;
   text-align: left;
 }
 .markstream-chat th {
-  background: rgb(var(--color-control-bg));
+  background: var(--color-control-bg);
   font-weight: 600;
 }
 .markstream-chat a {
-  color: rgb(var(--color-info));
+  color: var(--color-info);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -566,16 +601,16 @@ body[data-bb-screenshot-active] [data-screenshot-hide] {
   align-items: center;
   padding: 0.125rem 0.25rem;
   border-radius: 0.25rem;
-  background-color: rgb(var(--color-accent) / 0.15);
-  color: rgb(var(--color-accent));
+  background-color: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  color: var(--color-accent);
   font-weight: 500;
   cursor: pointer;
 }
 .markstream-chat .mention-chip:hover {
-  background-color: rgb(var(--color-accent) / 0.25);
+  background-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
 }
 .markstream-chat hr {
   border: none;
-  border-top: 1px solid rgb(var(--color-control-border));
+  border-top: 1px solid var(--color-control-border);
   margin: 1em 0;
 }

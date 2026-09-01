@@ -504,7 +504,7 @@ function LedgerTable({
                     "grid grid-cols-[150px_minmax(0,1fr)] border-b border-control-border/60 transition-colors",
                     "hover:bg-control-bg/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
                     selected &&
-                      "bg-accent/5 shadow-[inset_3px_0_0_0_rgb(var(--color-accent))]",
+                      "bg-accent/5 shadow-[inset_3px_0_0_0_var(--color-accent)]",
                     rangeKeySet && !rangeKeySet.has(row.key) && "opacity-30"
                   )}
                 >

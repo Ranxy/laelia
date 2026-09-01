@@ -15,11 +15,11 @@ function hash32(str: string): number {
 // the CSS color vars so the identicon stays visually consistent with the rest
 // of the UI and adapts if a dark theme is introduced.
 const PALETTE = [
-  "rgb(var(--color-accent))", // #4f46e5 indigo-600
-  "rgb(var(--color-accent-hover))", // #3730a3 indigo-800
-  "rgb(var(--color-accent-disabled))", // #a5b4fc indigo-300
-  "rgb(var(--color-info))", // #2563eb blue-600
-  "rgb(var(--color-control-light))", // #71717a gray-500
+  "var(--color-accent)", // #4f46e5 indigo-600
+  "var(--color-accent-hover)", // #3730a3 indigo-800
+  "var(--color-accent-disabled)", // #a5b4fc indigo-300
+  "var(--color-info)", // #2563eb blue-600
+  "var(--color-control-light)", // #71717a gray-500
 ];
 
 const GRID = 5;
@@ -80,7 +80,7 @@ export function PixelAvatar({
         y={0}
         width={size}
         height={size}
-        fill="rgb(var(--color-control-bg))"
+        fill="var(--color-control-bg)"
       />
       {rects}
     </svg>
