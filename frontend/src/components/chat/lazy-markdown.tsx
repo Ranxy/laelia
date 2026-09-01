@@ -43,7 +43,7 @@ function findClosestScrollContainer(
 
 export interface LazyMarkdownProps {
   // render is invoked only once the row is near the scroll viewport, so the
-  // expensive MarkdownRender parse is skipped for off-screen history. Called at
+  // expensive Markdown parse is skipped for off-screen history. Called at
   // most once per row (the result stays mounted afterward — we never unmount it
   // to avoid re-parsing on scroll-back).
   render: () => ReactNode;
@@ -66,7 +66,7 @@ export interface LazyMarkdownProps {
 
 // LazyMarkdown defers the heavy markdown render until its row is near the scroll
 // viewport. The channel chat mounts up to 100 MessageRows at once; each agent
-// row runs markstream-react's MarkdownRender (markdown parse + syntax
+// row runs the shared Markdown renderer (markdown parse + syntax
 // highlight + DOM build), and doing that for all of them on entry is the single
 // biggest contributor to the channel's slow first paint. Rendering a cheap
 // raw-text placeholder until the row is visible cuts that to the handful of rows

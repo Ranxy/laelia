@@ -45,9 +45,11 @@ describe("contentWithMentionTags", () => {
     );
   });
 
-  it("preserves surrounding markdown", () => {
-    expect(contentWithMentionTags("Visit **@alice** now.", [alice])).toBe(
-      'Visit **<mention type="user" id="alice-user-1" name="alice">@alice</mention>** now.'
+  it("uses the resolved channel label without changing click attributes", () => {
+    expect(
+      contentWithMentionTags("ping @alice", [alice], () => "Alice Lee")
+    ).toBe(
+      'ping <mention type="user" id="alice-user-1" name="alice" label="Alice Lee">@Alice Lee</mention>'
     );
   });
 });

@@ -4,7 +4,6 @@ import {
   Loader2,
   MessageCircleReply,
 } from "lucide-react";
-import MarkdownRender from "markstream-react";
 import { memo, type RefObject, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Avatar, formatTime } from "@/components/chat/avatar";
@@ -26,6 +25,7 @@ import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { useAvatar } from "@/lib/avatar-cache";
 import { isHtmlAttachment, MAX_HTML_PREVIEW_BYTES } from "@/lib/html-file";
 import { isImageAttachment } from "@/lib/image-file";
+import { MarkdownRenderer } from "@/lib/markdown";
 import {
   isMarkdownAttachment,
   MAX_MARKDOWN_PREVIEW_BYTES,
@@ -42,13 +42,7 @@ import { CommandEventType, SenderType } from "@/types/proto-es/v1/command_pb";
 // array reference across renders, and MemoMarkdown's memo keeps bailing out.
 const EMPTY_EVENTS: CommandEvent[] = [];
 
-// Module-level constant for the mention path's customHtmlTags prop. Passing an
-// inline ["mention"] array literal would mint a fresh reference every render,
-// defeating MemoMarkdown's React.memo (shallow props compare) in exactly the
-// channel/thread path the memo was added for.
-const MENTION_HTML_TAGS = ["mention"];
-
-// MemoMarkdown isolates the markstream/LazyMarkdown subtree so it only
+// MemoMarkdown isolates the Markdown/LazyMarkdown subtree so it only
 // re-renders (and re-parses markdown) when the content actually changed. A row
 // otherwise re-renders on cheap field patches — e.g. the channel watcher
 // replacing the msg object to update a reply-count or task badge — and without
@@ -59,14 +53,12 @@ const MemoMarkdown = memo(function MemoMarkdown({
   content,
   eager,
   scrollRoot,
-  markdownCustomId,
-  customHtmlTags,
+  mentionAware = false,
 }: {
   content: string;
   eager: boolean;
   scrollRoot?: RefObject<HTMLElement | null>;
-  markdownCustomId: string;
-  customHtmlTags?: string[];
+  mentionAware?: boolean;
 }) {
   return (
     <LazyMarkdown
@@ -76,11 +68,11 @@ const MemoMarkdown = memo(function MemoMarkdown({
         <span className="whitespace-pre-wrap break-words">{content}</span>
       }
       render={() => (
-        <MarkdownRender
-          customId={markdownCustomId}
+        <MarkdownRenderer
           content={content}
-          customHtmlTags={customHtmlTags}
-          final
+          variant="chat"
+          mentionAware={mentionAware}
+          className="break-words"
         />
       )}
     />
@@ -106,9 +98,6 @@ export interface MessageRowProps {
   // MentionBadge is injected (rather than imported) so the shared MessageRow
   // doesn't pull the channel-specific popup machinery into the DM chat bundle.
   MentionBadge?: typeof import("@/components/chat/mention-badge").MentionBadge;
-  // markdownCustomId distinguishes the markstream renderer instance between
-  // DM and channel chat so each can carry independent streaming state.
-  markdownCustomId: string;
   // onOpenThread, when provided (channel chat only), enables the "Reply in
   // thread" hover action and the reply-count entry. The message's id is the
   // thread root id the panel opens against.
@@ -303,8 +292,8 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     onViewDetails,
     onMentionClick,
     onSenderClick,
+    mentionLabel,
     MentionBadge,
-    markdownCustomId,
     onOpenThread,
     onOpenThreadAt,
     onPreviewAttachment,
@@ -430,15 +419,18 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
 
   // Markdown with @mentions rewritten to inline <mention> nodes, so a mention
   // flows inline with the surrounding prose instead of landing on its own line
-  // (which happened when each text segment was rendered through its own
-  // block-emitting MarkdownRender). Used for both user and agent messages in
+  // because Streamdown keeps mention nodes in the same paragraph. Used for
   // the mention-aware path (channel chat / threads).
   const mentionContent = useMemo(
     () =>
       MentionBadge
-        ? contentWithMentionTags(displayContent ?? "", msg.mentions ?? [])
+        ? contentWithMentionTags(
+            displayContent ?? "",
+            msg.mentions ?? [],
+            mentionLabel
+          )
         : null,
-    [MentionBadge, displayContent, msg.mentions]
+    [MentionBadge, displayContent, msg.mentions, mentionLabel]
   );
 
   const MentionBadgeCmp = MentionBadge;
@@ -665,28 +657,22 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
             // Mention-aware rendering (channel chat / threads): render the
             // whole body in a single markdown pass with @mentions rewritten
             // to inline <mention> nodes (mentionContent) for both user and
-            // agent messages. A single MarkdownRender keeps each mention
+            // agent messages. The shared Markdown renderer keeps each mention
             // inside the same <p> as the surrounding prose, so it flows
             // inline instead of being forced onto its own line by per-segment
             // block <p> wrappers.
-            <div className="markstream-chat break-words">
-              <MemoMarkdown
-                content={mentionContent ?? ""}
-                eager={eager}
-                scrollRoot={scrollRoot}
-                markdownCustomId={markdownCustomId}
-                customHtmlTags={MENTION_HTML_TAGS}
-              />
-            </div>
+            <MemoMarkdown
+              content={mentionContent ?? ""}
+              eager={eager}
+              scrollRoot={scrollRoot}
+              mentionAware
+            />
           ) : displayContent ? (
-            <div className="markstream-chat break-words">
-              <MemoMarkdown
-                content={displayContent}
-                eager={eager}
-                scrollRoot={scrollRoot}
-                markdownCustomId={markdownCustomId}
-              />
-            </div>
+            <MemoMarkdown
+              content={displayContent}
+              eager={eager}
+              scrollRoot={scrollRoot}
+            />
           ) : null}
           {msg.attachments && msg.attachments.length > 0 && (
             <div className="flex flex-col gap-1">

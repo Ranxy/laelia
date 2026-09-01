@@ -43,8 +43,9 @@ const LEADING_NUMBER_RE = /^\d+(\.\d+)*\s+/;
 // stable DOM id, and returns outline entries with auto-numbered sections.
 // Numbering is relative to the shallowest heading level present, so a document
 // that starts at H2 (with H1 as a title) still numbers its first section "1".
-// Must run after the markdown renderer has produced DOM (preview content is
-// static `final`, so one rAF after render suffices). Idempotent: ids are
+// Must run after the markdown renderer has produced DOM. Preview rendering
+// may commit deferred nodes across frames, so callers should run this after
+// the content has settled. Idempotent: ids are
 // reassigned deterministically by heading index.
 export function buildOutline(container: HTMLElement): OutlineItem[] {
   const headings = Array.from(

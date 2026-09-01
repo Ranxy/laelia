@@ -179,7 +179,6 @@ const MessageList = memo(function MessageList({
               onMentionClick={onMentionClick}
               onSenderClick={onMentionClick}
               MentionBadge={MentionBadge}
-              markdownCustomId="channel-chat"
               onOpenThread={onOpenThread}
               onOpenThreadAt={onOpenThreadAt}
               onCopyMarkdown={onCopyMarkdown}

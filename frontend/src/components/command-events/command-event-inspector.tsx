@@ -1,5 +1,4 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
-import MarkdownRender from "markstream-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChatDiff } from "@/components/chat-events/diff-view";
@@ -13,6 +12,7 @@ import {
   getOutputStreamKind,
   isToolCallError,
 } from "@/lib/command-events-model";
+import { MarkdownRenderer } from "@/lib/markdown";
 import { safeStringify } from "@/lib/safe-stringify";
 import { cn } from "@/lib/utils";
 import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
@@ -338,20 +338,11 @@ function OutputOverview({ output }: { output: InspectorOutput }) {
 
 function OutputPreview({ output }: { output: InspectorOutput }) {
   return (
-    <div className="markstream-chat p-3">
-      <MarkdownRender
-        customId="command-output-preview"
-        content={output.content}
-        final
-        smoothStreaming={false}
-        fade
-        // Long merged ASSISTANT output can hit hundreds of KB; align the
-        // preview with the markdown overlay's rendering params so it does
-        // not synchronously mount the whole tree (08 F-P5).
-        batchRendering
-        deferNodesUntilVisible={false}
-      />
-    </div>
+    <MarkdownRenderer
+      content={output.content}
+      variant="command"
+      className="p-3"
+    />
   );
 }
 

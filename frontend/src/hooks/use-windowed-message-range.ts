@@ -6,9 +6,9 @@
 // a bare div with the last-measured height (or the default estimate for
 // rows never seen), so scroll geometry stays continuous. This keeps a
 // multi-thousand-message history's DOM bounded without a virtualization
-// library, and without fighting markstream's streaming height mutations:
-// the streaming tail is always inside the window bottom margin, so its
-// growth is always measured against real content.
+// library, and without fighting the Markdown renderer's height mutations:
+// the streaming tail is always inside the window bottom margin, so its growth
+// is always measured against real content.
 //
 // The window only engages after the scroll container has been measured by a
 // ResizeObserver. jsdom reports zero-height containers and never fires

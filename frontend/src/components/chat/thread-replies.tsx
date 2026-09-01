@@ -78,7 +78,6 @@ export const ThreadReplies = memo(function ThreadReplies({
               onSenderClick={onSenderClick}
               mentionLabel={mentionLabel}
               MentionBadge={MentionBadge}
-              markdownCustomId="thread-chat"
               onPreviewAttachment={onPreviewAttachment}
               onJumpToSection={onJumpToSection}
               onPreviewImage={onPreviewImage}

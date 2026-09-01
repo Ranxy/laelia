@@ -8,8 +8,8 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-vi.mock("markstream-react", () => ({
-  default: ({ content }: { content: string }) => <div>{content}</div>,
+vi.mock("@/lib/markdown", () => ({
+  MarkdownRenderer: ({ content }: { content: string }) => <div>{content}</div>,
 }));
 
 // The inspector's SidePanel shells into a mobile Sheet when the viewport is

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Stub react-i18next and markstream-react so MessageRow renders in isolation.
+// Stub react-i18next and the project Markdown renderer so MessageRow renders in isolation.
 let translationHookCalls = 0;
 vi.mock("react-i18next", () => ({
   useTranslation: () => {
@@ -9,10 +9,8 @@ vi.mock("react-i18next", () => ({
   },
 }));
 
-vi.mock("markstream-react", () => ({
-  MarkdownRender: ({ content }: { content: string }) => <>{content}</>,
-  setCustomComponents: () => {},
-  default: ({ content }: { content: string }) => <>{content}</>,
+vi.mock("@/lib/markdown", () => ({
+  MarkdownRenderer: ({ content }: { content: string }) => <>{content}</>,
 }));
 
 // Desktop by default so the mobile-only "tap bubble to open thread" path stays
@@ -111,7 +109,6 @@ describe("MessageRow shared render", () => {
           showAvatar
           agentTitle="Agent"
           onViewDetails={onViewDetails}
-          markdownCustomId="chat"
           debugMode={false}
         />
       );
@@ -135,12 +132,11 @@ describe("MessageRow shared render", () => {
           onViewDetails={onViewDetails}
           MentionBadge={MentionBadge}
           onMentionClick={() => {}}
-          markdownCustomId="channel-chat"
           debugMode={false}
         />
       );
     });
-    // The mock MarkdownRender emits its content as-is, so the rewritten
+    // The mock MarkdownRenderer emits its content as-is, so the rewritten
     // mention node should be visible (user markdown now goes through the same
     // single-pass mention-aware renderer as agent markdown).
     expect(container?.textContent).toContain(
@@ -160,7 +156,6 @@ describe("MessageRow thread entry", () => {
           agentTitle="Agent"
           onViewDetails={() => {}}
           onOpenThread={onOpenThread}
-          markdownCustomId="chat"
           debugMode={false}
         />
       );
@@ -220,7 +215,6 @@ describe("MessageRow reaction bar", () => {
           showAvatar
           agentTitle="Agent"
           onViewDetails={() => {}}
-          markdownCustomId="chat"
           debugMode={false}
           onToggleReaction={onToggleReaction}
         />
@@ -278,7 +272,6 @@ describe("MessageRow sender click", () => {
           onViewDetails={() => {}}
           onSenderClick={onSenderClick}
           currentPrincipalId={currentPrincipalId}
-          markdownCustomId="chat"
           debugMode={false}
         />
       );
@@ -376,7 +369,6 @@ describe("MessageRow inline thread preview", () => {
           onViewDetails={() => {}}
           onOpenThread={() => {}}
           onOpenThreadAt={onOpenThreadAt}
-          markdownCustomId="chat"
           debugMode={false}
         />
       );
@@ -453,7 +445,6 @@ describe("MessageRow inline thread preview", () => {
           onViewDetails={() => {}}
           onOpenThread={() => {}}
           onOpenThreadAt={() => {}}
-          markdownCustomId="chat"
           debugMode={false}
         />
       );
@@ -471,7 +462,6 @@ describe("MessageRow context menu", () => {
           showAvatar
           agentTitle="Agent"
           onViewDetails={() => {}}
-          markdownCustomId="chat"
           debugMode={false}
           {...props}
         />

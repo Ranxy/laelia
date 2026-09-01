@@ -4,10 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MessageRow } from "@/components/chat/message-row";
 import type { ChatMessageUI } from "@/stores/ui-models";
 
-// MessageRow pulls react-i18next (no provider in the test environment) and
-// markstream-react (full markdown renderer). Stub both so the test isolates
-// memo behaviour: react-i18next's useTranslation is the per-render sentinel we
-// count, and markstream's MarkdownRender becomes a trivial passthrough.
+// Chat tests stub the project Markdown adapter so they can focus on page behavior.
 let translationHookCalls = 0;
 vi.mock("react-i18next", () => ({
   useTranslation: () => {
@@ -16,11 +13,8 @@ vi.mock("react-i18next", () => ({
   },
 }));
 
-vi.mock("markstream-react", () => ({
-  MarkdownRender: ({ content }: { content: string }) => <>{content}</>,
-  MarkdownCodeBlockNode: () => null,
-  setCustomComponents: () => {},
-  default: ({ content }: { content: string }) => <>{content}</>,
+vi.mock("@/lib/markdown", () => ({
+  MarkdownRenderer: ({ content }: { content: string }) => <>{content}</>,
 }));
 
 // Desktop by default so the mobile-only "tap bubble to open thread" path stays
@@ -75,7 +69,6 @@ describe("MessageRow memo", () => {
       showAvatar: true,
       agentTitle: "Agent",
       onViewDetails,
-      markdownCustomId: "chat",
       debugMode: false,
     };
 

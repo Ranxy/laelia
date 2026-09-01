@@ -39,27 +39,37 @@ export default defineConfig({
     chunkSizeWarningLimit: 800,
     rollupOptions: {
       checks: {
-        // markstream-react's published dist contains misplaced /* @__PURE__ */
-        // comments (e.g. after `case "xxx":` labels). Rolldown warns and
-        // ignores them; they are harmless. Silence the noise.
+        // Streamdown and its dependencies may contain pure annotations that
+        // Rolldown cannot associate with a statement. They are harmless.
         invalidAnnotation: false,
       },
       output: {
         // Rolldown's manualChunks takes a function. Bucket the big, stable
         // vendors into cacheable chunks so the entry chunk stays lean.
         manualChunks(id) {
-          // Check i18next before the broad react match (react-i18next would
-          // otherwise land in the react vendor).
+          const normalizedId = id.replaceAll("\\\\", "/");
+          // Streamdown has a pnpm peer suffix containing `react-dom` and
+          // `react`; exclude it before matching React package directories so
+          // Markdown stays in the lazy chunks that use it.
           if (
-            id.includes("react-i18next") ||
-            id.includes("/i18next/")
+            normalizedId.includes("/node_modules/streamdown/") ||
+            normalizedId.includes("/node_modules/@streamdown/code/")
+          ) {
+            return undefined;
+          }
+          // Check i18next before the React match (react-i18next would
+          // otherwise land in the React vendor).
+          if (
+            normalizedId.includes("/node_modules/react-i18next/") ||
+            normalizedId.includes("/node_modules/i18next/")
           ) {
             return "i18next";
           }
           if (
-            id.includes("react-router") ||
-            id.includes("react-dom") ||
-            id.includes("/react/")
+            normalizedId.includes("/node_modules/react-router/") ||
+            normalizedId.includes("/node_modules/react-router-dom/") ||
+            normalizedId.includes("/node_modules/react-dom/") ||
+            normalizedId.includes("/node_modules/react/")
           ) {
             return "react";
           }
@@ -72,10 +82,9 @@ export default defineConfig({
           if (id.includes("@base-ui") || id.includes("floating-ui")) {
             return "base-ui";
           }
-          // Deliberately NOT bucketing markstream/stream-markdown: forcing them
-          // into a named chunk made Rolldown treat it as an entry static
-          // dependency (fetched at boot), defeating the lazy preview overlays.
-          // The default splitter makes it a shared chunk loaded on demand.
+          // Keep Streamdown and its code plugin out of manual vendor buckets.
+          // The default splitter can leave Markdown dependencies in the lazy
+          // route chunks instead of forcing them into the initial entry.
           return undefined;
         },
       },

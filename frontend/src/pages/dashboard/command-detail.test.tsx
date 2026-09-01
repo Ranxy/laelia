@@ -46,12 +46,8 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: tFn }),
 }));
 
-vi.mock("markstream-react", () => ({
-  default: ({ content }: { content: string }) => <div>{content}</div>,
-}));
-
-// markstream splits text across nested spans, which defeats getByText; stub
-// the summary renderer so assertions read the content directly.
+// Markdown renderers may split text across nested spans, which defeats
+// getByText; stub the summary renderer so assertions read the content directly.
 vi.mock("@/lib/markdown", () => ({
   FinalSummary: ({ content }: { content: string }) => (
     <div data-testid="final-summary">{content}</div>

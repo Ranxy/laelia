@@ -177,18 +177,22 @@ export function mentionTagMarkdown(m: MentionRef, label?: string): string {
   return `<mention type="${escapeHtml(m.type)}" id="${escapeHtml(m.id)}" name="${escapeHtml(m.name)}"${labelAttr}>${text}</mention>`;
 }
 
-// Rewrites a message body so every @mention matched by splitByMentions becomes
-// an inline <mention> node, while leaving the surrounding text (and any other
-// markdown) intact. Reuses splitByMentions so the matching/dedup behavior is
-// identical to the plain-text segment path used for user messages. The badge
-// label comes from the backend-provided Mention.Name (display name, or handle
-// when the message has same-named members).
+// The badge label normally comes from the channel roster resolver. When it is
+// absent, the backend-provided Mention.Name remains the display fallback.
 export function contentWithMentionTags(
   content: string,
-  mentions: MentionRef[]
+  mentions: MentionRef[],
+  mentionLabel?: (handle: string) => string | undefined
 ): string {
   if (mentions.length === 0) return content;
   return splitByMentions(content, mentions)
-    .map((seg) => (seg.mention ? mentionTagMarkdown(seg.mention) : seg.text))
+    .map((seg) =>
+      seg.mention
+        ? mentionTagMarkdown(
+            seg.mention,
+            mentionLabel?.(seg.mention.id) ?? mentionLabel?.(seg.mention.name)
+          )
+        : seg.text
+    )
     .join("");
 }

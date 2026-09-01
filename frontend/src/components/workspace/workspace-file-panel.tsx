@@ -1,10 +1,10 @@
 import { FileText, Loader2, X } from "lucide-react";
-import MarkdownRender from "markstream-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatBytes } from "@/components/chat/file-card";
 import { Button } from "@/components/ui/button";
 import { HtmlFileView } from "@/components/workspace/html-file-view";
+import { MarkdownRenderer } from "@/lib/markdown";
 import { useAppStore } from "@/stores";
 import type {
   WorkspaceEntry,
@@ -35,7 +35,7 @@ function isHtmlFile(name: string): boolean {
 
 // WorkspaceFilePanel is the right pane of the agent workspace browser: it
 // shows one file's content next to the tree. Text files render in a monospace
-// pane, markdown files through markstream-react, html files in a sandboxed
+// pane, markdown files through the shared Markdown renderer, html files in a sandboxed
 // iframe, images inline, and other binary files as metadata only. The machine
 // returns a non-empty `error` for files it refuses to read (sensitive, too
 // large, missing), rendered instead of content.
@@ -135,16 +135,11 @@ export function WorkspaceFilePanel({
             {t("workspace.binary-file")} — {formatBytes(file.size)}
           </p>
         ) : markdown ? (
-          <div className="markstream-chat mx-auto w-full max-w-4xl px-6 py-6">
-            <MarkdownRender
-              customId="workspace-md-preview"
-              content={file.content}
-              final
-              fade
-              batchRendering
-              deferNodesUntilVisible={false}
-            />
-          </div>
+          <MarkdownRenderer
+            content={file.content}
+            variant="workspace"
+            className="mx-auto w-full max-w-4xl px-6 py-6"
+          />
         ) : html ? (
           <HtmlFileView name={entry.name} content={file.content} />
         ) : (

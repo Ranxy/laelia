@@ -44,8 +44,9 @@ export interface PreviewSlice {
 
 // createPreviewSlice owns the markdown/html file preview overlay state.
 // Opening a preview decodes the file bytes as UTF-8 text and stores it for
-// the overlay to render (markstream for markdown, a sandboxed iframe for
-// html). Files above the per-kind size limit are refused before any download
+// the overlay to render (the shared Markdown renderer for markdown, a
+// sandboxed iframe for html). Files above the per-kind size limit are refused
+// before any download
 // happens — the overlay still opens in a "too-large" status so the user sees
 // an explicit "preview not supported" message and can fall back to download.
 export const createPreviewSlice: AppSliceCreator<PreviewSlice> = (

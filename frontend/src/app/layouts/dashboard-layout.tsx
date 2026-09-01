@@ -21,11 +21,12 @@ import { ROUTE_INFO } from "@/router/route-info";
 import { useCurrentRoute } from "@/router/use-current-route";
 import { useAppStore } from "@/stores";
 
-// The overlays/dialog are code-split so markstream-react (and the
-// stream-markdown grammar registry it pulls in) stays out of the initial entry
+// The overlays/dialog are code-split so the Markdown preview renderer and its
+// parsing/highlighting dependencies stay out of the initial entry
 // chunk: the shell only loads a chunk when a preview/lightbox is actually
-// open, or when an admin loads the setup checklist. Chat pages pull markstream
-// in their own lazy route chunks, so it is never part of first paint.
+// open, or when an admin loads the setup checklist. Chat pages pull the
+// Markdown renderer in their own lazy route chunks, so it is never part of
+// first paint.
 const MarkdownPreviewOverlay = lazy(() =>
   import("@/components/preview/markdown-preview-overlay").then((m) => ({
     default: m.MarkdownPreviewOverlay,

@@ -6,12 +6,12 @@ import {
   MessageSquare,
   X,
 } from "lucide-react";
-import MarkdownRender from "markstream-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatBytes } from "@/components/chat/file-card";
 import { Button } from "@/components/ui/button";
 import { downloadAttachment } from "@/lib/file-download";
+import { MarkdownRenderer } from "@/lib/markdown";
 import { buildOutline, type OutlineItem } from "@/lib/markdown-file";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -33,26 +33,35 @@ export function MarkdownPreviewOverlay() {
   const [outlineOpen, setOutlineOpen] = useState(true);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<number | null>(null);
 
-  // Build the outline once the markdown DOM is painted. The content is static
-  // (`final`), so a single rAF after `status === "ready"` suffices. When the
-  // preview was opened with a scrollToAnchorId (cross-scenario anchor jump
-  // from a comment card), scroll to that heading right after ids are assigned.
+  // Build the outline after both the static markdown render and any deferred
+  // code-block work have had a chance to commit their DOM nodes. The second
+  // frame is harmless for already-settled content and prevents missing late
+  // headings when Streamdown yields during a static render.
   useEffect(() => {
     if (!active || active.status !== "ready") {
       setOutline([]);
       return;
     }
-    const id = requestAnimationFrame(() => {
-      if (!contentRef.current) return;
-      setOutline(buildOutline(contentRef.current));
-      if (active.scrollToAnchorId) {
-        document
-          .getElementById(active.scrollToAnchorId)
-          ?.scrollIntoView({ block: "start", behavior: "smooth" });
-      }
+    const firstFrame = requestAnimationFrame(() => {
+      const secondFrame = requestAnimationFrame(() => {
+        if (!contentRef.current) return;
+        setOutline(buildOutline(contentRef.current));
+        if (active.scrollToAnchorId) {
+          document
+            .getElementById(active.scrollToAnchorId)
+            ?.scrollIntoView({ block: "start", behavior: "smooth" });
+        }
+      });
+      frameRef.current = secondFrame;
     });
-    return () => cancelAnimationFrame(id);
+    frameRef.current = firstFrame;
+    return () => {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+      }
+    };
   }, [active]);
 
   if (!active) return null;
@@ -155,16 +164,11 @@ export function MarkdownPreviewOverlay() {
             />
           )}
           {active.status === "ready" && (
-            <div className="markstream-chat mx-auto max-w-4xl px-6 py-8">
-              <MarkdownRender
-                customId="md-preview"
-                content={active.content}
-                final
-                fade
-                batchRendering
-                deferNodesUntilVisible={false}
-              />
-            </div>
+            <MarkdownRenderer
+              content={active.content}
+              variant="preview"
+              className="mx-auto max-w-4xl px-6 py-8"
+            />
           )}
         </div>
         {commentsOpen && active.status === "ready" && (

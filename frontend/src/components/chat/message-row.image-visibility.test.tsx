@@ -1,14 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Stub react-i18next and markstream-react so MessageRow renders in isolation.
+// Stub react-i18next and the project Markdown renderer so MessageRow renders in isolation.
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: "en-US" } }),
 }));
 
-vi.mock("markstream-react", () => ({
-  MarkdownRender: ({ content }: { content: string }) => <>{content}</>,
-  setCustomComponents: () => {},
-  default: ({ content }: { content: string }) => <>{content}</>,
+vi.mock("@/lib/markdown", () => ({
+  MarkdownRenderer: ({ content }: { content: string }) => <>{content}</>,
 }));
 
 const mockUseIsDesktop = vi.hoisted(() => vi.fn(() => true));
@@ -83,7 +81,6 @@ describe("MessageRow inline image visibility (recipient vs sender)", () => {
           currentPrincipalId="ran-user-2"
           agentTitle="Agent"
           onViewDetails={() => {}}
-          markdownCustomId="chat"
           debugMode={false}
         />
       );
@@ -108,7 +105,6 @@ describe("MessageRow inline image visibility (recipient vs sender)", () => {
           currentPrincipalId="ran-user-2"
           agentTitle="Agent"
           onViewDetails={() => {}}
-          markdownCustomId="chat"
           debugMode={false}
         />
       );
@@ -135,7 +131,6 @@ describe("MessageRow inline image visibility (recipient vs sender)", () => {
           currentPrincipalId="ran-user-2"
           agentTitle="Agent"
           onViewDetails={() => {}}
-          markdownCustomId="chat"
           debugMode={false}
         />
       );
@@ -165,7 +160,6 @@ describe("MessageRow inline image visibility (recipient vs sender)", () => {
           currentPrincipalId="ran-user-2"
           agentTitle="Agent"
           onViewDetails={() => {}}
-          markdownCustomId="chat"
           debugMode={false}
         />
       );
@@ -190,7 +184,6 @@ describe("MessageRow inline image visibility (recipient vs sender)", () => {
           currentPrincipalId="ran-user-2"
           agentTitle="Agent"
           onViewDetails={() => {}}
-          markdownCustomId="chat"
           debugMode={false}
         />
       );

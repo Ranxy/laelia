@@ -33,10 +33,8 @@ vi.mock("react-router-dom", () => ({
   useSearchParams: () => [mockRouter.searchParams, mockRouter.setSearchParams],
 }));
 
-vi.mock("markstream-react", () => ({
-  MarkdownRender: ({ content }: { content: string }) => <>{content}</>,
-  setCustomComponents: () => {},
-  default: ({ content }: { content: string }) => <>{content}</>,
+vi.mock("@/lib/markdown", () => ({
+  MarkdownRenderer: ({ content }: { content: string }) => <>{content}</>,
 }));
 
 const mockClient = vi.hoisted(() => ({

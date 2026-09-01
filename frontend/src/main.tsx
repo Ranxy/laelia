@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import "@/lib/i18n";
 import { AppRoot } from "@/app/root";
 import "@/assets/css/tailwind.css";
-import "markstream-react/index.css";
+import "streamdown/styles.css";
 import { registerServiceWorker } from "@/lib/pwa";
 
 registerServiceWorker();

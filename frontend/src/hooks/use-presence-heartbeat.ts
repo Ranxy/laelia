@@ -46,6 +46,24 @@ function collectWantedNames(): string[] {
   return wanted;
 }
 
+const EMPTY_PRESENCES: Record<string, boolean> = {};
+
+const presenceQueryFn = async (): Promise<Record<string, boolean>> => {
+  // The RPC fires even with an empty list — the server records the
+  // signed-in user's own heartbeat from the auth context.
+  const wanted = collectWantedNames();
+  const res = await commandServiceClient.syncPresence({ names: wanted });
+  // Merge over the previously known map so peers learned from rosters
+  // that have since unloaded keep their last known state (the old slice
+  // merged in place; reset clears via the cleanup registration below).
+  const prev =
+    queryClient.getQueryData<Record<string, boolean>>(PRESENCES_QUERY_KEY) ??
+    EMPTY_PRESENCES;
+  const next: Record<string, boolean> = { ...prev };
+  for (const p of res.presences) next[p.name] = p.online;
+  return next;
+};
+
 // usePresenceHeartbeat keeps the signed-in user marked online and feeds the
 // online state the app renders: every beat sends one SyncPresence (the server
 // records the caller's own heartbeat even with an empty query list; the
@@ -76,22 +94,7 @@ export function usePresenceHeartbeat() {
     // immediately (Query's focus manager listens to visibilitychange, and
     // staleTime 0 makes every visibility beat eligible).
     refetchIntervalInBackground: false,
-    queryFn: async () => {
-      // The RPC fires even with an empty list — the server records the
-      // signed-in user's own heartbeat from the auth context.
-      const wanted = collectWantedNames();
-      const res = await commandServiceClient.syncPresence({ names: wanted });
-      // Merge over the previously known map so peers learned from rosters
-      // that have since unloaded keep their last known state (the old slice
-      // merged in place; reset clears via the cleanup registration below).
-      const prev =
-        queryClient.getQueryData<Record<string, boolean>>(
-          PRESENCES_QUERY_KEY
-        ) ?? EMPTY_PRESENCES;
-      const next: Record<string, boolean> = { ...prev };
-      for (const p of res.presences) next[p.name] = p.online;
-      return next;
-    },
+    queryFn: presenceQueryFn,
   });
   // Same cadence refreshes agent connection state for the agent badges.
   usePolling(() => {
@@ -99,8 +102,6 @@ export function usePresenceHeartbeat() {
     void state.fetchAgents({ pageSize: 100 }, { silent: true });
   }, PRESENCE_POLL_INTERVAL_MS);
 }
-
-const EMPTY_PRESENCES: Record<string, boolean> = {};
 
 // useOnlineUsers reads the online map the heartbeat maintains. Consumers that
 // render presence badges (conversation list, members panels, chat headers)
@@ -112,6 +113,9 @@ export function useOnlineUsers(): Record<string, boolean> {
   const { data } = useQuery<Record<string, boolean>>({
     queryKey: PRESENCES_QUERY_KEY,
     enabled: false, // cache reader — the heartbeat hook owns the cadence
+    // Disabled cache readers still need the same query function so a manual
+    // refetch uses the heartbeat RPC rather than replacing it with a stub.
+    queryFn: presenceQueryFn,
   });
   return data ?? EMPTY_PRESENCES;
 }

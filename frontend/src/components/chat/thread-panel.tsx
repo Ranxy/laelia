@@ -315,7 +315,6 @@ export function ThreadPanel({
                 onSenderClick={handleSenderClick}
                 mentionLabel={mentionLabel}
                 MentionBadge={MentionBadge}
-                markdownCustomId="thread-chat"
                 onPreviewAttachment={onPreviewAttachment}
                 onJumpToSection={onJumpToSection}
                 onPreviewImage={onPreviewImage}
