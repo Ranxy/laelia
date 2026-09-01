@@ -308,6 +308,7 @@ export function useSwipeBack(): SwipeBackState {
   // the navigation (location changes) before clearing the transform. This
   // prevents a one-frame flash where the old route would be visible at
   // translateX(0) before the new route renders.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the location commit; the body reads refs only.
   useEffect(() => {
     if (!pendingResetRef.current) return;
     pendingResetRef.current = false;

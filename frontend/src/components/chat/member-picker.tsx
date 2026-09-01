@@ -1,6 +1,7 @@
-import { ChevronsUpDown, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronsUpDown } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -9,6 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { SearchInput } from "@/components/ui/search-input";
+import { Spinner } from "@/components/ui/spinner";
 import { userServiceClient } from "@/connect";
 import { buildUserFilter } from "@/lib/user-filter";
 import { cn } from "@/lib/utils";
@@ -64,6 +66,54 @@ function agentOption(a: AgentSummary): Option {
     sublabel: a.description || undefined,
   };
 }
+
+interface MemberRowProps {
+  option: Option;
+  joined: boolean;
+  selected: boolean;
+  onToggle: (memberId: string) => void;
+}
+
+// Memoized row: the popover body re-renders on unrelated parent state
+// (selection toggles, store churn), but with stable `option` objects from the
+// memoized `options` array an unchanged row skips re-rendering.
+const MemberRow = memo(function MemberRow({
+  option,
+  joined,
+  selected,
+  onToggle,
+}: MemberRowProps) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      disabled={joined}
+      onClick={() => onToggle(option.memberId)}
+      className={cn(
+        "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+        joined
+          ? "cursor-not-allowed text-control-light"
+          : "hover:bg-accent/10 text-main"
+      )}
+    >
+      <span className="pointer-events-none flex shrink-0 items-center">
+        <Checkbox checked={selected} size="sm" tabIndex={-1} />
+      </span>
+      <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-control-bg text-[10px] font-medium">
+        {option.label.charAt(0).toUpperCase()}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate">{option.label}</p>
+        {option.sublabel && (
+          <p className="truncate text-[10px] text-control-placeholder">
+            {option.sublabel}
+          </p>
+        )}
+      </div>
+      {joined && <Badge size="sm">{t("channel.member-joined")}</Badge>}
+    </button>
+  );
+});
 
 export function MemberPicker({
   memberType,
@@ -150,10 +200,12 @@ export function MemberPicker({
       );
   }, [isUser, userResults, agents, query, isAdmin, currentUser?.name]);
 
-  function handleToggle(o: Option) {
-    if (existingMemberIds.has(o.memberId)) return;
-    onToggle(o.memberId);
-  }
+  const handleToggle = useCallback(
+    (memberId: string) => {
+      if (!existingMemberIds.has(memberId)) onToggle(memberId);
+    },
+    [existingMemberIds, onToggle]
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -196,7 +248,7 @@ export function MemberPicker({
         <div className="flex-1 overflow-y-auto">
           {(isUser ? userResultsLoading : false) && (
             <div className="flex items-center justify-center gap-2 py-6 text-xs text-control-light">
-              <Loader2 className="size-3.5 animate-spin" />
+              <Spinner size="sm" />
               {t("common.loading")}
             </div>
           )}
@@ -206,44 +258,15 @@ export function MemberPicker({
             </p>
           )}
           {!(isUser ? userResultsLoading : false) &&
-            options.map((o) => {
-              const joined = existingMemberIds.has(o.memberId);
-              const selected = value.includes(o.memberId);
-              return (
-                <button
-                  key={o.memberId}
-                  type="button"
-                  disabled={joined}
-                  onClick={() => handleToggle(o)}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
-                    joined
-                      ? "cursor-not-allowed text-control-light"
-                      : "hover:bg-accent/10 text-main"
-                  )}
-                >
-                  <span className="pointer-events-none flex shrink-0 items-center">
-                    <Checkbox checked={selected} size="sm" tabIndex={-1} />
-                  </span>
-                  <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-control-bg text-[10px] font-medium">
-                    {o.label.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate">{o.label}</p>
-                    {o.sublabel && (
-                      <p className="truncate text-[10px] text-control-placeholder">
-                        {o.sublabel}
-                      </p>
-                    )}
-                  </div>
-                  {joined && (
-                    <span className="rounded bg-control-bg px-1.5 py-0 text-[10px] font-medium text-control">
-                      {t("channel.member-joined")}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+            options.map((o) => (
+              <MemberRow
+                key={o.memberId}
+                option={o}
+                joined={existingMemberIds.has(o.memberId)}
+                selected={value.includes(o.memberId)}
+                onToggle={handleToggle}
+              />
+            ))}
         </div>
       </PopoverContent>
     </Popover>

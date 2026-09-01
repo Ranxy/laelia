@@ -44,6 +44,7 @@ export function ThreadTaskControls({
 
   // Load the channel roster for the assignee dropdown on first render of a
   // task thread (the members panel may not have been opened yet).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: same fetch discipline as the pre-split header — one load per mount / channel change; the roster guard keeps repeat mounts from re-fetching.
   useEffect(() => {
     if (members.length === 0) {
       void listChannelMembers(channelId);
@@ -52,8 +53,6 @@ export function ThreadTaskControls({
       .listAgentTeams({ pageSize: 1000 })
       .then((res) => setTeams(res.agentTeams ?? []))
       .catch(() => setTeams([]));
-    // Same fetch discipline as the pre-split header: one load per mount /
-    // channel change; the roster guard keeps repeat mounts from re-fetching.
   }, [channelId]);
 
   const handleStatusChange = async (value: string | null) => {

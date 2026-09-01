@@ -80,11 +80,11 @@ export function useCrudDialog<TTarget>(options?: {
   // can never both pass it before the first state update lands.
   const busyRef = useRef<SubmitKind | null>(null);
 
-  const closeSheetFor = (kind: SubmitKind) => {
+  const closeSheetFor = useCallback((kind: SubmitKind) => {
     if (kind === "create") setCreateOpen(false);
     else if (kind === "save") setEditOpen(false);
     else setDeleteOpen(false);
-  };
+  }, []);
 
   const runSubmit = useCallback(
     async (
@@ -114,7 +114,7 @@ export function useCrudDialog<TTarget>(options?: {
         setBusy(null);
       }
     },
-    []
+    [closeSheetFor]
   );
 
   return {

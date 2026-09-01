@@ -53,7 +53,7 @@ export function MarkdownPreviewOverlay() {
       }
     });
     return () => cancelAnimationFrame(id);
-  }, [active?.status, active?.content, active?.scrollToAnchorId]);
+  }, [active]);
 
   if (!active) return null;
   const { attachment } = active;

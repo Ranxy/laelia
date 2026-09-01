@@ -1,4 +1,4 @@
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { FocusEvent, KeyboardEvent } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "./input";
 import { getLayerRoot, LAYER_SURFACE_CLASS } from "./layer";
 import { POPUP_SURFACE_CLASS } from "./positioned-popup";
+import { Spinner } from "./spinner";
 
 export interface ModelComboboxOption {
   id: string;
@@ -177,7 +178,7 @@ export function ModelCombobox({
   function listboxBody() {
     return loading ? (
       <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-control-placeholder">
-        <Loader2 className="size-3.5 animate-spin" />
+        <Spinner size="sm" />
       </div>
     ) : filtered.length === 0 ? (
       <div className="px-2 py-1.5 text-xs text-control-placeholder">

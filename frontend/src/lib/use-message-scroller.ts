@@ -143,6 +143,7 @@ export function useMessageScroller({
   // is already read (cursor caught up), stick to the bottom instead. Runs at
   // most once per version so it does not fight the user's own scrolling.
   const scrollToReadVersionRef = useRef<bigint>(0n);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deep-link scroll runs at most once per version; keyed on length for mount timing.
   useEffect(() => {
     if (scrollToReadVersion <= 0n || messages.length === 0) return;
     if (scrollToReadVersionRef.current === scrollToReadVersion) return;
@@ -316,6 +317,7 @@ export function useMessageScroller({
   // Restore the captured anchor after a history page is committed. This runs
   // before paint (useLayoutEffect) so the user never sees the jump that would
   // otherwise happen when older rows are prepended above the current viewport.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-runs on messages/jumpLoading identity as the history-commit trigger; the body reads refs only.
   useLayoutEffect(() => {
     // Only restore once the history request has actually committed. While
     // jumpLoading is still true, a watcher append or optimistic send can change
@@ -402,6 +404,7 @@ export function useMessageScroller({
   // Auto-stick to the bottom only when the user is already viewing the latest
   // messages. When they have scrolled up to read history, new polling updates
   // must not yank them back down.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: auto-stick is keyed on messages/jumpTarget changes; the body reads none of them.
   useEffect(() => {
     if (scrollRef.current && stickToBottomRef.current && !jumpTarget) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -464,16 +467,19 @@ export function useMessageScroller({
     isJumpLoading,
   ]);
 
-  const beginJumpWindow = useCallback((messageId: string) => {
-    // Entering a focused history view: release stick-to-bottom before the
-    // window loads so the auto-stick effect never yanks the list to the
-    // bottom of the jump window, and drop any stale scroll anchor/latch.
-    stickToBottomRef.current = false;
-    jumpMessageIdRef.current = null;
-    suppressHistoryLoadRef.current = true;
-    suppressNativeScrollAnchor();
-    setJumpMessageId(messageId);
-  }, []);
+  const beginJumpWindow = useCallback(
+    (messageId: string) => {
+      // Entering a focused history view: release stick-to-bottom before the
+      // window loads so the auto-stick effect never yanks the list to the
+      // bottom of the jump window, and drop any stale scroll anchor/latch.
+      stickToBottomRef.current = false;
+      jumpMessageIdRef.current = null;
+      suppressHistoryLoadRef.current = true;
+      suppressNativeScrollAnchor();
+      setJumpMessageId(messageId);
+    },
+    [suppressNativeScrollAnchor]
+  );
 
   const releaseHistorySuppression = useCallback(() => {
     suppressHistoryLoadRef.current = false;

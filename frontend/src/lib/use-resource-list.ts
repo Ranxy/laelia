@@ -119,9 +119,9 @@ export function useResourceList<TRow>(
   // Non-silent load: first page, pagination turns, resets. The reset effect
   // bumps resetGen so this re-runs with the cleared pagination state; the
   // pre-reset run (if any) is dropped by the sequence guard.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resetGen is the generation trigger for resets — the pre-reset run is dropped by the seq guard.
   useEffect(() => {
     void run(false, currentToken);
-    // `run` is stable; currentToken + generation drive re-loads.
   }, [currentToken, resetGen, run]);
 
   useEffect(() => {

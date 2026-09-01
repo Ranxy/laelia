@@ -1,4 +1,5 @@
-import { Bot, Brain, Loader2, MessageSquare, Play, Wrench } from "lucide-react";
+import { Bot, Brain, MessageSquare, Play, Wrench } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import type { AgentActivity } from "@/types/proto-es/v1/command_pb";
 
@@ -84,7 +85,7 @@ export function AgentStatusBar({
   if (loading) {
     return (
       <span className="inline-flex items-center gap-1 text-xs text-control-placeholder shrink-0">
-        <Loader2 className="size-3 animate-spin" />
+        <Spinner size="xs" />
         <span>agents</span>
       </span>
     );

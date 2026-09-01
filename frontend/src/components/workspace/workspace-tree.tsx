@@ -79,6 +79,7 @@ export function WorkspaceTree({ agentName, onPreview }: WorkspaceTreeProps) {
     [agentName, includeHidden, listAgentWorkspaceDir]
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: root load keyed on loadDir + a manual reloadKey; the body only resets state.
   useEffect(() => {
     let cancelled = false;
     setRootLoading(true);

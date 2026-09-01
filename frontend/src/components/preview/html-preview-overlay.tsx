@@ -69,6 +69,7 @@ export function HtmlPreviewOverlay() {
 
   // Reset per-open state when a different file is previewed. The bridge's
   // nonce/epoch reset runs from its own effect over the same key.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset keyed on the previewed attachment; the body only clears state.
   useEffect(() => {
     setIframeReady(false);
     setCommentsOpen(false);
@@ -133,6 +134,17 @@ export function HtmlPreviewOverlay() {
     flashTimerRef.current = window.setTimeout(() => setFlash(null), 2000);
   }, []);
 
+  // F-B9: locate promises settle asynchronously (bridge reply or the 3s
+  // timeout), so their consumers must not touch state after the overlay
+  // unmounted. The ref flips on unmount; the jumpToComment callback reads it.
+  const mountedRef = useRef(true);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    []
+  );
+
   // Cross-scenario anchor jump: the preview was opened from a comment's
   // anchor chip; locate the quote (nearest to the stored content-y) and
   // scroll + flash it once the iframe is live.
@@ -141,8 +153,12 @@ export function HtmlPreviewOverlay() {
     if (!active.scrollToAnchorId) return;
     const parsed = parseHtmlAnchor(active.scrollToAnchorId);
     if (!parsed) return;
+    // Guard against overlay unmount / attachment switch while the locate
+    // promise is still pending.
+    let cancelled = false;
     if (active.scrollToQuote) {
       void locateQuote(active.scrollToQuote, parsed.y).then((rect) => {
+        if (cancelled) return;
         if (!rect) {
           scrollTo(0, parsed.y);
           return;
@@ -153,6 +169,9 @@ export function HtmlPreviewOverlay() {
     } else {
       scrollTo(0, parsed.y);
     }
+    return () => {
+      cancelled = true;
+    };
   }, [active, iframeReady, locateQuote, scrollTo, flashRect]);
 
   // Locate every existing comment's quote once when the aside opens, so pins
@@ -183,7 +202,9 @@ export function HtmlPreviewOverlay() {
       if (!quote) return;
       const parsed = parseHtmlAnchor(sectionId);
       void locateQuote(quote, parsed?.y ?? null).then((rect) => {
-        if (!rect) return;
+        // The promise can outlive the overlay (bridge timeout up to 3s);
+        // never touch state after unmount (F-B9).
+        if (!mountedRef.current || !rect) return;
         scrollTo(rect.x, rect.y);
         flashRect(rect);
       });

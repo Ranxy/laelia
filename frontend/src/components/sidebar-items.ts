@@ -204,6 +204,7 @@ export function useSidebarItems(): SidebarItem[] {
     [
       t,
       canViewStorage,
+      canViewMachines,
       canViewUsers,
       canViewRoles,
       canViewIam,

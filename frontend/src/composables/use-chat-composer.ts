@@ -224,7 +224,7 @@ export function useChatComposer(opts: UseChatComposerOptions): ChatComposerApi {
         },
       });
     },
-    [threadRootId, conversationName]
+    [threadRootId, conversationName, write.patch]
   );
 
   // ---- Draft cache ---------------------------------------------------------
@@ -261,6 +261,7 @@ export function useChatComposer(opts: UseChatComposerOptions): ChatComposerApi {
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, textareaMaxHeight)}px`;
   }, [textareaMaxHeight]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resize is keyed on input changes; autoResize reads nothing it depends on.
   useEffect(() => {
     autoResize();
   }, [input, autoResize]);
@@ -370,7 +371,7 @@ export function useChatComposer(opts: UseChatComposerOptions): ChatComposerApi {
       });
       await Promise.all(tasks);
     },
-    [conversationName, mirrorUploadProgress]
+    [conversationName, mirrorUploadProgress, t]
   );
 
   // removeUpload drops a (failed) upload chip; removeAttachment drops a
@@ -513,10 +514,8 @@ export function useChatComposer(opts: UseChatComposerOptions): ChatComposerApi {
     taskEnabled,
     channelId,
     threadRootId,
-    conversationName,
     onSendStart,
     write,
-    t,
   ]);
 
   // handleTextareaKeyDown drives the mention popup's keyboard navigation and
@@ -560,7 +559,7 @@ export function useChatComposer(opts: UseChatComposerOptions): ChatComposerApi {
         void send();
       }
     },
-    [mentionState, insertMention, enterToSend, send]
+    [mentionState, mentionSelectedIndex, insertMention, enterToSend, send]
   );
 
   const focusTextarea = useCallback(() => textareaRef.current?.focus(), []);

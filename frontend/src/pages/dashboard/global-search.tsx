@@ -8,7 +8,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { SearchResultList } from "@/components/chat/search-result-list";
@@ -240,51 +240,46 @@ export function GlobalSearchPage() {
       .finally(() => setLoadingMore(false));
   };
 
-  const body = useMemo(() => {
-    if (loading) return <LoadingState />;
-    if (!query.trim()) {
-      return (
-        <EmptyState
-          icon={Search}
-          message={t("globalSearch.empty")}
-          className="py-32"
-        />
-      );
-    }
-    if (searched && results.length === 0) {
-      return (
-        <EmptyState
-          icon={SearchX}
-          message={t("globalSearch.no-results", { query: query.trim() })}
-          className="py-32"
-        />
-      );
-    }
-    return (
-      <div className="flex w-full flex-col gap-3 px-4 py-3">
-        <SearchResultList
-          entries={results}
-          query={query}
-          onOpen={handleOpen}
-          threadLabel={t("globalSearch.thread")}
-        />
-        {nextPageToken && (
-          <div className="flex justify-center pb-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={loadMore}
-              disabled={loadingMore}
-              className="h-11 w-full touch-manipulation sm:h-7 sm:w-auto"
-            >
-              {t("globalSearch.load-more")}
-            </Button>
-          </div>
-        )}
-      </div>
-    );
-  }, [loading, loadingMore, nextPageToken, query, results, searched, t]);
+  // Plain render body: it captures per-render handlers (handleOpen/loadMore),
+  // so a useMemo would need both as deps and could never bail out.
+  const body = loading ? (
+    <LoadingState />
+  ) : !query.trim() ? (
+    <EmptyState
+      icon={Search}
+      message={t("globalSearch.empty")}
+      className="py-32"
+    />
+  ) : searched && results.length === 0 ? (
+    <EmptyState
+      icon={SearchX}
+      message={t("globalSearch.no-results", { query: query.trim() })}
+      className="py-32"
+    />
+  ) : (
+    <div className="flex w-full flex-col gap-3 px-4 py-3">
+      <SearchResultList
+        entries={results}
+        query={query}
+        onOpen={handleOpen}
+        threadLabel={t("globalSearch.thread")}
+      />
+      {nextPageToken && (
+        <div className="flex justify-center pb-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="h-11 w-full touch-manipulation sm:h-7 sm:w-auto"
+          >
+            {t("globalSearch.load-more")}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="flex h-full flex-col overflow-hidden">

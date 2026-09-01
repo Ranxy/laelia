@@ -532,11 +532,12 @@ export function CommandEventInspector({
               </div>
             )}
 
-            {event.type === CommandEventType.WARNING && (
-              <div className="p-3">
-                <ChatWarning event={event} />
-              </div>
-            )}
+            {activeTab === "summary" &&
+              event.type === CommandEventType.WARNING && (
+                <div className="p-3">
+                  <ChatWarning event={event} />
+                </div>
+              )}
           </>
         )}
       </div>

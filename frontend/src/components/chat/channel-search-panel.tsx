@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { SearchX } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SearchResultList } from "@/components/chat/search-result-list";
 import { EmptyState, LoadingState } from "@/components/chat/states";
@@ -109,59 +109,45 @@ export function ChannelSearchPanel({
       .finally(() => setLoadingMore(false));
   };
 
-  const body = useMemo(() => {
-    if (loading) return <LoadingState />;
-    if (!query.trim()) {
-      return (
-        <EmptyState
-          icon={SearchX}
-          message={t("channelSearch.empty", { channel: channelTitle })}
-        />
-      );
-    }
-    if (searched && results.length === 0) {
-      return (
-        <EmptyState
-          icon={SearchX}
-          message={t("channelSearch.no-results", { query: query.trim() })}
-        />
-      );
-    }
-    return (
-      <div className="flex flex-col gap-2 p-2">
-        <SearchResultList
-          entries={results}
-          query={query}
-          onOpen={handleOpen}
-          compact
-          threadLabel={t("channelSearch.thread")}
-        />
-        {nextPageToken && (
-          <div className="flex justify-center pb-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={loadMore}
-              disabled={loadingMore}
-              className="h-11 w-full touch-manipulation sm:h-7 sm:w-auto"
-            >
-              {t("channelSearch.load-more")}
-            </Button>
-          </div>
-        )}
-      </div>
-    );
-  }, [
-    channelTitle,
-    loading,
-    loadingMore,
-    nextPageToken,
-    query,
-    results,
-    searched,
-    t,
-  ]);
+  // Plain render body: it captures per-render handlers (handleOpen/loadMore),
+  // so a useMemo would need both as deps and could never bail out.
+  const body = loading ? (
+    <LoadingState />
+  ) : !query.trim() ? (
+    <EmptyState
+      icon={SearchX}
+      message={t("channelSearch.empty", { channel: channelTitle })}
+    />
+  ) : searched && results.length === 0 ? (
+    <EmptyState
+      icon={SearchX}
+      message={t("channelSearch.no-results", { query: query.trim() })}
+    />
+  ) : (
+    <div className="flex flex-col gap-2 p-2">
+      <SearchResultList
+        entries={results}
+        query={query}
+        onOpen={handleOpen}
+        compact
+        threadLabel={t("channelSearch.thread")}
+      />
+      {nextPageToken && (
+        <div className="flex justify-center pb-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="h-11 w-full touch-manipulation sm:h-7 sm:w-auto"
+          >
+            {t("channelSearch.load-more")}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="flex h-full flex-col">

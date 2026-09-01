@@ -72,6 +72,7 @@ export function ActivityRow({
 
   // Close the swipe action when the row becomes active (user navigated into it)
   // or when the activity is marked done so the UI doesn't feel stuck.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset keyed on active/isDone changes; the body reads neither.
   useEffect(() => {
     setOffset(0);
   }, [active, isDone]);

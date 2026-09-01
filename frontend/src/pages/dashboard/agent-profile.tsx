@@ -234,26 +234,24 @@ export function AgentProfilePage() {
     }
   }
 
-  async function loadAgent() {
+  const loadAgent = useCallback(async () => {
     if (!agentId) return;
     const a = await getAgent(agentName);
     setAgent(a);
     setLoadError(!a);
-  }
+  }, [agentId, agentName, getAgent]);
 
   useEffect(() => {
-    if (!agentId) return;
     void loadAgent();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentId, agentName, getAgent]);
+  }, [loadAgent]);
 
   // Load the user roster (once) so the ownership transfer target picker and the
   // owner/creator display can resolve users/{id} → display title.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one roster load per mount; users.length is an already-loaded guard only.
   useEffect(() => {
     if (users.length === 0) {
       void fetchUsers({ pageSize: 100 }, { silent: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load the caller's accessible global API providers once per page view. The
@@ -301,6 +299,7 @@ export function AgentProfilePage() {
   // runtime-config editor seeds its own draft the same way: the page remounts
   // it via key={agent.name}, so only the persona/description editors and the
   // save-status indicator (which still live here) are reset in this effect.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset keyed on agent?.name only — NOT on acpConfig, so the post-save refetch never clobbers in-progress edits (see comment above).
   useEffect(() => {
     setPersonaDraft(agent?.info?.acpConfig?.personaPrompt ?? "");
     setPersonaEditing(false);
@@ -308,7 +307,6 @@ export function AgentProfilePage() {
     setDescriptionEditing(false);
     setSavingDescription(false);
     setSaveStatus("idle");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent?.name]);
 
   // The config editor is memoized, so its callbacks must keep their identity

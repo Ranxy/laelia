@@ -461,7 +461,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     // Close any open thread panel — it belongs to the previous channel.
     closeThread();
     setThreadExpanded(false);
-    scroller.resetScrollState();
+    resetScrollState();
     lastChannelRef.current = channelId;
     try {
       await loadMessages(conversationName);
@@ -516,6 +516,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const messageDeepLinkId = searchParams.get("message") ?? "";
   const messageDeepLinkVersion = searchParams.get("version") ?? "";
   const deepLinkRef = useRef<string>("");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deep-link scroll targets are read through refs; keyed on the link ids and load state.
   useEffect(() => {
     if (!channelId) return;
     const target = messageDeepLinkId || threadDeepLinkId;

@@ -125,4 +125,28 @@ describe("CommandEventInspector", () => {
     );
     expect(screen.getByText("**hello** world")).toBeInTheDocument();
   });
+
+  it("renders the WARNING banner on the summary tab only", () => {
+    render(
+      <CommandEventInspector
+        event={event({
+          seqNo: 5,
+          type: CommandEventType.WARNING,
+          payload: { case: "warning", value: { message: "disk almost full" } },
+        })}
+      />
+    );
+
+    // The banner lives on the summary (default) tab.
+    expect(screen.getByText("disk almost full")).toBeInTheDocument();
+
+    // Switching to raw no longer repeats it (previously it rendered on
+    // every tab).
+    fireEvent.click(
+      screen
+        .getAllByRole("tab")
+        .find((el) => el.textContent === "command.inspector-raw")!
+    );
+    expect(screen.queryByText("disk almost full")).not.toBeInTheDocument();
+  });
 });

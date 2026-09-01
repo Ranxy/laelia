@@ -145,6 +145,7 @@ export function LazyMarkdown({
     // would make the growing row a valid anchor again and defeat the exclusion.
   }, [visible]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: observed element and scroll root are read through refs; refresh is keyed on visible/rootMargin.
   useEffect(() => {
     if (visible) return;
     const el = ref.current;

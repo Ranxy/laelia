@@ -1,6 +1,6 @@
-import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@/components/ui/spinner";
 
 // Shared scaffolding for the settings pages: the scroll container + title
 // header (with optional trailing actions), the centered loading marker, and
@@ -13,7 +13,7 @@ export function PageLoading({ message }: { message?: string } = {}) {
   const { t } = useTranslation();
   return (
     <div className="flex items-center justify-center gap-2 py-16 text-control-light text-sm">
-      <Loader2 className="size-4 animate-spin" />
+      <Spinner />
       {message ?? t("common.loading")}
     </div>
   );

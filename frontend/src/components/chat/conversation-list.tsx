@@ -564,6 +564,7 @@ const ConversationRow = memo(function ConversationRow({
 
   // Close the swipe action when the row becomes active (user navigated into it)
   // or when pinned state changes so the UI doesn't feel stuck.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset keyed on active/pinned changes; the body reads neither.
   useEffect(() => {
     setOffset(0);
   }, [active, pinned]);

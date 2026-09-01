@@ -150,6 +150,7 @@ export function ThreadPanel({
   );
 
   // Auto-stick to bottom as replies arrive.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the reply-arrival count; the body intentionally reads nothing else.
   useEffect(() => {
     if (scrollRef.current && stickToBottomRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;

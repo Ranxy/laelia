@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { Card } from "@/components/profile-common";
@@ -63,25 +63,26 @@ export function AgentMcpPage() {
 
   const agentName = agentResourceName(agentId);
 
-  async function loadAgent() {
+  const loadAgent = useCallback(async () => {
     if (!agentId) return;
     const a = await getAgent(agentName);
     setAgent(a);
     setLoadError(!a);
-  }
+  }, [agentId, agentName, getAgent]);
 
   useEffect(() => {
-    if (!agentId) return;
     void loadAgent();
-  }, [agentId, agentName, getAgent]);
+  }, [loadAgent]);
 
   // Seed the selection once per agent so the refetch after a save does not
   // clobber in-progress toggles.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: seed keyed on agent?.name only — NOT on mcpServers, so a save refetch never clobbers in-progress toggles.
   useEffect(() => {
     setSelectedMcpServers(agent?.mcpServers ? [...agent.mcpServers] : []);
   }, [agent?.name]);
 
   // Load the MCP server roster the caller may use (once) for the picker.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one roster load per mount; mcpServers.length is an already-loaded guard only.
   useEffect(() => {
     if (mcpServers.length === 0) {
       void fetchMcpServers({ pageSize: 100 }, { silent: true });

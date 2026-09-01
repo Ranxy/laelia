@@ -1,6 +1,7 @@
 import { Activity, Home, Settings, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { RouterLink } from "@/components/router-link";
 import { cn } from "@/lib/utils";
 
 interface TabItem {
@@ -40,7 +41,6 @@ function isTabActive(tab: TabItem, pathname: string): boolean {
 export function MobileTabBar() {
   const { t } = useTranslation();
   const location = useLocation();
-  const navigate = useNavigate();
   const pathname = location.pathname;
 
   return (
@@ -58,9 +58,8 @@ export function MobileTabBar() {
           const active = isTabActive(tab, pathname);
           return (
             <li key={tab.path} className="flex">
-              <button
-                type="button"
-                onClick={() => navigate(tab.path)}
+              <RouterLink
+                path={tab.path}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex flex-1 flex-col items-center justify-center gap-0.5",
@@ -72,7 +71,7 @@ export function MobileTabBar() {
               >
                 <Icon className="size-5" strokeWidth={active ? 2.25 : 2} />
                 <span>{t(tab.labelKey)}</span>
-              </button>
+              </RouterLink>
             </li>
           );
         })}

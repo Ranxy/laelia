@@ -202,11 +202,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "src/shims-3rd-party.d.ts",
-        "tailwind.config.js",
-        "vite-plugin-export-csp-hashes.ts"
-      ],
+      "includes": ["tailwind.config.js", "src/shims-css.d.ts"],
       "formatter": { "enabled": false },
       "linter": { "enabled": false }
     },
@@ -217,6 +213,8 @@
           "complexity": { "noArguments": "error" },
           "correctness": {
             "noUnusedImports": "error",
+            "useExhaustiveDependencies": "error",
+            "useHookAtTopLevel": "error",
             "noConstAssign": "off",
             "noGlobalObjectCalls": "off",
             "noInvalidBuiltinInstantiation": "off",

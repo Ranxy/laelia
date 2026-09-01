@@ -162,6 +162,7 @@ export function useAvatar(name: string | undefined | null): string | null {
     name ? getCachedAvatarUrl(name) : null
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: epochValue forces a refetch after invalidateAvatar even when `name` is unchanged (the resource name is stable across re-uploads).
   useEffect(() => {
     if (!name) {
       setUrl(null);
@@ -183,8 +184,6 @@ export function useAvatar(name: string | undefined | null): string | null {
     return () => {
       active = false;
     };
-    // epochValue forces a refetch after invalidateAvatar even when `name` is
-    // unchanged (the resource name is stable across re-uploads).
   }, [name, epochValue]);
 
   return url;

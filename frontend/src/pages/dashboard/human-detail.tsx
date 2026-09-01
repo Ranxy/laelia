@@ -190,6 +190,7 @@ export function HumanDetailPage() {
     };
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the user's resource name (stable across roster refetches) so a description save that refreshes the roster does not re-fetch the policy.
   useEffect(() => {
     if (!canGetPolicy || !user) return;
     let active = true;
@@ -237,8 +238,6 @@ export function HumanDetailPage() {
     return () => {
       active = false;
     };
-    // Depend on the user's resource name (stable across roster refetches) so a
-    // description save that refreshes the roster does not re-fetch the policy.
   }, [canGetPolicy, user?.name]);
 
   if (!user) {

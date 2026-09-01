@@ -10,7 +10,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "biome:format": "biome format --write src",
-    "biome:lint": "biome lint src",
     "biome:check": "biome check --write src",
     "lint": "biome lint src",
     "check": "node scripts/check-store-writes.mjs && node scripts/check-react-layering.mjs && node scripts/check-react-i18n.mjs && node scripts/sort_i18n_keys.mjs --check",

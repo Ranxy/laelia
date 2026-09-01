@@ -1,5 +1,5 @@
 import { Check, Loader2 } from "lucide-react";
-import { forwardRef, memo, useImperativeHandle, useState } from "react";
+import { memo, useImperativeHandle, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { KeyValueEnvEditor } from "@/components/agent/key-value-env-editor";
@@ -96,25 +96,23 @@ export interface AcpConfigEditorProps {
   noProvidersHint?: string;
 }
 
-function AcpConfigEditorImpl(
-  {
-    acpConfig,
-    agentName,
-    availableProviders,
-    apiProviders,
-    canEdit,
-    canEditAdminOnly,
-    canSelfProvide,
-    machineResourceID,
-    saveStatus,
-    onAutoSave,
-    onRefreshModels,
-    mode,
-    draftController,
-    noProvidersHint,
-  }: AcpConfigEditorProps,
-  ref: React.Ref<AcpConfigEditorHandle>
-) {
+function AcpConfigEditorImpl({
+  acpConfig,
+  agentName,
+  availableProviders,
+  apiProviders,
+  canEdit,
+  canEditAdminOnly,
+  canSelfProvide,
+  machineResourceID,
+  saveStatus,
+  onAutoSave,
+  onRefreshModels,
+  mode,
+  draftController,
+  noProvidersHint,
+  ref,
+}: AcpConfigEditorProps & { ref?: React.Ref<AcpConfigEditorHandle> }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const showLegacyInline = canEditAdminOnly || canSelfProvide;
@@ -941,4 +939,4 @@ function AcpConfigEditorImpl(
 // Memoized so typing in the page-level identity/description/persona fields
 // never re-renders the config form; typing inside it re-renders only this
 // editor (the page re-renders only around saves and store loads).
-export const AcpConfigEditor = memo(forwardRef(AcpConfigEditorImpl));
+export const AcpConfigEditor = memo(AcpConfigEditorImpl);

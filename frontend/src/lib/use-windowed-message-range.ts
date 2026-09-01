@@ -138,6 +138,7 @@ export function useWindowedMessageRange(
     return () => observer.disconnect();
   }, [containerRef, recompute]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset keyed on the head row id — a shifted window must re-engage from scratch.
   useEffect(() => {
     setEngaged(false);
     heightsRef.current = new Map();

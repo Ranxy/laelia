@@ -130,8 +130,7 @@ export function MachineProfilePage() {
   useEffect(() => {
     if (!machineId) return;
     void reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [machineId, machineName]);
+  }, [machineId, reload]);
 
   // Load the caller's accessible global API providers once per page view; the
   // store slice caches them for the add-agent sheet's provider/entry
@@ -177,8 +176,7 @@ export function MachineProfilePage() {
     void groupServiceClient
       .listGroups({ pageSize: 1000 })
       .then((res) => setGroups(res.groups ?? []));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [machineId, machineName, machine?.canManage, fetchUsers]);
+  }, [machineId, machine?.canManage, fetchUsers, loadPolicy]);
 
   // agentCreatorMembers are the principals bound to the machineAgentCreator
   // role on this machine's IAM policy.

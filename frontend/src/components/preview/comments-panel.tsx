@@ -248,7 +248,6 @@ function CommentRow({
   const att = msg.attachments?.find(
     (a) => a.sectionAnchor !== "" && a.id === attachmentId
   );
-  if (!att) return null;
   const isUser = msg.role === "user";
   const isOwnUser = isOwnUserMessage(msg, currentPrincipalId);
   const avatarSeed = isUser
@@ -261,7 +260,10 @@ function CommentRow({
     : msg.agentId
       ? avatarNameForAgentId(msg.agentId)
       : undefined;
+  // Hooks must run before the `!att` early return below so the hook order is
+  // stable across renders regardless of the attachment's presence.
   const avatarSrc = useAvatar(avatarName);
+  if (!att) return null;
   const quote = att.quotedText;
   const jump =
     quote || !jumpRequiresQuote
