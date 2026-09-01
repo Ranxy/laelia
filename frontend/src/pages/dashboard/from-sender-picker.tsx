@@ -4,10 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Avatar } from "@/components/chat/avatar";
 import { getLayerRoot, LAYER_SURFACE_CLASS } from "@/components/ui/layer";
-import { userServiceClient } from "@/connect";
+import { useUserSearch } from "@/hooks/use-user-search";
 import { useAvatar } from "@/lib/avatar-cache";
 import { avatarNameForAgentId, avatarNameForUserId } from "@/lib/resource";
-import { buildUserFilter } from "@/lib/user-filter";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
@@ -137,10 +136,15 @@ export function FromSenderPicker({
 
   const [query, setQuery] = useState(() => (value ? senderTitle(value) : ""));
   const [open, setOpen] = useState(false);
-  const [userResults, setUserResults] = useState<User[]>([]);
-  const [loading, setLoading] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Debounced server-side user search, shared with MemberPicker
+  // (hooks/use-user-search). Gated on typed input: the empty query clears the
+  // results instead of listing a browse page. `searching` flips on with the
+  // query change so the dropdown shows the loading state instead of stale rows.
+  const { results: userResults, searching: loading } = useUserSearch(query, {
+    enabled: query.trim() !== "",
+  });
 
   // Preload the agent roster as soon as the picker mounts so agents are ready
   // before the user starts typing (avoids agents popping in later and making
@@ -159,35 +163,6 @@ export function FromSenderPicker({
       void fetchAgents({ pageSize: 100 });
     }
   }, [open, fetchAgents]);
-
-  // Debounced server-side user search, matching the existing MemberPicker
-  // pattern. `loading` is turned on synchronously in the input onChange so the
-  // dropdown does not briefly show stale results from the previous query.
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    const q = query.trim();
-    if (!q) {
-      setUserResults([]);
-      setLoading(false);
-      return;
-    }
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await userServiceClient.listUsers({
-          pageSize: 50,
-          filter: buildUserFilter(q),
-        });
-        setUserResults(res.users ?? []);
-      } catch {
-        setUserResults([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 250);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query]);
 
   const q = query.trim().toLowerCase();
   const filteredAgents = useMemo(
@@ -244,10 +219,8 @@ export function FromSenderPicker({
         }
         setQuery(next);
         setOpen(true);
-        // Drop stale user results immediately and show the loading state so
-        // the dropdown doesn't flash old content while the new search runs.
-        setUserResults([]);
-        setLoading(next.trim().length > 0);
+        // The shared hook drops stale results and flips `searching` on this
+        // query change, so the dropdown never flashes old content.
         // Typing away from the selected sender starts a fresh lookup.
         if (value && senderTitle(value) !== next) {
           onChange(null);

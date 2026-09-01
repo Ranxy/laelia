@@ -1,5 +1,5 @@
 import { ChevronsUpDown } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,7 @@ import {
 } from "@/components/ui/popover";
 import { SearchInput } from "@/components/ui/search-input";
 import { Spinner } from "@/components/ui/spinner";
-import { userServiceClient } from "@/connect";
-import { buildUserFilter } from "@/lib/user-filter";
+import { useUserSearch } from "@/hooks/use-user-search";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
@@ -130,11 +129,6 @@ export function MemberPicker({
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // User search results live in local state (not the shared users roster) so a
-  // filtered picker fetch can never clobber the roster other pages depend on.
-  const [userResults, setUserResults] = useState<User[]>([]);
-  const [userResultsLoading, setUserResultsLoading] = useState(false);
 
   const isUser = memberType === 1;
   // Workspace admins hold laelia.agents.edit and may add any agent; everyone
@@ -142,29 +136,15 @@ export function MemberPicker({
   const isAdmin =
     currentUser?.permissions?.includes("laelia.agents.edit") ?? false;
 
-  // Debounced backend search for users (local state); agents are filtered
+  // Debounced backend search for users; results live in the shared hook's
+  // local state (not the users roster) so a filtered picker fetch can never
+  // clobber the roster other pages depend on. Kept enabled while open so an
+  // empty query still lists the first page (browse mode); agents are filtered
   // client-side from the shared roster below.
-  useEffect(() => {
-    if (!open || !isUser) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      setUserResultsLoading(true);
-      try {
-        const res = await userServiceClient.listUsers({
-          pageSize: 50,
-          filter: buildUserFilter(query),
-        });
-        setUserResults(res.users ?? []);
-      } catch {
-        setUserResults([]);
-      } finally {
-        setUserResultsLoading(false);
-      }
-    }, 250);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [open, isUser, query]);
+  const { results: userResults, searching: userResultsLoading } = useUserSearch(
+    query,
+    { enabled: open && isUser }
+  );
 
   // The agent list filters the shared roster client-side; ensure the roster is
   // loaded when the picker opens so it's never empty just because the user
