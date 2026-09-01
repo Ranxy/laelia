@@ -26,7 +26,7 @@ function event(
 
 describe("CommandEventLedger", () => {
   it("renders kind tags, content and time for visible events", () => {
-    render(
+    const { container } = render(
       <CommandEventLedger
         outputs={[]}
         events={[
@@ -48,8 +48,34 @@ describe("CommandEventLedger", () => {
     expect(screen.getByText("started")).toBeInTheDocument();
     expect(screen.getByText("command.event-warning")).toBeInTheDocument();
     expect(screen.getByText("careful")).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-row-key="ev-1"] > div:nth-child(2)')
+    ).toHaveClass("text-xs");
   });
 
+  it("uses a compact label for long compaction event tags", () => {
+    render(
+      <CommandEventLedger
+        outputs={[]}
+        events={[
+          event({
+            seqNo: 1,
+            type: CommandEventType.CONTEXT_COMPACTION_STARTED,
+          }),
+        ]}
+      />
+    );
+
+    expect(
+      screen.getByText("command.event-compaction-started")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("command.event-context-compaction-started")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("command.event-compaction-started").closest("span")
+    ).toHaveAttribute("title", "command.event-context-compaction-started");
+  });
   it("merges paired tool calls into a single row", () => {
     render(
       <CommandEventLedger

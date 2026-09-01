@@ -435,6 +435,8 @@
     "content-column": "Content",
     "duration": "Duration",
     "event-column": "Event",
+    "event-compaction-finished": "Compaction Finished",
+    "event-compaction-started": "Compaction Started",
     "event-context-compaction-finished": "Context Compaction Finished",
     "event-context-compaction-started": "Context Compaction Started",
     "event-context-usage": "Context Usage",

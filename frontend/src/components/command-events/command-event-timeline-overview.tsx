@@ -158,21 +158,18 @@ export function CommandEventTimelineOverview({
     };
   }, [outputs, events]);
 
-  // The time window the visible spans cover; span left/width are linear in
-  // wall time across it (real time axis, per the trajectory design report),
-  // so two bursts a minute apart no longer render as equal neighbors.
-  const timeWindow = useMemo(() => {
-    if (spans.length === 0) return { t0: 0, duration: 1 };
-    const t0 = spans[0].start;
-    let t1 = t0;
-    for (const span of spans) t1 = Math.max(t1, span.end);
-    return { t0, duration: Math.max(1, t1 - t0) };
-  }, [spans]);
-
-  const fractionToTime = useCallback(
-    (fraction: number) => timeWindow.t0 + fraction * timeWindow.duration,
-    [timeWindow]
+  // This overview intentionally uses ordinal slots instead of wall-clock
+  // positioning. Most system events (for example Context Usage, Final
+  // Summary, and Token Usage) are instantaneous markers represented as
+  // `end = start + 1` millisecond. Mapping those markers to a real-time axis
+  // makes their bars effectively zero-width and turns the gaps between event
+  // timestamps into a mostly empty timeline. Keep the track densely filled;
+  // the ledger shows the exact timestamps and durations for time-based detail.
+  const ordered = [...spans].sort(
+    (a, b) => a.start - b.start || a.seqNo - b.seqNo
   );
+  const step = 100 / ordered.length;
+  const gap = Math.min(1.6, step / 4);
 
   const fractionFromEvent = useCallback((clientX: number): number => {
     const el = trackRef.current;
@@ -221,18 +218,18 @@ export function CommandEventTimelineOverview({
     setDragging(false);
     setSelection(range);
 
-    // Collect every span overlapping the selected time window. This is the
-    // same predicate the render-time dimming uses, so the committed highlight
-    // always matches what was on screen while dragging (and a span that only
-    // partially sticks into the range stays selected).
-    const startT = fractionToTime(range.start);
-    const endT = fractionToTime(range.end);
+    // Use the same ordinal slots as the rendered bars so range selection
+    // remains aligned with the visual timeline instead of wall-clock gaps.
     const selectedKeys: string[] = [];
     let first: Span | undefined;
-    for (const span of spans) {
-      if (span.start <= endT && span.end >= startT) {
-        selectedKeys.push(span.key);
-        if (!first) first = span;
+    for (let i = 0; i < ordered.length; i++) {
+      const left = i * step;
+      const width = Math.max(MIN_SPAN_WIDTH_PERCENT, step - gap);
+      const inRange =
+        left < range.end * 100 && left + width > range.start * 100;
+      if (inRange) {
+        selectedKeys.push(ordered[i]!.key);
+        if (!first) first = ordered[i];
       }
     }
     onRangeSelect?.(selectedKeys.length > 0 ? selectedKeys : null);
@@ -259,9 +256,8 @@ export function CommandEventTimelineOverview({
     );
   }
 
-  const { t0, duration } = timeWindow;
-  const selectionStartT = selection ? fractionToTime(selection.start) : 0;
-  const selectionEndT = selection ? fractionToTime(selection.end) : 0;
+  const selectionStart = selection?.start ?? 0;
+  const selectionEnd = selection?.end ?? 0;
 
   return (
     <div
@@ -327,19 +323,14 @@ export function CommandEventTimelineOverview({
               />
             </>
           )}
-          {spans.map((span) => {
-            const width = Math.max(
-              MIN_SPAN_WIDTH_PERCENT,
-              ((span.end - span.start) / duration) * 100
-            );
-            const left = Math.min(
-              100 - width,
-              ((span.start - t0) / duration) * 100
-            );
+          {ordered.map((span, index) => {
+            const left = index * step;
+            const width = Math.max(MIN_SPAN_WIDTH_PERCENT, step - gap);
             const selected = selectedKey === span.key;
             const inSelection =
               !selection ||
-              (span.start <= selectionEndT && span.end >= selectionStartT);
+              (left < selectionEnd * 100 &&
+                left + width > selectionStart * 100);
             return (
               <button
                 key={span.key}

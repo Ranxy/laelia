@@ -74,14 +74,14 @@ describe("CommandEventTimelineOverview", () => {
   });
 });
 
-describe("CommandEventTimelineOverview real time axis", () => {
-  it("positions spans linearly by their real timestamps", () => {
+describe("CommandEventTimelineOverview filled layout", () => {
+  it("fills the track with consecutive ordinal event slots", () => {
     render(
       <CommandEventTimelineOverview
         outputs={
           [
-            // Different stream types stay separate runs; the second sits one
-            // second after the first, at the far right of the covered window.
+            // Different stream types stay separate runs and still receive
+            // adjacent slots even when their timestamps are far apart.
             output(1, 1700000001, 1),
             output(2, 1700000002, 2),
           ] as never[]
@@ -92,12 +92,10 @@ describe("CommandEventTimelineOverview real time axis", () => {
 
     const spans = outputSpans();
     expect(spans).toHaveLength(2);
-    // Real time axis: the first span starts at the window origin, the second
-    // sits ~1s later at the right edge (min-width floored) — not two equal
-    // halves as under the old ordinal layout.
     expect(spans[0].style.left).toBe("0%");
-    expect(parseFloat(spans[0].style.width)).toBeLessThanOrEqual(0.5);
-    expect(parseFloat(spans[1].style.left)).toBeGreaterThan(90);
+    expect(parseFloat(spans[0].style.width)).toBeGreaterThan(40);
+    expect(parseFloat(spans[1].style.left)).toBeGreaterThan(45);
+    expect(parseFloat(spans[1].style.left)).toBeLessThan(55);
   });
 
   it("caps rendered spans and marks the truncated prefix", () => {
@@ -170,8 +168,8 @@ describe("CommandEventTimelineOverview drag selection", () => {
     fireEvent.pointerMove(track, { clientX: 120, pointerId: 1 });
     fireEvent.pointerUp(track, { clientX: 120, pointerId: 1 });
 
-    expect(onRangeSelect).toHaveBeenCalledWith(["out-2"]);
-    expect(onSelect).toHaveBeenCalledWith("out-2");
+    expect(onRangeSelect).toHaveBeenCalledWith(["out-1", "out-2"]);
+    expect(onSelect).toHaveBeenCalledWith("out-1");
   });
 
   it("keeps partially covered spans selected and undimmed", () => {

@@ -435,6 +435,8 @@
     "content-column": "内容",
     "duration": "耗时",
     "event-column": "事件",
+    "event-compaction-finished": "压缩完成",
+    "event-compaction-started": "压缩开始",
     "event-context-compaction-finished": "上下文压缩完成",
     "event-context-compaction-started": "上下文压缩开始",
     "event-context-usage": "上下文用量",

@@ -159,8 +159,10 @@ export function isToolCallError(status: string | undefined | null): boolean {
 // --- Event-kind registry (moved from components/command-events/) -----------
 
 export interface CommandEventKind {
-  /** i18n key for the tag label. */
+  /** i18n key for the full event label. */
   labelKey: string;
+  /** Optional shorter label for dense list rows. */
+  compactLabelKey?: string;
   /** Tailwind classes for the tag pill. */
   tagClass: string;
   /** Tailwind classes for the row text accent. */
@@ -250,6 +252,7 @@ export const commandEventKind: Record<number, CommandEventKind> = {
   },
   [CommandEventType.CONTEXT_COMPACTION_STARTED]: {
     labelKey: "command.event-context-compaction-started",
+    compactLabelKey: "command.event-compaction-started",
     tagClass: WARNING_TAG,
     textClass: "text-warning",
     icon: Minimize2,
@@ -257,6 +260,7 @@ export const commandEventKind: Record<number, CommandEventKind> = {
   },
   [CommandEventType.CONTEXT_COMPACTION_FINISHED]: {
     labelKey: "command.event-context-compaction-finished",
+    compactLabelKey: "command.event-compaction-finished",
     tagClass: SUCCESS_TAG,
     textClass: "text-success",
     icon: Minimize2,

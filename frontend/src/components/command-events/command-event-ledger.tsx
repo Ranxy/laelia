@@ -469,6 +469,10 @@ function LedgerTable({
                   : event!.seqNo;
               const selected = selectedKey === row.key;
               const Icon = kind.icon;
+              const displayLabelKey = isOutput
+                ? kind.labelKey
+                : (getCommandEventKind(event!.type).compactLabelKey ??
+                  kind.labelKey);
               const outputTruncated =
                 isOutput && row.content.length > MAX_OUTPUT_RENDER_CHARS;
 
@@ -511,15 +515,16 @@ function LedgerTable({
                   <div className="px-3 py-1.5 align-top">
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium",
+                        "inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium",
                         kind.tagClass
                       )}
+                      title={t(kind.labelKey)}
                     >
                       <Icon className="size-3 shrink-0" />
-                      {t(kind.labelKey)}
+                      {t(displayLabelKey)}
                     </span>
                   </div>
-                  <div className="min-w-0 px-3 py-1.5">
+                  <div className="min-w-0 px-3 py-1.5 text-xs">
                     <div className="flex min-w-0 items-start gap-2">
                       <div className="min-w-0 flex-1">
                         {isOutput ? (
