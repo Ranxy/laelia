@@ -2,7 +2,8 @@
 
 > **⚙ 实施进度标注(批 3 收口后)**
 - ✅ 已完成:P0 首项(冻结删除)+ Rt-05(UNSAFE_RouteContext 退役,`d4774c3`);错误映射单点化 connect/toast-errors(`389ce97`);agent-token 并入 machine-token、command-status 部分拆解、4 个死导出清理(`b0499db`);chat-layout/machines/machine-profile 轮询转 usePolling(`acb701d`);AGENTS.md 幽灵引用修正;tsconfig 覆盖 sw/vitest(批 6 `d8c8e46`);**Biome hooks 正确性规则启用 + 存量全清偿 + 幽灵 overrides(批 11)**;**批 12(`d839784`~`83c38ad`)**:R-02 落地(command-status 拆 time-format/resource,死导出 commandEventTypeToI18nKey/formatTimeOfDay/commandResourceName 清除)、R-03 落地(async-memo-cache 统一原语,avatar/image 两站接入)、B-02/B-03/B-09 三缓存竞态全修、路由名 satisfies 缝合(RouteName 联合 + ROUTE_INFO 穷尽 + handle satisfies + backTo 改路由名,routeNameForPath 反查删除)。toast.ts 去 Base UI 私有接口实为批 6 `9655606` 已修(本行原为过期清单)。
-- ⏳ 未完成:路由名 handle.permission 权限守卫;useEdgeDragToClose 手势合并;resolvePath→generatePath;tailwind.config.js 迁 @theme(E-01)。
+- ✅ **批 14(`8acfe2f`~`cc7e298`)06 章账面清零**:R-04 hooks 目录合并(lib/use-* 与 composables/ 全部并入单一 `src/hooks/` kebab-case,3 个 camelCase 文件更名,63 文件导入面重写,`8acfe2f`)、P2 手势合并(useEdgeDragToClose + useSwipeBack 收敛到共享 useEdgeDrag 引擎,use-swipe-to-close-sheet 退役,touchCancel 策略按面保留零行为漂移,`fef3b17`)、Rt-03 resolvePath→generatePath(缺参从静默留 `:id` 改为大声抛错,`3847640`)、Rt-02 handle.permission 路由权限守卫(RouteHandle.permission 单值/any-of 数组 + DashboardLayout 响应式 RoutePermissionGate,settings 全家 + machines list/new 共 14 处声明,镜像菜单可见性口径,`f31b591`)、E-01 tailwind.config.js 迁 @theme(语义色与字体栈入 CSS,三元组换名 --rgb-*,死配置/死插件(matrix-green、3xl/4xl、大 spacing、ping-slow、typography)随文件删除,vite build + 产物 CSS 验证,`cc7e298`)。
+- ⏳ 未完成:无(06 章账面清零;allowedHosts 进 env 为可选余项未立项)。
 
 > **决策状态更新**:本报告 P0 首项(废除 `suppressLoadingFlags` 全局冻结)与 Rt-05(UNSAFE_RouteContext)已由总报告 **ADR-2 拍板**:`use-preview-routes.tsx` 整体退役、冻结删除、swipe-back 保留手势识别仅重写提交阶段(复核 `replace: true` 历史语义,Rt-05/B-04/B-01 一并解决);错误映射单点化(connect/errors.ts)维持 P0 不变。
 
@@ -56,6 +57,7 @@ grep 统计的"被引用文件数"(不含 lib 自身与测试):
 - 位置:`src/lib/use-*.ts`(6 个 kebab-case)vs `src/composables/`(4 个文件:`useAvatarEditor.ts`、`useMentionDetect.ts`、`useMentionTargets.ts`、`use-presence-heartbeat.ts`——3 个 camelCase + 1 个 kebab-case)
 - 问题:同样"裸函数集合 + hook"的东西,一个目录叫 lib(React 词汇),一个叫 composables(Vue 词汇);`use-presence-heartbeat.ts` 是应用级 hook 却不在 lib。对 33 个 lib 文件的新人而言"该放哪"没有可执行规则。
 - 建议:合并进单一 `src/hooks/`(kebab-case);保留 lib 放非 React 纯函数。
+- **✅ 批 14 已修**(`8acfe2f`):lib 的 8 个 use-*(含其测试)与 composables 全部 16 文件并入 `src/hooks/`,useAvatarEditor/useMentionDetect/useMentionTargets 更名 kebab-case;lib 保留纯函数(platform-edge-swipe 等),hooks 内跨目录相对导入改 `@/lib/` 别名;63 文件导入与 vi.mock 路径随迁。
 
 **【中】R-05 `lib/toast.ts` 依赖 Base UI 未公开接口 + 前导空格属性 hack**
 - 位置:`src/lib/toast.ts:9-34`,被 52 个文件 / 146 处 `toastManager.add()` 使用
@@ -91,6 +93,7 @@ grep 统计的"被引用文件数"(不含 lib 自身与测试):
 - `use-history-sentinel.ts`(90 行):单 token 序列 + `setTimeout(0)` 延迟平衡 pop,处理了 StrictMode 重挂与堆叠 overlay;是本仓库最精巧的 90 行,但理解成本极高(注释即 30 行)。**保留,建议封装成 `overlay-history.ts` 专用模块并补文档**。
 - `use-swipe-back.ts`(335 行):核心手势质量高(方向锁、bezel guard、touchcancel 即时重置、1000ms 导航兜底),但存在 B-01(store 冻结)与 B-04(replace 导航)的结构性问题。
 - `use-swipe-to-close-sheet.ts`(197 行):与 `useSwipeBack` 的 thread 模式重复约 70%(同为方向锁+阈值+`SWIPE_BACK_*` 常量透传),且 `enabled` 参数表明它在 iOS 上整体旁路。**应合并**为 `useEdgeDragToClose(rootRef, { onCommit })`(中)。
+  **✅ 批 14 已修**(`fef3b17`):共享 `useEdgeDrag` 引擎落地于 `hooks/use-edge-drag-to-close.ts`(监听/边区/方向锁/阈值/settle 时序单点),useSwipeBack 改为宿主(提供 begin/follow/settle/reset),use-swipe-to-close-sheet 模块退役;touchCancel 策略按面保留(路由/线程 instant、sheet settle)确保零行为漂移;`SWIPE_BACK_*` 再导出 shim 随之删除。
 - `useAvatar`(avatar-cache.ts:154-191):见 B-02/B-03 竞态。
 - `useIsDesktop`(30 行):实现干净(useSyncExternalStore + server snapshot),但见 L-03 断点双定义问题。
 
@@ -151,11 +154,13 @@ grep 统计的"被引用文件数"(不含 lib 自身与测试):
 - 问题:rootGuard 只做登录态。`/settings/iam`、`/settings/roles` 等高敏页面在后端自然 403(API 层兜底),但路由级权限为零——深链接可达后再失败,而不是路由级拒绝;移动端 Mobile Header/ROUTE_INFO 也没有做权限相关的可见性分支。
 - 证据:grep 全 router 目录无 `permission`;仅有 `SetupChecklistGate`(dashboard-layout.tsx:74-77)自行检查 `laelia.settings.get`。
 - 建议:扩展 route handle 为 `{ name, permission? }`,rootGuard(或 dashboard layout loader)统一跳 forbidden;成本一个文件,收益一处授权策略。
+- **✅ 批 14 已修**(`f31b591`):`RouteHandle.permission`(单值或 any-of 数组,镜像 sidebar/settings-menu 隐藏条目的同一权限)落进 14 个 handle(settings 全家可门禁项 + machines list/new);`app/layouts/route-permission-gate.tsx` 以**组件门**包住 dashboard Outlet——选组件而非 loader 是因为 loader 只在导航时运行,硬刷新深链时会话未到无法重估;无权限渲染禁止面(新 i18n 键 `router.forbidden-*`)+ 返回首页按钮,页面 chunk 不再加载;6 用例(纯助手 + MemoryRouter 双向)。
 
 **【中】Rt-03 `resolvePath` 的字符串正则是 react-router 语法之外的第二套路由 DSL**
 - 位置:`route-index.ts:60-86`
 - 证据:`path.replace(new RegExp(`:${key}(?![A-Za-z0-9_])`, "g"), encodeURIComponent(single))` —— 不支持 splat、不支持可选段、**params 缺失时静默把 `:id` 留在 URL 里**、路径模板与 `path` 属性两处字符串一处真相。`agent-detail-layout.tsx:107/117/129` 等处用它导航。
 - 建议:换成 react-router v7 的原生 `generatePath`/`<Link>`(v7 内置路径编译),或至少在 params 缺失时 `console.warn`。
+- **✅ 批 14 已修**(`3847640`):插值改 `generatePath`(splat/可选段支持 + 缺参 invariant 抛错);路由名查找、未知名 warn+"/" 兜底与 query 拼装保留;测试补编码/兜底/缺参抛错三案。
 
 **【低】Rt-04 `ROUTE_INFO.backTo` 用路径字面量而非 handles 常量且 15 次重复 "/settings"**
 - 位置:`route-info.ts:48,56-58,81-89,90-146`
@@ -219,6 +224,7 @@ grep 统计的"被引用文件数"(不含 lib 自身与测试):
 - 位置:`tailwind.config.js:9-10`(content 配置,v4 自动扫描,无效)、`11-29`(safelist —— 验证:raw 色类全库仅 2 处且不在 safelist 列表内,safelist 的 gray/blue/yellow/red/indigo 系列全部为死字符)、`113-124`(`darkMode/variants/mode:"jit"` v4 皆无效)
 - 证据:`assets/css/tailwind.css:4` `@config "../../../tailwind.config.js"` —— 只有 `theme.extend` 的 colors/spacing/screens/animation 真正生效(v4 通过 @config 合并);文件头注释 "Colors for dark theme / Only used by Web Terminal now"。grep 验证 raw 色仅 `search-result-list.tsx:84`(bg-yellow-200)与 `agent-status-bar.tsx:28`(text-blue-400)2 处——违反自家 AGENTS 语义 token 规则。
 - 建议:把 colors/spacing/screens/animation 迁入 `tailwind.css @theme`,删除 config 文件与 `@config`;顺手清除 2 处 raw 色。**这是重构者第一眼看了会困惑的最大配置债。**
+- **✅ 批 14 已修**(`cc7e298`):语义色 token 与 v3 默认字体栈迁入 `@theme`;raw 三元组 `--color-x` 换名 `--rgb-x`(theme token 持有完整色值,工具类 opacity 走 color-mix),三处手写三元组消费端(markstream CSS 块、pixel-avatar、ledger 阴影)同步改写;死配置随文件删除(matrix-green ×3、3xl/4xl 屏、112~320 spacing、ping-slow、safelist/content/variants/darkMode),forms 以 `@plugin` 保留、零使用的 typography 插件删除;vite build + 产物 CSS 逐项验证(.bg-accent/.bg-accent\/5/theme 变量发射/阴影工具类)。2 处 raw 色未动(默认调色板类,另行处理无收益)。
 
 **【中】E-02 tsc 盲区:`sw/`、`vitest.config.ts` 都不在任何 ts project**
 - 位置:`tsconfig.json:25`(`"include": ["src"]`)、`tsconfig.node.json:17`(`include: ["vite.config.ts"]`)
@@ -376,12 +382,12 @@ src/
 | **P0** | 废除 `suppressLoadingFlags` 全局 store 冻结,统一改 `silent` fetch 约定(项目内已有先例) | 高 | 消灭最大竞态源,方案已在库内存在;中工作量、低风险 | stores/index.ts:37-56、use-swipe-back.ts:135,192 |
 | **P0** | 错误映射单点化:`connect/errors.ts` 建立 错误码→i18n/重试/dedupe,`describeError` i18n 化并迁入 | 高 | 新增 feature 时的最高复用点;146 个调用点可渐进迁移 | connect-errors.ts、146 处 toastManager.add |
 | **P1** | 修复 avatar/image 缓存三竞态:invalidate 后写回、useAvatar stale URL、加容量上限 | 中 | 用户可见 bug(串头像/跨会话残留)+ 顺带引入统一 cache 工具 | avatar-cache.ts:73-96,164-188;image-blob-cache.ts:30-47 | ✅ 批 12 `74691e0` |
-| **P1** | lib 目录整形:agent-token 并入 machine-token、command-status 拆 format/resource、hooks 合并到单一目录、toast 去 Base UI 私有接口依赖 | 中 | 纯机械重构;为"真正的 lib"立规(禁 import stores) | agent-token/command-status/toast/composables | ✅ 批 12 `d839784`(agent-token 批 0、toast 批 6;hooks 目录合并仍开放) |
-| **P1** | 路由名三合一:handles + dashboard.handle + ROUTE_INFO 用 `satisfies` 缝合,backTo 改名常量;handle 加 permission 权限守卫 | 中 | 防以后每次加页面的双份维护;低风险 | handles.ts、route-info.ts、routes/dashboard.tsx | ✅ 批 12 `e393232`(handle.permission 仍开放) |
+| **P1** | lib 目录整形:agent-token 并入 machine-token、command-status 拆 format/resource、hooks 合并到单一目录、toast 去 Base UI 私有接口依赖 | 中 | 纯机械重构;为"真正的 lib"立规(禁 import stores) | agent-token/command-status/toast/composables | ✅ 批 12 `d839784`(agent-token 批 0、toast 批 6);✅ hooks 目录合并批 14 `8acfe2f` |
+| **P1** | 路由名三合一:handles + dashboard.handle + ROUTE_INFO 用 `satisfies` 缝合,backTo 改名常量;handle 加 permission 权限守卫 | 中 | 防以后每次加页面的双份维护;低风险 | handles.ts、route-info.ts、routes/dashboard.tsx | ✅ 批 12 `e393232`(satisfies 缝合);✅ permission 守卫批 14 `f31b591` |
 | **P1** | 开启 Biome React 正确性规则(useExhaustiveDependencies 等),同步清理 4 处 no-op eslint-disable | 中 | 当前 deps 数组类 bug 零防护;一次性修复量可控 | biome.json:24-67 | ✅ 批 11 |
-| **P2** | 手势收敛:`useEdgeDragToClose` 合并 use-swipe-back(thread 模式)与 use-swipe-to-close-sheet;决策是否退役 preview 克隆(UNSAFE_RouteContext) | 中 | -900 行复杂度;可与 P0 联动 | use-swipe-back.ts、use-swipe-to-close-sheet.ts、use-preview-routes.tsx |
-| **P2** | 布局适配单点:useAppShell(desktop/mobile 壳),收敛 21 文件 useIsDesktop + 2 处断点定义 | 中 | 断点语义漂移防患;渐进可行 | use-is-desktop.ts、tailwind.css:10-16 |
-| **P2** | 工程清障:tailwind.config.js 迁 @theme 删除、tsconfig 补 sw/vitest 覆盖、biome.json 幽灵条目+schema 对齐、allowedHosts 进 env | 高(配置债)| 一次 PR 解决,后续自文档化 | tailwind.config.js、sw/sw.ts、biome.json:203-212、vite.config.ts:95 |
+| **P2** | 手势收敛:`useEdgeDragToClose` 合并 use-swipe-back(thread 模式)与 use-swipe-to-close-sheet;决策是否退役 preview 克隆(UNSAFE_RouteContext) | 中 | -900 行复杂度;可与 P0 联动 | use-swipe-back.ts、use-swipe-to-close-sheet.ts、use-preview-routes.tsx | ✅ 批 14 `fef3b17`(手势合并;preview 克隆已随 ADR-2 批 6 `d4774c3` 退役) |
+| **P2** | 布局适配单点:useAppShell(desktop/mobile 壳),收敛 21 文件 useIsDesktop + 2 处断点定义 | 中 | 断点语义漂移防患;渐进可行 | use-is-desktop.ts、tailwind.css:10-16 | ⏳ 未立项(低紧迫;hooks 目录已归一) |
+| **P2** | 工程清障:tailwind.config.js 迁 @theme 删除、tsconfig 补 sw/vitest 覆盖、biome.json 幽灵条目+schema 对齐、allowedHosts 进 env | 高(配置债)| 一次 PR 解决,后续自文档化 | tailwind.config.js、sw/sw.ts、biome.json:203-212、vite.config.ts:95 | ✅ 批 14 `cc7e298`(tailwind)+ 批 6 `d8c8e46`(tsconfig)+ 批 11(biome);allowedHosts 进 env 未立项 |
 | **P3** | 死代码清扫:4 个死导出、双 member-picker、双 slugify、2 处 raw 色、package.json 脚本 dup、`user-scalable=no` | 低 | 纯删除;随手可做 | 见第七章表格 | ✅ 脚本 dup 批 11;死导出余量随批 12 `d839784` 清除(commandEventTypeToI18nKey/formatTimeOfDay/commandResourceName;agent-token/slugify 已在批 0/5 收敛) |
 | **P3** | PWA reload 加用户可见性护栏(编辑态延后)+ push suppressedRoute 多 tab 语义 | 中 | 低频但伤信任;改动小 | pwa.ts:38-44、sw/sw.ts:62-80 |
 
