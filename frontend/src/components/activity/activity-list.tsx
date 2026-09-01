@@ -1,10 +1,9 @@
-import { ChevronLeft, ChevronRight, Inbox, Loader2 } from "lucide-react";
+import { Inbox, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { ActivityRow } from "@/components/activity/activity-row";
 import { EmptyState, LoadingState } from "@/components/chat/states";
-import { Button } from "@/components/ui/button";
 import {
   useActivityPages,
   useMarkActivityDone,
@@ -57,67 +56,24 @@ export function ActivityList() {
 
   const [filter, setFilter] = useState<Filter>("unread");
   // pageTokens[i] is the page_token to ENTER page i; page 0 is "" (offset 0).
-  // Desktop keeps a visited-page stack for Prev/Next; mobile grows it through
-  // infinite scroll. The list data itself lives in the Query cache, one entry
-  // per (filter, token) — use-activity-feed.ts owns it.
+  // One list, one paging semantic — infinite scroll on every viewport: the
+  // stack grows as rows scroll in, and the data itself lives in the Query
+  // cache, one entry per (filter, token) — use-activity-feed.ts owns it.
   const [pageTokens, setPageTokens] = useState<string[]>([""]);
-  const [pageIndex, setPageIndex] = useState(0);
   const [markingDone, setMarkingDone] = useState<string>("");
 
   const params = filterToParams(filter);
-  // The 5s silent poll rides exactly one visible page: the one on screen on
-  // desktop, page 0 on mobile (matching the old slice poll that merged the
-  // first page and left scrolled-in pages untouched).
-  const pages = useActivityPages({
-    params,
-    pageTokens,
-    intervalIndex: isDesktop ? pageIndex : 0,
-  });
+  // The 5s silent poll rides page 0 on every viewport. The feed is
+  // newest-first (created_at DESC, offset pagination), so the head is the one
+  // stable window to poll — a later offset window drifts as new rows are
+  // inserted above it.
+  const pages = useActivityPages({ params, pageTokens });
   const markDone = useMarkActivityDone();
-
-  const activePage = pages[pageIndex] ?? {
-    activities: [],
-    nextPageToken: "",
-    pending: true,
-    fetching: true,
-  };
-
-  // While a just-entered page is loading, keep the previous page's rows on
-  // screen — the old store-backed list never cleared rows on a page turn, it
-  // only flipped loading flags. Cleared on filter changes so a new filter's
-  // first load owns the screen.
-  const lastRowsRef = useRef<Activity[]>([]);
-  const shownRows =
-    activePage.pending && lastRowsRef.current.length > 0
-      ? lastRowsRef.current
-      : activePage.activities;
-  if (!activePage.pending) lastRowsRef.current = activePage.activities;
-
-  const canPrev = pageIndex > 0;
-  const canNext =
-    pageIndex < pageTokens.length - 1 || activePage.nextPageToken !== "";
 
   const handleFilterChange = (next: Filter) => {
     if (next === filter) return;
     setFilter(next);
     setPageTokens([""]);
-    setPageIndex(0);
-    lastRowsRef.current = [];
-  };
-
-  const gotoPage = (delta: number) => {
-    if (delta > 0) {
-      if (pageIndex < pageTokens.length - 1) {
-        setPageIndex((i) => i + 1);
-        return;
-      }
-      if (!activePage.nextPageToken) return;
-      setPageTokens((tok) => [...tok, activePage.nextPageToken]);
-      setPageIndex((i) => i + 1);
-    } else {
-      if (pageIndex <= 0) return;
-      setPageIndex((i) => Math.max(0, i - 1));
-    }
   };
 
   // A row's message id is the last path segment of its name
@@ -142,18 +98,18 @@ export function ActivityList() {
     }
   };
 
-  // Mobile infinite scroll appends the next page's token; desktop keeps the
-  // Prev/Next pagination footer over the visited-page stack. The tail token
-  // comes from the last page WITH data: while a just-appended page is loading
-  // it has no rows yet, so the previous page still carries hasMore.
+  // Infinite scroll: when the bottom sentinel enters the viewport and another
+  // page is available, load and append it. Already-loaded pages stay cached
+  // rows on screen while an appended page is still pending. The tail token
+  // comes from the last page WITH data — a just-appended pending page has no
+  // rows yet, so the previous page still carries hasMore.
   const loadedPages = pages.filter((p) => !p.pending);
   const tailLoaded = loadedPages[loadedPages.length - 1];
-  const tailToken = tailLoaded?.nextPageToken ?? activePage.nextPageToken;
+  const tailToken = tailLoaded?.nextPageToken ?? "";
   const tailBusy = pages.length > loadedPages.length;
-  const rows = isDesktop ? shownRows : pages.flatMap((p) => p.activities);
-  const initialPending = isDesktop
-    ? activePage.pending
-    : (pages[0]?.pending ?? true);
+  const hasMore = tailToken !== "";
+  const rows = pages.flatMap((p) => p.activities);
+  const initialPending = pages[0]?.pending ?? true;
 
   const unreadCount = rows.filter(
     (a) => a.state === ActivityState.UNREAD
@@ -161,13 +117,8 @@ export function ActivityList() {
 
   const filters: Filter[] = ["all", "unread", "mention", "task", "reminder"];
 
-  // Mobile infinite scroll: when the bottom sentinel enters the viewport and
-  // there is another page available, load and append it. Hidden on desktop,
-  // which keeps the Prev/Next pagination footer.
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const hasMore = !isDesktop && tailToken !== "";
   useEffect(() => {
-    if (isDesktop) return;
     const el = sentinelRef.current;
     if (!el) return;
     const observer = new IntersectionObserver((entries) => {
@@ -179,7 +130,7 @@ export function ActivityList() {
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMore, tailBusy, tailToken, isDesktop]);
+  }, [hasMore, tailBusy, tailToken]);
 
   return (
     <div className="flex h-full flex-col">
@@ -266,51 +217,19 @@ export function ActivityList() {
                 markingDone={markingDone === a.name}
               />
             ))}
-            {/* Mobile infinite-scroll sentinel. */}
-            {!isDesktop && (
-              <div
-                ref={sentinelRef}
-                className="flex items-center justify-center py-3"
-              >
-                {(tailBusy || pages.length === 0) && hasMore && (
-                  <Loader2 className="size-4 animate-spin text-control-light" />
-                )}
-              </div>
-            )}
+            {/* Infinite-scroll sentinel: appending the next page or nothing
+                when the feed is exhausted. */}
+            <div
+              ref={sentinelRef}
+              className="flex items-center justify-center py-3"
+            >
+              {tailBusy && hasMore && (
+                <Loader2 className="size-4 animate-spin text-control-light" />
+              )}
+            </div>
           </div>
         )}
       </div>
-
-      {/* Pagination footer — desktop only. On mobile infinite scroll replaces it;
-          also hide entirely when there are no activities so empty tabs don't show
-          two disabled icon-only buttons floating at the bottom. */}
-      {isDesktop && rows.length > 0 && (
-        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-control-border px-3 py-2 text-xs text-control-light">
-          <span className="hidden lg:inline">
-            {t("activity.page", { n: pageIndex + 1 })}
-          </span>
-          <div className="flex w-full justify-end gap-1 lg:w-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => gotoPage(-1)}
-              disabled={!canPrev || activePage.pending}
-            >
-              <ChevronLeft className="size-3.5" />
-              <span className="hidden lg:inline">{t("activity.prev")}</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => gotoPage(1)}
-              disabled={!canNext || activePage.pending}
-            >
-              <span className="hidden lg:inline">{t("activity.next")}</span>
-              <ChevronRight className="size-3.5" />
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

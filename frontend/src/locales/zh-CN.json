@@ -14,10 +14,7 @@
     "filter-task": "任务",
     "filter-unread": "未读",
     "mark-done": "标记为完成",
-    "next": "下一页",
     "not-found": "未找到动态",
-    "page": "第 {{n}} 页",
-    "prev": "上一页",
     "thread": "讨论串",
     "title": "动态",
     "view-in-channel": "在频道中查看"

@@ -21,9 +21,8 @@ import {
 // had already loaded through infinite scroll. All of that dissolves here:
 //   - one query per (filter, pageToken) — request ordering is the Query key,
 //     so a stale poll can never overwrite a newer view;
-//   - refetchInterval only on the page the user is looking at (desktop: the
-//     current page; mobile: page 0, mirroring the old silent poll), so the
-//     5s cadence keeps its visibility gating (refetchIntervalInBackground);
+//   - refetchInterval only on page 0, so the 5s cadence keeps its visibility
+//     gating (refetchIntervalInBackground);
 //   - structuralSharing (Query default) replaces the hand-written equality;
 //   - markDone optimistically removes the row from every cached page (every
 //     non-Done view excludes Done server-side) instead of patching a shared
@@ -70,17 +69,15 @@ export interface ActivityServerPage {
 
 // useActivityPages mounts one query per entry of pageTokens (the token to
 // ENTER that page; page 0 uses ""). Appended tokens mount as new queries;
-// already-mounted pages keep their cached rows and only the intervalIndex
-// page polls. intervalIndex selects which visible page refreshes on the 5s
-// cadence (desktop: the page on screen; mobile: the first page — the old
-// silent poll polled exactly the first page and never re-fetched scrolled-in
-// pages).
+// already-mounted pages keep their cached rows and only page 0 refreshes on
+// the 5s cadence — with newest-first offset pagination the feed's head is the
+// one stable point to poll (a later offset window drifts as new rows are
+// inserted above it), and polling the head is what the pre-Query slice did.
 export function useActivityPages(opts: {
   params: ActivityPageParams;
   pageTokens: string[];
-  intervalIndex: number;
 }): ActivityPageView[] {
-  const { params, pageTokens, intervalIndex } = opts;
+  const { params, pageTokens } = opts;
   const queries = useQueries({
     queries: pageTokens.map((token, index) => ({
       queryKey: [ACTIVITY_ROOT_KEY[0], filterKey(params), token] as const,
@@ -100,8 +97,7 @@ export function useActivityPages(opts: {
       // the cached rows and the next tick retries (the old slice kept the
       // list on transient errors too).
       retry: false,
-      refetchInterval:
-        index === intervalIndex ? ACTIVITY_POLL_INTERVAL_MS : false,
+      refetchInterval: index === 0 ? ACTIVITY_POLL_INTERVAL_MS : false,
       refetchIntervalInBackground: false,
     })),
   });

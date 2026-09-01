@@ -51,6 +51,29 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: tFn }),
 }));
 
+// jsdom has no IntersectionObserver; the list's infinite-scroll effect only
+// needs a constructor that hands its callback back so tests can fire
+// intersections against the latest registered observer.
+let fireIntersection: IntersectionObserverCallback = () => {};
+class IntersectionObserverStub {
+  constructor(callback: IntersectionObserverCallback) {
+    fireIntersection = callback;
+  }
+  observe() {}
+  disconnect() {}
+  unobserve() {}
+}
+
+// intersect pretends the bottom sentinel just entered the viewport.
+function intersect() {
+  act(() => {
+    fireIntersection(
+      [{ isIntersecting: true } as unknown as IntersectionObserverEntry],
+      {} as IntersectionObserver
+    );
+  });
+}
+
 // listActivities receives a proto-es ListActivitiesRequest; assert on plain
 // fields (proto-es repeated/enum fields read back as numbers).
 function activity(
@@ -91,6 +114,11 @@ beforeEach(() => {
   mock.isDesktop = true;
   mock.listActivities.mockReset().mockResolvedValue(page([]));
   mock.markActivityDone.mockReset().mockResolvedValue({});
+  fireIntersection = () => {};
+  Object.defineProperty(window, "IntersectionObserver", {
+    value: IntersectionObserverStub,
+    configurable: true,
+  });
 });
 
 afterEach(() => {
@@ -133,33 +161,34 @@ describe("activity-list", () => {
     expect(second.filter).toEqual([]);
   });
 
-  it("turns pages with the server's next token and returns to the cached first page", async () => {
+  it("appends the next page when the scroll sentinel intersects", async () => {
     mock.listActivities.mockImplementation(async (req) =>
       page(
-        [activity(`activities/p2-${req.pageToken || "first"}`)],
+        [activity(`activities/m-${req.pageToken || "first"}`)],
         req.pageToken ? "" : "tok-0"
       )
     );
     renderList();
-    await screen.findByTestId("row-p2-first");
+    await screen.findByTestId("row-m-first");
 
-    fireEvent.click(screen.getByRole("button", { name: "activity.next" }));
-    await screen.findByTestId("row-p2-tok-0");
+    intersect();
 
+    await screen.findByTestId("row-m-tok-0");
     expect(mock.listActivities).toHaveBeenCalledTimes(2);
     expect(mock.listActivities.mock.calls[1][0].pageToken).toBe("tok-0");
-
-    // Back to page 1: its cache entry is still mounted, so the rows render
-    // without another fetch.
-    fireEvent.click(screen.getByRole("button", { name: "activity.prev" }));
-    await screen.findByTestId("row-p2-first");
-    expect(mock.listActivities).toHaveBeenCalledTimes(2);
+    // Loaded pages stay mounted: page 1's rows remain above the appended ones.
+    expect(screen.getByTestId("row-m-first")).toBeInTheDocument();
+    // The desktop Prev/Next footer is gone — infinite scroll is the only
+    // paging semantic now.
+    expect(
+      screen.queryByRole("button", { name: "activity.next" })
+    ).not.toBeInTheDocument();
   });
 
-  it("shows the previous rows while a newly entered page loads", async () => {
+  it("keeps loaded rows while an appended page is still loading", async () => {
     let resolveSecond: (value: unknown) => void = () => {};
-    mock.listActivities.mockImplementationOnce(async () =>
-      page([activity("activities/p2-first")], "tok-0")
+    mock.listActivities.mockResolvedValueOnce(
+      page([activity("activities/a1")], "tok-0")
     );
     mock.listActivities.mockImplementationOnce(
       async () =>
@@ -168,20 +197,35 @@ describe("activity-list", () => {
         })
     );
     renderList();
-    await screen.findByTestId("row-p2-first");
+    await screen.findByTestId("row-a1");
 
-    fireEvent.click(screen.getByRole("button", { name: "activity.next" }));
-    // Page 2 is still loading — page 1's rows stay on screen.
-    expect(screen.getByTestId("row-p2-first")).toBeInTheDocument();
+    intersect();
+    // Page 2 is still loading — page 1's rows stay on screen and the sentinel
+    // shows the appender spinner.
+    expect(screen.getByTestId("row-a1")).toBeInTheDocument();
+    expect(mock.listActivities).toHaveBeenCalledTimes(2);
+    expect(document.querySelector(".animate-spin")).not.toBeNull();
 
     await act(async () => {
-      resolveSecond(page([activity("activities/p2-tok-0")], ""));
+      resolveSecond(page([activity("activities/a2")], ""));
     });
-    await screen.findByTestId("row-p2-tok-0");
-    expect(screen.queryByTestId("row-p2-first")).not.toBeInTheDocument();
+    await screen.findByTestId("row-a2");
+    expect(screen.getByTestId("row-a1")).toBeInTheDocument();
+    expect(document.querySelector(".animate-spin")).toBeNull();
   });
 
-  it("polls the visible page every 5s", async () => {
+  it("does not fetch more pages once the feed is exhausted", async () => {
+    mock.listActivities.mockResolvedValue(page([activity("activities/a1")]));
+    renderList();
+    await screen.findByTestId("row-a1");
+
+    intersect();
+    intersect();
+
+    expect(mock.listActivities).toHaveBeenCalledTimes(1);
+  });
+
+  it("polls page 0 every 5s on every viewport", async () => {
     vi.useFakeTimers();
     mock.listActivities.mockResolvedValue(page([activity("activities/a1")]));
     renderList();

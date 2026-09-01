@@ -14,10 +14,7 @@
     "filter-task": "Task",
     "filter-unread": "Unread",
     "mark-done": "Mark as done",
-    "next": "Next",
     "not-found": "Activity not found",
-    "page": "Page {{n}}",
-    "prev": "Prev",
     "thread": "Thread",
     "title": "Activity",
     "view-in-channel": "View in channel"
