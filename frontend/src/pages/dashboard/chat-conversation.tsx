@@ -30,7 +30,7 @@ import { TasksPanel } from "@/components/chat/tasks-panel";
 import { ThreadPanel } from "@/components/chat/thread-panel";
 import { Button } from "@/components/ui/button";
 import { SheetBody, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { commandServiceClient } from "@/connect";
+import { useChannel } from "@/hooks/use-channel";
 import {
   type ComposerDraft,
   type ComposerDraftsRef,
@@ -56,7 +56,6 @@ import type {
   Attachment,
   ChannelMember,
   ChatMessage,
-  Conversation,
   ConversationFile,
 } from "@/types/proto-es/v1/command_pb";
 
@@ -375,16 +374,20 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // an admin opens one directly `channels` has no entry and `channel` would be
   // undefined. We fetch the single conversation so its type is known and the
   // composer can be gated for agent-DMs. Null while unset or on fetch failure.
-  const [fetchedChannel, setFetchedChannel] = useState<Conversation | null>(
-    null
-  );
+  // Shared Query cache with the channel-detail/activity reads (use-channel);
+  // the enabled gate reproduces the old roster-skip: while the conversation is
+  // present in the left rail the fetched fallback is null.
 
   // True only while the open conversation is present in the user's left-rail
-  // list. Derived as a boolean (not the array) so the metadata effect below
+  // list. Derived as a boolean (not the array) so the metadata read below
   // re-runs on a membership change but not on every fetchChannels poll that
   // replaces the array with equivalent content — that would otherwise re-fire
   // GetChannel every 5s for conversations outside the list (e.g. agent-DMs).
   const channelInList = channels.some((c) => c.name === conversationName);
+
+  const { channel: fetchedChannel } = useChannel(conversationName, {
+    enabled: !!channelId && !channelInList,
+  });
 
   const channel =
     channels.find((c) => c.name === conversationName) ??
@@ -417,30 +420,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     agents,
     onlineUsers
   );
-
-  // Fetch conversation metadata when the open conversation is absent from the
-  // user's left-rail `channels` (notably agent-DMs, which ListChannels excludes
-  // by membership). GetChannel's admin bypass lets an admin read it; a non-admin
-  // is denied and the fetch fails silently (they cannot view the DM at all).
-  useEffect(() => {
-    if (!channelId || !conversationName) return;
-    if (channelInList) {
-      setFetchedChannel(null);
-      return;
-    }
-    let cancelled = false;
-    commandServiceClient
-      .getChannel({ name: conversationName })
-      .then((res) => {
-        if (!cancelled) setFetchedChannel(res);
-      })
-      .catch(() => {
-        if (!cancelled) setFetchedChannel(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [channelId, conversationName, channelInList]);
 
   // The thread panel is open only when it belongs to the currently-viewed
   // channel; switching channels closes it (see init()).

@@ -7,7 +7,7 @@ import {
   MessageSquare,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChannelMembersPanel } from "@/components/chat/channel-members-panel";
@@ -21,9 +21,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { commandServiceClient } from "@/connect";
+import { useChannel } from "@/hooks/use-channel";
 import { useAppStore } from "@/stores";
-import type { Conversation } from "@/types/proto-es/v1/command_pb";
 
 // ChannelDetailPage is the right-pane detail view for a channel opened from
 // the Members directory's Channels roster. It shows the channel's metadata
@@ -43,29 +42,10 @@ export function ChannelDetailPage() {
 
   // GetChannel enriches the roster entry with the viewer's joined_at (and is
   // the source of truth on a deep link when the roster hasn't loaded yet).
-  const [channel, setChannel] = useState<Conversation | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!channelId) return;
-    let cancelled = false;
-    setLoading(true);
-    commandServiceClient
-      .getChannel({ name: conversationName })
-      .then((res) => {
-        if (cancelled) return;
-        setChannel(res);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setChannel(null);
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [channelId, conversationName]);
+  // Shared Query cache with the chat/activity fallback reads (use-channel).
+  const { channel, loading, setChannel } = useChannel(conversationName, {
+    enabled: !!channelId,
+  });
 
   const rosterChannel =
     myChannels.find((c) => c.name === conversationName) ?? null;

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores";
@@ -120,7 +120,9 @@ describe("ChannelDetailPage", () => {
     expect(await screen.findByText("Design")).toBeTruthy();
     expect(screen.getByText("members.message-channel")).toBeTruthy();
     expect(screen.queryByText("channel.closed")).toBeNull();
-    expect(screen.getByText("channel.owner")).toBeTruthy();
+    // The metadata card renders once the GetChannel read settles (the roster
+    // entry already carries the same fields — wait for the loading gate).
+    expect(await screen.findByText("channel.owner")).toBeTruthy();
     expect(screen.getAllByText("channel.joined-at").length).toBeGreaterThan(0);
   });
 
@@ -161,6 +163,11 @@ describe("ChannelDetailPage", () => {
     mock.getChannel.mockResolvedValue({ ...CONV, closed: false });
     renderPage();
     await screen.findByText("Design");
+    // Wait for the GetChannel read: the roster entry is closed:true, and the
+    // straight-navigation branch needs the fetched live channel to win.
+    await waitFor(() =>
+      expect(screen.queryByText("common.loading")).toBeNull()
+    );
 
     fireEvent.click(screen.getByText("members.message-channel"));
 

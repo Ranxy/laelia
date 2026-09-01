@@ -1,15 +1,15 @@
 import { MessageSquareOff } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { EmptyState } from "@/components/chat/states";
 import { ThreadPanel } from "@/components/chat/thread-panel";
 import { Button } from "@/components/ui/button";
-import { commandServiceClient } from "@/connect";
 import { useActivityFromCache } from "@/hooks/use-activity-feed";
+import { useChannel } from "@/hooks/use-channel";
 import { ChannelConversationView } from "@/pages/dashboard/chat-conversation";
 import { useAppStore } from "@/stores";
-import type { Activity, Conversation } from "@/types/proto-es/v1/command_pb";
+import type { Activity } from "@/types/proto-es/v1/command_pb";
 
 // ActivityDetail is the right pane of the Activity page. It locates the
 // selected activity's message and embeds the full view inline rather than
@@ -47,31 +47,15 @@ export function ActivityDetail() {
 
   // Conversation title: prefer the left-rail channel list; fall back to a
   // GetChannel fetch for conversations the user isn't a member of (e.g. an
-  // admin viewing an agent-DM they were @mentioned in).
+  // admin viewing an agent-DM they were @mentioned in). Shared Query cache
+  // with the chat/channel-detail reads (use-channel); the enabled gate
+  // reproduces the old roster-skip.
   const convId = activity ? (activity.conversation.split("/")[1] ?? "") : "";
   const convName = `conversations/${convId}`;
-  const [fetchedChannel, setFetchedChannel] = useState<Conversation | null>(
-    null
-  );
-  useEffect(() => {
-    if (!convId) return;
-    if (channels.some((c) => c.name === convName)) {
-      setFetchedChannel(null);
-      return;
-    }
-    let cancelled = false;
-    commandServiceClient
-      .getChannel({ name: convName })
-      .then((res) => {
-        if (!cancelled) setFetchedChannel(res);
-      })
-      .catch(() => {
-        if (!cancelled) setFetchedChannel(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [convId, convName, channels]);
+  const convInRoster = channels.some((c) => c.name === convName);
+  const { channel: fetchedChannel } = useChannel(convName, {
+    enabled: !!convId && !convInRoster,
+  });
   const channel = channels.find((c) => c.name === convName) ?? fetchedChannel;
   const channelTitle = channel?.title ?? convId;
 
