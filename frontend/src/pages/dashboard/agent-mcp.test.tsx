@@ -112,14 +112,20 @@ describe("agent-mcp", () => {
     renderPage();
 
     expect(
-      await screen.findByText("agent.mcp-workspace-section")
+      await screen.findByText(
+        "agent.mcp-workspace-section",
+        {},
+        { timeout: 3000 }
+      )
     ).toBeInTheDocument();
     expect(screen.getByText("agent.mcp-my-section")).toBeInTheDocument();
     // The selection-seeding effect runs after the agent render; wait for it.
-    await waitFor(() =>
-      expect(
-        screen.getByRole("checkbox", { name: /Workspace Server/ })
-      ).toBeChecked()
+    await waitFor(
+      () =>
+        expect(
+          screen.getByRole("checkbox", { name: /Workspace Server/ })
+        ).toBeChecked(),
+      { timeout: 3000 }
     );
     expect(
       screen.getByRole("checkbox", { name: /Second Server/ })
@@ -134,17 +140,28 @@ describe("agent-mcp", () => {
     mock.updateAgentMcpConfig.mockResolvedValue(agent());
 
     renderPage();
-    const ws2 = await screen.findByRole("checkbox", { name: /Second Server/ });
+    // 3s waits: under full-suite parallel load the default 1s timeout is too
+    // tight for the agent fetch + save RPC round trips (same rationale as
+    // d1301ba).
+    const ws2 = await screen.findByRole(
+      "checkbox",
+      {
+        name: /Second Server/,
+      },
+      { timeout: 3000 }
+    );
     fireEvent.click(ws2);
     expect(ws2).toBeChecked();
 
     fireEvent.click(screen.getByRole("button", { name: "agent.mcp-save" }));
 
-    await waitFor(() =>
-      expect(mock.updateAgentMcpConfig).toHaveBeenCalledWith("agents/a1", [
-        "mcp/workspace-1",
-        "mcp/workspace-2",
-      ])
+    await waitFor(
+      () =>
+        expect(mock.updateAgentMcpConfig).toHaveBeenCalledWith("agents/a1", [
+          "mcp/workspace-1",
+          "mcp/workspace-2",
+        ]),
+      { timeout: 3000 }
     );
     expect(toastMock.add).toHaveBeenCalledWith(
       expect.objectContaining({ type: "success", title: "agent.mcp-saved" })
@@ -156,17 +173,23 @@ describe("agent-mcp", () => {
     mock.updateAgentMcpConfig.mockRejectedValue(new Error("mcp down"));
 
     renderPage();
-    await screen.findByRole("checkbox", { name: /Workspace Server/ });
+    await screen.findByRole(
+      "checkbox",
+      { name: /Workspace Server/ },
+      { timeout: 3000 }
+    );
     fireEvent.click(screen.getByRole("button", { name: "agent.mcp-save" }));
 
-    await waitFor(() =>
-      expect(toastMock.add).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: "error",
-          title: "agent.mcp-save-failed",
-          description: "mcp down",
-        })
-      )
+    await waitFor(
+      () =>
+        expect(toastMock.add).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "error",
+            title: "agent.mcp-save-failed",
+            description: "mcp down",
+          })
+        ),
+      { timeout: 3000 }
     );
   });
 
@@ -175,9 +198,11 @@ describe("agent-mcp", () => {
 
     renderPage();
 
-    const ws1 = await screen.findByRole("checkbox", {
-      name: /Workspace Server/,
-    });
+    const ws1 = await screen.findByRole(
+      "checkbox",
+      { name: /Workspace Server/ },
+      { timeout: 3000 }
+    );
     expect(ws1).toBeDisabled();
     expect(
       screen.queryByRole("button", { name: "agent.mcp-save" })
