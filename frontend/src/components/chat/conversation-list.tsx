@@ -501,6 +501,9 @@ export function ConversationList() {
 // rows whose title/unread/active/pinned are unchanged bail out.
 // Two 72px swipe actions (pin + close) side by side.
 const SWIPE_ACTION_WIDTH = 144;
+// Travel before the gesture axis is decided; mirrors the shared edge-drag
+// engine's direction lock so every touch gesture in the app feels the same.
+const DIRECTION_LOCK_PX = 10;
 
 const ConversationRow = memo(function ConversationRow({
   id,
@@ -558,70 +561,109 @@ const ConversationRow = memo(function ConversationRow({
   const avatarSrc = useAvatar(avatarName);
   const peerId = peer ? (peer.split("/").pop() ?? "") : "";
 
+  // Row swipe state. `offset` is the RESTING position (0 or fully open);
+  // mid-drag the row's transform is written straight to the DOM (rowRef) so a
+  // 60fps touchmove stream never re-renders the row — the per-move setState
+  // the row used to do was the whole-list jank the 04 report flagged.
   const [offset, setOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const offsetRef = useRef(0);
+  const rowRef = useRef<HTMLButtonElement>(null);
   const startXRef = useRef(0);
+  const startYRef = useRef(0);
   const startOffsetRef = useRef(0);
+  // Direction lock (parity with the shared useEdgeDrag engine's 10px): a
+  // touch that travels mostly vertically is scrolling the list and must not
+  // drag the row — the old code swiped on any 1-2px horizontal jitter.
+  const axisRef = useRef<"horizontal" | "vertical" | null>(null);
+
+  const applyOffset = useCallback((value: number) => {
+    offsetRef.current = value;
+    if (rowRef.current) {
+      rowRef.current.style.transform = `translateX(${-value}px)`;
+    }
+  }, []);
+
+  const closeSwipe = useCallback(() => {
+    setOffset(0);
+    applyOffset(0);
+  }, [applyOffset]);
 
   // Close the swipe action when the row becomes active (user navigated into it)
   // or when pinned state changes so the UI doesn't feel stuck.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset keyed on active/pinned changes; the body reads neither.
   useEffect(() => {
-    setOffset(0);
-  }, [active, pinned]);
+    closeSwipe();
+  }, [active, pinned, closeSwipe]);
 
   const clampOffset = useCallback((value: number) => {
     return Math.max(0, Math.min(SWIPE_ACTION_WIDTH, value));
   }, []);
 
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      startXRef.current = e.touches[0].clientX;
-      startOffsetRef.current = offset;
-    },
-    [offset]
-  );
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    startXRef.current = e.touches[0].clientX;
+    startYRef.current = e.touches[0].clientY;
+    startOffsetRef.current = offsetRef.current;
+    axisRef.current = null;
+    // Suppress the snap transition for the whole gesture (one render).
+    setDragging(true);
+  }, []);
 
   const handleTouchMove = useCallback(
     (e: React.TouchEvent) => {
       const clientX = e.touches[0]?.clientX ?? startXRef.current;
-      const delta = startXRef.current - clientX;
-      // Only allow left-swipe (positive delta) from an already-open or closed
+      const clientY = e.touches[0]?.clientY ?? startYRef.current;
+      const dx = startXRef.current - clientX;
+      const dy = startYRef.current - clientY;
+      if (!axisRef.current) {
+        if (
+          Math.abs(dx) < DIRECTION_LOCK_PX &&
+          Math.abs(dy) < DIRECTION_LOCK_PX
+        ) {
+          return;
+        }
+        axisRef.current =
+          Math.abs(dx) >= Math.abs(dy) ? "horizontal" : "vertical";
+      }
+      if (axisRef.current !== "horizontal") return;
+      // Only allow left-swipe (positive dx) from an already-open or closed
       // state; right-swipe closes the action.
-      const next = clampOffset(startOffsetRef.current + delta);
-      setOffset(next);
+      applyOffset(clampOffset(startOffsetRef.current + dx));
     },
-    [clampOffset]
+    [applyOffset, clampOffset]
   );
 
   const handleTouchEnd = useCallback(() => {
-    setOffset((current) => {
-      // Snap open if dragged past half the action width, otherwise close.
-      return current > SWIPE_ACTION_WIDTH / 2 ? SWIPE_ACTION_WIDTH : 0;
-    });
-  }, []);
+    setDragging(false);
+    // Snap open if dragged past half the action width, otherwise close.
+    const resting =
+      offsetRef.current > SWIPE_ACTION_WIDTH / 2 ? SWIPE_ACTION_WIDTH : 0;
+    applyOffset(resting);
+    setOffset(resting);
+  }, [applyOffset]);
 
   const handleOpen = useCallback(() => {
-    if (offset > 8) {
-      setOffset(0);
+    if (offsetRef.current > 8) {
+      closeSwipe();
       return;
     }
     onOpen(id);
-  }, [offset, onOpen, id]);
+  }, [closeSwipe, onOpen, id]);
 
   const handlePinClick = useCallback(() => {
     onTogglePin(id, !pinned);
-    setOffset(0);
-  }, [onTogglePin, id, pinned]);
+    closeSwipe();
+  }, [onTogglePin, closeSwipe, id, pinned]);
 
   const handleCloseClick = useCallback(() => {
     onClose(id);
-    setOffset(0);
-  }, [onClose, id]);
+    closeSwipe();
+  }, [onClose, closeSwipe, id]);
 
   const handleMuteClick = useCallback(() => {
     onToggleMute(id, !muted);
-    setOffset(0);
-  }, [onToggleMute, id, muted]);
+    closeSwipe();
+  }, [onToggleMute, closeSwipe, id, muted]);
 
   const isDesktop = useIsDesktop();
 
@@ -660,13 +702,19 @@ const ConversationRow = memo(function ConversationRow({
 
       <button
         type="button"
+        ref={rowRef}
         onClick={handleOpen}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         style={{
           transform: `translateX(${-offset}px)`,
-          transition: offset === 0 ? "transform 200ms ease-out" : "none",
+          // Dragging writes the transform directly (no transition); the snap
+          // back to a resting position animates. pan-y keeps the list's
+          // native vertical scroll while the row owns horizontal moves.
+          transition: dragging ? "none" : "transform 200ms ease-out",
+          touchAction: "pan-y",
         }}
         className={cn(
           "relative z-10 flex w-full items-center gap-3 bg-background px-2 py-2.5 pr-10 text-left transition-colors lg:pl-3 lg:pr-10",

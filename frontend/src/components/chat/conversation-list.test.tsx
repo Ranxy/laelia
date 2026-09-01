@@ -493,6 +493,48 @@ describe("ConversationList close and context menu", () => {
     expect(mock.setConversationClosed).toHaveBeenCalledWith("ch1", true);
   });
 
+  it("does not drag the row when the touch travels vertically", () => {
+    mock.useIsDesktop.mockReturnValue(false);
+    mock.channels = [channel()];
+    renderList();
+    const row = screen.getByText("Design").closest("button") as HTMLElement;
+
+    // A scroll gesture: mostly vertical travel with the 1-2px horizontal
+    // jitter every real finger produces. The direction lock (10px) must
+    // classify it as a scroll and leave the row at rest.
+    fireEvent.touchStart(row, { touches: [{ clientX: 100, clientY: 100 }] });
+    fireEvent.touchMove(row, { touches: [{ clientX: 98, clientY: 140 }] });
+    fireEvent.touchEnd(row);
+    expect(row.style.transform).toBe("translateX(0px)");
+  });
+
+  it("snaps the row open when the horizontal drag passes half the action width", () => {
+    mock.useIsDesktop.mockReturnValue(false);
+    mock.channels = [channel()];
+    renderList();
+    const row = screen.getByText("Design").closest("button") as HTMLElement;
+
+    fireEvent.touchStart(row, { touches: [{ clientX: 200, clientY: 100 }] });
+    // 80px horizontal travel (past half of SWIPE_ACTION_WIDTH=144) with only
+    // vertical jitter below the direction lock.
+    fireEvent.touchMove(row, { touches: [{ clientX: 120, clientY: 104 }] });
+    expect(row.style.transform).toBe("translateX(-80px)");
+    fireEvent.touchEnd(row);
+    expect(row.style.transform).toBe("translateX(-144px)");
+  });
+
+  it("keeps the row at rest for sub-lock horizontal jitter", () => {
+    mock.useIsDesktop.mockReturnValue(false);
+    mock.channels = [channel()];
+    renderList();
+    const row = screen.getByText("Design").closest("button") as HTMLElement;
+
+    fireEvent.touchStart(row, { touches: [{ clientX: 100, clientY: 100 }] });
+    fireEvent.touchMove(row, { touches: [{ clientX: 95, clientY: 100 }] });
+    fireEvent.touchEnd(row);
+    expect(row.style.transform).toBe("translateX(0px)");
+  });
+
   it("does not mount the context menu trigger on mobile", () => {
     mock.useIsDesktop.mockReturnValue(false);
     mock.channels = [channel()];
