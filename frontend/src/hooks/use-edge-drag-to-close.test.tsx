@@ -1,5 +1,4 @@
 import { act, render, screen } from "@testing-library/react";
-import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mock = vi.hoisted(() => ({
@@ -10,12 +9,13 @@ vi.mock("@/hooks/use-is-desktop", () => ({
   useIsDesktop: mock.useIsDesktop,
 }));
 
-import { useSwipeToCloseSheet } from "./use-swipe-to-close-sheet";
+import { useEdgeDragToClose } from "./use-edge-drag-to-close";
 
 function Harness({ onClose = vi.fn() }: { onClose?: () => void }) {
-  const [popup, setPopup] = useState<HTMLDivElement | null>(null);
-  const [overlay, setOverlay] = useState<HTMLDivElement | null>(null);
-  useSwipeToCloseSheet({ open: true, onClose, popup, overlay });
+  const { setPopup, setOverlay } = useEdgeDragToClose({
+    open: true,
+    onClose,
+  });
   return (
     <div>
       <div ref={setOverlay} data-testid="overlay" />
@@ -52,7 +52,7 @@ function swipeFromEdge(target: HTMLElement, dx: number, dy = 0) {
   );
 }
 
-describe("useSwipeToCloseSheet", () => {
+describe("useEdgeDragToClose", () => {
   beforeEach(() => {
     mock.useIsDesktop.mockReturnValue(false);
     Object.defineProperty(window, "innerWidth", {
@@ -90,6 +90,27 @@ describe("useSwipeToCloseSheet", () => {
       );
       overlay.dispatchEvent(
         touch("touchend", [{ clientX: 300, clientY: 110 }])
+      );
+    });
+    expect(popup.style.transform).toBe("");
+    expect(overlay.style.opacity).toBe("");
+  });
+
+  it("ignores touches that start outside the sheet", () => {
+    render(<Harness />);
+    const popup = screen.getByTestId("popup");
+    const overlay = screen.getByTestId("overlay");
+    act(() => {
+      // On the page body, not on the popup or the overlay: the gesture only
+      // owns touches that begin on the sheet surface itself.
+      document.body.dispatchEvent(
+        touch("touchstart", [{ clientX: 10, clientY: 100 }])
+      );
+      document.body.dispatchEvent(
+        touch("touchmove", [{ clientX: 200, clientY: 110 }])
+      );
+      document.body.dispatchEvent(
+        touch("touchend", [{ clientX: 200, clientY: 110 }])
       );
     });
     expect(popup.style.transform).toBe("");

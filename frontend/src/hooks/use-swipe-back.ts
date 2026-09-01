@@ -5,6 +5,11 @@ import { resolvePath } from "@/router/route-index";
 import { ROUTE_INFO } from "@/router/route-info";
 import { useCurrentRoute } from "@/router/use-current-route";
 import { useAppStore } from "@/stores";
+import {
+  EDGE_DRAG_COMMIT_MS,
+  EDGE_DRAG_SNAP_MS,
+  useEdgeDrag,
+} from "./use-edge-drag-to-close";
 import { useIsDesktop } from "./use-is-desktop";
 
 // iOS-style interactive back gesture for mobile: drag from the left edge of
@@ -18,7 +23,10 @@ import { useIsDesktop } from "./use-is-desktop";
 // back to), over layer overlays (sheets/dialogs/previews dismiss on their
 // own), and for route-level back on real iOS/iPadOS browsers whose system
 // edge-swipe recognizer owns those touches (see platform-edge-swipe.ts).
-const EDGE_SIZE = 24; // px from the left edge where the gesture may start
+//
+// The touch mechanics (edge zone, direction lock, thresholds, settle timing)
+// live in the shared edge-drag engine (use-edge-drag-to-close.ts); this hook
+// only supplies the surface host below.
 // Touches that BEGIN on the device bezel report their first position at the
 // viewport edge (clientX ≈ 0-2px). On Android, gesture navigation claims those
 // touches below the browser, and on any browser with a previous history entry
@@ -27,28 +35,12 @@ const EDGE_SIZE = 24; // px from the left edge where the gesture may start
 // platform-edge-swipe.ts for the full artifact description). Bezel touches are
 // therefore yielded whenever the browser has somewhere to swipe back to.
 const BEZEL_GUARD = 3;
-const DIRECTION_LOCK = 10; // px of movement before the gesture is decided
-const MAX_DRAG_RATIO = 0.5; // the page may slide up to half the viewport
-const TRIGGER_RATIO = 0.25; // release past 25% of the viewport commits
-const MIN_TRIGGER_PX = 80;
-const SNAP_MS = 200; // spring-back animation
-const COMMIT_MS = 250; // slide-out animation before the navigation commits
-
-// Shared with the mention-detail sheet's swipe-to-close gesture so both
-// surfaces feel identical on mobile.
-export {
-  COMMIT_MS as SWIPE_BACK_COMMIT_MS,
-  DIRECTION_LOCK as SWIPE_BACK_DIRECTION_LOCK,
-  EDGE_SIZE as SWIPE_BACK_EDGE_SIZE,
-  MAX_DRAG_RATIO as SWIPE_BACK_MAX_DRAG_RATIO,
-  MIN_TRIGGER_PX as SWIPE_BACK_MIN_TRIGGER_PX,
-  SNAP_MS as SWIPE_BACK_SNAP_MS,
-  TRIGGER_RATIO as SWIPE_BACK_TRIGGER_RATIO,
-};
 
 // Safety timeout: if the data router's navigation doesn't complete within this
 // window, force a reset so the gesture state doesn't get stuck.
 const RESET_TIMEOUT_MS = 1000;
+
+type SwipeBackMode = "thread" | "route" | null;
 
 export interface SwipeBackState {
   // Bind to the layout root (CSS variables for the thread panel live here).
@@ -82,6 +74,9 @@ export function useSwipeBack(): SwipeBackState {
   // finishes the navigation (preventing a one-frame flash of the old
   // route before the new one renders).
   const pendingResetRef = useRef(false);
+  // Decided per gesture in begin(); read by follow/settle. Lives in a ref so
+  // a re-render mid-drag (store update, etc.) cannot lose the mode.
+  const modeRef = useRef<SwipeBackMode>(null);
 
   const backTargetRef = useRef<string | null>(null);
   // backTo is a route name; the gesture commits its navigation by path.
@@ -101,57 +96,13 @@ export function useSwipeBack(): SwipeBackState {
     pageRef.current = el;
   }, []);
 
-  useEffect(() => {
-    if (isDesktop) return;
-    const root = rootRef.current;
-    if (!root) return;
-
-    let startX = 0;
-    let startY = 0;
-    let dragging = false;
-    let decided = false;
-    let cancelled = false;
-    let mode: "thread" | "route" | null = null;
-    let maxDrag = 0;
-    let timers: number[] = [];
-
-    const clearTimers = () => {
-      for (const t of timers) window.clearTimeout(t);
-      timers = [];
-    };
-
-    const reset = () => {
-      dragging = false;
-      decided = false;
-      cancelled = false;
-      mode = null;
-      clearTimers();
-      if (pageRef.current) {
-        pageRef.current.style.transition = "";
-        pageRef.current.style.transform = "";
-      }
-      root.style.removeProperty("--swipe-offset");
-      root.style.removeProperty("--swipe-transition");
-    };
-
-    const onTouchStart = (e: TouchEvent) => {
-      const target = e.target as HTMLElement | null;
+  useEdgeDrag(!isDesktop, {
+    begin(target, clientX) {
       if (target?.closest?.("[data-bb-layer-family]")) {
-        cancelled = true;
-        return;
+        return false;
       }
-      const touch = e.touches[0];
-      if (!touch || touch.clientX > EDGE_SIZE) {
-        cancelled = true;
-        return;
-      }
-      startX = touch.clientX;
-      startY = touch.clientY;
-      dragging = false;
-      decided = false;
-      cancelled = false;
-      maxDrag = window.innerWidth * MAX_DRAG_RATIO;
-      clearTimers();
+      const root = rootRef.current;
+      if (!root) return false;
       if (
         (threadActiveRef.current || tasksPanelConvRef.current != null) &&
         !platformOwnsEdgeSwipe()
@@ -162,9 +113,11 @@ export function useSwipeBack(): SwipeBackState {
         // panels dismiss through their history sentinels there
         // (useHistorySentinel) instead of this synthetic gesture, which would
         // stack the browser's back-transition snapshot underneath them.
-        mode = "thread";
+        modeRef.current = "thread";
         root.style.setProperty("--swipe-transition", "none");
-      } else if (backTargetRef.current) {
+        return true;
+      }
+      if (backTargetRef.current) {
         // Only race the platform edge swipe when it cannot engage. On real
         // iOS/iPadOS browsers the system recognizer's zone covers the whole
         // edge area (not just the bezel), so ANY synthetic route gesture
@@ -181,131 +134,93 @@ export function useSwipeBack(): SwipeBackState {
           (window.history.state as { idx?: number } | null)?.idx ?? 0;
         if (
           historyIdx > 0 &&
-          (platformOwnsEdgeSwipe() || touch.clientX <= BEZEL_GUARD)
+          (platformOwnsEdgeSwipe() || clientX <= BEZEL_GUARD)
         ) {
-          cancelled = true;
-          return;
+          return false;
         }
-        mode = "route";
-        if (pageRef.current) pageRef.current.style.transition = "none";
-      } else {
-        cancelled = true;
-        return;
+        modeRef.current = "route";
+        const page = pageRef.current;
+        if (page) page.style.transition = "none";
+        return true;
       }
-    };
+      return false;
+    },
 
-    const onTouchMove = (e: TouchEvent) => {
-      if (cancelled || !mode) return;
-      const touch = e.touches[0];
-      if (!touch) return;
-      const dx = touch.clientX - startX;
-      const dy = touch.clientY - startY;
-      if (!decided) {
-        if (Math.abs(dx) < DIRECTION_LOCK && Math.abs(dy) < DIRECTION_LOCK)
-          return;
-        decided = true;
-        if (dy > dx || dx < 0) {
-          cancelled = true;
-          reset();
-          return;
-        }
-        dragging = true;
-      }
-      if (!dragging) return;
-      e.preventDefault();
-      const offset = Math.min(Math.max(0, dx), maxDrag);
+    follow(offset) {
+      const mode = modeRef.current;
       if (mode === "route" && pageRef.current) {
         pageRef.current.style.transform = `translateX(${offset}px)`;
       } else if (mode === "thread") {
-        root.style.setProperty("--swipe-offset", `${offset}px`);
+        rootRef.current?.style.setProperty("--swipe-offset", `${offset}px`);
       }
-    };
+    },
 
-    const finish = (commit: boolean) => {
-      if (!dragging) return;
-      dragging = false;
+    settle(commit, done, schedule) {
+      const mode = modeRef.current;
       const width = window.innerWidth;
-      const ms = commit ? COMMIT_MS : SNAP_MS;
+      const ms = commit ? EDGE_DRAG_COMMIT_MS : EDGE_DRAG_SNAP_MS;
       if (mode === "route" && pageRef.current) {
         const page = pageRef.current;
         page.style.transition = `transform ${ms}ms ease-out`;
         page.style.transform = `translateX(${commit ? width : 0}px)`;
-        timers.push(
-          window.setTimeout(() => {
-            if (commit) {
-              const target = backTargetRef.current;
-              if (target) {
-                // Start the navigation but DON'T reset yet — the
-                // location-change effect will reset once the data router
-                // finishes the navigation. This prevents a one-frame flash
-                // where the old route is visible at translateX(0) before the
-                // new route renders.
-                pendingResetRef.current = true;
-                navigate(target, { replace: true });
-                // Safety: force a reset if the navigation doesn't complete.
-                timers.push(
-                  window.setTimeout(() => {
-                    if (pendingResetRef.current) reset();
-                  }, RESET_TIMEOUT_MS)
-                );
-                return;
-              }
+        schedule(() => {
+          if (commit) {
+            const target = backTargetRef.current;
+            if (target) {
+              // Start the navigation but DON'T reset yet — the
+              // location-change effect will reset once the data router
+              // finishes the navigation. This prevents a one-frame flash
+              // where the old route is visible at translateX(0) before the
+              // new route renders.
+              pendingResetRef.current = true;
+              navigate(target, { replace: true });
+              // Safety: force a reset if the navigation doesn't complete.
+              schedule(() => {
+                if (pendingResetRef.current) done();
+              }, RESET_TIMEOUT_MS);
+              return;
             }
-            reset();
-          }, ms + 50)
-        );
-      } else if (mode === "thread") {
+          }
+          done();
+        }, ms + 50);
+      } else if (mode === "thread" && rootRef.current) {
+        const root = rootRef.current;
         root.style.setProperty(
           "--swipe-transition",
           `transform ${ms}ms ease-out`
         );
         root.style.setProperty("--swipe-offset", `${commit ? width : 0}px`);
-        timers.push(
-          window.setTimeout(() => {
-            if (commit) {
-              if (threadActiveRef.current) {
-                closeThread();
-              } else if (tasksPanelConvRef.current) {
-                closeTasksPanel(tasksPanelConvRef.current);
-              }
+        schedule(() => {
+          if (commit) {
+            if (threadActiveRef.current) {
+              closeThread();
+            } else if (tasksPanelConvRef.current) {
+              closeTasksPanel(tasksPanelConvRef.current);
             }
-            reset();
-          }, ms + 50)
-        );
+          }
+          done();
+        }, ms + 50);
+      } else {
+        done();
       }
-    };
+    },
 
-    const onTouchEnd = (e: TouchEvent) => {
-      if (!dragging) {
-        if (mode) reset();
-        return;
+    reset() {
+      modeRef.current = null;
+      const page = pageRef.current;
+      if (page) {
+        page.style.transition = "";
+        page.style.transform = "";
       }
-      const touch = e.changedTouches[0];
-      const dx = touch ? touch.clientX - startX : 0;
-      const width = window.innerWidth;
-      const commit = dx > Math.max(MIN_TRIGGER_PX, width * TRIGGER_RATIO);
-      finish(commit);
-    };
+      const root = rootRef.current;
+      if (root) {
+        root.style.removeProperty("--swipe-offset");
+        root.style.removeProperty("--swipe-transition");
+      }
+    },
 
-    const onTouchCancel = () => {
-      // A touchcancel typically means a system gesture (e.g. the iOS edge
-      // swipe) claimed the touch mid-drag: reset instantly instead of
-      // animating a spring-back underneath the browser's own transition.
-      reset();
-    };
-
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
-    window.addEventListener("touchend", onTouchEnd, { passive: true });
-    window.addEventListener("touchcancel", onTouchCancel, { passive: true });
-    return () => {
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", onTouchEnd);
-      window.removeEventListener("touchcancel", onTouchCancel);
-      clearTimers();
-    };
-  }, [isDesktop, navigate, closeThread, closeTasksPanel]);
+    touchCancel: "instant",
+  });
 
   // When a route-level commit is pending, wait for the data router to finish
   // the navigation (location changes) before clearing the transform. This
