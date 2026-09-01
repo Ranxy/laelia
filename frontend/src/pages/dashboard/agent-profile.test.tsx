@@ -335,8 +335,12 @@ describe("AgentProfilePage", () => {
     renderPage();
 
     fireEvent.click(await screen.findByLabelText("common.edit"));
+    // findBy retries: the edit sheet mounts its textarea a tick after the
+    // click, which is not always same-frame under full-suite load.
     fireEvent.change(
-      screen.getByPlaceholderText("agent.profile.persona-prompt-placeholder"),
+      await screen.findByPlaceholderText(
+        "agent.profile.persona-prompt-placeholder"
+      ),
       { target: { value: "Draft" } }
     );
     fireEvent.click(screen.getByRole("button", { name: "common.cancel" }));
