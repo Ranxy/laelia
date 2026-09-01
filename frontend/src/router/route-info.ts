@@ -83,6 +83,12 @@ export type RouteName =
 // at each definition keeps route-tree names inside this union.
 export interface RouteHandle {
   name: RouteName;
+  // Route-level permission gate (06 Rt-02): the permission(s) the sidebar and
+  // settings menu use to hide this entry. A string is a single requirement;
+  // an array is ANY-of (holding one satisfies the handle), matching the
+  // sidebar's `a || b` view gates. Enforced by RoutePermissionGate
+  // (app/layouts/route-permission-gate.tsx) around the dashboard Outlet.
+  permission?: string | string[];
 }
 
 export interface RouteInfo {

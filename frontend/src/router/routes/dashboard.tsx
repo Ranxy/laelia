@@ -238,7 +238,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
     children: [
       {
         index: true,
-        handle: { name: MACHINE_ROUTE_LIST } satisfies RouteHandle,
+        handle: {
+          name: MACHINE_ROUTE_LIST,
+          permission: "laelia.machines.get",
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/components/selection-empty-state").then((m) => ({
             element: (
@@ -250,7 +253,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         // Must be declared before :machineId so "new" is not captured as a
         // machine resource id.
         path: "new",
-        handle: { name: MACHINE_ROUTE_NEW } satisfies RouteHandle,
+        handle: {
+          name: MACHINE_ROUTE_NEW,
+          permission: "laelia.machines.create",
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/machine-new").then((m) => ({
             Component: m.MachineNewPage,
@@ -313,7 +319,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "agents",
-        handle: { name: SETTINGS_ROUTE_AGENTS } satisfies RouteHandle,
+        handle: {
+          name: SETTINGS_ROUTE_AGENTS,
+          permission: ["laelia.settings.get", "laelia.settings.update"],
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-agents").then((m) => ({
             Component: m.SettingsAgentsPage,
@@ -321,7 +330,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "general",
-        handle: { name: SETTINGS_ROUTE_GENERAL } satisfies RouteHandle,
+        handle: {
+          name: SETTINGS_ROUTE_GENERAL,
+          permission: ["laelia.settings.get", "laelia.settings.update"],
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-general").then((m) => ({
             Component: m.SettingsGeneralPage,
@@ -329,7 +341,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "smtp",
-        handle: { name: SETTINGS_ROUTE_SMTP } satisfies RouteHandle,
+        handle: {
+          name: SETTINGS_ROUTE_SMTP,
+          permission: ["laelia.settings.get", "laelia.settings.update"],
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-smtp").then((m) => ({
             Component: m.SettingsSmtpPage,
@@ -345,7 +360,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "storage",
-        handle: { name: SETTINGS_ROUTE_STORAGE } satisfies RouteHandle,
+        handle: {
+          name: SETTINGS_ROUTE_STORAGE,
+          permission: ["laelia.settings.get", "laelia.settings.update"],
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-storage").then((m) => ({
             Component: m.SettingsStoragePage,
@@ -353,7 +371,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "notifications",
-        handle: { name: SETTINGS_ROUTE_NOTIFICATIONS } satisfies RouteHandle,
+        handle: {
+          name: SETTINGS_ROUTE_NOTIFICATIONS,
+          permission: "laelia.pushConfig.update",
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-notifications").then((m) => ({
             Component: m.SettingsNotificationsPage,
@@ -361,7 +382,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "users",
-        handle: { name: SETTINGS_ROUTE_USERS } satisfies RouteHandle,
+        handle: {
+          name: SETTINGS_ROUTE_USERS,
+          permission: "laelia.users.list",
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/user-list").then((m) => ({
             Component: m.UserListPage,
@@ -369,7 +393,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "roles",
-        handle: { name: SETTINGS_ROUTE_ROLES } satisfies RouteHandle,
+        handle: {
+          name: SETTINGS_ROUTE_ROLES,
+          permission: "laelia.roles.list",
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-roles").then((m) => ({
             Component: m.SettingsRolesPage,
@@ -377,7 +404,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "iam",
-        handle: { name: SETTINGS_ROUTE_IAM } satisfies RouteHandle,
+        handle: {
+          name: SETTINGS_ROUTE_IAM,
+          permission: "laelia.iam.getPolicy",
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-iam").then((m) => ({
             Component: m.SettingsIamPage,
@@ -385,7 +415,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "groups",
-        handle: { name: SETTINGS_ROUTE_GROUPS } satisfies RouteHandle,
+        handle: {
+          name: SETTINGS_ROUTE_GROUPS,
+          permission: "laelia.groups.list",
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-groups").then((m) => ({
             Component: m.SettingsGroupsPage,
@@ -393,7 +426,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "api-providers",
-        handle: { name: SETTINGS_ROUTE_API_PROVIDERS } satisfies RouteHandle,
+        handle: {
+          name: SETTINGS_ROUTE_API_PROVIDERS,
+          permission: "laelia.apiProviders.list",
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-api-providers").then((m) => ({
             Component: m.SettingsApiProvidersPage,
@@ -403,6 +439,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         path: "identity-providers",
         handle: {
           name: SETTINGS_ROUTE_IDENTITY_PROVIDERS,
+          permission: "laelia.identityProviders.list",
         } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-identity-providers").then((m) => ({
@@ -419,7 +456,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
       },
       {
         path: "audit",
-        handle: { name: SETTINGS_ROUTE_AUDIT } satisfies RouteHandle,
+        handle: {
+          name: SETTINGS_ROUTE_AUDIT,
+          permission: "laelia.auditLogs.search",
+        } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-audit").then((m) => ({
             Component: m.SettingsAuditPage,

@@ -8,7 +8,8 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { RoutePermissionGate } from "@/app/layouts/route-permission-gate";
 import { MobileHeader } from "@/components/mobile-header";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { DesktopSidebar } from "@/components/sidebar";
@@ -187,7 +188,9 @@ export function DashboardLayout() {
             ref={currentPageRef}
             className="relative z-10 h-full bg-background will-change-transform"
           >
-            <Outlet />
+            {/* Route-level permission gate (06 Rt-02): refuses to render the
+                matched page when a handle.permission is not granted. */}
+            <RoutePermissionGate />
           </div>
         </main>
         <div className="fixed bottom-0 left-0 right-0 z-chrome lg:hidden">

@@ -814,7 +814,10 @@
   "router": {
     "error-retry": "Reload",
     "error-title": "Something went wrong",
-    "error-unknown": "An unexpected error occurred."
+    "error-unknown": "An unexpected error occurred.",
+    "forbidden-back": "Back to home",
+    "forbidden-description": "Your account does not have access to this page.",
+    "forbidden-title": "No access"
   },
   "settings": {
     "account": "Account",
