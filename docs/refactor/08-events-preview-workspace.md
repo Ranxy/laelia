@@ -6,7 +6,8 @@
 - ✅ 批 9 完成:proto `tool_call_id` 契约 + 全链路透传(`68e53a6`/`69396f8`:两个 ToolCall*Payload 增可选 `tool_call_id`;ToolCallSink 接口与 ACP 三帧、acp2 thread executor、pi executor 全部发射点透传 runtime id;interleaved/pi 测试钉死 ID 契约),前端配对改 ID 优先 + FIFO 兜底(`baf4167`:并发交错不再错配,断线缝隙丢 START、legacy 无 ID 仍走事件序兜底,pair 按 started 顺序输出)。
 - ✅ 批 10 完成:F-S8 双分页收敛(`29be54e`,产品拍板统一无限滚动)——activity-list 桌面 Prev/Next 分页栈退役,桌面/移动共用一套 token 栈 + IntersectionObserver sentinel;`useActivityPages` 去 `intervalIndex`,5s 轮询统一骑第 0 页(newest-first offset 分页下唯一稳定窗口,修掉轮询可见 offset 页的漂移隐患);`activity.page/prev/next` 三死键删除,测试改写为无限滚动三案。
 - ✅ 批 11 完成:inspector WARNING 游离块收敛进 summary tab(F-B6,`activeTab === "summary"` 门控 + 回归用例);html overlay 两处 locate `.then` 补 unmount/换代防护(F-B9 尾款,桥内 drain 与 flash 清理批 6 已落);buildHtmlPreviewDoc 注入断言核实为批 6 `16a10c8` 已修(候选断言 + fragment 兜底 + 两个 spoof 单测)。
-- ⏳ 未完成(留待后续):overview 真实时间轴与 span 上限(F-P4,依赖 model 后续演进);SidePanel 壳统一(F-S5);AgentSelect→Combobox(12 项)。
+- ✅ 批 13 完成(08 章全部清零,`49ae3c4`~`fd9419a`):overview 真实时间轴 + span 上限(F-P4,`f462da9`——span 按真实时间线性定位回归原设计意图,500 上限保留最近 span 并以 "+N" 徽标标注被截断前缀;同提交以单一 overlap 谓词统一拖选收集与渲染压暗、span 按钮按下不再起拖、4px 位移阈值分离点击与拖拽、pointerup 按实际位移判定,顺带清偿 F-B5);SidePanel 壳统一(F-S5,`fd9419a`——新增 `ui/side-panel.tsx` 共享壳:头行/工具条槽/滚动体/钉底槽,`mobileSheet` 时窄屏走 Sheet + 边缘滑动关闭/历史哨兵语义;inspector 与 CommentsPanel 换壳,workspace 文件面板按"布局面板非浮层"刻意保留);AgentSelect 迁共享 Select(F-S7,`49ae3c4`——手写下拉 z-30/外点关闭/无 ARIA/无键盘导航全部由原语接管,附挑选/排除/空态三用例)。测试 121→123 文件、809→821 用例。
+- ⏳ 未完成:无(08 章账面清零;design report 中的 wheel-to-zoom 未随批实现,如需再立项)。
 
 > 范围:`command-events/`(5 文件 1750 行)、`preview/`(6 文件 1470 行)、`agent/`(4 文件 796 行)、`activity/`(2 文件 575 行)、`workspace/`(3 文件 474 行)、`chat-events/`(3 文件 214 行),并对照 `components/chat/message-row.tsx`、`components/command-timeline.tsx`、`components/command-terminal.tsx`、`pages/dashboard/command-detail.tsx`(主消费者)、`stores/{command,preview,image-preview,activity,workspace}.ts`、`lib/{tool-call-events,html-file,command-status}.ts` 与 proto 契约 `proto/v1/v1/command.proto`。全部文件已完整阅读,未抽样;所有"无人引用"结论均经全仓 grep + git 历史验证。
 
@@ -160,6 +161,7 @@
 ### F-S5 【中】抽屉/面板壳层四种形态并存,移动端无方案
 - **证据**:inspector 是 ledger 上的绝对定位浮层 `command-detail.tsx:489-500`(`absolute inset-y-0 right-0 z-10 w-80`,移动端直接盖死表格);CommentsAside/HtmlCommentsAside 是静态 `w-80` aside(chat-events-aside 双胞胎,见 F-R9/F-R4);chat 侧有成熟 `ChatDrawerSheet`(`chat/chat-drawer-sheet.tsx:52`,Sheet + swipe-to-close + history-sentinel);preview 内 aside 又是第三种。frontend 的 overlay/层策略(AGENTS.md)明确要求 dropdown/panel 走共享原语,但"侧栏面板"这一层原语是缺失的。
 - **建议**:抽 `SidePanel`(desktop: 内嵌 aside;mobile: 复用 ChatDrawerSheet 的 swipe/历史语义),inspector/评论 aside/文件面板统一换壳。
+- ✅ **批 13 已修**(`fd9419a`):新增 `components/ui/side-panel.tsx` 共享壳(头行 icon/title/meta/actions/close + toolbar 槽 + 滚动体 + 钉底 footer 槽;`mobileSheet` 时窄屏呈现为带边缘滑动关闭与历史哨兵的右缘 Sheet)。inspector 换壳(移动端由"盖死表格的绝对浮层"改为抽屉);CommentsPanel(批 6 双胞胎合并后的共享面板)换壳且不渲染自有关闭按钮(预览 overlay 持有开关);workspace 文件面板经复核为两栏页布局面板而非浮层,刻意不换壳(审计时点的"文件面板"归类已被 TwoPaneShell 时代客观消解)。
 
 ### F-S6 【中】workspace 树:无虚拟化、无 a11y、无搜索,patchRow 全树重映射
 - **位置**:`workspace/workspace-tree.tsx:175-253`(递归 `TreeRows` 全量渲染)、`:160-173`(`patchRow` O(n) 不可变重映射,每次 toggle 触发)、`:200,228,237`(用内联 `paddingLeft` 表达深度)、搜索缺失——chat 侧文件抽屉有"名字搜索"(`channel-files-panel.tsx:111-117`),工作区树连"树内过滤"都没有,与本报告命题所提"树上搜索"重复问题相反:是**搜索能力不一致**。
@@ -168,6 +170,7 @@
 ### F-S7 【低】`AgentSelect` 是 ad-hoc 下拉,违反项目 layering/组件规范
 - **位置**:`agent/agent-team-form.tsx:292-363`(`z-30` 本地 z-index 于 341、手写外点关闭 307-316、无 ARIA listbox/option、无键盘导航);同文件 232-255 的角色选择用的却是共享 `Select`。
 - **建议**:替换为共享 `Combobox`(支持 portal,符合 frontend/AGENTS.md "下拉必须走共享原语"条款);顺带修复键盘可达性。
+- ✅ **批 13 已修**(`49ae3c4`):重建于共享 `Select` 原语(定值单选语义下 Select 比 Combobox 更贴切——同文件 role 下拉即为其既有消费者;portal/外点关闭/键盘/ARIA 全部由 Base UI 接管),富内容行(头像 + 标题 + 描述 + AGENT 徽章)保留在 SelectItem 内,"排除其他行已选 agent、保留本行自身"语义不变,空花名册提示移入弹层。新增挑选/排除/空态三用例。
 
 ### F-S8 【低】activity 列表:桌面分页 + 移动无限滚动双方案共存
 - **位置**:`activity/activity-list.tsx:69-86(pageTokens 栈/gotoPage)、121-128(轮询)、181-199(IntersectionObserver)` + store 端静默合并逻辑 `stores/activity.ts:88-105`。
@@ -203,6 +206,7 @@
 ### F-B5 【中】overview 拖选的两套几何语义不一致,且单击路径依赖事件顺序
 - **位置**:`command-event-timeline-overview.tsx:229-231`(pointerup 判定用 **overlap**:`left < end && left+width > start`)vs `:324-327`(渲染期 inSelection 用 **containment**)→ 拖拽过程中与松手后的高亮集合不一致;另外 `handlePointerDown`(196-203)不区分命中目标,点在 span 按钮上也启动拖选,松手先触发 pointerup 的 range 选择、再触发 click 的 `onRangeSelect(null)`(332-336),正确性依赖 pointerup→click 的固定次序。
 - **建议**:统一 containment;pointerdown 命中 span 时短路为纯点击;为拖选加 4px 移动阈值防误触。
+- ✅ **批 13 已修**(随 F-P4 几何重写,`f462da9`):拖选收集与渲染压暗共用同一"时间区间 overlap"谓词(部分覆盖的 span 保持选中且不压暗);pointerdown 命中 span 按钮即短路;4px 位移阈值之下视为背景单击清空选择;pointerup 改按实际位移判定(修复"快速按下-松开跳过 move 帧被误判为单击"的衍生缺陷)。回归用例:部分覆盖不压暗、短按清空、span 按钮不起新拖。
 
 ### F-B6 【中】inspector 的 WARNING 条游离于 tab 机制之外,每个 tab 都重复渲染
 - **位置**:`command-event-inspector.tsx:553-557`:该块位于 tab 内容 switch 之外,WARNING 事件的 summary 与 raw tab 底部都会再出现一条告警横幅。
@@ -256,6 +260,7 @@
 ### F-P4 【中】overview 每个 span 一个绝对定位 `<button>`,等宽序数布局上限低
 - **位置**:`command-event-timeline-overview.tsx:260-262,320-350`:DOM 节点数 = 行数(数千 span 时不可用);`width = max(0.5%, step-gap)`(262/322)在 >200 span 后全部 0.5% 挤在一起,不可点也不可辨。
 - **建议**:短期按 span 数截断(>500 时聚类成 "…N more");中期改 SVG/canvas 渲染或**真实时间轴**(以 ts 线性分位而非序数等宽,顺带解决"两个相邻分钟事件被等宽展示"的失真),支持 zoom。
+- ✅ **批 13 已修**(`f462da9`):span 按真实时间在覆盖窗口内线性定位(回归 design report §3.4 的原意;首版等宽布局以钉死测试退役),零长事件与末位 span 以最小宽度兜底;>500 时保留最近 500 个 span,被截断的更早前缀以左缘 "+N" 徽标(`command.timeline-more`)标注,ledger 仍是完整虚拟化面。wheel-to-zoom 未随批实现,需要时再立项。
 
 ### F-P5 【中】inspector 输出预览全量渲染 Markdown
 - **位置**:`command-event-inspector.tsx:357-369`:`MarkdownRender` 无 `batchRendering`/`deferNodesUntilVisible`(对照 `markdown-preview-overlay.tsx:179-186` 两个都开了);merged ASSISTANT 输出可达数百 KB。
@@ -308,10 +313,10 @@
 | 6 | **统一工具卡与状态语义**(`<ToolCallCard variant>`;修 chat 侧 error 显示灰) | chat-events/tool-call.tsx、ledger、inspector、overview | ~150 行 | 用户可见的误导性 bug 修复 | 高可见度收益 |
 | 7 | **评论面板双胞胎合并 + FilePreviewShell + useHtmlPreviewBridge** | preview/ 三文件 + workspace/html-file-view.tsx | −≈300 行 | 消除最大复制粘贴块,协议演化单点 | 重构期顺手完成 |
 | 8 | **ledger 虚拟化 + 输出行截断 + 搜索 debounce/索引** | command-event-ledger.tsx + toolbar | ~200 行 | 长会话可用性关键 | 性价比最高的性能项 |
-| 9 | **overview 改真实时间轴 + span 上限**(≥500 截断) | command-event-timeline-overview.tsx | ~120 行 | 修语义失真 + DOM 规模 | 依赖 #4 |
+| 9 | ~~**overview 改真实时间轴 + span 上限**(≥500 截断)~~ | command-event-timeline-overview.tsx | ~120 行 | 修语义失真 + DOM 规模 | 依赖 #4 | ✅ 批 13 完成(`f462da9`,顺带清偿 F-B5) |
 | 10 | **workspace 树虚拟化 + a11y + 树内搜索** | workspace-tree.tsx | ~150 行 | 大工作区可用性 | 中等规模收益 |
 | 11 | **杂项修复包**:activity 魔数/可见性/双分页收敛(✅ 批 6 F-B7 + 批 8 迁 Query + 批 10 `29be54e` 收敛)、workspace-file-panel `t` 依赖(✅ 批 6 F-B8)、inspector WARNING 游离块(✅ 批 11)、buildHtmlPreviewDoc 注入断言(✅ 批 6 `16a10c8`)、locate 定时器清理(✅ 批 6 桥内 drain + 批 11 overlay `.then` 防护) | §5 各条 | ~80 行 | 各自独立小修 | ✅ 全部清偿 |
-| 12 | **AgentSelect → Combobox;toolbar → SearchInput;SidePanel 壳统一** | agent-team-form.tsx、toolbar、inspector/aside | ~200 行 | 规范对齐 + a11y | 视 UI 改版档期 |
+| 12 | ~~**AgentSelect → Combobox;toolbar → SearchInput;SidePanel 壳统一**~~ | agent-team-form.tsx、toolbar、inspector/aside | ~200 行 | 规范对齐 + a11y | 视 UI 改版档期 | ✅ 批 13 完成(toolbar→SearchInput 已随批 6 `38f78af`;AgentSelect `49ae3c4`、SidePanel `fd9419a`) |
 
 **不建议做的**:为 activity 桌面分页补齐更多能力(✅ 已被批 10 收敛取代:统一无限滚动,分页方案不复存在);给 chat 侧 message-row 大改(其 memo 结构已较成熟,属另一章范围)。
 

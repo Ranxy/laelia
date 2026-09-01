@@ -6,9 +6,9 @@
 
 ---
 
-## ⚡ 实施进度总览(更新于重构执行批 0~批 12 后)
+## ⚡ 实施进度总览(更新于重构执行批 0~批 13 后)
 
-重构已执行 **99 个提交、13 个批次(含批次间 docs 收口提交)**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **121 文件 / 809 用例**,全量 vitest 干净退出(exit 0;预存的 jsdom IntersectionObserver unhandled 随重构消失)。各章文件头部已附加对应的"进度标注"块。
+重构已执行 **105 个提交、14 个批次(含批次间 docs 收口提交)**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **123 文件 / 821 用例**,全量 vitest 干净退出(exit 0;预存的 jsdom IntersectionObserver unhandled 随重构消失)。各章文件头部已附加对应的"进度标注"块。
 
 | 批次 | 提交范围 | 内容 | 状态 |
 |---|---|---|---|
@@ -25,8 +25,9 @@
 | 批 10(activity 双分页收敛,08 F-S8)| `29be54e`(1 提交)| **统一无限滚动**(产品拍板):activity-list 桌面 Prev/Next 分页栈/翻页脚手架/lastRowsRef 退役,桌面/移动共用 token 栈 + IntersectionObserver sentinel(316→235 行);5s 轮询统一骑第 0 页(`useActivityPages` 去 `intervalIndex`,newest-first offset 分页下唯一稳定窗口,顺带修掉轮询可见 offset 页的行漂移隐患);`activity.page/prev/next` 死键删除;测试改写为 scroll-append/加载中保留行/耗尽即止 三案| ✅ 完成(1 个提交)|
 | 批 11(hooks 门禁 + 杂项清偿包,06 E-03/P1 + 08 杂项 + 07 杂项)| `96963cc`(1 提交)| **Biome hooks 正确性规则启用**:`useExhaustiveDependencies` + `useHookAtTopLevel` 上线,25 处存量清偿(6 处真漏依赖补齐、惯用法 reset/keyed effect 以带理由 `biome-ignore` 固化、`AcpConfigEditor` 退役 `memo(forwardRef)` 转回 ref-as-prop、comments-panel 条件 hook 上移)、profile 页 5 处 no-op `eslint-disable` 全删、biome.json 幽灵 overrides 清理 + `biome:lint` 重复脚本去重;**08 杂项**:inspector WARNING 游离块收进 summary tab(F-B6)+ 回归用例、html overlay locate `.then` 补 unmount/换代防护(F-B9 尾款)、F-B10 注入断言核实批 6 已修;**07 杂项**:`ui/spinner.tsx` 共享 Spinner(F-D6,4 处点名消费端)、MobileTabBar→RouterLink、member-picker 行 memo + joined 徽章归一 Badge size="sm"| ✅ 完成(1 个提交)|
 | 批 12(数据层与 lib 收尾清偿,05 终局 + 06 P1 + 01 尾巴)| `d839784`~`bf39872`(6 提交)| **useResourceList 退役(05 章终局)**:最后消费者 command-list 迁 `composables/use-command-list.ts`(one query per (agent,status,pageToken) + scoped placeholderData 翻页保持),CommandSlice 死缓存(`commands`/`commandsLoading` 零读者)与 `listCommands` 退役,`lib/use-resource-list.ts` 删除;**缓存统一 + 三竞态修复(06 R-03/B-02/B-03/B-09)**:`lib/async-memo-cache.ts` 共享原语(世代号守卫 + invalidate 广播 + FIFO 容量),avatar/image 两站接入——invalidate 后 in-flight 不再写回、useAvatar 切换即清屏、avatar 获 500 条上限;**lib 整形(06 R-02/B-08)**:command-status 拆 `time-format.ts` + `resource.ts`(avatarName 构造并入),死导出 ×3 清除;**路由名缝合(06 P1)**:RouteName 联合 + `Record<RouteName, RouteInfo>` 穷尽 + 37 处 handle `satisfies RouteHandle` + backTo 改路由名(routeNameForPath 反查删除;顺带补齐 machine.new/channel.detail 的移动端标题缺口);**01 尾巴**:B10(groups owner 校验 + set 语义 dirty)、B13(profile 表单脏保护种子)、B15(死 `??`)+ 回归用例;agent-mcp 满载 flake 超时放宽(承 `d1301ba`)| ✅ 完成(6 个提交)|
+| 批 13(08 章终局:时间轴/侧栏壳/成员选择器)| `49ae3c4`~`fd9419a`(4 提交)| **overview 真实时间轴 + span 上限(08 F-P4,`f462da9`)**:span 按真实时间线性定位(回归 trajectory 重设计原意,等宽钉死测试退役),500 上限保留最近 span 并以 "+N" 徽标标注截断前缀;同提交以单一 overlap 谓词统一拖选收集与渲染压暗 + span 按钮按下短路 + 4px 位移阈值 + pointerup 按实际位移判定,顺带清偿 F-B5;**SidePanel 壳统一(08 F-S5,`fd9419a`)**:新增 `ui/side-panel.tsx`(头行/toolbar 槽/滚动体/钉底槽,`mobileSheet` 窄屏走 Sheet + 边缘滑动关闭/历史哨兵),inspector(移动端不再盖死 ledger)与 CommentsPanel 换壳,workspace 文件面板按"布局面板非浮层"刻意保留;**AgentSelect 迁共享 Select(08 F-S7,`49ae3c4`)**:手写下拉(z-30/外点关闭/无 ARIA/无键盘)由原语接管,富内容行与排除语义保留 + 三用例;agent-profile 满载 flake 改 findBy(承 d1301ba 房法,`aea60d7`)| ✅ 完成(4 个提交)|
 
-**当前数据层状态**:Query 已纵切 12 个读族 + 应用级单例与 Provider(api-provider/mcp/user/agent/machine/settings 目录/iam-policy/presence/reminder/activity/command-list);聊天域长轮询已收敛为共享 ChatGateway 循环(可见性门控 + badge 同节拍);乐观发送经 useChatComposer 走 slice action;错误出口统一;登出经注册表(lib 自注册 + 各 Query 域 registerCleanup 清缓存)。**批 8 收官 = 05 章账面清零**:presence/activity/reminder 三 slice 退役,store 组合收缩至 16 slice。**批 12 = 05 章真正终局**:`useResourceList` 退役(全部列表域直奔 Query),CommandSlice 死缓存与手写分页薄壳删除;同批 avatar/image 缓存统一到 `async-memo-cache` 原语并修复三处竞态。**批 11 = hooks 正确性零黑洞**:`useExhaustiveDependencies`/`useHookAtTopLevel` 已随门禁启用,存量清偿完毕,后续 hooks 依赖漂移在 lint 阶段即被拦截。(产品拍板项已全部清零:流式管线拆除批 6、tool_call_id 批 9、activity 双分页批 10。)
+**当前数据层状态**:Query 已纵切 12 个读族 + 应用级单例与 Provider(api-provider/mcp/user/agent/machine/settings 目录/iam-policy/presence/reminder/activity/command-list);聊天域长轮询已收敛为共享 ChatGateway 循环(可见性门控 + badge 同节拍);乐观发送经 useChatComposer 走 slice action;错误出口统一;登出经注册表(lib 自注册 + 各 Query 域 registerCleanup 清缓存)。**批 8 收官 = 05 章账面清零**:presence/activity/reminder 三 slice 退役,store 组合收缩至 16 slice。**批 12 = 05 章真正终局**:`useResourceList` 退役(全部列表域直奔 Query),CommandSlice 死缓存与手写分页薄壳删除;同批 avatar/image 缓存统一到 `async-memo-cache` 原语并修复三处竞态。**批 13 = 08 章账面清零**:overview 回归真实时间轴 + 500 span 上限并顺带清偿 F-B5 拖选几何缺陷,`ui/side-panel.tsx` 补上侧栏面板原语缺口(inspector/CommentsPanel 换壳),AgentSelect 收编共享 Select。**批 11 = hooks 正确性零黑洞**:`useExhaustiveDependencies`/`useHookAtTopLevel` 已随门禁启用,存量清偿完毕,后续 hooks 依赖漂移在 lint 阶段即被拦截。(产品拍板项已全部清零:流式管线拆除批 6、tool_call_id 批 9、activity 双分页批 10。)
 
 ---
 
@@ -285,6 +286,7 @@ src/
 | activity 双分页收敛(批 10)| ✅ 完成(1 提交)| 08 F-S8 产品拍板统一无限滚动:桌面分页栈退役、双端一套 token 栈 + sentinel(316→235 行),5s 轮询统一骑第 0 页(offset 分页稳定窗口),i18n 死键清理;全量 120 文件/799 用例双跑 exit 0 |
 | hooks 门禁 + 杂项清偿包(批 11)| ✅ 完成(1 提交)| Biome hooks 正确性规则上线(25 处存量清偿、AcpConfigEditor 转 ref-as-prop、死 eslint-disable/幽灵 overrides/重复脚本清理)+ 08 杂项(F-B6 inspector WARNING 收进 summary tab、F-B9 overlay `.then` 防护、F-B10 核实批 6 已修)+ 07 杂项(共享 Spinner、MobileTabBar→RouterLink、member-picker 行 memo + 徽章归一);全量 120 文件/800 用例双跑 exit 0 |
 | 数据层与 lib 收尾清偿(批 12)| ✅ 完成(6 提交)| useResourceList 退役(05 章终局:command-list 迁 Query、CommandSlice 死缓存删除)+ `async-memo-cache` 缓存统一与 B-02/B-03/B-09 三竞态修复 + command-status 拆 time-format/resource(死导出 ×3)+ 路由名 RouteName 缝合(backTo 改名、反查删除)+ settings B10/B13/B15;全量 121 文件/809 用例双跑 exit 0 |
+| 08 章终局(批 13)| ✅ 完成(4 提交)| overview 真实时间轴 + 500 span 上限 + F-B5 拖选几何统一(F-P4/F-B5,`f462da9`)+ `ui/side-panel.tsx` 共享壳与 inspector/CommentsPanel 换壳(F-S5,`fd9419a`)+ AgentSelect 收编共享 Select(F-S7,`49ae3c4`,附三用例)+ agent-profile 满载 flake findBy 化;全量 123 文件/821 用例双跑 exit 0 |
 
 **已完成部分的实际收益(截至批 3)**:四道门禁全绿的测试规模 95→103 文件 / 611→686 用例;高危 bug 十项中**七项已修**(余三项在聊天域收拢内解决);错误呈现 5 种→1 种出口 + 2 处记录在案;轮询策略收敛(可见性门控、终态停轮、重连退避);预存竞态(fetchChannels 族)与三处无界缓存根治;swipe-back 的 UNSAFE_API + 冻结 hack 全部拆除。
 
