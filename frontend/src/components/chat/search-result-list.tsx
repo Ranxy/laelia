@@ -8,7 +8,6 @@ import type {
   ChatMessage,
   SearchChatHistoryEntry,
 } from "@/types/proto-es/v1/command_pb";
-import { SenderType } from "@/types/proto-es/v1/command_pb";
 
 // SearchResultList renders search hits as a single-column flow of cards. A
 // normal hit is one card; a thread-reply hit is grouped under its root message
@@ -100,9 +99,6 @@ function channelLabel(entry: SearchChatHistoryEntry): string {
 
 function senderLabel(msg: ChatMessage): string {
   const name = msg.senderName?.trim();
-  if (msg.senderType === SenderType.USER) {
-    return name || msg.principalId?.trim() || "";
-  }
   return name || msg.principalId?.trim() || "";
 }
 
