@@ -1,5 +1,9 @@
 # 聊天模块深度代码审查报告(frontend/src/components/chat/)
 
+> **⚙ 实施进度标注(批 15 收口后)**
+- ✅ 已完成(本批):P0-4 ConversationRow 方向锁——10px 方向锁(与共享 useEdgeDrag 引擎同参数)、拖动期 transform 直写 DOM(60fps touchmove 不再逐帧 setState)、`touchAction: pan-y`、touchCancel 同收(`802b739`,3 用例防回归);§5.3 senderLabel 死分支清偿 + 组件 4 用例(`cc377b4`);§2.2 ThreadHeader teams 直连拉全量收敛——thread-task-controls/agent-teams-manager/TeamDetailPage 三消费端共享 `hooks/use-agent-teams.ts` 一个 `["agent-teams"]` 缓存(`20195fe`)。
+- ⏳ 未完成:P2-2 badge 家族(ui/badge xs variant)低收益保留;P2-4 FileRow memo(视性能表现);P2-1 轻窗口化已在批 6 落地(`useWindowedMessageRange`),eager=40 阈值常量化为可选微项。
+
 > **⚙ 实施进度标注(批 4 收口后)**
 - ✅ 已完成:ThreadReplies mentionLabel 透传(含回归测试,`5bc9f90`);useChatComposer 双份管线收编与全部组件内联 setState 清零(`5c6665c`,共享 `composables/use-chat-composer.ts` + `components/chat/chat-composer.tsx`,per-surface keyed 挂载),连同三个真实 bug:上传跨会话串台 / mentionMap 残留 / 发送失败不恢复(新增回归测试 `chat-composer.test.tsx`)。
 - ⏳ 未完成:streaming 管线拆除(待产品确认);thread-panel 拆四件(批 5);ConversationRow 方向锁;Avatar sizeClass 显式映射;messages 轻窗口化(ADR-3)。

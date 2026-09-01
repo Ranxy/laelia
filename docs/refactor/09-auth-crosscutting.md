@@ -1,5 +1,9 @@
 # 前端架构评审报告 09:auth 页面分析与横切扫描
 
+> **⚙ 实施进度标注(批 15 收口后)**
+- ✅ 已完成(本批):A-6 redirect protocol-relative 校验——`sanitizeRedirect()` 单点落 `router/auth-redirect.ts`,signin 参数消费、oauth state 存储(startOAuthLogin)与回调消费三面统一,`//evil.com`/外站 URL/空值一律回落 `/`(`e368389`);A-5 auth 域 6 处直连 RPC 清零——公共配置读收敛 `hooks/use-workspace-policy.ts`(signin/signup/machines 三消费端共享一个 `["workspace-policy"]` 缓存)与 `hooks/use-identity-providers.ts`(signin/oauth-login 共享),A-8 的 `endsWith` 过宽匹配同步收紧为资源名精确匹配(`9ecb3cd`);横切防抖用户搜索双份拷贝合一 `hooks/use-user-search.ts`(member-picker/from-sender-picker,含生成号守卫修复两份拷贝共有的过期回写竞态,`4fdb72a`);getChannel 三胞胎(chat-conversation 兜底读/channel-detail 真相源/activity-detail 兜底读)收敛 `hooks/use-channel.ts`(`9b56444`);agent-teams 目录读三消费端(thread 分配下拉/管理卡片/TeamDetailPage)收敛 `hooks/use-agent-teams.ts`,TeamDetailPage 手写 load 退役 + agents 归共享花名册(`20195fe`);auth slice 15 用例、permission 目录一致性、search-result-list 4 用例(`cc377b4`)。
+- ⏳ 未完成:AuthShell(A-4,布局复用);loginWithIdp/register 参数更名(A-9);i18n camelCase 段归一(P3);§2.2 直连 RPC 余量 72 处中,settings 域 ~40 处为四原语合法形态(queryFn 读 + useCrudDialog 写回调),真余量是 machine-profile IAM、user-menu、setup-checklist 等页面级特化点(低收益)。
+
 > **⚙ 实施进度标注(批 3 收口后)**
 - ✅ 已完成:device-login 轮询治理(终态停轮、退避、后台暂停、清理)+ 4 用例测试(`7eedafb`);auth 五页错误出口统一(389ce97);auth.oauth-callback 等 3 个描述性 fallback 键删除;stale-data 提示已加;auth 域 6 处直连 RPC 未变(见下)。
 - ⏳ 未完成:auth 域直连 RPC 收敛(useWorkspacePolicy 等,归页面拆分);AuthShell;loginWithIdp/register 参数更名;redirect protocol-relative 校验;oauth 两页测试;settings 域 60 处直连 RPC 收敛(归页面拆分);i18n camelCase 段归一与 12~15 个未翻译键。
