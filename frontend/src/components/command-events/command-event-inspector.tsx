@@ -6,6 +6,7 @@ import { ChatDiff } from "@/components/chat-events/diff-view";
 import { ChatWarning } from "@/components/chat-events/warning";
 import { ContextUsageBar } from "@/components/context-usage-bar";
 import { TokenUsageCard } from "@/components/token-usage-card";
+import { SidePanel } from "@/components/ui/side-panel";
 import {
   formatClockTime,
   getCommandEventKind,
@@ -407,15 +408,11 @@ export function CommandEventInspector({
       event.type === CommandEventType.TOKEN_USAGE);
 
   return (
-    <aside
-      aria-label={t("command.inspector-title")}
-      className={cn(
-        "flex min-h-0 flex-col overflow-hidden rounded-lg border border-control-border bg-background shadow-xl",
-        className
-      )}
-    >
-      {/* Header */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-control-border bg-control-bg/50 px-3 py-2">
+    <SidePanel
+      open
+      onClose={onClose}
+      label={t("command.inspector-title")}
+      icon={
         <span
           className={cn(
             "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium",
@@ -425,122 +422,116 @@ export function CommandEventInspector({
           <kind.icon className="size-3 shrink-0" />
           {t(kind.labelKey)}
         </span>
-        {!output && (
-          <span className="text-[10px] text-control-light">#{event.seqNo}</span>
-        )}
-        <span className="ml-auto min-w-0 flex-1 truncate text-right text-[10px] text-control-light">
-          {output
-            ? formatClockTime(output.startTs)
-            : formatDateTime(event.timestamp)}
-        </span>
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t("common.close")}
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-control-light hover:bg-control-bg hover:text-control"
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-        )}
-      </div>
-
-      {/* Tabs */}
-      <div
-        className="flex shrink-0 gap-1 border-b border-control-border px-2"
-        role="tablist"
-        aria-label={t("command.inspector-title")}
-      >
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab}
-            onClick={() => setActiveTab(tab)}
-            className={cn(
-              "relative rounded-t px-2 py-1.5 text-[11px] font-medium text-control-light transition-colors hover:text-control",
-              activeTab === tab &&
-                "text-accent after:absolute after:inset-x-1 after:bottom-0 after:h-0.5 after:bg-accent"
-            )}
-          >
-            {tabLabels[tab]}
-          </button>
-        ))}
-      </div>
-
-      {/* Body */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {output ? (
-          <>
-            {activeTab === "summary" && <OutputOverview output={output} />}
-            {activeTab === "preview" && <OutputPreview output={output} />}
-            {activeTab === "raw" && <OutputRaw output={output} />}
-          </>
-        ) : (
-          <>
-            {activeTab === "summary" &&
-              (isTool ? (
-                <ToolOverview
-                  event={event}
-                  startedEvent={startedEvent}
-                  finishedEvent={finishedEvent}
-                />
-              ) : isDiff ? (
-                <DiffOverview event={event} />
-              ) : isUsage ? (
-                <UsageOverview event={event} />
-              ) : (
-                <SummaryOverview event={event} />
-              ))}
-
-            {activeTab === "payload" && startedEvent && (
-              <RawPayload event={startedEvent} />
-            )}
-            {activeTab === "result" && finishedEvent && (
-              <RawPayload event={finishedEvent} />
-            )}
-            {activeTab === "diff" && <ChatDiff event={event} />}
-            {activeTab === "raw" && <RawPayload event={event} />}
-            {activeTab === "usage" &&
-              event.type === CommandEventType.CONTEXT_USAGE_UPDATE && (
-                <div className="p-3">
-                  <ContextUsageBar event={event} />
-                </div>
+      }
+      title={
+        output ? undefined : (
+          <span className="text-[10px] font-normal text-control-light">
+            #{event.seqNo}
+          </span>
+        )
+      }
+      meta={
+        output
+          ? formatClockTime(output.startTs)
+          : formatDateTime(event.timestamp)
+      }
+      toolbar={
+        <div
+          className="flex shrink-0 gap-1 border-b border-control-border px-2"
+          role="tablist"
+          aria-label={t("command.inspector-title")}
+        >
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab}
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                "relative rounded-t px-2 py-1.5 text-[11px] font-medium text-control-light transition-colors hover:text-control",
+                activeTab === tab &&
+                  "text-accent after:absolute after:inset-x-1 after:bottom-0 after:h-0.5 after:bg-accent"
               )}
-            {activeTab === "usage" &&
-              event.type === CommandEventType.TOKEN_USAGE &&
-              event.payload.case === "tokenUsage" && (
-                <div className="p-3">
-                  <TokenUsageCard usage={event.payload.value} />
-                </div>
-              )}
-            {activeTab === "timing" && (
+            >
+              {tabLabels[tab]}
+            </button>
+          ))}
+        </div>
+      }
+      mobileSheet
+      className={cn("rounded-lg border shadow-xl", className)}
+      headerClassName="bg-control-bg/50"
+    >
+      {output ? (
+        <>
+          {activeTab === "summary" && <OutputOverview output={output} />}
+          {activeTab === "preview" && <OutputPreview output={output} />}
+          {activeTab === "raw" && <OutputRaw output={output} />}
+        </>
+      ) : (
+        <>
+          {activeTab === "summary" &&
+            (isTool ? (
+              <ToolOverview
+                event={event}
+                startedEvent={startedEvent}
+                finishedEvent={finishedEvent}
+              />
+            ) : isDiff ? (
+              <DiffOverview event={event} />
+            ) : isUsage ? (
+              <UsageOverview event={event} />
+            ) : (
+              <SummaryOverview event={event} />
+            ))}
+
+          {activeTab === "payload" && startedEvent && (
+            <RawPayload event={startedEvent} />
+          )}
+          {activeTab === "result" && finishedEvent && (
+            <RawPayload event={finishedEvent} />
+          )}
+          {activeTab === "diff" && <ChatDiff event={event} />}
+          {activeTab === "raw" && <RawPayload event={event} />}
+          {activeTab === "usage" &&
+            event.type === CommandEventType.CONTEXT_USAGE_UPDATE && (
               <div className="p-3">
-                {/* The timing tab only exists for tool events, so render the
-                    dl directly (no unreachable placeholder branch). */}
-                <dl>
-                  <OverviewRow
-                    dt={t("command.inspector-started")}
-                    dd={formatDateTime(startedEvent?.timestamp)}
-                  />
-                  <OverviewRow
-                    dt={t("command.inspector-finished")}
-                    dd={formatDateTime(finishedEvent?.timestamp)}
-                  />
-                </dl>
+                <ContextUsageBar event={event} />
               </div>
             )}
+          {activeTab === "usage" &&
+            event.type === CommandEventType.TOKEN_USAGE &&
+            event.payload.case === "tokenUsage" && (
+              <div className="p-3">
+                <TokenUsageCard usage={event.payload.value} />
+              </div>
+            )}
+          {activeTab === "timing" && (
+            <div className="p-3">
+              {/* The timing tab only exists for tool events, so render the
+                  dl directly (no unreachable placeholder branch). */}
+              <dl>
+                <OverviewRow
+                  dt={t("command.inspector-started")}
+                  dd={formatDateTime(startedEvent?.timestamp)}
+                />
+                <OverviewRow
+                  dt={t("command.inspector-finished")}
+                  dd={formatDateTime(finishedEvent?.timestamp)}
+                />
+              </dl>
+            </div>
+          )}
 
-            {activeTab === "summary" &&
-              event.type === CommandEventType.WARNING && (
-                <div className="p-3">
-                  <ChatWarning event={event} />
-                </div>
-              )}
-          </>
-        )}
-      </div>
-    </aside>
+          {activeTab === "summary" &&
+            event.type === CommandEventType.WARNING && (
+              <div className="p-3">
+                <ChatWarning event={event} />
+              </div>
+            )}
+        </>
+      )}
+    </SidePanel>
   );
 }

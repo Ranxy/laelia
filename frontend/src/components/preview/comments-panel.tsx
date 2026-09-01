@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Avatar, formatTime } from "@/components/chat/avatar";
 import { Button } from "@/components/ui/button";
+import { SidePanel } from "@/components/ui/side-panel";
 import { Textarea } from "@/components/ui/textarea";
 import { useAvatar } from "@/lib/avatar-cache";
 import type { CommentAnchor } from "@/lib/markdown-file";
@@ -131,16 +132,86 @@ export function CommentsPanel({
 
   const canSend = body.trim().length > 0 && pendingAnchor !== null && !sending;
 
-  return (
-    <aside className="flex w-80 shrink-0 flex-col border-l border-control-border bg-background">
-      <div className="flex shrink-0 items-center gap-2 border-b border-control-border px-3 py-2">
-        <MessageSquare className="size-3.5 shrink-0 text-control-light" />
-        <span className="truncate text-xs font-semibold text-main">
-          {t("preview.comments")} · {attachment.name}
-        </span>
+  const footerContent = (
+    <>
+      {pendingAnchor && (
+        <div className="mb-2 flex items-start gap-1.5 rounded-md border border-control-border bg-control-bg/40 p-1.5 text-[11px]">
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-medium text-main">
+              {pendingAnchor.sectionAnchor}
+            </div>
+            <div className="line-clamp-2 italic text-control-light">
+              {pendingAnchor.quotedText}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onSetPendingAnchor(null)}
+            aria-label={t("common.close")}
+            className="shrink-0 text-control-placeholder hover:text-main"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      )}
+      <div className="rounded-lg border border-control-border bg-control-bg/40 focus-within:border-accent">
+        <Textarea
+          ref={textareaRef}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder={t("preview.comments-placeholder", {
+            name: attachment.name,
+          })}
+          rows={2}
+          className="max-h-32 min-h-10 resize-none border-0 bg-transparent text-sm focus-visible:ring-0"
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing) return;
+            if (e.key !== "Enter") return;
+            const wantSend = enterToSend ? !e.shiftKey : e.shiftKey;
+            if (wantSend) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+        />
+        <div className="flex items-center justify-between gap-2 px-1.5 pb-1.5">
+          <span className="text-[10px] text-control-placeholder">
+            {pendingAnchor
+              ? t(
+                  enterToSend
+                    ? "preview.comments-ready"
+                    : "preview.comments-ready-inverted"
+                )
+              : t("preview.comments-select-hint")}
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleSend}
+            disabled={!canSend}
+            className="flex size-7 items-center justify-center p-0"
+            aria-label={t("preview.comments-send")}
+          >
+            <Send className="size-3.5" />
+          </Button>
+        </div>
       </div>
+    </>
+  );
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+  return (
+    <SidePanel
+      label={t("preview.comments")}
+      icon={<MessageSquare className="size-3.5 shrink-0 text-control-light" />}
+      title={
+        <>
+          {t("preview.comments")} · {attachment.name}
+        </>
+      }
+      className="w-80 shrink-0"
+      footer={<div className="p-2">{footerContent}</div>}
+    >
+      <div className="px-3 py-2">
         {comments.length === 0 && (
           <p className="text-xs text-control-placeholder">
             {t("preview.comments-empty")}
@@ -159,72 +230,7 @@ export function CommentsPanel({
           ))}
         </ul>
       </div>
-
-      <div className="shrink-0 border-t border-control-border p-2">
-        {pendingAnchor && (
-          <div className="mb-2 flex items-start gap-1.5 rounded-md border border-control-border bg-control-bg/40 p-1.5 text-[11px]">
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-medium text-main">
-                {pendingAnchor.sectionAnchor}
-              </div>
-              <div className="line-clamp-2 italic text-control-light">
-                {pendingAnchor.quotedText}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onSetPendingAnchor(null)}
-              aria-label={t("common.close")}
-              className="shrink-0 text-control-placeholder hover:text-main"
-            >
-              <X className="size-3" />
-            </button>
-          </div>
-        )}
-        <div className="rounded-lg border border-control-border bg-control-bg/40 focus-within:border-accent">
-          <Textarea
-            ref={textareaRef}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder={t("preview.comments-placeholder", {
-              name: attachment.name,
-            })}
-            rows={2}
-            className="max-h-32 min-h-10 resize-none border-0 bg-transparent text-sm focus-visible:ring-0"
-            onKeyDown={(e) => {
-              if (e.nativeEvent.isComposing) return;
-              if (e.key !== "Enter") return;
-              const wantSend = enterToSend ? !e.shiftKey : e.shiftKey;
-              if (wantSend) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-          />
-          <div className="flex items-center justify-between gap-2 px-1.5 pb-1.5">
-            <span className="text-[10px] text-control-placeholder">
-              {pendingAnchor
-                ? t(
-                    enterToSend
-                      ? "preview.comments-ready"
-                      : "preview.comments-ready-inverted"
-                  )
-                : t("preview.comments-select-hint")}
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSend}
-              disabled={!canSend}
-              className="flex size-7 items-center justify-center p-0"
-              aria-label={t("preview.comments-send")}
-            >
-              <Send className="size-3.5" />
-            </Button>
-          </div>
-        </div>
-      </div>
-    </aside>
+    </SidePanel>
   );
 }
 
