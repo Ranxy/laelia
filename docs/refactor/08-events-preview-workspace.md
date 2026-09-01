@@ -3,7 +3,8 @@
 > **⚙ 实施进度标注(批 6 收口后)**
 - ✅ 已完成:整文件死代码(command-timeline/CommandTerminal/use-auto-scroll)+ isToolEvent/投机枚举/双映射清除(`b0499db`);iframe 桥 `safeOpenExternal` 白名单(`75d844b`);watch 流断线重连 + 退避 + seqNo 续传(`4b7cf57`)。
 - ✅ 批 6 完成:TimelineModel 归一(`b3c2644`:`lib/command-events-model.ts` 唯一 merge/kind/时间与状态语义,行键漂移根治,`command-event-kind.ts` 删除);preview 收敛(`16a10c8`:CommentsPanel 双胞胎合并 + FilePreviewShell + useHtmlPreviewBridge + F-B9/F-S2/F-S3/F-B10);ledger 虚拟化 + 100KB 截断 + 搜索防抖(`38f78af`);workspace 树扁平化虚拟化 + role=tree + 树内搜索(`a4dcabf`);activity 魔数(F-B7)与 workspace-file-panel t 依赖(F-B8)已修;inspector timing 死分支(F-D7)随迁。
-- ⏳ 未完成(留待后续):overview 真实时间轴与 span 上限(F-P4,依赖 model 后续演进);inspector WARNING 游离 tab 之外(F-B6);proto `tool_call_id`(F-B1 并发配对根治,需后端立项);activity 桌面分页与无限滚动双方案收敛(F-S8,产品侧拍板);SidePanel 壳统一(F-S5);AgentSelect→Combobox(12 项)。
+- ✅ 批 9 完成:proto `tool_call_id` 契约 + 全链路透传(`68e53a6`/`69396f8`:两个 ToolCall*Payload 增可选 `tool_call_id`;ToolCallSink 接口与 ACP 三帧、acp2 thread executor、pi executor 全部发射点透传 runtime id;interleaved/pi 测试钉死 ID 契约),前端配对改 ID 优先 + FIFO 兜底(`baf4167`:并发交错不再错配,断线缝隙丢 START、legacy 无 ID 仍走事件序兜底,pair 按 started 顺序输出)。
+- ⏳ 未完成(留待后续):overview 真实时间轴与 span 上限(F-P4,依赖 model 后续演进);inspector WARNING 游离 tab 之外(F-B6);activity 桌面分页与无限滚动双方案收敛(F-S8,产品侧拍板);SidePanel 壳统一(F-S5);AgentSelect→Combobox(12 项)。
 
 > 范围:`command-events/`(5 文件 1750 行)、`preview/`(6 文件 1470 行)、`agent/`(4 文件 796 行)、`activity/`(2 文件 575 行)、`workspace/`(3 文件 474 行)、`chat-events/`(3 文件 214 行),并对照 `components/chat/message-row.tsx`、`components/command-timeline.tsx`、`components/command-terminal.tsx`、`pages/dashboard/command-detail.tsx`(主消费者)、`stores/{command,preview,image-preview,activity,workspace}.ts`、`lib/{tool-call-events,html-file,command-status}.ts` 与 proto 契约 `proto/v1/v1/command.proto`。全部文件已完整阅读,未抽样;所有"无人引用"结论均经全仓 grep + git 历史验证。
 
@@ -179,6 +180,7 @@
 - **位置**:`lib/tool-call-events.ts:9-27`;契约缺口 `proto/v1/v1/command.proto:190-193` —— `ToolCallFinishedPayload` 只有 `status/raw_output`,**没有关联 ID**;注释自认 "payloads carry no correlation id... pair by event order: FIFO"。
 - **败坏场景**:agent 并发两工具时事件序为 `START-A, START-B, FIN-B, FIN-A` → FIFO 把 A 配上 B 的结果,状态与输出全部张冠李戴;且 START 丢失一条(断线缝隙)后所有后续配对永久错位一格。
 - **建议**:proto 为 STARTED/FINISHED 增加 `tool_call_id`(配合 AIP 字段命名规范),前端配对改 ID 匹配 + FIFO 兜底;这是"大规模重构"里少数必须先动 proto 的项。
+- **✅ 批 9 已修**:`68e53a6`(proto 字段 + Go/proto-es/grpc-doc 重新生成)+ `69396f8`(ToolCallSink 接口带 id;ACP DefaultAdapter/OpenCodeAdapter 三帧、acp2 thread_executor、pi executor 全部发射点透传;interleaved-opencode 与 pi 测试钉死 payload ID)+ `baf4167`(`pairToolCallEvents` 先按 `tool_call_id` 匹配,无 ID/ID 无匹配走 FIFO 兜底,兜底关闭时同步退休 map 条目防二次配对;新增并发交错/START 丢失/legacy 混合三案)。
 
 ### F-B2 【高】watch 流断线不会重连:网络闪断 = 页面永久停更
 - **位置**:`stores/command.ts:74-89,106-122`(for-await 抛错即 `return false`)、消费方 `command-detail.tsx:124-134`(一次性订阅,`.catch(() => {})`)。
@@ -296,7 +298,7 @@
 | 2 | **`window.open` scheme 白名单**(统一 `safeOpenExternal`) | html-preview-overlay.tsx:218-222、html-file-view.tsx:35-38 | ~20 行 + 测试 | 堵住唯一可利用 XSS 面 | 安全问题,最高优先 |
 | 3 | **watch 断线重连 + 合批 flush + LRU**(重构 store 层) | stores/command.ts、command-detail.tsx:124-134 | ~120 行 | 解决"页面永久停更"与内存无上限 | 正确性 + 性能双收益 |
 | 4 | **建 `lib/command-events-model.ts`**:唯一 merge/pair/tsToMs/kind 注册表/lane 映射 | 替换 §3 F-R1/F-R2/F-D6 四份拷贝 | ~250 行 + 迁移 | 消灭行键漂移这类隐性 bug 的总根源 | 后续一切重构的地基 |
-| 5 | **proto 加 `tool_call_id`** + 配对改 ID 优先 | proto/v1/v1/command.proto、tool-call-events.ts | proto + ~40 行 | 根治并发错配 | 需要后端协同,尽早立项 |
+| 5 | ~~**proto 加 `tool_call_id`** + 配对改 ID 优先~~ | proto/v1/v1/command.proto、tool-call-events.ts | proto + ~40 行 | 根治并发错配 | ✅ 批 9 完成(`68e53a6`/`69396f8`/`baf4167`) |
 | 6 | **统一工具卡与状态语义**(`<ToolCallCard variant>`;修 chat 侧 error 显示灰) | chat-events/tool-call.tsx、ledger、inspector、overview | ~150 行 | 用户可见的误导性 bug 修复 | 高可见度收益 |
 | 7 | **评论面板双胞胎合并 + FilePreviewShell + useHtmlPreviewBridge** | preview/ 三文件 + workspace/html-file-view.tsx | −≈300 行 | 消除最大复制粘贴块,协议演化单点 | 重构期顺手完成 |
 | 8 | **ledger 虚拟化 + 输出行截断 + 搜索 debounce/索引** | command-event-ledger.tsx + toolbar | ~200 行 | 长会话可用性关键 | 性价比最高的性能项 |

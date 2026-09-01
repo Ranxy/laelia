@@ -8,7 +8,7 @@
 
 ## ⚡ 实施进度总览(更新于重构执行批 0~批 8 后)
 
-重构已执行 **83 个提交、9 个批次(含批次间 docs 收口提交)**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **120 文件 / 797 用例**,全量 vitest 干净退出(exit 0;预存的 jsdom IntersectionObserver unhandled 随重构消失)。各章文件头部已附加对应的"进度标注"块。
+重构已执行 **86 个提交、10 个批次(含批次间 docs 收口提交)**,四道门禁(type-check / biome / vitest / check)持续保持全绿;测试规模从 95 文件 / 611 用例增长到 **120 文件 / 798 用例**,全量 vitest 干净退出(exit 0;预存的 jsdom IntersectionObserver unhandled 随重构消失)。各章文件头部已附加对应的"进度标注"块。
 
 | 批次 | 提交范围 | 内容 | 状态 |
 |---|---|---|---|
@@ -18,11 +18,12 @@
 | 批 3(Phase 1 收官)| `e7aca3a`~`acb701d`(4 提交) | user/agent/machine 纵切、watch 断线重连、cleanup registry、usePolling 收敛 | ✅ 完成 |
 | 批 4(Phase 2 聊天域收拢)| `4085c66`~`bc65511`(3 提交) | ChatGateway watcher 合一与可见性门控、useChatComposer(-600 行重复)+ 3 真实 bug 修复、批 4 归位(interval 收编 + lib 自注册) | ✅ 完成 |
 | 批 5(Phase 3 页面拆分)| `627bf6b`~`b6664ad`(19 提交) | settings CRUD 脚手架四原语 + 7 页全迁移(roles/api-providers/mcp/idp/iam 特化 + 尾部统一,idp 测试从 0 → 9 用例,B4/B6/B7/B8/B12 随迁修复)、thread-panel 拆四件(790→393)、agent-profile ACP 编辑器抽取(2379→1168)、global-search 手写 pickers 收敛 Base UI combobox(1011→477)+ 首个测试、sidebar 拆件(457→49)、chat-conversation/machine-new 页面级测试 | ✅ 完成(19 个提交) |
-| 批 6(Phase 4 UI/事件管线,重设计后路线)| `5fdf8fa`~`a4dcabf`(23 提交)| badge/词典收敛(StatusBadge 范型、destructive→error、Badge size="sm"、Button size 别名删除、Avatar 显式映射、组件 API 约定与 Separator 决策入 AGENTS.md)、modal 壳/弹层共享(LAYER_BACKDROP_SET + positioned-popup + ModelCombobox portal)、**TimelineModel 归一**(`lib/command-events-model.ts`:4 份 merge 拷贝→1、kind 注册表唯一化、isToolCallError 单点 + F-D7 死分支)、preview 收敛(CommentsPanel 双胞胎合并 + FilePreviewShell + useHtmlPreviewBridge,修 F-B9/F-S2/F-S3/F-B10)、**ADR-3 ②③**(ledger 虚拟化 + 100KB 输出截断 + 搜索防抖、workspace 树扁平化虚拟化 + role=tree a11y + 树内搜索、消息列表轻窗口化 `useWindowedMessageRange`)、TwoPaneShell/DetailTabsLayout 布局收敛、手势统一 + 共享 TransferOwnershipDialog + useMessageScroller 搬移(-499 行状态机出页面)、B7/B8/B-7 随手清偿、PWA reload 用户可见护栏、toast.ts 改 Base UI 官方工厂、tsconfig 覆盖 vite/sw(tool_call_id 需后端立项,未动)| ✅ 完成(24 个提交)|
+| 批 6(Phase 4 UI/事件管线,重设计后路线)| `5fdf8fa`~`a4dcabf`(23 提交)| badge/词典收敛(StatusBadge 范型、destructive→error、Badge size="sm"、Button size 别名删除、Avatar 显式映射、组件 API 约定与 Separator 决策入 AGENTS.md)、modal 壳/弹层共享(LAYER_BACKDROP_SET + positioned-popup + ModelCombobox portal)、**TimelineModel 归一**(`lib/command-events-model.ts`:4 份 merge 拷贝→1、kind 注册表唯一化、isToolCallError 单点 + F-D7 死分支)、preview 收敛(CommentsPanel 双胞胎合并 + FilePreviewShell + useHtmlPreviewBridge,修 F-B9/F-S2/F-S3/F-B10)、**ADR-3 ②③**(ledger 虚拟化 + 100KB 输出截断 + 搜索防抖、workspace 树扁平化虚拟化 + role=tree a11y + 树内搜索、消息列表轻窗口化 `useWindowedMessageRange`)、TwoPaneShell/DetailTabsLayout 布局收敛、手势统一 + 共享 TransferOwnershipDialog + useMessageScroller 搬移(-499 行状态机出页面)、B7/B8/B-7 随手清偿、PWA reload 用户可见护栏、toast.ts 改 Base UI 官方工厂、tsconfig 覆盖 vite/sw(~~tool_call_id 需后端立项,未动~~ → 批 9 `68e53a6`~`baf4167` 根治)| ✅ 完成(24 个提交)|
 | 批 7(05 章 stores 收尾)| `2d4f224`~`4dad293`(6 提交)| **types.ts 拆分**(903 行契约上帝文件→共享 UI 模型入 `stores/ui-models.ts`、19 个 slice 接口与实现同文件、51 行组合点,组件导入改 `@/stores/ui-models`,50 文件)、**写入面收敛**(`SliceSet` 重载收窄 + 四条跨 slice 写入授予注册表:channel→chat 消息 map、thread→chatMessages 回复数、task→threadByRoot、members→user/agent 花名册;直接字面量越权写入编译期拦截)、**conversations 私有化**(module 缓存 + cleanup 注册,reset 即清,+4 测试)、**polling.ts→delay.ts 更名**、**reset 测试表驱动化**(覆盖面随 slice 自动补全)、**store 写入面守卫入 check 门禁**(`check-store-writes.mjs` 置首位 + AGENTS.md「Store Write Surface」)| ✅ 完成(6 个提交)|
 | 批 8(05 章收官:presence/activity/reminder 迁 Query)| `b7a3799`~`53b9cc3`(6 提交)| **presence 心跳保留、数据入 Query**(`["presences"]` 唯一 fetcher 挂 dashboard 布局,结构共享替代手写 bailout,空名单仍发心跳,消费端 `useOnlineUsers()` 只读,reset 清缓存)、**reminder 列表/详情迁 per-key 查询**(终态停轮、keepPreviousData 翻页、外包装+内体 key 化重置、list/detail 双 composable)、**activity per-(filter,pageToken) 查询 + useQueries**(requestSeq/手写 equal/首屏 merge hack 消解,markDone 乐观移除全部缓存页,detail 兜底 QueryCache 订阅扫描)、**三 slice 退役**(19→16 组合,手写 equal ×3、silent 样板 ×3 随之消失)| ✅ 完成(6 个提交)|
+| 批 9(tool_call_id 全栈贯通)| `68e53a6`~`baf4167`(3 提交)| **proto 契约**(ToolCallStarted/FinishedPayload 增可选 `tool_call_id`,Go/proto-es/grpc-doc 重生成)、**后端全链路透传**(ToolCallSink 接口带 id,ACP 三帧、acp2 thread executor、pi executor 全部发射点透传 runtime id,interleaved/pi 测试钉死契约)、**前端配对 ID 优先 + FIFO 兜底**(并发交错不再错配,断线缝隙/legacy 仍事件序兜底,pair 按 started 顺序输出)| ✅ 完成(3 个提交)|
 
-**当前数据层状态**:Query 已纵切 12 个读族 + 应用级单例与 Provider(api-provider/mcp/user/agent/machine/settings 目录/iam-policy/presence/reminder/activity);聊天域长轮询已收敛为共享 ChatGateway 循环(可见性门控 + badge 同节拍);乐观发送经 useChatComposer 走 slice action;错误出口统一;登出经注册表(lib 自注册 + 三个新 Query 域各自 registerCleanup 清缓存)。**批 8 收官 = 05 章账面清零**:presence/activity/reminder 三 slice 退役,store 组合收缩至 16 slice,`useResourceList` 仅剩 command-list 一个消费者。**遗留:proto `tool_call_id`(后端立项)、Biome `useExhaustiveDependencies` 启用、activity 双分页等产品拍板项与穿插清理**。
+**当前数据层状态**:Query 已纵切 12 个读族 + 应用级单例与 Provider(api-provider/mcp/user/agent/machine/settings 目录/iam-policy/presence/reminder/activity);聊天域长轮询已收敛为共享 ChatGateway 循环(可见性门控 + badge 同节拍);乐观发送经 useChatComposer 走 slice action;错误出口统一;登出经注册表(lib 自注册 + 三个新 Query 域各自 registerCleanup 清缓存)。**批 8 收官 = 05 章账面清零**:presence/activity/reminder 三 slice 退役,store 组合收缩至 16 slice,`useResourceList` 仅剩 command-list 一个消费者。**遗留:Biome `useExhaustiveDependencies` 启用、activity 双分页等产品拍板项与穿插清理**(批 9 已根治 proto `tool_call_id` FIFO 配对,高危清单仅余产品拍板项)。
 
 ---
 
@@ -41,7 +42,7 @@
 | 7 | **ADR-1 引入 TanStack Query**(`b95c530`~`e7aca3a`)/ **ADR-2 preview 退役 + 冻结删除**(`d4774c3`) | ✅ 完成:数据层 slice + 聊天域长轮询与组件 interval 全部收敛(`4085c66`/`bc65511`) |
 | 8 | **流式管线拆除决策** | ✅ 完成(`07b2799`,产品确认拆除):ChatMessageUI.streaming 字段 + rowStreamingProps + typing-dots + fade 全部移除,MessageRow 接口面 -2 个流式 props |
 | 9 | **三个巨型页面拆分** | ✅ 完成(批 5+6):agent-profile 2379→1168(ACP 编辑器共享化 `f4e5a36`)、machine-profile 2184→763 + 共享 Ownership 对话框(`b6664ad`/`663867b`)、chat 滚动状态机搬移为 `useMessageScroller`(`10cb1bb`)、thread-panel/chat-conversation 页面级测试齐备 |
-| 10 | **事件渲染管线统一** | ✅ 完成(批 6):watch 断线重连(`4b7cf57`)+ TimelineModel 归一(`b3c2644`:唯一 pair/merge/kind 注册表/行键统一,行键漂移根治)+ ledger/workspace 虚拟化与消息列表轻窗口化(`38f78af`/`a4dcabf`/`2f3e949`);proto `tool_call_id`(F-B1 FIFO 配对的根治)仍需后端立项 |
+| 10 | **事件渲染管线统一** | ✅ 完成(批 6):watch 断线重连(`4b7cf57`)+ TimelineModel 归一(`b3c2644`:唯一 pair/merge/kind 注册表/行键统一,行键漂移根治)+ ledger/workspace 虚拟化与消息列表轻窗口化(`38f78af`/`a4dcabf`/`2f3e949`);proto `tool_call_id` ✅ 批 9 根治(`68e53a6`~`baf4167`,ID 优先配对 + FIFO 兜底) |
 
 
 **量化总览**:全部建议落地后,预计净删 **7,000~9,000 行**(约 15~19%),修复 **约 30 个已定位 bug(其中高危 12 个)**,收敛 **6 套互不一致的轮询策略、5 种错误呈现、4 套时间格式化、3 套 size 词典**。整体规划约 **8~12 人周**,Phase 0(见 §7)一周内可完成。
@@ -138,7 +139,7 @@
 7. **列表 store 无请求序号** — 快速切过滤/页码时旧响应覆盖新列表(fetchChannels/agents/machines/audits 全族)[05 B1、03 B1、01 B6/B7]
 8. **MCP header 输入框每键失焦** — `key={name-i}` 动态 key [01 B1,已本人复核]
 9. **ThreadReplies mentionLabel 漏透传** — 共享频道回复行 mention 永不解析显示名 [04 §3.1,已本人复核]
-10. **FIFO 工具调用配对** — proto 无关联 ID,并发工具必错配;chat 侧 error 状态显示成灰色 [08 F-B1/F-R3,需 proto 联动]
+10. **FIFO 工具调用配对** → ✅ 批 9 根治:`tool_call_id` 进 proto + 全链路透传(`68e53a6`/`69396f8`),配对 ID 优先 + FIFO 兜底(`baf4167`);chat 侧 error 状态显示成灰色已随批 6 `f01f818` 修复 [08 F-B1/F-R3]
 
 中危(代表项):IAM/角色空表渲染 "No agents yet."、删除按钮一律 "Saving…"、设置页 CRUD 不失效对应 store 切片、`toggleReaction` 双击竞态、乐观发送失败输入框文本不恢复、头像/图片缓存 invalidate 后旧数据写回(跨会话数据残留)、`drainRoster` 与心跳互踩串页、device-login 终态后无限轮询、conversation-list 滑动无方向锁 60fps 重渲染、avatar `size-${n}` 动态类依赖巧合、8 处 mutation 无 catch 静默失败。
 
@@ -256,7 +257,7 @@ src/
 ### ✅ Phase 4(原 Phase 3)· UI 体系与事件管线 — 完成(批 6,`5fdf8fb`~`a2a31bc`,23 提交)
 1. Badge 家族 ✅ `5fdf8fa`:范型 StatusBadge(五胞胎收敛,查表保留在 lib/)、Badge 色调 `destructive`→`error`(与 Alert/Toast 词表统一,Button 的 destructive 保留为危险动作语义)、`size="sm"` 小字徽章、Button size `default` 别名删除、Avatar 显式尺寸映射;组件 API 约定(ref-as-prop/cva 不导出/cn 范式/size 与色调词表/portal/禁 asChild)与 Separator 决策(承认 `border-t border-control-border` 惯例)写入 frontend/AGENTS.md;modal 壳共享(`LAYER_BACKDROP_SET` + Title/Description 常量,`da3f234`)、弹层四复制收敛 positioned-popup、ModelCombobox portal 化 prop;
 2. `lib/command-events-model.ts` ✅ `b3c2644`:merge×4→1(`mergeOutputRuns`,seqNo 全序 + 稳定排序,行键漂移根治)、kind/ostream 注册表迁入、isToolCallError 单点(chat 侧 error 徽章修复 `f01f818`)、safeStringify 入 lib;preview 收敛 ✅ `16a10c8`(CommentsPanel + FilePreviewShell + useHtmlPreviewBridge,F-B9/F-S2/F-S3/F-B10);
-3. ADR-3 ②③ ✅:ledger 虚拟化 + 100KB 截断 + SearchInput/250ms 防抖(`38f78af`)、workspace 树扁平化 + 虚拟化 + role=tree 与键盘导航 + 树内搜索(`a4dcabf`)、消息列表轻窗口化(`use-windowed-message-range`,`2f3e949`);ActivityState 魔数 ✅ `3c9b9c5`;proto `tool_call_id` ⏳ 需后端立项;
+3. ADR-3 ②③ ✅:ledger 虚拟化 + 100KB 截断 + SearchInput/250ms 防抖(`38f78af`)、workspace 树扁平化 + 虚拟化 + role=tree 与键盘导航 + 树内搜索(`a4dcabf`)、消息列表轻窗口化(`use-windowed-message-range`,`2f3e949`);ActivityState 魔数 ✅ `3c9b9c5`;proto `tool_call_id` ✅ 批 9 完成(`68e53a6`~`baf4167`,ID 优先配对 + FIFO 兜底);
 4. UI 侧收尾 ✅:`toast.ts` 改 `Toast.createToastManager()` 官方工厂(`9655606`,as any 洞消除)、PWA controllerchange reload 增用户可见 toast 护栏(`0db2492`)、Separator 决策落地(AGENTS.md)、tsconfig 覆盖 vite/sw(`d8c8e46`,type-check 现跑 node 工程);TwoPaneShell/DetailTabsLayout/RailRow 布局收敛(`8ed13c3`)、手势统一 + TransferOwnershipDialog + useMessageScroller 搬移 + activity-detail 死契约(`d861c56`/`663867b`/`10cb1bb`/`c84281f`)同批清偿。
 
 ### 贯穿全程的规则(部分已落地)
@@ -277,6 +278,7 @@ src/
 | Phase 4 UI/事件管线 | ✅ 完成(批 6,24 提交)| TimelineModel 4→1 + 行键统一、badge/modal/弹层收敛 + AGENTS.md API 约定、ADR-3 ②③ 虚拟化与轻窗口化、preview 收敛、TwoPaneShell/手势/Ownership 收敛;proto `tool_call_id` 留待后端立项 |
 | 05 章 stores 收尾 | ✅ 完成(批 7,6 提交)| types.ts 903→51 行(ui-models + 接口同文件)、SliceSet 写入面授予注册表、conversations 私有化(reset 即清)、delay.ts 更名、表驱动 reset 测试、写入面守卫入 check;全量 120 文件/783 用例双跑 exit 0 |
 | 05 章收官(批 8)| ✅ 完成(6 提交)| presence/reminder/activity 数据源全部迁 Query(refetchInterval 可见性门控 + 结构共享;手写 equal ×3、requestSeq、首屏 merge hack 消解),三 slice 退役 19→16 组合;心跳 hook 保留;全量 120 文件/797 用例双跑 exit 0 |
+| tool_call_id 全栈贯通(批 9)| ✅ 完成(3 提交)| proto 两 payload 增 `tool_call_id`(Go/proto-es/grpc-doc 重生成)、ToolCallSink 接口 + 后端全部发射点透传、前端配对 ID 优先 + FIFO 兜底(并发交错根治);后端 6 包测试全绿,全量 120 文件/798 用例 |
 
 **已完成部分的实际收益(截至批 3)**:四道门禁全绿的测试规模 95→103 文件 / 611→686 用例;高危 bug 十项中**七项已修**(余三项在聊天域收拢内解决);错误呈现 5 种→1 种出口 + 2 处记录在案;轮询策略收敛(可见性门控、终态停轮、重连退避);预存竞态(fetchChannels 族)与三处无界缓存根治;swipe-back 的 UNSAFE_API + 冻结 hack 全部拆除。
 
