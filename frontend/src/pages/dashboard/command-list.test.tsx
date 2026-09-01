@@ -28,6 +28,16 @@ import { CommandListPage } from "./command-list";
 // unmounts the whole Members tree and remounts it, re-triggering
 // fetchMembers/fetchMachines — which looks like a full page reload.
 
+// The page reads rows through useCommandListPage → commandServiceClient;
+// mock the client so pages are controllable per test.
+const mock = vi.hoisted(() => ({
+  listCommands: vi.fn(),
+}));
+
+vi.mock("@/connect", () => ({
+  commandServiceClient: { listCommands: mock.listCommands },
+}));
+
 function seedStore() {
   useAppStore.setState({
     currentUser: { name: "users/1", title: "U" } as unknown as User,
@@ -51,24 +61,6 @@ function seedStore() {
     ],
     machinesLoading: false,
     fetchMachines: vi.fn(async () => undefined),
-    commands: [
-      {
-        name: "agents/a/commands/c1",
-        status: 3,
-        finalSummary: "done",
-      } as unknown as Command,
-    ],
-    commandsLoading: false,
-    activeOutputs: {},
-    activeEvents: {},
-    // The page loads rows through useResourceList → listCommands; mirror the
-    // seeded commands so store-seeded fixtures keep rendering.
-    listCommands: vi.fn(async () => {
-      return {
-        commands: (useAppStore.getState().commands ?? []) as Command[],
-        nextPageToken: "",
-      };
-    }),
     releaseCommand: vi.fn(),
     getCommand: vi.fn(async () => undefined),
     watchCommand: vi.fn(async () => true),
@@ -78,6 +70,14 @@ function seedStore() {
     fetchChannels: vi.fn(async () => {}),
     sendChatMessage: vi.fn(async () => ({}) as ChatMessage),
   });
+}
+
+function cmd(name: string, summary: string): Command {
+  return {
+    name,
+    status: CommandStatus.COMPLETED,
+    finalSummary: summary,
+  } as unknown as Command;
 }
 
 function buildRealRouter() {
@@ -101,6 +101,10 @@ function buildRealRouter() {
 describe("command row click navigation", () => {
   beforeEach(() => {
     seedStore();
+    mock.listCommands.mockResolvedValue({
+      commands: [cmd("agents/a/commands/c1", "done")],
+      nextPageToken: "",
+    });
     window.history.replaceState(null, "", "/members/agents/a/commands");
   });
 
@@ -183,53 +187,43 @@ describe("command row click navigation", () => {
 
 describe("command list page", () => {
   function renderListPage() {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     return render(
-      <MemoryRouter initialEntries={["/members/agents/a/commands"]}>
-        <Routes>
-          <Route
-            path="/members/agents/:agentId/commands"
-            element={<CommandListPage />}
-          />
-          <Route
-            path="/members/agents/:agentId/commands/:commandId"
-            element={<div data-testid="detail" />}
-          />
-        </Routes>
-      </MemoryRouter>
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/members/agents/a/commands"]}>
+          <Routes>
+            <Route
+              path="/members/agents/:agentId/commands"
+              element={<CommandListPage />}
+            />
+            <Route
+              path="/members/agents/:agentId/commands/:commandId"
+              element={<div data-testid="detail" />}
+            />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
     );
-  }
-
-  function cmd(name: string, summary: string): Command {
-    return {
-      name,
-      status: CommandStatus.COMPLETED,
-      finalSummary: summary,
-    } as unknown as Command;
   }
 
   beforeEach(() => {
     seedStore();
+    mock.listCommands.mockReset();
   });
 
-  it("shows the loading row while commands are being fetched", () => {
-    useAppStore.setState({
-      commands: [],
-      commandsLoading: false,
-      // A never-resolving fetch keeps the hook in its skeleton state.
-      listCommands: vi.fn(
-        (): Promise<
-          { commands: Command[]; nextPageToken: string } | undefined
-        > => new Promise(() => {})
-      ),
-    });
+  it("shows the loading row while commands are being fetched", async () => {
+    // A never-resolving fetch keeps the query in its skeleton state.
+    mock.listCommands.mockReturnValue(new Promise(() => {}));
 
     renderListPage();
 
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(await screen.findByText("Loading...")).toBeInTheDocument();
   });
 
   it("shows the empty state and opens the new-task sheet from it", async () => {
-    useAppStore.setState({ commands: [], commandsLoading: false });
+    mock.listCommands.mockResolvedValue({ commands: [], nextPageToken: "" });
 
     renderListPage();
 
@@ -245,15 +239,7 @@ describe("command list page", () => {
   });
 
   it("filters the list by status", async () => {
-    const listCommands = vi.fn(async () => ({
-      commands: [],
-      nextPageToken: "",
-    }));
-    useAppStore.setState({
-      commands: [],
-      commandsLoading: false,
-      listCommands,
-    });
+    mock.listCommands.mockResolvedValue({ commands: [], nextPageToken: "" });
 
     renderListPage();
 
@@ -262,41 +248,31 @@ describe("command list page", () => {
     );
     await waitFor(
       () =>
-        expect(listCommands).toHaveBeenCalledWith(
-          "agents/a",
-          expect.objectContaining({ status: CommandStatus.RUNNING })
+        expect(mock.listCommands).toHaveBeenCalledWith(
+          expect.objectContaining({
+            agent: "agents/a",
+            status: CommandStatus.RUNNING,
+          }),
+          expect.anything()
         ),
       { timeout: 3000 }
     );
   });
 
   it("paginates with next/prev", async () => {
-    // The real store listCommands writes the fetched page into the store; the
-    // mock mirrors that so the table re-renders per page.
-    const listCommands = vi.fn(
-      async (
-        _agent: string,
-        params?: { pageSize?: number; pageToken?: string; status?: number }
-      ) => {
-        const page =
-          params?.pageToken === "tok2"
-            ? {
-                commands: [cmd("agents/a/commands/c2", "two")],
-                nextPageToken: "",
-              }
-            : {
-                commands: [cmd("agents/a/commands/c1", "one")],
-                nextPageToken: "tok2",
-              };
-        useAppStore.setState({ commands: page.commands });
-        return page;
-      }
+    // Page 0 heads to tok2; tok2 is the last page.
+    mock.listCommands.mockImplementation(
+      (input: { pageToken?: string | null }) =>
+        input.pageToken === "tok2"
+          ? Promise.resolve({
+              commands: [cmd("agents/a/commands/c2", "two")],
+              nextPageToken: "",
+            })
+          : Promise.resolve({
+              commands: [cmd("agents/a/commands/c1", "one")],
+              nextPageToken: "tok2",
+            })
     );
-    useAppStore.setState({
-      commands: [cmd("agents/a/commands/c1", "one")],
-      commandsLoading: false,
-      listCommands,
-    });
 
     renderListPage();
 
@@ -310,9 +286,9 @@ describe("command list page", () => {
       await screen.findByText("two", {}, { timeout: 3000 })
     ).toBeInTheDocument();
     expect(screen.getByText("Page 2")).toBeInTheDocument();
-    expect(listCommands).toHaveBeenCalledWith(
-      "agents/a",
-      expect.objectContaining({ pageToken: "tok2" })
+    expect(mock.listCommands).toHaveBeenCalledWith(
+      expect.objectContaining({ pageToken: "tok2" }),
+      expect.anything()
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Prev" }));
@@ -324,16 +300,8 @@ describe("command list page", () => {
 
   it("sends a new task from the sheet", async () => {
     const sendChatMessage = vi.fn(async () => ({}) as ChatMessage);
-    const listCommands = vi.fn(async () => ({
-      commands: [],
-      nextPageToken: "",
-    }));
-    useAppStore.setState({
-      commands: [],
-      commandsLoading: false,
-      sendChatMessage,
-      listCommands,
-    });
+    useAppStore.setState({ sendChatMessage });
+    mock.listCommands.mockResolvedValue({ commands: [], nextPageToken: "" });
 
     renderListPage();
 
@@ -363,9 +331,9 @@ describe("command list page", () => {
   });
 
   it("expands the final summary in a sheet", async () => {
-    useAppStore.setState({
+    mock.listCommands.mockResolvedValue({
       commands: [cmd("agents/a/commands/c1", "long summary text")],
-      commandsLoading: false,
+      nextPageToken: "",
     });
 
     renderListPage();
@@ -385,9 +353,9 @@ describe("command list page", () => {
   });
 
   it("opens the detail page when a row is activated with the keyboard", async () => {
-    useAppStore.setState({
+    mock.listCommands.mockResolvedValue({
       commands: [cmd("agents/a/commands/c1", "done")],
-      commandsLoading: false,
+      nextPageToken: "",
     });
 
     renderListPage();

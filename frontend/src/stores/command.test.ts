@@ -48,8 +48,6 @@ const NAME = "agents/a/commands/c";
 
 beforeEach(() => {
   useAppStore.setState({
-    commands: [],
-    commandsLoading: false,
     activeOutputs: {},
     activeEvents: {},
   });

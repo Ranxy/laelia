@@ -14,8 +14,6 @@ import { sleep } from "./delay";
 import type { AppSliceCreator } from "./types";
 
 export interface CommandSlice {
-  commands: Command[];
-  commandsLoading: boolean;
   activeOutputs: Record<string, CommandOutput[]>;
   activeEvents: Record<string, CommandEvent[]>;
 
@@ -24,10 +22,6 @@ export interface CommandSlice {
   // running command. Best-effort: executors without mid-turn steering ignore
   // it. Throws when the command is not running or the agent is unreachable.
   steerCommand: (name: string, text: string) => Promise<Command>;
-  listCommands: (
-    agent: string,
-    params?: { pageSize?: number; pageToken?: string; status?: number }
-  ) => Promise<{ commands: Command[]; nextPageToken: string } | undefined>;
   getCommand: (name: string) => Promise<Command | undefined>;
   // watchCommand/watchCommandEvents resolve with true when the server closed
   // the stream normally (e.g. the command finished), false when the stream was
@@ -116,46 +110,19 @@ export const createCommandSlice: AppSliceCreator<CommandSlice> = (set, get) => {
     set({ activeOutputs: {}, activeEvents: {} });
   });
   return {
-    commands: [],
-    commandsLoading: false,
     activeOutputs: {},
     activeEvents: {},
 
     async cancelCommand(name) {
-      const res = await commandServiceClient.cancelCommand(
+      return commandServiceClient.cancelCommand(
         create(CancelCommandRequestSchema, { name })
       );
-      set((state) => ({
-        commands: state.commands.map((c) => (c.name === name ? res : c)),
-      }));
-      return res;
     },
 
     async steerCommand(name, text) {
-      const res = await commandServiceClient.steerCommand(
+      return commandServiceClient.steerCommand(
         create(SteerCommandRequestSchema, { name, text })
       );
-      set((state) => ({
-        commands: state.commands.map((c) => (c.name === name ? res : c)),
-      }));
-      return res;
-    },
-
-    async listCommands(agent, params) {
-      set({ commandsLoading: true });
-      try {
-        const res = await commandServiceClient.listCommands({
-          agent,
-          pageSize: params?.pageSize ?? 50,
-          pageToken: params?.pageToken ?? "",
-          status: params?.status ?? 0,
-        });
-        set({ commands: res.commands, commandsLoading: false });
-        return { commands: res.commands, nextPageToken: res.nextPageToken };
-      } catch {
-        set({ commands: [], commandsLoading: false });
-        return undefined;
-      }
     },
 
     async getCommand(name) {

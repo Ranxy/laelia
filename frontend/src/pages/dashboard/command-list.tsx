@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Expand, Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -22,17 +23,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  COMMAND_LIST_QUERY_ROOT,
+  useCommandListPage,
+} from "@/composables/use-command-list";
 import { FinalSummary } from "@/lib/markdown";
 import { agentResourceName, commandIdFromName } from "@/lib/resource";
 import { formatDuration, formatTimestamp } from "@/lib/time-format";
-import { useResourceList } from "@/lib/use-resource-list";
 import { useAppStore } from "@/stores";
 import type { Command } from "@/types/proto-es/v1/command_pb";
 import { CommandStatus } from "@/types/proto-es/v1/command_pb";
 
 type StatusFilter = "all" | "pending" | "running" | "done" | "failed";
-
-const PAGE_SIZE = 50;
 
 // 服务端 ListCommandsRequest.status 为单个 CommandStatus。`failed` tab 仅按
 // FAILED 过滤，CANCELLED/TIMEOUT 不在此 tab 内（避免后端改动为 repeated）。
@@ -47,25 +49,42 @@ const statusFilterToStatusValue: Record<StatusFilter, CommandStatus> = {
 export function CommandListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { agentId } = useParams<{ agentId: string }>();
   const agent = agentResourceName(agentId);
 
   const sendChatMessage = useAppStore((s) => s.sendChatMessage);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const list = useResourceList<Command>({
-    resetKey: `${agent ?? ""}|${statusFilter}`,
-    fetch: async (pageToken) => {
-      const res = await useAppStore.getState().listCommands(agent, {
-        pageSize: PAGE_SIZE,
-        pageToken,
-        status: statusFilterToStatusValue[statusFilter],
-      });
-      return res
-        ? { rows: res.commands, nextPageToken: res.nextPageToken }
-        : undefined;
-    },
+  // pageTokens[i] is the page_token to ENTER page i; page 0 is "" (offset 0).
+  // The token stack is pagination UI state; the pages themselves live in the
+  // Query cache, one entry per (agent, status, token) — use-command-list.ts
+  // owns it (same split as the activity feed).
+  const [pageTokens, setPageTokens] = useState<string[]>([""]);
+  const [pageIndex, setPageIndex] = useState(0);
+
+  // Reset the pagination stack when the agent or the filter tab changes so
+  // the page re-enters at page 0 (render-time adjust: no extra effect pass).
+  const resetKey = `${agent}|${statusFilter}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
+    setPageTokens([""]);
+    setPageIndex(0);
+  }
+
+  const pageToken = pageTokens[pageIndex] ?? "";
+  const page = useCommandListPage({
+    agent,
+    status: statusFilterToStatusValue[statusFilter],
+    pageToken,
   });
+  const rows = page.data?.commands;
+  const nextPageToken = page.data?.nextPageToken ?? "";
+  const loading = page.isPending;
+  // A user-initiated fetch is in flight (first page / page turn / post-send
+  // reload); it disables the pager so canNext can't double-trigger.
+  const refreshing = page.isFetching;
 
   const [sendOpen, setSendOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
@@ -73,8 +92,22 @@ export function CommandListPage() {
   const [expandedSummary, setExpandedSummary] = useState<Command | null>(null);
 
   const handleStatusFilterChange = (f: StatusFilter) => {
+    if (f === statusFilter) return;
     setStatusFilter(f);
-    // The resetKey change drives the hook back to page 1 + reload.
+    // The resetKey change above drives the stack back to page 1.
+  };
+
+  const handleNextPage = () => {
+    // Truncate any forward history (after going back a page) and push the
+    // cursor for the page we are about to enter.
+    const cut = pageTokens.slice(0, pageIndex + 1);
+    cut.push(nextPageToken);
+    setPageTokens(cut);
+    setPageIndex(pageIndex + 1);
+  };
+
+  const handlePrevPage = () => {
+    setPageIndex((i) => Math.max(0, i - 1));
   };
 
   const handleSend = async () => {
@@ -84,7 +117,10 @@ export function CommandListPage() {
       await sendChatMessage(agent, instruction.trim());
       setInstruction("");
       setSendOpen(false);
-      list.reload();
+      // The new command heads page 1: re-enter at page 0 and refetch it.
+      setPageTokens([""]);
+      setPageIndex(0);
+      void queryClient.invalidateQueries({ queryKey: COMMAND_LIST_QUERY_ROOT });
     } finally {
       setSending(false);
     }
@@ -147,7 +183,7 @@ export function CommandListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {list.loading && (
+                {loading && (
                   <TableRow>
                     <TableCell
                       colSpan={4}
@@ -157,7 +193,7 @@ export function CommandListPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {!list.loading && list.rows.length === 0 && (
+                {!loading && (rows ?? []).length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-12">
                       <div className="flex flex-col items-center gap-3">
@@ -176,8 +212,8 @@ export function CommandListPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {!list.loading &&
-                  list.rows.map((cmd) => (
+                {!loading &&
+                  (rows ?? []).map((cmd) => (
                     <TableRow
                       key={cmd.name}
                       className="cursor-pointer"
@@ -233,13 +269,13 @@ export function CommandListPage() {
 
       <div className="shrink-0 border-t border-control-border px-4 py-2">
         <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-control-light">
-          <span>{t("tasks.page", { n: list.pageIndex + 1 })}</span>
+          <span>{t("tasks.page", { n: pageIndex + 1 })}</span>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={!list.canPrev || list.refreshing}
-              onClick={list.prevPage}
+              disabled={pageIndex === 0 || refreshing}
+              onClick={handlePrevPage}
             >
               <ChevronLeft className="size-3.5" />
               {t("tasks.prev")}
@@ -247,8 +283,8 @@ export function CommandListPage() {
             <Button
               variant="outline"
               size="sm"
-              disabled={!list.canNext || list.refreshing}
-              onClick={list.nextPage}
+              disabled={nextPageToken === "" || refreshing}
+              onClick={handleNextPage}
             >
               {t("tasks.next")}
               <ChevronRight className="size-3.5" />
