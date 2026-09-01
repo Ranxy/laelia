@@ -4,7 +4,8 @@
 - ✅ 已完成:整文件死代码(command-timeline/CommandTerminal/use-auto-scroll)+ isToolEvent/投机枚举/双映射清除(`b0499db`);iframe 桥 `safeOpenExternal` 白名单(`75d844b`);watch 流断线重连 + 退避 + seqNo 续传(`4b7cf57`)。
 - ✅ 批 6 完成:TimelineModel 归一(`b3c2644`:`lib/command-events-model.ts` 唯一 merge/kind/时间与状态语义,行键漂移根治,`command-event-kind.ts` 删除);preview 收敛(`16a10c8`:CommentsPanel 双胞胎合并 + FilePreviewShell + useHtmlPreviewBridge + F-B9/F-S2/F-S3/F-B10);ledger 虚拟化 + 100KB 截断 + 搜索防抖(`38f78af`);workspace 树扁平化虚拟化 + role=tree + 树内搜索(`a4dcabf`);activity 魔数(F-B7)与 workspace-file-panel t 依赖(F-B8)已修;inspector timing 死分支(F-D7)随迁。
 - ✅ 批 9 完成:proto `tool_call_id` 契约 + 全链路透传(`68e53a6`/`69396f8`:两个 ToolCall*Payload 增可选 `tool_call_id`;ToolCallSink 接口与 ACP 三帧、acp2 thread executor、pi executor 全部发射点透传 runtime id;interleaved/pi 测试钉死 ID 契约),前端配对改 ID 优先 + FIFO 兜底(`baf4167`:并发交错不再错配,断线缝隙丢 START、legacy 无 ID 仍走事件序兜底,pair 按 started 顺序输出)。
-- ⏳ 未完成(留待后续):overview 真实时间轴与 span 上限(F-P4,依赖 model 后续演进);inspector WARNING 游离 tab 之外(F-B6);activity 桌面分页与无限滚动双方案收敛(F-S8,产品侧拍板);SidePanel 壳统一(F-S5);AgentSelect→Combobox(12 项)。
+- ✅ 批 10 完成:F-S8 双分页收敛(`29be54e`,产品拍板统一无限滚动)——activity-list 桌面 Prev/Next 分页栈退役,桌面/移动共用一套 token 栈 + IntersectionObserver sentinel;`useActivityPages` 去 `intervalIndex`,5s 轮询统一骑第 0 页(newest-first offset 分页下唯一稳定窗口,修掉轮询可见 offset 页的漂移隐患);`activity.page/prev/next` 三死键删除,测试改写为无限滚动三案。
+- ⏳ 未完成(留待后续):overview 真实时间轴与 span 上限(F-P4,依赖 model 后续演进);inspector WARNING 游离 tab 之外(F-B6);SidePanel 壳统一(F-S5);AgentSelect→Combobox(12 项)。
 
 > 范围:`command-events/`(5 文件 1750 行)、`preview/`(6 文件 1470 行)、`agent/`(4 文件 796 行)、`activity/`(2 文件 575 行)、`workspace/`(3 文件 474 行)、`chat-events/`(3 文件 214 行),并对照 `components/chat/message-row.tsx`、`components/command-timeline.tsx`、`components/command-terminal.tsx`、`pages/dashboard/command-detail.tsx`(主消费者)、`stores/{command,preview,image-preview,activity,workspace}.ts`、`lib/{tool-call-events,html-file,command-status}.ts` 与 proto 契约 `proto/v1/v1/command.proto`。全部文件已完整阅读,未抽样;所有"无人引用"结论均经全仓 grep + git 历史验证。
 
@@ -171,6 +172,7 @@
 - **位置**:`activity/activity-list.tsx:69-86(pageTokens 栈/gotoPage)、121-128(轮询)、181-199(IntersectionObserver)` + store 端静默合并逻辑 `stores/activity.ts:88-105`。
 - **分析**:竞态防护是认真的(`requestSeq` 81-101,注释清楚),但三条写路径 + 双分页语义让后续改动成本高;桌面"第 N 页"和移动"无限列表"共享同一个 `activities` 数组与 `activitiesNextPageToken`。
 - **建议**:收敛为无限滚动(桌面列表区高度足够),分页栈删除;或把分页逻辑整体下沉 store。同时轮询(5s,`:121-128`)建议加 `document.visibilityState` 门控。
+- **✅ 批 10 已修**(`29be54e`,产品拍板:统一无限滚动;先经批 8 `53b9cc3` 迁 Query per-(filter,pageToken)):桌面分页栈/翻页脚手架/`lastRowsRef` 翻页保持全部删除,双端共用 token 栈 + sentinel;轮询可见性门控已随批 8 由 `refetchIntervalInBackground` 覆盖,批 10 起 5s 轮询统一骑第 0 页(后端 `created_at DESC` + offset 分页下唯一稳定窗口);`activity.page/prev/next` 死键删除,activity-list 316→235 行。
 
 ---
 
@@ -304,10 +306,10 @@
 | 8 | **ledger 虚拟化 + 输出行截断 + 搜索 debounce/索引** | command-event-ledger.tsx + toolbar | ~200 行 | 长会话可用性关键 | 性价比最高的性能项 |
 | 9 | **overview 改真实时间轴 + span 上限**(≥500 截断) | command-event-timeline-overview.tsx | ~120 行 | 修语义失真 + DOM 规模 | 依赖 #4 |
 | 10 | **workspace 树虚拟化 + a11y + 树内搜索** | workspace-tree.tsx | ~150 行 | 大工作区可用性 | 中等规模收益 |
-| 11 | **杂项修复包**:activity 魔数/可见性/双分页收敛、workspace-file-panel `t` 依赖、inspector WARNING 游离块、buildHtmlPreviewDoc 注入断言、locate 定时器清理 | §5 各条 | ~80 行 | 各自独立小修 | 批量清偿 |
+| 11 | **杂项修复包**:activity 魔数/可见性/双分页收敛(✅ 批 6 F-B7 + 批 8 迁 Query + 批 10 `29be54e` 收敛)、workspace-file-panel `t` 依赖(✅ 批 6 F-B8)、inspector WARNING 游离块、buildHtmlPreviewDoc 注入断言、locate 定时器清理 | §5 各条 | ~80 行 | 各自独立小修 | 批量清偿 |
 | 12 | **AgentSelect → Combobox;toolbar → SearchInput;SidePanel 壳统一** | agent-team-form.tsx、toolbar、inspector/aside | ~200 行 | 规范对齐 + a11y | 视 UI 改版档期 |
 
-**不建议做的**:为 activity 桌面分页补齐更多能力(先 #11 收敛);给 chat 侧 message-row 大改(其 memo 结构已较成熟,属另一章范围)。
+**不建议做的**:为 activity 桌面分页补齐更多能力(✅ 已被批 10 收敛取代:统一无限滚动,分页方案不复存在);给 chat 侧 message-row 大改(其 memo 结构已较成熟,属另一章范围)。
 
 ---
 
