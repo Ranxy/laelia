@@ -45,6 +45,18 @@ interface FractionRange {
 
 const LANE_LABELS = ["Output", "Tools", "System"] as const;
 
+// DOM scale cap: beyond this many spans the per-span buttons stop being
+// distinguishable (and affordable), so the overview keeps the most recent
+// MAX_TIMELINE_SPANS of them and marks the truncated prefix with a "+N" chip
+// at the left edge. The ledger remains the complete, virtualized surface.
+const MAX_TIMELINE_SPANS = 500;
+// Zero-length events (and the last span) stay clickable with a minimum
+// visual width instead of collapsing to nothing.
+const MIN_SPAN_WIDTH_PERCENT = 0.5;
+// Pointer travel (px) before a background press counts as a drag rather than
+// a plain click that clears the selection.
+const DRAG_THRESHOLD_PX = 4;
+
 function orderedRange(a: number, b: number): FractionRange {
   return a <= b ? { start: a, end: b } : { start: b, end: a };
 }
@@ -72,9 +84,10 @@ export function CommandEventTimelineOverview({
   const [selection, setSelection] = useState<FractionRange | null>(null);
   const [dragging, setDragging] = useState(false);
   const dragAnchor = useRef<number | null>(null);
+  const pressX = useRef(0);
 
-  const { spans } = useMemo(() => {
-    const spans: Span[] = [];
+  const { spans, droppedCount } = useMemo(() => {
+    const all: Span[] = [];
     const pairs = pairToolCallEvents(events);
 
     // Output runs come from the shared merge implementation, so the span keys
@@ -82,7 +95,7 @@ export function CommandEventTimelineOverview({
     // order (runs → tools → events) keeps the same tie-break at equal
     // timestamps as the previous ts-interleaved construction.
     for (const run of mergeOutputRuns(outputs, events)) {
-      spans.push({
+      all.push({
         lane: 0,
         start: run.startTs,
         end: Math.max(run.endTs, run.startTs + 1),
@@ -100,7 +113,7 @@ export function CommandEventTimelineOverview({
         pair.finished?.payload.case === "toolCallFinished"
           ? pair.finished.payload.value.status
           : undefined;
-      spans.push({
+      all.push({
         lane: 1,
         start,
         end: Math.max(end, start + 1),
@@ -123,7 +136,7 @@ export function CommandEventTimelineOverview({
       const phase = kind.phase;
       const lane = eventSpanLane(phase);
       const ts = tsToMs(event.timestamp);
-      spans.push({
+      all.push({
         lane,
         start: ts,
         end: ts + 1,
@@ -135,8 +148,31 @@ export function CommandEventTimelineOverview({
       });
     }
 
-    return { spans };
+    all.sort((a, b) => a.start - b.start || a.seqNo - b.seqNo);
+    if (all.length <= MAX_TIMELINE_SPANS) {
+      return { spans: all, droppedCount: 0 };
+    }
+    return {
+      spans: all.slice(all.length - MAX_TIMELINE_SPANS),
+      droppedCount: all.length - MAX_TIMELINE_SPANS,
+    };
   }, [outputs, events]);
+
+  // The time window the visible spans cover; span left/width are linear in
+  // wall time across it (real time axis, per the trajectory design report),
+  // so two bursts a minute apart no longer render as equal neighbors.
+  const timeWindow = useMemo(() => {
+    if (spans.length === 0) return { t0: 0, duration: 1 };
+    const t0 = spans[0].start;
+    let t1 = t0;
+    for (const span of spans) t1 = Math.max(t1, span.end);
+    return { t0, duration: Math.max(1, t1 - t0) };
+  }, [spans]);
+
+  const fractionToTime = useCallback(
+    (fraction: number) => timeWindow.t0 + fraction * timeWindow.duration,
+    [timeWindow]
+  );
 
   const fractionFromEvent = useCallback((clientX: number): number => {
     const el = trackRef.current;
@@ -147,43 +183,56 @@ export function CommandEventTimelineOverview({
   }, []);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Span buttons handle their own click; pressing one must not start a drag.
+    if ((e.target as HTMLElement).closest("button")) return;
     e.preventDefault();
-    const f = fractionFromEvent(e.clientX);
-    dragAnchor.current = f;
-    setSelection({ start: f, end: f });
-    setDragging(true);
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    pressX.current = e.clientX;
+    dragAnchor.current = fractionFromEvent(e.clientX);
+    trackRef.current?.setPointerCapture?.(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragging || dragAnchor.current === null) return;
+    if (dragAnchor.current === null) return;
+    if (!dragging) {
+      if (Math.abs(e.clientX - pressX.current) < DRAG_THRESHOLD_PX) return;
+      setDragging(true);
+    }
     const f = fractionFromEvent(e.clientX);
     setSelection(orderedRange(dragAnchor.current, f));
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragging) return;
-    const f = fractionFromEvent(e.clientX);
-    const range = orderedRange(dragAnchor.current ?? f, f);
-    setDragging(false);
+    if (dragAnchor.current === null) return;
+    const anchor = dragAnchor.current;
     dragAnchor.current = null;
+    // Judge by traveled distance, not by whether a move event flipped
+    // `dragging`: a fast press→release can jump past the threshold without
+    // any intermediate pointermove.
+    const moved = Math.abs(e.clientX - pressX.current) >= DRAG_THRESHOLD_PX;
+    if (!moved) {
+      // A plain background click clears the selection instead of re-selecting
+      // whatever happens to sit under the point.
+      setDragging(false);
+      setSelection(null);
+      onRangeSelect?.(null);
+      return;
+    }
+    const range = orderedRange(anchor, fractionFromEvent(e.clientX));
+    setDragging(false);
     setSelection(range);
 
-    // Collect every span inside the range and scroll the ledger to the first
-    // one (the "start of the range").
-    const ordered = [...spans].sort((a, b) => a.start - b.start);
-    const step = 100 / ordered.length;
-    const gap = Math.min(1.6, step / 4);
+    // Collect every span overlapping the selected time window. This is the
+    // same predicate the render-time dimming uses, so the committed highlight
+    // always matches what was on screen while dragging (and a span that only
+    // partially sticks into the range stays selected).
+    const startT = fractionToTime(range.start);
+    const endT = fractionToTime(range.end);
     const selectedKeys: string[] = [];
     let first: Span | undefined;
-    for (let i = 0; i < ordered.length; i++) {
-      const left = i * step;
-      const width = Math.max(0.5, step - gap);
-      const inRange =
-        left < range.end * 100 && left + width > range.start * 100;
-      if (inRange) {
-        selectedKeys.push(ordered[i].key);
-        if (!first) first = ordered[i];
+    for (const span of spans) {
+      if (span.start <= endT && span.end >= startT) {
+        selectedKeys.push(span.key);
+        if (!first) first = span;
       }
     }
     onRangeSelect?.(selectedKeys.length > 0 ? selectedKeys : null);
@@ -210,9 +259,9 @@ export function CommandEventTimelineOverview({
     );
   }
 
-  const ordered = [...spans].sort((a, b) => a.start - b.start);
-  const step = 100 / ordered.length;
-  const gap = Math.min(1.6, step / 4);
+  const { t0, duration } = timeWindow;
+  const selectionStartT = selection ? fractionToTime(selection.start) : 0;
+  const selectionEndT = selection ? fractionToTime(selection.end) : 0;
 
   return (
     <div
@@ -248,6 +297,14 @@ export function CommandEventTimelineOverview({
             dragging && "cursor-grabbing"
           )}
         >
+          {droppedCount > 0 && (
+            <span
+              title={t("command.timeline-more", { count: droppedCount })}
+              className="absolute left-0.5 top-1/2 z-10 -translate-y-1/2 rounded bg-control-bg px-1 py-0.5 text-[9px] text-control-light"
+            >
+              +{droppedCount}
+            </span>
+          )}
           {selection && (
             <>
               <div
@@ -270,14 +327,19 @@ export function CommandEventTimelineOverview({
               />
             </>
           )}
-          {ordered.map((span, index) => {
-            const left = index * step;
-            const width = Math.max(0.5, step - gap);
+          {spans.map((span) => {
+            const width = Math.max(
+              MIN_SPAN_WIDTH_PERCENT,
+              ((span.end - span.start) / duration) * 100
+            );
+            const left = Math.min(
+              100 - width,
+              ((span.start - t0) / duration) * 100
+            );
             const selected = selectedKey === span.key;
             const inSelection =
               !selection ||
-              (left >= selection.start * 100 &&
-                left + width <= selection.end * 100);
+              (span.start <= selectionEndT && span.end >= selectionStartT);
             return (
               <button
                 key={span.key}

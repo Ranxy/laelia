@@ -504,6 +504,7 @@
     "tab-run": "Output & Events",
     "tab-summary": "Final Summary",
     "timeline-drag-hint": "Timeline overview; drag horizontally to focus events",
+    "timeline-more": "+{{count}} earlier events not shown",
     "token-cache-read": "Cache Read",
     "token-cache-write": "Cache Write",
     "token-input": "Input",

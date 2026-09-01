@@ -504,6 +504,7 @@
     "tab-run": "输出与事件",
     "tab-summary": "最终摘要",
     "timeline-drag-hint": "时间轴概览；水平拖动以聚焦事件",
+    "timeline-more": "更早的 {{count}} 条事件未展示",
     "token-cache-read": "缓存读取",
     "token-cache-write": "缓存写入",
     "token-input": "输入",
