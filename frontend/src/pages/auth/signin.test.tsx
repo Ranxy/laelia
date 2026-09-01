@@ -1,8 +1,9 @@
 import { create } from "@bufbuild/protobuf";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores";
+import { renderWithQueryClient } from "@/test/query";
 import { GetWorkspaceInfoResponseSchema } from "@/types/proto-es/v1/setting_pb";
 import { UserSchema } from "@/types/proto-es/v1/user_service_pb";
 import { SignInPage } from "./signin";
@@ -35,7 +36,7 @@ const EMAIL = "alice@example.com";
 const PASSWORD = "secret123";
 
 function renderPage(initialEntry = "/auth/signin") {
-  return render(
+  return renderWithQueryClient(
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/auth/signin" element={<SignInPage />} />

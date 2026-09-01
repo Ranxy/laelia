@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { settingServiceClient } from "@/connect";
+import { useWorkspacePolicy } from "@/hooks/use-workspace-policy";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
@@ -66,32 +66,17 @@ export function SignUpPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState(false);
-  const [signupDisallowed, setSignupDisallowed] = useState(false);
-  const [allowedDomains, setAllowedDomains] = useState<string[]>([]);
-  const [requireVerification, setRequireVerification] = useState(false);
   const [registered, setRegistered] = useState(false);
   const [resending, setResending] = useState(false);
 
   // The signup policy is public (GetWorkspaceInfo needs no auth): when the
   // workspace disallows self-service registration, show a notice instead of
-  // the form. The backend enforces the policy regardless.
-  useEffect(() => {
-    let cancelled = false;
-    settingServiceClient
-      .getWorkspaceInfo({})
-      .then((res) => {
-        if (cancelled) return;
-        setSignupDisallowed(res.disallowSignup);
-        setRequireVerification(res.requireEmailVerification ?? false);
-        if (res.enforceIdentityDomain) setAllowedDomains(res.domains ?? []);
-      })
-      .catch(() => {
-        // Keep the form on failure; the backend still enforces the policy.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // the form. The backend enforces the policy regardless. Shared Query cache
+  // with the sign-in page (see use-workspace-policy); until the read settles
+  // the permissive defaults render, so a failed read keeps the form usable.
+  const policy = useWorkspacePolicy();
+  const { signupDisallowed, allowedDomains } = policy;
+  const requireVerification = policy.requireEmailVerification;
 
   const checks = passwordChecks(password);
   const hasHint =

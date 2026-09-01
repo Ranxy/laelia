@@ -1,8 +1,9 @@
 import { create } from "@bufbuild/protobuf";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores";
+import { renderWithQueryClient } from "@/test/query";
 import {
   LoginRequest,
   ResendVerificationEmailRequest,
@@ -63,7 +64,7 @@ function workspaceInfo(
 }
 
 function renderPage() {
-  return render(
+  return renderWithQueryClient(
     <MemoryRouter initialEntries={["/auth/signup"]}>
       <Routes>
         <Route path="/auth/signup" element={<SignUpPage />} />

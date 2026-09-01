@@ -22,8 +22,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TwoPaneShell } from "@/components/ui/two-pane-shell";
-import { settingServiceClient } from "@/connect";
 import { usePolling } from "@/hooks/use-polling";
+import { useWorkspacePolicy } from "@/hooks/use-workspace-policy";
 import { describeError } from "@/lib/connect-errors";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -48,7 +48,11 @@ export function MachinesPage() {
   // create their own machines; per-machine canDelete (creator or
   // laelia.machines.delete) is populated by ListMachines.
   const hasCreatePermission = useHasPermission("laelia.machines.create");
-  const [allowUserCreateMachine, setAllowUserCreateMachine] = useState(true);
+  // The machine-creation policy is public workspace info, so ordinary users
+  // can read it without admin settings access. Defaults to allowed while the
+  // request is in flight (shared cache — see use-workspace-policy).
+  const { userCreateMachineDisallowed } = useWorkspacePolicy();
+  const allowUserCreateMachine = !userCreateMachineDisallowed;
   const canCreate = hasCreatePermission || allowUserCreateMachine;
   const [listScrolled, setListScrolled] = useState(false);
   const [actionError, setActionError] = useState("");
@@ -66,26 +70,6 @@ export function MachinesPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-  // The machine-creation policy is public workspace info, so ordinary users
-  // can read it without admin settings access. Default to enabled while the
-  // request is in flight.
-  useEffect(() => {
-    let cancelled = false;
-    void settingServiceClient
-      .getWorkspaceInfo({})
-      .then((res) => {
-        if (!cancelled) {
-          setAllowUserCreateMachine(!res.disallowUserCreateMachine);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setAllowUserCreateMachine(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Refresh while any machine is not yet online so the list flips to "online"
   // promptly once the machine app connects. Silent refreshes skip the loading

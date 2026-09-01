@@ -1,16 +1,16 @@
 import { Eye, EyeOff } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { identityProviderServiceClient, settingServiceClient } from "@/connect";
+import { useIdentityProviders } from "@/hooks/use-identity-providers";
+import { useWorkspacePolicy } from "@/hooks/use-workspace-policy";
 import { startOAuthLogin } from "@/lib/oauth";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
 import { sanitizeRedirect } from "@/router/auth-redirect";
 import { useAppStore } from "@/stores";
-import type { IdentityProvider } from "@/types/proto-es/v1/idp_service_pb";
 import { IdentityProviderType } from "@/types/proto-es/v1/idp_service_pb";
 export function SignInPage() {
   const { t } = useTranslation();
@@ -22,43 +22,14 @@ export function SignInPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [signupDisallowed, setSignupDisallowed] = useState(false);
-  const [providers, setProviders] = useState<IdentityProvider[]>([]);
 
   // The signup policy is public (GetWorkspaceInfo needs no auth): hide the
   // signup entry when the workspace disallows self-service registration.
-  useEffect(() => {
-    let cancelled = false;
-    settingServiceClient
-      .getWorkspaceInfo({})
-      .then((res) => {
-        if (!cancelled) setSignupDisallowed(res.disallowSignup);
-      })
-      .catch(() => {
-        // Keep the signup link on failure; the backend still enforces the
-        // policy on the signup attempt itself.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+  // Shared Query cache with the signup page (see use-workspace-policy).
+  const { signupDisallowed } = useWorkspacePolicy();
   // Public endpoint: lists configured SSO targets so the login page can render
   // "Continue with …" buttons.
-  useEffect(() => {
-    let cancelled = false;
-    identityProviderServiceClient
-      .listIdentityProviders({})
-      .then((res) => {
-        if (!cancelled) setProviders(res.identityProviders ?? []);
-      })
-      .catch(() => {
-        // Non-fatal: the password form remains available.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { providers } = useIdentityProviders();
 
   const redirectTo = sanitizeRedirect(searchParams.get("redirect"));
   const allowSubmit = email.length > 0 && password.length > 0 && !loading;

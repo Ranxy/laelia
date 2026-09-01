@@ -1,9 +1,10 @@
 import { create } from "@bufbuild/protobuf";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores";
 import { invalidateMachinesCache } from "@/stores/machine";
+import { renderWithQueryClient } from "@/test/query";
 import {
   MachineStatus_ConnectionState,
   MachineSummarySchema,
@@ -51,7 +52,7 @@ function machine(
 }
 
 function renderPage() {
-  return render(
+  return renderWithQueryClient(
     <MemoryRouter initialEntries={["/machines"]}>
       <Routes>
         <Route path="/machines" element={<MachinesPage />}>
