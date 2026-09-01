@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -160,6 +161,35 @@ describe("settings-profile", () => {
     expect(screen.getByDisplayValue("alice@example.com")).toBeInTheDocument();
     expect(screen.getByDisplayValue("123")).toBeInTheDocument();
     expect(screen.getByDisplayValue("hello")).toBeInTheDocument();
+  });
+
+  it("keeps in-progress edits when an external refresh updates currentUser (01 B13)", async () => {
+    renderPage();
+    const title = await screen.findByDisplayValue("Alice");
+    fireEvent.change(title, { target: { value: "Alice B" } });
+
+    // Another page's fetchCurrentUser (or the session refresh) lands with
+    // the same server values under a new object identity; the form seed must
+    // not swallow the typed edit.
+    act(() => {
+      useAppStore.setState({ currentUser: { ...user() } } as never);
+    });
+
+    expect(screen.getByDisplayValue("Alice B")).toBeInTheDocument();
+  });
+
+  it("re-seeds the form from a server refresh while pristine (01 B13)", async () => {
+    renderPage();
+    await screen.findByDisplayValue("Alice");
+
+    // With no edits in flight, a server-side change flows into the form.
+    act(() => {
+      useAppStore.setState({
+        currentUser: { ...user(), title: "Alice Server" },
+      } as never);
+    });
+
+    expect(await screen.findByDisplayValue("Alice Server")).toBeInTheDocument();
   });
 
   it("saves changed fields with an update mask", async () => {

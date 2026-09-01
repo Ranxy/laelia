@@ -317,9 +317,7 @@ function RoleMembersForm({
                     <div className="flex flex-col gap-2">
                       {[...members]
                         .sort((a, b) =>
-                          (labelMember(a) ?? a).localeCompare(
-                            labelMember(b) ?? b
-                          )
+                          labelMember(a).localeCompare(labelMember(b))
                         )
                         .map((member) => {
                           const user = users.find((u) => u.name === member);

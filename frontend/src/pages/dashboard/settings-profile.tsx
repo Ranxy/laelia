@@ -129,18 +129,33 @@ export function SettingsProfilePage() {
     },
   });
 
-  // Seed from currentUser once it is available. Re-seeding on currentUser
-  // change (e.g. after a save-driven refetch) keeps the form in sync without
-  // clobbering in-progress edits, because the only currentUser change during
-  // this page's life is our own save.
+  // Seed from currentUser when it becomes available, and re-seed on later
+  // refreshes ONLY while the form is untouched (01 B13): other pages and the
+  // session refresh also trigger fetchCurrentUser, so an unconditional
+  // re-seed could swallow in-progress edits. The baseline is the last values
+  // this page seeded (or saved — handleSave re-baselines it), so the form
+  // still syncs with the server truth after its own save.
+  const seededRef = useRef<ProfileForm | null>(null);
+  const formRef = useRef(form);
+  formRef.current = form;
   useEffect(() => {
     if (!currentUser) return;
-    setForm({
+    const baseline = seededRef.current;
+    const pristine =
+      baseline === null ||
+      (formRef.current.title === baseline.title &&
+        formRef.current.email === baseline.email &&
+        formRef.current.phone === baseline.phone &&
+        formRef.current.description === baseline.description);
+    if (!pristine) return;
+    const seed: ProfileForm = {
       title: currentUser.title,
       email: currentUser.email,
       phone: currentUser.phone,
       description: currentUser.description,
-    });
+    };
+    seededRef.current = seed;
+    setForm(seed);
   }, [currentUser]);
 
   // Derive the desktop-notification status from the browser + server once.
@@ -225,6 +240,10 @@ export function SettingsProfilePage() {
         return;
       }
       await updateUser(currentUser.name, fields, maskPaths);
+      // Re-baseline the seed to what was just saved so the save-driven
+      // refresh below re-syncs the form with the server truth while later
+      // external refreshes still leave new edits alone (01 B13).
+      seededRef.current = { ...formRef.current };
       // Refresh the cached current user so the user menu and rosters reflect
       // the new description without a full reload.
       await fetchCurrentUser();

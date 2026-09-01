@@ -164,8 +164,22 @@ export function SettingsGroupsPage() {
     [refsByGroup, loadRefs]
   );
 
+  // Owner validation (01 B10): a row only counts when it names a member —
+  // blank placeholder rows must not satisfy the at-least-one-owner rule.
   const hasOwner = (form: GroupForm) =>
-    form.members.some((m) => m.role === GroupMemberRole.OWNER);
+    form.members.some(
+      (m) => m.role === GroupMemberRole.OWNER && m.member.trim() !== ""
+    );
+
+  // membersDirty compares (member → role) pairs set-semantically (01 B10):
+  // JSON.stringify was order-sensitive, so merely reordering rows triggered a
+  // full members write on every save.
+  const membersDirty = (form: GroupForm, target: Group) => {
+    const original = groupToForm(target).members;
+    if (form.members.length !== original.length) return true;
+    const byMember = new Map(original.map((m) => [m.member, m.role]));
+    return form.members.some((m) => byMember.get(m.member) !== m.role);
+  };
 
   const handleCreateForm = async (form: GroupForm) => {
     if (!form.title.trim()) {
@@ -222,10 +236,7 @@ export function SettingsGroupsPage() {
     await crud.runSave(
       async () => {
         const paths = ["title", "description"];
-        if (
-          JSON.stringify(form.members) !==
-          JSON.stringify(groupToForm(target).members)
-        ) {
+        if (membersDirty(form, target)) {
           paths.push("members");
         }
         await groupServiceClient.updateGroup({

@@ -263,6 +263,57 @@ describe("settings-groups", () => {
     );
   });
 
+  it("does not rewrite members when only their order changed (01 B10)", async () => {
+    mock.listGroups.mockResolvedValue({ groups: [group()] });
+    mock.listUsers.mockResolvedValue({
+      users: [
+        user(),
+        user({ name: "users/2", title: "Bob", email: "bob@example.com" }),
+      ],
+    });
+    renderPage();
+
+    fireEvent.click(await screen.findByLabelText("common.edit"));
+
+    // Remove the owner row and re-add the same user at the end, restoring
+    // their owner role: the (member → role) set is unchanged, only the order.
+    // The old JSON.stringify dirty check treated that as a member change and
+    // rewrote the whole member list on every such save.
+    const removeButtons = await screen.findAllByRole("button", {
+      name: "settings.groups.member-remove",
+    });
+    fireEvent.click(removeButtons[0]);
+    fireEvent.click(screen.getByText("settings.groups.member-add"));
+
+    // The re-added row (users/1) defaults to MEMBER; restore OWNER. The
+    // owner label also appears in the untouched row's trigger, so pick the
+    // option inside the open listbox by role.
+    const roleSelect = screen.getAllByRole("combobox")[3];
+    fireEvent.click(roleSelect);
+    const ownerItem = await screen.findByRole("option", {
+      name: "settings.groups.member-role-owner",
+    });
+    fireEvent.pointerDown(ownerItem);
+    fireEvent.pointerUp(ownerItem);
+    fireEvent.click(ownerItem);
+
+    fireEvent.click(screen.getByRole("button", { name: "common.save" }));
+
+    await waitFor(() => {
+      expect(mock.updateGroup).toHaveBeenCalledWith(
+        expect.objectContaining({
+          group: expect.objectContaining({
+            members: [
+              { member: "users/2", role: GroupMemberRole.MEMBER },
+              { member: "users/1", role: GroupMemberRole.OWNER },
+            ],
+          }),
+          updateMask: { paths: ["title", "description"] },
+        })
+      );
+    });
+  });
+
   it("loads and expands group references", async () => {
     const refs: GroupReference[] = [
       { resourceType: "policy", resource: "policies/1" } as GroupReference,
