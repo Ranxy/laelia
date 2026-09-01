@@ -5,18 +5,36 @@ import {
   CommandEventType,
 } from "@/types/proto-es/v1/command_pb";
 
-// Minimal event stubs: pairing only reads `.type`, so we build typed shells
-// instead of fully-populated proto messages.
+// Minimal event stubs: pairing only reads `.type` and the payload's
+// toolCallId, so we build typed shells instead of fully-populated proto
+// messages. A built shell without a payload mirrors proto-es's unset oneof
+// ({ case: undefined }).
 function started(seqNo: number): CommandEvent {
   return {
     type: CommandEventType.TOOL_CALL_STARTED,
     seqNo,
+    payload: { case: undefined, value: undefined },
   } as unknown as CommandEvent;
 }
 function finished(seqNo: number): CommandEvent {
   return {
     type: CommandEventType.TOOL_CALL_FINISHED,
     seqNo,
+    payload: { case: undefined, value: undefined },
+  } as unknown as CommandEvent;
+}
+function startedWithId(seqNo: number, id: string): CommandEvent {
+  return {
+    type: CommandEventType.TOOL_CALL_STARTED,
+    seqNo,
+    payload: { case: "toolCallStarted", value: { toolCallId: id } },
+  } as unknown as CommandEvent;
+}
+function finishedWithId(seqNo: number, id: string): CommandEvent {
+  return {
+    type: CommandEventType.TOOL_CALL_FINISHED,
+    seqNo,
+    payload: { case: "toolCallFinished", value: { toolCallId: id } },
   } as unknown as CommandEvent;
 }
 
@@ -52,6 +70,48 @@ describe("pairToolCallEvents", () => {
     expect(inFlight).toEqual([
       { started: started(1), finished: finished(2) },
       { started: started(3), finished: undefined },
+    ]);
+  });
+
+  it("pairs concurrent tool calls by tool_call_id", () => {
+    // The regression case: two concurrent tool calls interleave, and the
+    // finished events arrive in the opposite order to their starts. Matching
+    // by id keeps A→A; the old FIFO pairing swapped their results.
+    const interleaved = pairToolCallEvents([
+      startedWithId(1, "A"),
+      startedWithId(2, "B"),
+      finishedWithId(3, "B"),
+      finishedWithId(4, "A"),
+    ]);
+    expect(interleaved).toEqual([
+      { started: startedWithId(1, "A"), finished: finishedWithId(4, "A") },
+      { started: startedWithId(2, "B"), finished: finishedWithId(3, "B") },
+    ]);
+
+    // A finished whose id matches no open started (its start was lost in a
+    // disconnect gap) falls back to closing the oldest open call instead of
+    // being dropped, and the call that owns its id still gets its own close.
+    const lostStart = pairToolCallEvents([
+      startedWithId(1, "B"),
+      finishedWithId(2, "A"),
+      finishedWithId(3, "B"),
+    ]);
+    expect(lostStart).toEqual([
+      { started: startedWithId(1, "B"), finished: finishedWithId(2, "A") },
+    ]);
+
+    // Id-less events (legacy) interleave with id-bearing ones: the id-bearing
+    // close finds its own start; the id-less finished closes the oldest open
+    // call. Pair order still follows the started-event order.
+    const mixed = pairToolCallEvents([
+      started(1),
+      startedWithId(2, "B"),
+      finishedWithId(3, "B"),
+      finished(4),
+    ]);
+    expect(mixed).toEqual([
+      { started: started(1), finished: finished(4) },
+      { started: startedWithId(2, "B"), finished: finishedWithId(3, "B") },
     ]);
   });
 });
