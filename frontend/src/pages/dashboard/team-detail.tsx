@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { ArrowLeft, Pencil, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -18,18 +18,30 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { agentServiceClient, agentTeamServiceClient } from "@/connect";
+import { agentTeamServiceClient } from "@/connect";
+import {
+  AGENT_TEAMS_QUERY_KEY,
+  useAgentTeamsQuery,
+} from "@/hooks/use-agent-teams";
+import { useResourceQuery } from "@/hooks/use-resource-query";
+import { queryClient } from "@/lib/query-client";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
-import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
+import type { AgentTeam } from "@/types/proto-es/v1/agent_team_service_pb";
 import {
-  type AgentTeam,
   AgentTeamMemberSchema,
   AgentTeamRole,
   AgentTeamSchema,
 } from "@/types/proto-es/v1/agent_team_service_pb";
 import { State } from "@/types/proto-es/v1/common_pb";
+
+const EMPTY_TEAM_FORM: TeamFormValues = {
+  title: "",
+  description: "",
+  teamPrompt: "",
+  members: [],
+};
 
 function teamToForm(team: AgentTeam): TeamFormValues {
   return {
@@ -63,49 +75,57 @@ export function TeamDetailPage() {
   const currentUser = useAppStore((s) => s.currentUser);
 
   const isCreate = teamId === "new";
-  const [team, setTeam] = useState<AgentTeam | null>(null);
-  const [agents, setAgents] = useState<AgentSummary[]>([]);
-  const [teams, setTeams] = useState<AgentTeam[]>([]);
-  const [form, setForm] = useState<TeamFormValues>({
-    title: "",
-    description: "",
-    teamPrompt: "",
-    members: [],
-  });
-  // Create mode starts in the editable state; edit mode starts read-only.
+  const teamName = isCreate ? null : `agentTeams/${teamId ?? ""}`;
+  // The form derives from the fetched team; user edits live in `formDraft`
+  // (cleared on team switch / save / cancel, so the derived values always
+  // reflect the current server state — parity with the old load() seeding).
+  const [formDraft, setFormDraft] = useState<TeamFormValues | null>(null);
   const [editing, setEditing] = useState(isCreate);
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!teamId) return;
-    setLoading(true);
-    try {
-      const [agentData, teamListData] = await Promise.all([
-        agentServiceClient.listAgents({ pageSize: 1000 }),
-        agentTeamServiceClient.listAgentTeams({ pageSize: 1000 }),
-      ]);
-      setAgents(agentData.agents ?? []);
-      setTeams(teamListData.agentTeams ?? []);
-      if (!isCreate) {
-        const teamData = await agentTeamServiceClient.getAgentTeam({
-          name: `agentTeams/${teamId}`,
-        });
-        setTeam(teamData);
-        setForm(teamToForm(teamData));
-      }
-    } catch (err) {
-      void showErrorToast(err, t("settings.agentTeams.load-failed"));
-    } finally {
-      setLoading(false);
-    }
-  }, [teamId, t, isCreate]);
+  // Reads moved onto the shared primitives: the teams directory is one
+  // ["agent-teams"] cache entry (also consumed by the thread assignee dropdown
+  // and the manager card), the team detail is a keyed single-item read, and
+  // the agents come from the shared roster (fetchAgents) instead of a private
+  // full-page copy.
+  const teamsQuery = useAgentTeamsQuery({
+    failureTitle: t("settings.agentTeams.load-failed"),
+  });
+  const teams = teamsQuery.items;
+  const detailQuery = useResourceQuery<AgentTeam>({
+    enabled: !isCreate && !!teamName,
+    queryKey: ["agent-team", teamName],
+    queryFn: async () => [
+      await agentTeamServiceClient.getAgentTeam({ name: teamName ?? "" }),
+    ],
+    failureTitle: t("settings.agentTeams.load-failed"),
+  });
+  const team = detailQuery.items[0] ?? null;
 
+  const agents = useAppStore((s) => s.agents);
+  const fetchAgents = useAppStore((s) => s.fetchAgents);
+  const agentsLoading = useAppStore((s) => s.agentsLoading);
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (useAppStore.getState().agents.length === 0) {
+      void fetchAgents({ pageSize: 1000 });
+    }
+  }, [fetchAgents]);
+
+  const loading =
+    teamsQuery.initialLoading ||
+    (!isCreate && detailQuery.initialLoading) ||
+    (agents.length === 0 && agentsLoading);
+
+  // Derived form: drafts win while editing; otherwise the server team seeds it.
+  const form: TeamFormValues =
+    formDraft ?? (team ? teamToForm(team) : EMPTY_TEAM_FORM);
+  // A stale draft from another team must never leak into the next page.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset keyed on the team identity; the body reads neither.
+  useEffect(() => {
+    setFormDraft(null);
+  }, [teamName]);
 
   const activeAgents = useMemo(
     () => agents.filter((a) => a.state === State.ACTIVE),
@@ -147,6 +167,12 @@ export function TeamDetailPage() {
   const hasLeader = (form: TeamFormValues) =>
     form.members.some((m) => m.role === AgentTeamRole.LEADER);
 
+  // First edit seeds the draft from the CURRENT effective form (not the empty
+  // skeleton), so editing one field never drops the rest of the team.
+  const updateForm = (patch: Partial<TeamFormValues>) => {
+    setFormDraft({ ...form, ...patch });
+  };
+
   const updateMember = (
     nextForm: TeamFormValues,
     index: number,
@@ -159,7 +185,7 @@ export function TeamDetailPage() {
         i === index ? m : { ...m, role: AgentTeamRole.MEMBER }
       );
     }
-    setForm(next);
+    setFormDraft(next);
   };
 
   const addMember = () => {
@@ -168,7 +194,7 @@ export function TeamDetailPage() {
     );
     if (available.length === 0) return;
     const first = available[0];
-    setForm({
+    setFormDraft({
       ...form,
       members: [
         ...form.members,
@@ -184,7 +210,7 @@ export function TeamDetailPage() {
   const removeMember = (index: number) => {
     const next = { ...form, members: [...form.members] };
     next.members.splice(index, 1);
-    setForm(next);
+    setFormDraft(next);
   };
 
   const handleSave = async () => {
@@ -219,6 +245,9 @@ export function TeamDetailPage() {
           type: "success",
           title: t("settings.agentTeams.created"),
         });
+        // The team directory changed: the shared ["agent-teams"] entry feeds
+        // the manager card and the thread assignee dropdown.
+        void queryClient.invalidateQueries({ queryKey: AGENT_TEAMS_QUERY_KEY });
         navigate(`/members/users/${userId ?? ""}`);
       } else if (team) {
         await agentTeamServiceClient.updateAgentTeam({
@@ -245,7 +274,10 @@ export function TeamDetailPage() {
           title: t("settings.agentTeams.saved"),
         });
         setEditing(false);
-        await load();
+        // Re-read through the cache keys (the old load() refetched everything).
+        setFormDraft(null);
+        detailQuery.reload();
+        teamsQuery.reload();
       }
     } catch (err) {
       void showErrorToast(err, t("settings.agentTeams.save-failed"));
@@ -263,6 +295,7 @@ export function TeamDetailPage() {
         type: "success",
         title: t("settings.agentTeams.deleted"),
       });
+      void queryClient.invalidateQueries({ queryKey: AGENT_TEAMS_QUERY_KEY });
       navigate(`/members/users/${userId ?? ""}`);
     } catch (err) {
       void showErrorToast(err, t("settings.agentTeams.delete-failed"));
@@ -330,7 +363,7 @@ export function TeamDetailPage() {
                 variant="outline"
                 onClick={() => {
                   setEditing(false);
-                  if (team) setForm(teamToForm(team));
+                  setFormDraft(null);
                 }}
               >
                 <X className="size-4" />
@@ -354,6 +387,7 @@ export function TeamDetailPage() {
                 size="sm"
                 className="text-control-light hover:text-error"
                 onClick={() => setDeleteOpen(true)}
+                aria-label={t("settings.agentTeams.delete")}
               >
                 <Trash2 className="size-4" />
               </Button>
@@ -367,28 +401,32 @@ export function TeamDetailPage() {
           <div className="flex flex-col gap-4">
             {(editing || isCreate) && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-control">
+                <label
+                  htmlFor="team-title"
+                  className="text-xs font-medium text-control"
+                >
                   {t("settings.agentTeams.team-name")}
                 </label>
                 <Input
+                  id="team-title"
                   value={form.title}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, title: e.target.value }))
-                  }
+                  onChange={(e) => updateForm({ title: e.target.value })}
                   placeholder={t("settings.agentTeams.team-name")}
                 />
               </div>
             )}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-control">
+              <label
+                htmlFor="team-description"
+                className="text-xs font-medium text-control"
+              >
                 {t("settings.agentTeams.description")}
               </label>
               {editing || isCreate ? (
                 <Input
+                  id="team-description"
                   value={form.description}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, description: e.target.value }))
-                  }
+                  onChange={(e) => updateForm({ description: e.target.value })}
                   placeholder={t("settings.agentTeams.description")}
                 />
               ) : form.description ? (
@@ -408,7 +446,7 @@ export function TeamDetailPage() {
           agents={availableAgents}
           form={form}
           disabled={!editing && !isCreate}
-          onChange={setForm}
+          onChange={setFormDraft}
           onAdd={addMember}
           onRemove={removeMember}
           onUpdate={(i, patch) => updateMember(form, i, patch)}

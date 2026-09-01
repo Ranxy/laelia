@@ -1,15 +1,13 @@
 import { Plus, Users } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { agentServiceClient, agentTeamServiceClient } from "@/connect";
+import { useAgentTeamsQuery } from "@/hooks/use-agent-teams";
 import { useAvatar } from "@/lib/avatar-cache";
-import { describeError } from "@/lib/connect-errors";
 import { avatarNameForAgentId } from "@/lib/resource";
-import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
 import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
@@ -30,39 +28,30 @@ export function AgentTeamsManager() {
     s.currentUser?.name?.split("/").pop()
   );
 
-  const [teams, setTeams] = useState<AgentTeam[]>([]);
-  const [agents, setAgents] = useState<AgentSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Teams ride the shared ["agent-teams"] cache (also the thread assignee
+  // dropdown and TeamDetailPage); agents come from the shared roster instead
+  // of a private full-page fetch.
+  const teamsQuery = useAgentTeamsQuery({
+    enabled: canList,
+    failureTitle: t("settings.agentTeams.load-failed"),
+  });
+  const teams = teamsQuery.items;
+  const agents = useAppStore((s) => s.agents);
+  const fetchAgents = useAppStore((s) => s.fetchAgents);
 
   const activeAgents = useMemo(
     () => agents.filter((a) => a.state === State.ACTIVE),
     [agents]
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [teamRes, agentRes] = await Promise.all([
-        agentTeamServiceClient.listAgentTeams({ pageSize: 1000 }),
-        agentServiceClient.listAgents({ pageSize: 1000 }),
-      ]);
-      setTeams(teamRes.agentTeams ?? []);
-      setAgents(agentRes.agents ?? []);
-    } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.agentTeams.load-failed"),
-        description: describeError(err),
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
   useEffect(() => {
-    if (canList) load();
-    else setLoading(false);
-  }, [canList, load]);
+    if (!canList) return;
+    if (useAppStore.getState().agents.length === 0) {
+      void fetchAgents({ pageSize: 1000 });
+    }
+  }, [canList, fetchAgents]);
+
+  const loading = canList ? teamsQuery.initialLoading : false;
 
   const agentLabel = (name: string) => {
     const id = name.split("/").pop() ?? name;

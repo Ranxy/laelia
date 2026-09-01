@@ -1,4 +1,5 @@
 import { create } from "@bufbuild/protobuf";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -120,13 +121,24 @@ function plainRoot(): ChatMessageUI {
   };
 }
 
+// ThreadTaskControls rides the shared agent-teams Query cache — every
+// ThreadPanel render needs a QueryClientProvider (fresh per call).
+function renderPanelWithClient(node: React.ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  return render(
+    <QueryClientProvider client={client}>{node}</QueryClientProvider>
+  );
+}
+
 function renderPanel(rootMsg: ChatMessageUI, readOnly?: boolean) {
   useAppStore.setState({
     threadByRoot: {
       [ROOT_NAME]: { messages: [rootMsg], currentVersion: 1n, loading: false },
     },
   });
-  return render(
+  return renderPanelWithClient(
     <ThreadPanel
       channelId="c1"
       channelTitle="C1"
@@ -180,7 +192,7 @@ describe("ThreadPanel task controls", () => {
         },
       },
     });
-    render(
+    renderPanelWithClient(
       <ThreadPanel
         channelId="c1"
         channelTitle="C1"
@@ -208,7 +220,7 @@ describe("ThreadPanel task controls", () => {
         },
       },
     });
-    render(
+    renderPanelWithClient(
       <ThreadPanel
         channelId="c1"
         channelTitle="C1"

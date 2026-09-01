@@ -7,12 +7,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { agentTeamServiceClient } from "@/connect";
+import { useAgentTeamsQuery } from "@/hooks/use-agent-teams";
 import { taskStatusLabel } from "@/lib/task-status";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
 import type { ChatMessageUI } from "@/stores/ui-models";
-import type { AgentTeam } from "@/types/proto-es/v1/agent_team_service_pb";
 import { TaskStatus } from "@/types/proto-es/v1/command_pb";
 
 // ---------------------------------------------------------------------------
@@ -40,7 +39,13 @@ export function ThreadTaskControls({
     useAppStore((s) => s.channelMembersByConv[conversationName]) ?? [];
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [assigning, setAssigning] = useState(false);
-  const [teams, setTeams] = useState<AgentTeam[]>([]);
+
+  // Teams ride the shared ["agent-teams"] cache (AgentTeamsManager and
+  // TeamDetailPage consume the same entry), replacing this component's private
+  // full-list fetch.
+  const { items: teams } = useAgentTeamsQuery({
+    failureTitle: t("settings.agentTeams.load-failed"),
+  });
 
   // Load the channel roster for the assignee dropdown on first render of a
   // task thread (the members panel may not have been opened yet).
@@ -49,10 +54,6 @@ export function ThreadTaskControls({
     if (members.length === 0) {
       void listChannelMembers(channelId);
     }
-    void agentTeamServiceClient
-      .listAgentTeams({ pageSize: 1000 })
-      .then((res) => setTeams(res.agentTeams ?? []))
-      .catch(() => setTeams([]));
   }, [channelId]);
 
   const handleStatusChange = async (value: string | null) => {
