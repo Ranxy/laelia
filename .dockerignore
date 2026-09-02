@@ -3,6 +3,8 @@
 .agents
 .codex
 .vscode
+.gocache
+.gopath
 **/node_modules
 **/dist
 build
