@@ -168,3 +168,60 @@ func (d *Dispatcher) IsMachineConnected(machineID int) bool {
 	_, ok := d.registry.getMachine(machineID)
 	return ok
 }
+
+// RegisterProvisioner registers a provisioner's ProvisionerChannel stream.
+// Mirrors RegisterMachine: invalidate any previous session (a reconnect
+// replaced it) and install the new one under one critical section.
+func (d *Dispatcher) RegisterProvisioner(provisionerID int, provisionerResourceID string, send ProvisionerSendFunc) *ProvisionerSession {
+	d.registry.mu.Lock()
+	defer d.registry.mu.Unlock()
+
+	if old, ok := d.registry.provisioners[provisionerID]; ok {
+		slog.Info("replacing existing provisioner session", "provisionerID", provisionerID)
+		old.send.Store(nil)
+	}
+
+	sess := &ProvisionerSession{
+		provisionerID:         provisionerID,
+		provisionerResourceID: provisionerResourceID,
+		connectedAt:           time.Now(),
+		lastPingAt:            time.Now(),
+	}
+	fn := send
+	sess.send.Store(&fn)
+
+	d.registry.provisioners[provisionerID] = sess
+	slog.Info("provisioner registered for control dispatch", "provisionerID", provisionerID)
+	return sess
+}
+
+// UnregisterProvisionerIf tears down the provisioner session only if sess is
+// still the one registered for provisionerID. The ProvisionerChannel handler
+// uses this for its deferred cleanup so that, when a reconnect has replaced
+// the session in the map, the old stream's teardown does not destroy the new
+// (live) session. Reports whether this call actually tore the session down.
+func (d *Dispatcher) UnregisterProvisionerIf(provisionerID int, sess *ProvisionerSession) bool {
+	if !d.registry.deleteProvisionerIf(provisionerID, sess) {
+		return false
+	}
+	sess.send.Store(nil)
+	slog.Info("provisioner unregistered from control dispatch", "provisionerID", provisionerID)
+	return true
+}
+
+// UnregisterProvisioner tears down a provisioner's stream regardless of which
+// stream instance is registered. Used by rotate/delete flows to close the old
+// token's stream from outside the stream handler.
+func (d *Dispatcher) UnregisterProvisioner(provisionerID int) {
+	if sess, ok := d.registry.deleteProvisioner(provisionerID); ok {
+		sess.send.Store(nil)
+		slog.Info("provisioner unregistered from control dispatch", "provisionerID", provisionerID)
+	}
+}
+
+// IsProvisionerConnected reports whether a ProvisionerChannel stream is live
+// for the provisioner right now.
+func (d *Dispatcher) IsProvisionerConnected(provisionerID int) bool {
+	_, ok := d.registry.getProvisioner(provisionerID)
+	return ok
+}

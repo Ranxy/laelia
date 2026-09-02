@@ -62,9 +62,17 @@ func (d *Dispatcher) Stop() {
 	d.wgMu.Unlock()
 }
 
+// HandleProvisionerPing records a provisioner heartbeat ping.
+func (*Dispatcher) HandleProvisionerPing(sess *ProvisionerSession, _ *v1pb.Ping) {
+	if sess != nil {
+		sess.TouchPing()
+	}
+}
+
 func (d *Dispatcher) checkSessionLiveness() {
 	sessions := d.registry.snapshotAgents()
 	machines := d.registry.snapshotMachines()
+	provisioners := d.registry.snapshotProvisioners()
 
 	now := time.Now()
 	for _, sess := range sessions {
@@ -110,6 +118,27 @@ func (d *Dispatcher) checkSessionLiveness() {
 			// Same reconnect guard as for agents: only tear down the exact
 			// session that timed out.
 			d.UnregisterMachineIf(machineID, m)
+		}
+	}
+
+	for _, p := range provisioners {
+		p.mu.Lock()
+		idle := now.Sub(p.lastPingAt)
+		provisionerID := p.provisionerID
+		p.mu.Unlock()
+
+		if p.send.Load() == nil {
+			continue
+		}
+
+		if idle > d.pingTimeout {
+			slog.Warn("provisioner ping timeout, unregistering",
+				"provisionerID", provisionerID,
+				"idle", idle,
+				"timeout", d.pingTimeout)
+			// Same reconnect guard as for agents: only tear down the exact
+			// session that timed out.
+			d.UnregisterProvisionerIf(provisionerID, p)
 		}
 	}
 }

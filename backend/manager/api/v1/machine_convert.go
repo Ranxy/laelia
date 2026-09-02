@@ -10,56 +10,103 @@ import (
 	"github.com/Ranxy/laelia/backend/common"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
+	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/machinebuild"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
 func (s *MachineService) convertToMachine(ctx context.Context, m *store.MachineMessage) *v1pb.Machine {
+	return convertMachineRecord(ctx, s.store, s.dispatcher, m)
+}
+
+func (s *MachineService) convertToMachineSummary(ctx context.Context, m *store.MachineMessage, agentCount int) *v1pb.MachineSummary {
+	return convertMachineSummaryRecord(ctx, s.store, m, agentCount)
+}
+
+// convertMachineRecord builds the full v1 Machine for a machine row. A
+// package-level function so the provisioner service (ProvisionMachine) shares
+// the exact conversion the machine service uses.
+func convertMachineRecord(ctx context.Context, st *store.Store, d *dispatcher.Dispatcher, m *store.MachineMessage) *v1pb.Machine {
 	state := v1pb.State_ACTIVE
 	if m.Deleted {
 		state = v1pb.State_DELETED
 	}
 	out := &v1pb.Machine{
-		Name:      common.FormatMachineUID(m.ResourceID),
-		State:     state,
-		Title:     m.Name,
-		Info:      convertToV1MachineInfo(m.Info),
-		Status:    convertToV1MachineStatus(m.Status, m.Deleted),
-		CreatedAt: timestamppb.New(m.CreatedAt),
+		Name:         common.FormatMachineUID(m.ResourceID),
+		State:        state,
+		Title:        m.Name,
+		Info:         convertToV1MachineInfo(m.Info),
+		Status:       convertToV1MachineStatus(m.Status, m.Deleted),
+		CreatedAt:    timestamppb.New(m.CreatedAt),
+		Provisioning: convertToV1ProvisioningStatus(m.Provisioning),
 	}
 	if m.CreatedBy != 0 {
-		out.CreatedBy = resolveUserResource(ctx, s.store, m.CreatedBy)
+		out.CreatedBy = resolveUserResource(ctx, st, m.CreatedBy)
+	}
+	if m.ProvisionerID != 0 {
+		if prov, err := st.GetProvisioner(ctx, m.ProvisionerID); err == nil && prov != nil {
+			out.Provisioner = common.FormatProvisionerUID(prov.ResourceID)
+		}
 	}
 	latest := machinebuild.LatestVersion()
 	out.LatestVersion = latest
 	out.UpgradeAvailable = machinebuild.UpgradeAvailable(m.Info.GetVersion(), latest)
-	if s.dispatcher != nil {
-		if st := s.dispatcher.MachineUpgradeStatus(m.ID); st != nil {
-			out.UpgradeStatus = st
+	if d != nil {
+		if stt := d.MachineUpgradeStatus(m.ID); stt != nil {
+			out.UpgradeStatus = stt
 		}
 	}
 	return out
 }
 
-func (s *MachineService) convertToMachineSummary(ctx context.Context, m *store.MachineMessage, agentCount int) *v1pb.MachineSummary {
+// convertMachineSummaryRecord builds the v1 MachineSummary for a list row.
+// provisioning is mirrored (phase chip in the list); the provisioner resource
+// name is not (the profile page resolves it).
+func convertMachineSummaryRecord(ctx context.Context, st *store.Store, m *store.MachineMessage, agentCount int) *v1pb.MachineSummary {
 	state := v1pb.State_ACTIVE
 	if m.Deleted {
 		state = v1pb.State_DELETED
 	}
 	out := &v1pb.MachineSummary{
-		Name:       common.FormatMachineUID(m.ResourceID),
-		State:      state,
-		Title:      m.Name,
-		Status:     convertToV1MachineStatus(m.Status, m.Deleted),
-		AgentCount: int32(agentCount),
-		CreatedAt:  timestamppb.New(m.CreatedAt),
+		Name:         common.FormatMachineUID(m.ResourceID),
+		State:        state,
+		Title:        m.Name,
+		Status:       convertToV1MachineStatus(m.Status, m.Deleted),
+		AgentCount:   int32(agentCount),
+		CreatedAt:    timestamppb.New(m.CreatedAt),
+		Provisioning: convertToV1ProvisioningStatus(m.Provisioning),
 	}
 	if m.CreatedBy != 0 {
-		out.CreatedBy = resolveUserResource(ctx, s.store, m.CreatedBy)
+		out.CreatedBy = resolveUserResource(ctx, st, m.CreatedBy)
 	}
 	latest := machinebuild.LatestVersion()
 	out.LatestVersion = latest
 	out.UpgradeAvailable = machinebuild.UpgradeAvailable(m.Info.GetVersion(), latest)
+	return out
+}
+
+// convertToV1ProvisioningStatus converts the stored provisioning job state to
+// its v1 form (epoch seconds → Timestamps, same enum values). Nil for
+// self-hosted machines.
+func convertToV1ProvisioningStatus(p *storepb.ProvisioningStatus) *v1pb.ProvisioningStatus {
+	if p == nil {
+		return nil
+	}
+	out := &v1pb.ProvisioningStatus{
+		Phase:          v1pb.ProvisioningPhase(p.Phase),
+		Error:          p.Error,
+		WorkloadName:   p.WorkloadName,
+		WorkloadLabels: p.WorkloadLabels,
+	}
+	if p.PendingAt > 0 {
+		out.PendingAt = timestamppb.New(time.Unix(p.PendingAt, 0))
+	}
+	if p.ProvisionedAt > 0 {
+		out.ProvisionedAt = timestamppb.New(time.Unix(p.ProvisionedAt, 0))
+	}
+	if p.FailedAt > 0 {
+		out.FailedAt = timestamppb.New(time.Unix(p.FailedAt, 0))
+	}
 	return out
 }
 

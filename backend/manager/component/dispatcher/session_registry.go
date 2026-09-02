@@ -18,15 +18,17 @@ import (
 // single critical section, which the simple get/set helpers below cannot
 // express without changing the locking order.
 type sessionRegistry struct {
-	mu       sync.RWMutex
-	sessions map[int]*AgentSession
-	machines map[int]*MachineSession
+	mu           sync.RWMutex
+	sessions     map[int]*AgentSession
+	machines     map[int]*MachineSession
+	provisioners map[int]*ProvisionerSession
 }
 
 func newSessionRegistry() *sessionRegistry {
 	return &sessionRegistry{
-		sessions: make(map[int]*AgentSession),
-		machines: make(map[int]*MachineSession),
+		sessions:     make(map[int]*AgentSession),
+		machines:     make(map[int]*MachineSession),
+		provisioners: make(map[int]*ProvisionerSession),
 	}
 }
 

@@ -592,6 +592,12 @@ func (s *Store) UpdateMachineProvisioning(ctx context.Context, machineID int, pr
 		return errors.Errorf("machine %d not found", machineID)
 	}
 
+	// Invalidate both caches: progress consumers read by resource id, so a
+	// stale resource-id entry would keep serving the previous phase. Peek the
+	// resource id before dropping the id entry.
+	if current, ok := s.machineIDCache.Peek(machineID); ok && current != nil {
+		s.machineResourceIDCache.Remove(current.ResourceID)
+	}
 	s.machineIDCache.Remove(machineID)
 	return nil
 }
@@ -607,12 +613,16 @@ var replayableProvisioningPhases = map[models.ProvisioningPhase]bool{
 	models.ProvisioningPhase_PROVISIONING_PHASE_DEPROVISIONING: true,
 }
 
-// ListReplayableProvisioningMachines returns the non-deleted machines bound to
-// the provisioner whose provisioning job is in a replayable phase. Bound to
-// one provisioner, so the lookup is small and phases are filtered in Go (the
-// jsonb column stores the enum as a number; no SQL-side phase predicate).
+// ListReplayableProvisioningMachines returns the machines bound to the
+// provisioner whose provisioning job is in a replayable phase. Soft-deleted
+// machines are included on purpose: DeleteMachine tears the workload down
+// asynchronously (DEPROVISIONING), and the row is gone from the UI long before
+// the provisioner may reconnect — the deprovision job must survive that
+// deletion. Bound to one provisioner, so the lookup is small and phases are
+// filtered in Go (the jsonb column stores the enum as a number; no SQL-side
+// phase predicate).
 func (s *Store) ListReplayableProvisioningMachines(ctx context.Context, provisionerID int) ([]*MachineMessage, error) {
-	machines, err := s.ListMachines(ctx, &FindMachineMessage{ProvisionerID: &provisionerID})
+	machines, err := s.ListMachines(ctx, &FindMachineMessage{ProvisionerID: &provisionerID, ShowDeleted: true})
 	if err != nil {
 		return nil, err
 	}

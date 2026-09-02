@@ -191,6 +191,12 @@ func (s *Store) GetWorkspaceGeneralSetting(ctx context.Context) (*models.Workspa
 	return getSettingPayload[*models.WorkspaceProfileSetting](ctx, s, models.SettingName_WORKSPACE_PROFILE)
 }
 
+// GetProvisioningSetting returns the provisioning setting payload (the runtime
+// image + binary target used by ProvisionMachine).
+func (s *Store) GetProvisioningSetting(ctx context.Context) (*models.ProvisioningSetting, error) {
+	return getSettingPayload[*models.ProvisioningSetting](ctx, s, models.SettingName_PROVISIONING)
+}
+
 // UpsertWorkspaceGeneralSetting stores the workspace general setting payload.
 func (s *Store) UpsertWorkspaceGeneralSetting(ctx context.Context, setting *models.WorkspaceProfileSetting) error {
 	_, err := upsertSettingValue(ctx, s, models.SettingName_WORKSPACE_PROFILE, setting)

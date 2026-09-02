@@ -259,6 +259,14 @@ func GetMachineFromContext(ctx context.Context) (*store.MachineMessage, bool) {
 	return machine, ok
 }
 
+// GetProvisionerFromContext returns the provisioner authenticated by a
+// provisioner token (injected by the auth interceptor from the provisioner
+// audience branch). Only the provisioner control plane sees this principal.
+func GetProvisionerFromContext(ctx context.Context) (*store.ProvisionerMessage, bool) {
+	provisioner, ok := ctx.Value(common.ProvisionerContextKey).(*store.ProvisionerMessage)
+	return provisioner, ok
+}
+
 func getSubConditionFromExpr(expr celast.Expr, getFilter func(expr celast.Expr) (string, error), join string) (string, error) {
 	var args []string
 	for _, arg := range expr.AsCall().Args() {

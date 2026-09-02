@@ -257,6 +257,30 @@ func (s *MachineService) DeleteMachine(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can delete this machine"))
 	}
 
+	// Provisioned machines tear their workload down asynchronously: record the
+	// DEPROVISIONING phase BEFORE the soft-delete (a deleted row would no
+	// longer be picked up as a live update, but the reconnect replay does scan
+	// deleted rows for deprovision jobs), then soft-delete, then push — the row
+	// deletion is never blocked on the teardown (design §6.4).
+	var provisioner *store.ProvisionerMessage
+	if machine.ProvisionerID != 0 {
+		provisioner, err = s.store.GetProvisioner(ctx, machine.ProvisionerID)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get machine provisioner, error: %v", err))
+		}
+		if provisioner != nil && !provisioner.Deleted && machine.Provisioning != nil {
+			next := cloneProvisioningStatus(machine.Provisioning)
+			next.Phase = storepb.ProvisioningPhase_PROVISIONING_PHASE_DEPROVISIONING
+			if err := s.store.UpdateMachineProvisioning(ctx, machine.ID, next); err != nil {
+				return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to record deprovisioning, error: %v", err))
+			}
+		} else {
+			// The provisioner is gone (deleted last): the workload is orphaned
+			// in the cluster and visible to the cluster admin; nothing to push.
+			provisioner = nil
+		}
+	}
+
 	// Atomically soft-delete iff the machine hosts no live agents, so a
 	// concurrent CreateAgent cannot slip into the gap between the agent-count
 	// check and the soft-delete (agents are bound by machine_id and a soft
@@ -285,6 +309,18 @@ func (s *MachineService) DeleteMachine(ctx context.Context, req *connect.Request
 		Type:         storepb.Policy_IAM,
 	}); err != nil {
 		slog.Warn("failed to clean up machine iam policy", slog.String("machine", resourceID), log.WithError(err))
+	}
+
+	// Push the teardown job best-effort: a provisioner that is offline misses
+	// it, and the replay on its next connect completes the cleanup.
+	if provisioner != nil && s.dispatcher != nil && s.dispatcher.IsProvisionerConnected(provisioner.ID) {
+		if err := s.dispatcher.SendDeprovisionMachineJob(provisioner.ID, &v1pb.DeprovisionMachineJob{
+			Machine:  common.FormatMachineUID(resourceID),
+			KeepData: false,
+		}); err != nil {
+			slog.Warn("failed to push deprovision job; it will replay on reconnect",
+				slog.String("machine", resourceID), log.WithError(err))
+		}
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }

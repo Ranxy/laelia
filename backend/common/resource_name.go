@@ -24,6 +24,7 @@ const (
 	APIProviderEntryPrefix     = "entries/"
 	McpServerNamePrefix        = "mcpServers/"
 	AgentTeamNamePrefix        = "agentTeams/"
+	ProvisionerNamePrefix      = "provisioners/"
 )
 
 // GetUserHandle returns the user handle (or email alias) token from a
@@ -280,4 +281,20 @@ func GetMcpServerResourceID(name string) (string, error) {
 // resource id.
 func FormatMcpServerUID(id string) string {
 	return fmt.Sprintf("%s%s", McpServerNamePrefix, id)
+}
+
+// GetProvisionerResourceID returns the provisioner resource id (uuid) from a
+// provisioners/{provisioner} resource name.
+func GetProvisionerResourceID(name string) (string, error) {
+	tokens, err := GetNameParentTokens(name, ProvisionerNamePrefix)
+	if err != nil {
+		return "", err
+	}
+	return tokens[0], nil
+}
+
+// FormatProvisionerUID returns the provisioners/{provisioner} resource name for
+// the given provisioner resource id.
+func FormatProvisionerUID(id string) string {
+	return fmt.Sprintf("%s%s", ProvisionerNamePrefix, id)
 }

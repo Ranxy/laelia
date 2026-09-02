@@ -40,6 +40,10 @@ func configureV1Routers(
 	cmdDispatcher *dispatcher.Dispatcher,
 ) (*apiv1.AuditInterceptor, error) {
 	cmdDispatcher.StartPingMonitor()
+	// Provisioner auto-upgrade loop: scans every few minutes for machines of
+	// auto_upgrade provisioners that lag the embedded machine build. Bounded to
+	// the server's context so shutdown joins it.
+	apiv1.StartProvisionerAutoUpgradeLoop(ctx, stores, cmdDispatcher)
 
 	// Room hub: in-process notifier that wakes long-polling message readers
 	// (ListConversationMessages / ListThreadMessages with wait_ms) as soon as a
@@ -72,6 +76,8 @@ func configureV1Routers(
 	machineService := apiv1.NewMachineService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager)
 	deviceService := apiv1.NewDeviceService(deviceStore, stores, secret, profile, iamManager)
 	machineStreamService := apiv1.NewMachineStreamService(stores, cmdDispatcher)
+	provisionerService := apiv1.NewProvisionerService(stores, secret, profile, cmdDispatcher, iamManager)
+	provisionerStreamService := apiv1.NewProvisionerStreamService(stores, secret, profile, cmdDispatcher)
 	settingService := apiv1.NewSettingService(stores, s3clientmanager, profile, iamManager)
 	roleService := apiv1.NewRoleService(stores)
 	iamService := apiv1.NewIamService(stores, iamManager)
@@ -159,6 +165,10 @@ func configureV1Routers(
 	connectHandlers[devicePath] = deviceHandler
 	machineStreamPath, machineStreamHandler := v1connect.NewMachineStreamServiceHandler(machineStreamService, handlerOpts)
 	connectHandlers[machineStreamPath] = machineStreamHandler
+	provisionerPath, provisionerHandler := v1connect.NewProvisionerServiceHandler(provisionerService, handlerOpts)
+	connectHandlers[provisionerPath] = provisionerHandler
+	provisionerStreamPath, provisionerStreamHandler := v1connect.NewProvisionerStreamServiceHandler(provisionerStreamService, handlerOpts)
+	connectHandlers[provisionerStreamPath] = provisionerStreamHandler
 	settingPath, settingHandler := v1connect.NewSettingServiceHandler(settingService, handlerOpts)
 	connectHandlers[settingPath] = settingHandler
 	rolePath, roleHandler := v1connect.NewRoleServiceHandler(roleService, handlerOpts)
@@ -197,6 +207,8 @@ func configureV1Routers(
 			v1connect.MachineServiceName,
 			v1connect.DeviceServiceName,
 			v1connect.MachineStreamServiceName,
+			v1connect.ProvisionerServiceName,
+			v1connect.ProvisionerStreamServiceName,
 			v1connect.SettingServiceName,
 			v1connect.RoleServiceName,
 			v1connect.IamServiceName,

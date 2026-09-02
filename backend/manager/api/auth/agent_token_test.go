@@ -45,13 +45,14 @@ func TestParseAgentToken_RejectsTampered(t *testing.T) {
 	tok, err := GenerateAgentTokenWithSession("agent-1", "agents/agent-1", 3, TokenTypeRefresh, "", common.ReleaseModeDev, "secret", time.Hour)
 	require.NoError(t, err)
 
-	// Flip a character in the payload segment to break the signature.
-	tampered := tok[:len(tok)-1]
-	if last := tok[len(tok)-1]; last == 'A' {
-		tampered += "B"
-	} else {
-		tampered += "A"
-	}
+	// Tamper the payload's first character (always 'e' — the base64 of the
+	// leading '{' of the claims JSON — so the decoded payload bytes change and
+	// the signature no longer matches). Flipping the signature's last character
+	// instead is unreliable: for a 32-byte HS256 signature (length %3 == 2) the
+	// final base64url character's low two bits are padding, so swapping between
+	// e.g. 'A' and 'B' decodes to the same bytes and the "tampered" token still
+	// verifies.
+	tampered := "f" + tok[1:]
 	_, err = ParseAgentToken(tampered, "secret")
-	assert.Error(t, err, "a token whose signature no longer matches its payload must not verify")
+	assert.Error(t, err, "a token whose payload no longer matches its signature must not verify")
 }
