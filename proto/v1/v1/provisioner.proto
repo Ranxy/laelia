@@ -1,0 +1,268 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "v1/annotation.proto";
+import "v1/command.proto";
+import "v1/machine.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+// ProvisionerService manages provisioners (management-plane workers that
+// create machine workloads in a customer's infrastructure — k8s, docker, ... —
+// on behalf of the manager) and the user-facing ProvisionMachine RPC.
+//
+// A provisioner authenticates with a dedicated long-lived provisioner token
+// (minted once by CreateProvisioner) and connects out to the manager over
+// ProvisionerStreamService.ProvisionerChannel; the manager never talks to the
+// provisioner's infrastructure directly.
+service ProvisionerService {
+  // ---- Admin management ----
+
+  // CreateProvisioner registers a provisioner (title + backend) and mints its
+  // one-time long-lived token. The token is returned exactly once and never
+  // stored in plaintext.
+  rpc CreateProvisioner(CreateProvisionerRequest) returns (CreateProvisionerResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.provisioners.create";
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc ListProvisioners(ListProvisionersRequest) returns (ListProvisionersResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.provisioners.get";
+  }
+
+  rpc GetProvisioner(GetProvisionerRequest) returns (Provisioner) {
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.provisioners.get";
+  }
+
+  // RotateProvisionerToken bumps the provisioner's token version (killing the
+  // old token at its next use) and mints a new one-time token.
+  rpc RotateProvisionerToken(RotateProvisionerTokenRequest) returns (RotateProvisionerTokenResponse) {
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    // Destructive (invalidates the old credential), so admin-tier.
+    option (laelia.v1.permission) = "laelia.provisioners.delete";
+    option (laelia.v1.audit) = true;
+  }
+
+  // DeleteProvisioner soft-deletes the provisioner. Refused while any
+  // non-deleted machine still references it, so workloads can never silently
+  // become unmanaged.
+  rpc DeleteProvisioner(DeleteProvisionerRequest) returns (google.protobuf.Empty) {
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.provisioners.delete";
+    option (laelia.v1.audit) = true;
+  }
+
+  // ---- User self-service ----
+
+  // ProvisionMachine creates a machine owned by `owner` (defaults to the
+  // caller; only a workspace admin may name another user) and enqueues a
+  // provisioning job on the named provisioner. Fully automated: the machine
+  // appears and connects without any further user action.
+  rpc ProvisionMachine(ProvisionMachineRequest) returns (Machine) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.provisioners.provision";
+    option (laelia.v1.audit) = true;
+  }
+}
+
+// ProvisionerStreamService is the provisioner control channel, mirroring
+// MachineStreamService: jobs flow down, status flows up, over the provisioner's
+// long-lived token. Machines never depend on this stream after they boot — a
+// provisioned machine is a normal machine once its pod is running.
+service ProvisionerStreamService {
+  rpc ProvisionerChannel(stream ProvisionerStreamMessage) returns (stream ManagerProvisionerStreamMessage);
+}
+
+// ========== Request/Response Messages ==========
+
+message CreateProvisionerRequest {
+  // The provisioner to create: title, backend, and optional description.
+  Provisioner provisioner = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateProvisionerResponse {
+  Provisioner provisioner = 1;
+  // The one-time provisioner token; never stored server-side in plaintext and
+  // never returned again. Shown in a copy-once dialog.
+  string token = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message ListProvisionersRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+  bool show_deleted = 3;
+}
+
+message ListProvisionersResponse {
+  repeated Provisioner provisioners = 1;
+  string next_page_token = 2;
+}
+
+message GetProvisionerRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Provisioner"}
+  ];
+}
+
+message RotateProvisionerTokenRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Provisioner"}
+  ];
+  string reason = 2; // audit purpose
+}
+
+message RotateProvisionerTokenResponse {
+  Provisioner provisioner = 1;
+  // The new one-time token; see CreateProvisionerResponse.token.
+  string token = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message DeleteProvisionerRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Provisioner"}
+  ];
+}
+
+message ProvisionMachineRequest {
+  // The provisioner that will create the workload, provisioners/{id}.
+  string provisioner = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Provisioner"}
+  ];
+  // Machine title.
+  string title = 2 [(google.api.field_behavior) = REQUIRED];
+  // Target owner, users/{id}. Empty = caller. Naming another user requires a
+  // workspace admin (checked in the handler, like machine ownership transfer).
+  string owner = 3;
+}
+
+// ========== Resource Definition ==========
+
+// Provisioner is a registered worker that creates machine workloads in one
+// virtualization backend on the manager's behalf.
+message Provisioner {
+  option (google.api.resource) = {
+    type: "laelia/Provisioner"
+    pattern: "provisioners/{provisioner}"
+  };
+
+  string name = 1;
+  string title = 2;
+  // Backend type ("kubernetes", "docker", ...). Free-form; the UI lists known
+  // backends and shows others as registered-but-unsupported.
+  string backend = 3;
+  string description = 4;
+  ProvisionerStatus status = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Live (non-deleted) machines bound to this provisioner.
+  int32 machine_count = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp created_at = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Creator's user resource name (users/{id}).
+  string created_by = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ProvisionerStatus is the runtime status of a provisioner, derived from its
+// ProvisionerChannel stream.
+message ProvisionerStatus {
+  bool connected = 1;
+  google.protobuf.Timestamp last_seen = 2;
+  string version = 3;
+  string backend = 4;
+  bool auto_upgrade = 5;
+  string config_digest = 6;
+}
+
+// ========== Provisioner Control Channel messages ==========
+
+message ProvisionerStreamMessage {
+  oneof message {
+    // First frame after connect: version, backend, capabilities, config digest.
+    ProvisionerReady ready = 1;
+    ProvisionJobProgress job_progress = 2;
+    Ping ping = 3;
+  }
+}
+
+message ManagerProvisionerStreamMessage {
+  oneof message {
+    ProvisionMachineJob provision_job = 1;
+    DeprovisionMachineJob deprovision_job = 2;
+    Pong pong = 3;
+    // DisconnectNotice warns the provisioner its token was rotated or the
+    // provisioner deleted, so it can stop retrying with a dead credential.
+    ProvisionerDisconnectNotice disconnect_notice = 4;
+  }
+}
+
+message ProvisionerReady {
+  string version = 1;
+  string backend = 2;
+  repeated string capabilities = 3;
+  // Short hash of the provisioner's effective config, surfaced for drift
+  // visibility (e.g. a manager_url_override in effect).
+  string config_digest = 4;
+  // AutoUpgrade echoes the provisioner's config flag; persisted in the
+  // provisioner status and honored by the manager's auto-upgrade loop.
+  bool auto_upgrade = 5;
+}
+
+// ProvisionMachineJob carries everything the provisioner needs to create one
+// machine workload. The refresh token is the machine's durable credential:
+// the provisioner stores it in a backend secret (never in a CR) and the pod
+// picks it up at first boot.
+message ProvisionMachineJob {
+  string machine = 1; // machines/{uuid}
+  string title = 2;
+  // Owner display handle; display only (the provisioner never needs it).
+  string owner_handle = 3;
+  // The machine's refresh token, minted by the manager for the machine named
+  // above, bound to fingerprint.
+  string refresh_token = 4;
+  // The connection fingerprint the machine will present (LAELIA_FINGERPRINT).
+  string fingerprint = 5;
+  // URL pods use to download binaries from and connect to the manager.
+  string manager_url = 6;
+  // Runtime image for the pod (no machine binary inside; downloaded at boot).
+  string runtime_image = 7;
+  // Machine binary target to install, e.g. "linux-x64".
+  string binary_target = 8;
+  map<string, string> machine_labels = 9;
+  // The manager-rendered bootstrap script (init container payload).
+  string bootstrap_script = 10;
+}
+
+message DeprovisionMachineJob {
+  string machine = 1;
+  // keep_data preserves the machine's data volume when the backend supports
+  // retention; default (false) deletes it with the workload.
+  bool keep_data = 2;
+}
+
+// ProvisionJobProgress is the provisioner's report on one provisioning job.
+// Manager-side phase transitions are driven purely by these frames; the
+// manager never guesses cluster state.
+message ProvisionJobProgress {
+  string machine = 1;
+  ProvisioningPhase phase = 2;
+  string error = 3;
+  // Backend-specific locator, e.g. "laelia-machines/laelia-machine-abc123".
+  string workload_name = 4;
+}
+
+message ProvisionerDisconnectNotice {
+  string reason = 1;
+}

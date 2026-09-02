@@ -29,18 +29,20 @@ type Store struct {
 	// (the default) disables wake-ups (long polls run to their timeout).
 	roomNotifier RoomNotifier
 
-	userIDCache            *lru.Cache[int, *UserMessage]
-	userEmailCache         *lru.Cache[string, *UserMessage]
-	userHandleCache        *lru.Cache[string, *UserMessage]
-	settingCache           *lru.Cache[models.SettingName, *SettingMessage]
-	policyCache            *lru.Cache[string, *PolicyMessage]
-	idpCache               *lru.Cache[string, *IdentityProviderMessage]
-	groupCache             *lru.Cache[string, *GroupMessage]
-	agentIDCache           *lru.Cache[int, *AgentMessage]
-	agentResourceIDCache   *lru.Cache[string, *AgentMessage]
-	machineIDCache         *lru.Cache[int, *MachineMessage]
-	machineResourceIDCache *lru.Cache[string, *MachineMessage]
-	rolesCache             *lru.Cache[string, *RoleMessage]
+	userIDCache                *lru.Cache[int, *UserMessage]
+	userEmailCache             *lru.Cache[string, *UserMessage]
+	userHandleCache            *lru.Cache[string, *UserMessage]
+	settingCache               *lru.Cache[models.SettingName, *SettingMessage]
+	policyCache                *lru.Cache[string, *PolicyMessage]
+	idpCache                   *lru.Cache[string, *IdentityProviderMessage]
+	groupCache                 *lru.Cache[string, *GroupMessage]
+	agentIDCache               *lru.Cache[int, *AgentMessage]
+	agentResourceIDCache       *lru.Cache[string, *AgentMessage]
+	machineIDCache             *lru.Cache[int, *MachineMessage]
+	machineResourceIDCache     *lru.Cache[string, *MachineMessage]
+	provisionerIDCache         *lru.Cache[int, *ProvisionerMessage]
+	provisionerResourceIDCache *lru.Cache[string, *ProvisionerMessage]
+	rolesCache                 *lru.Cache[string, *RoleMessage]
 
 	// userMcpConfigSetting caches the USER_MCP_CONFIG row for a short TTL so
 	// per-call MCP gateway checks do not hit the database. Cleared on upsert.
@@ -116,25 +118,35 @@ func New(ctx context.Context, pgURL string, enableCache bool) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	provisionerIDCache, err := lru.New[int, *ProvisionerMessage](1024)
+	if err != nil {
+		return nil, err
+	}
+	provisionerResourceIDCache, err := lru.New[string, *ProvisionerMessage](1024)
+	if err != nil {
+		return nil, err
+	}
 	rolesCache, err := lru.New[string, *RoleMessage](512)
 	if err != nil {
 		return nil, err
 	}
 	s := &Store{
-		dbConnManager:          dbConnManager,
-		enableCache:            enableCache,
-		userIDCache:            userIDCache,
-		userEmailCache:         userEmailCache,
-		userHandleCache:        userHandleCache,
-		settingCache:           settingCache,
-		policyCache:            policyCache,
-		idpCache:               idpCache,
-		groupCache:             groupCache,
-		agentIDCache:           agentIDCache,
-		agentResourceIDCache:   agentResourceIDCache,
-		machineIDCache:         machineIDCache,
-		machineResourceIDCache: machineResourceIDCache,
-		rolesCache:             rolesCache,
+		dbConnManager:              dbConnManager,
+		enableCache:                enableCache,
+		userIDCache:                userIDCache,
+		userEmailCache:             userEmailCache,
+		userHandleCache:            userHandleCache,
+		settingCache:               settingCache,
+		policyCache:                policyCache,
+		idpCache:                   idpCache,
+		groupCache:                 groupCache,
+		agentIDCache:               agentIDCache,
+		agentResourceIDCache:       agentResourceIDCache,
+		machineIDCache:             machineIDCache,
+		machineResourceIDCache:     machineResourceIDCache,
+		provisionerIDCache:         provisionerIDCache,
+		provisionerResourceIDCache: provisionerResourceIDCache,
+		rolesCache:                 rolesCache,
 	}
 	s.startActivityWorkers()
 

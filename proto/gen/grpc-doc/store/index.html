@@ -413,6 +413,33 @@
         
           
           <li>
+            <a href="#store%2fprovisioner.proto">store/provisioner.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.store.ProvisionerStatus"><span class="badge">M</span>ProvisionerStatus</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.ProvisioningStatus"><span class="badge">M</span>ProvisioningStatus</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.ProvisioningStatus.WorkloadLabelsEntry"><span class="badge">M</span>ProvisioningStatus.WorkloadLabelsEntry</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#laelia.store.ProvisioningPhase"><span class="badge">E</span>ProvisioningPhase</a>
+                </li>
+              
+              
+              
+            </ul>
+          </li>
+        
+          
+          <li>
             <a href="#store%2frole.proto">store/role.proto</a>
             <ul>
               
@@ -457,6 +484,10 @@
               
                 <li>
                   <a href="#laelia.store.PasswordRestrictionSetting"><span class="badge">M</span>PasswordRestrictionSetting</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.ProvisioningSetting"><span class="badge">M</span>ProvisioningSetting</a>
                 </li>
               
                 <li>
@@ -2631,6 +2662,234 @@ authorized from this policy at authorization time.</p></td>
     
       
       <div class="file-heading">
+        <h2 id="store/provisioner.proto">store/provisioner.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.store.ProvisionerStatus">ProvisionerStatus</h3>
+        <p>ProvisionerStatus is the storage-layer runtime status of a provisioner,</p><p>stamped by the manager from ProvisionerChannel stream events. It lives in</p><p>provisioner.status (jsonb).</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>connected</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Connected reports whether a ProvisionerChannel stream is live right now. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_seen</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>Last connect/ready frame epoch seconds (0 = never seen). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Version is the provisioner binary version reported in ProvisionerReady. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>backend</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Backend echoes the provisioner&#39;s configured backend type
+(&#34;kubernetes&#34;, &#34;docker&#34;, ...). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>auto_upgrade</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>AutoUpgrade echoes the provisioner&#39;s config flag: when true the manager
+auto-triggers binary upgrades for this provisioner&#39;s machines. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>config_digest</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>ConfigDigest is a short hash of the provisioner&#39;s effective config,
+reported for drift visibility (e.g. manager_url_override in effect). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.ProvisioningStatus">ProvisioningStatus</h3>
+        <p>ProvisioningStatus is the storage-layer provisioning state carried on the</p><p>machine row (machine.provisioning). Epoch-second timestamps follow the</p><p>store-proto convention (see MachineStatus).</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>phase</td>
+                  <td><a href="#laelia.store.ProvisioningPhase">ProvisioningPhase</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>error</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Error is the last failure reason (phase FAILED or DEPROVISIONING issues). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>workload_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>WorkloadName is the backend-specific locator, e.g. &#34;namespace/name&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>workload_labels</td>
+                  <td><a href="#laelia.store.ProvisioningStatus.WorkloadLabelsEntry">ProvisioningStatus.WorkloadLabelsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>pending_at</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>provisioned_at</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>failed_at</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.ProvisioningStatus.WorkloadLabelsEntry">ProvisioningStatus.WorkloadLabelsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="laelia.store.ProvisioningPhase">ProvisioningPhase</h3>
+        <p>ProvisioningPhase is the lifecycle of one provisioning job. The manager</p><p>records the phase on machine.provisioning; the provisioner drives the</p><p>transitions through ProvisionJobProgress frames.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_PENDING</td>
+                <td>1</td>
+                <td><p>PENDING: the job is recorded but not yet acked by the provisioner
+(pushed on the next ProvisionerChannel connect).</p></td>
+              </tr>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_PROVISIONING</td>
+                <td>2</td>
+                <td><p>PROVISIONING: the provisioner acked and is creating the workload.</p></td>
+              </tr>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_PROVISIONED</td>
+                <td>3</td>
+                <td><p>PROVISIONED: the workload exists and the pod is running (the machine
+itself may still be OFFLINE until it connects).</p></td>
+              </tr>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_FAILED</td>
+                <td>4</td>
+                <td><p>FAILED is terminal: workload creation failed; error carries the reason.</p></td>
+              </tr>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_DEPROVISIONING</td>
+                <td>5</td>
+                <td><p>DEPROVISIONING: delete accepted, teardown in progress.</p></td>
+              </tr>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_DELETED</td>
+                <td>6</td>
+                <td><p>DELETED is terminal for the delete path: the workload is removed.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+    
+      
+      <div class="file-heading">
         <h2 id="store/role.proto">store/role.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
@@ -2987,6 +3246,42 @@ prefixes is rejected, taking precedence over the allow list. </p></td>
                   <td><a href="#google.protobuf.Duration">google.protobuf.Duration</a></td>
                   <td></td>
                   <td><p>password_rotation requires users to reset their password after the duration. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.ProvisioningSetting">ProvisioningSetting</h3>
+        <p>ProvisioningSetting configures machine provisioning via provisioners.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>runtime_image</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>runtime_image is the container image that provides the agent runtime
+environment for provisioned machine pods. It must NOT contain the
+laelia-machine binary — the binary is downloaded at pod start from this
+manager into the machine&#39;s data volume. ProvisionMachine refuses to run
+while this is empty. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>binary_target</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>binary_target is the machine binary target installed into provisioned
+pods (the manager&#39;s embedded manifest target). Default &#34;linux-x64&#34;. </p></td>
                 </tr>
               
             </tbody>
@@ -3470,6 +3765,12 @@ their own machines through the device-code flow. Default false (allowed). </p></
               <tr>
                 <td>SMTP_CONFIG</td>
                 <td>14</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PROVISIONING</td>
+                <td>15</td>
                 <td><p></p></td>
               </tr>
             

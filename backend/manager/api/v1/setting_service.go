@@ -63,6 +63,7 @@ var exposedSettings = map[models.SettingName]settingMeta{
 	models.SettingName_WORKSPACE_PROFILE:    {adminOnly: true},
 	models.SettingName_PASSWORD_RESTRICTION: {adminOnly: true},
 	models.SettingName_SMTP_CONFIG:          {adminOnly: true},
+	models.SettingName_PROVISIONING:         {adminOnly: true},
 }
 
 // parseSettingName converts a resource name ("settings/s3_config") to the
@@ -164,6 +165,8 @@ func (s *SettingService) updateSettingValue(ctx context.Context, name models.Set
 		return s.updatePasswordRestriction(ctx, req)
 	case models.SettingName_SMTP_CONFIG:
 		return s.updateSMTPConfig(ctx, req)
+	case models.SettingName_PROVISIONING:
+		return s.updateProvisioning(ctx, req)
 	default:
 		return nil, connect.NewError(connect.CodeInvalidArgument, pkgerrors.Errorf("unsupported setting %v", name))
 	}
@@ -310,6 +313,27 @@ func (s *SettingService) updatePasswordRestriction(ctx context.Context, req *con
 			return nil, err
 		}
 		return cfg, mergePasswordRestrictionPaths(req.Msg.GetUpdateMask().GetPaths(), payload, cfg)
+	})
+	if err != nil {
+		return nil, asSettingUpdateError(err)
+	}
+	return after, nil
+}
+
+func (s *SettingService) updateProvisioning(ctx context.Context, req *connect.Request[v1pb.UpdateSettingRequest]) (proto.Message, error) {
+	payload := req.Msg.GetSetting().GetValue().GetProvisioning()
+	if payload == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, pkgerrors.New("provisioning value is required"))
+	}
+	after, err := s.store.UpdateSettingValueAtomic(ctx, models.SettingName_PROVISIONING, func(current proto.Message) (proto.Message, error) {
+		cfg, err := typedPayload[*models.ProvisioningSetting](current, models.SettingName_PROVISIONING)
+		if err != nil {
+			return nil, err
+		}
+		if err := mergeProvisioningPaths(req.Msg.GetUpdateMask().GetPaths(), payload, cfg); err != nil {
+			return nil, err
+		}
+		return cfg, nil
 	})
 	if err != nil {
 		return nil, asSettingUpdateError(err)
@@ -525,6 +549,25 @@ func mergePasswordRestrictionPaths(paths []string, src, dst *models.PasswordRest
 	})
 }
 
+var provisioningPaths = []string{
+	"value.provisioning.runtime_image",
+	"value.provisioning.binary_target",
+}
+
+func mergeProvisioningPaths(paths []string, src, dst *models.ProvisioningSetting) error {
+	return mergeSettingPaths(paths, "value.provisioning.", provisioningPaths, func(field string) error {
+		switch field {
+		case "runtime_image":
+			dst.RuntimeImage = strings.TrimSpace(src.GetRuntimeImage())
+		case "binary_target":
+			dst.BinaryTarget = strings.TrimSpace(src.GetBinaryTarget())
+		default:
+			return invalidMaskPath("value.provisioning." + field)
+		}
+		return nil
+	})
+}
+
 // typedPayload asserts the payload has the expected concrete type. The store
 // payload factory registered for the setting guarantees it, so a mismatch is a
 // programming error rather than a user error.
@@ -583,6 +626,12 @@ func convertStoreToSettingValue(name models.SettingName, payload proto.Message) 
 		}
 		cfg.Password = maskSecret(cfg.Password)
 		return &v1pb.SettingValue{Value: &v1pb.SettingValue_SmtpConfig{SmtpConfig: cfg}}, nil
+	case models.SettingName_PROVISIONING:
+		cfg, ok := payload.(*models.ProvisioningSetting)
+		if !ok {
+			return nil, pkgerrors.Errorf("unexpected payload type %T for setting %v", payload, name)
+		}
+		return &v1pb.SettingValue{Value: &v1pb.SettingValue_Provisioning{Provisioning: cfg}}, nil
 	default:
 		return nil, pkgerrors.Errorf("unsupported setting %v", name)
 	}

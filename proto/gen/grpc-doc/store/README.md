@@ -63,6 +63,13 @@
     - [Policy.Resource](#laelia-store-Policy-Resource)
     - [Policy.Type](#laelia-store-Policy-Type)
   
+- [store/provisioner.proto](#store_provisioner-proto)
+    - [ProvisionerStatus](#laelia-store-ProvisionerStatus)
+    - [ProvisioningStatus](#laelia-store-ProvisioningStatus)
+    - [ProvisioningStatus.WorkloadLabelsEntry](#laelia-store-ProvisioningStatus-WorkloadLabelsEntry)
+  
+    - [ProvisioningPhase](#laelia-store-ProvisioningPhase)
+  
 - [store/role.proto](#store_role-proto)
     - [RolePermissions](#laelia-store-RolePermissions)
   
@@ -74,6 +81,7 @@
     - [LlmAgentConfigSetting](#laelia-store-LlmAgentConfigSetting)
     - [McpIpPolicy](#laelia-store-McpIpPolicy)
     - [PasswordRestrictionSetting](#laelia-store-PasswordRestrictionSetting)
+    - [ProvisioningSetting](#laelia-store-ProvisioningSetting)
     - [S3ConfigSetting](#laelia-store-S3ConfigSetting)
     - [SMTPSetting](#laelia-store-SMTPSetting)
     - [UserMcpConfigSetting](#laelia-store-UserMcpConfigSetting)
@@ -943,6 +951,102 @@ EnvironmentTierPolicy is the tier of an environment.
 
 
 
+<a name="store_provisioner-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## store/provisioner.proto
+
+
+
+<a name="laelia-store-ProvisionerStatus"></a>
+
+### ProvisionerStatus
+ProvisionerStatus is the storage-layer runtime status of a provisioner,
+stamped by the manager from ProvisionerChannel stream events. It lives in
+provisioner.status (jsonb).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| connected | [bool](#bool) |  | Connected reports whether a ProvisionerChannel stream is live right now. |
+| last_seen | [int64](#int64) |  | Last connect/ready frame epoch seconds (0 = never seen). |
+| version | [string](#string) |  | Version is the provisioner binary version reported in ProvisionerReady. |
+| backend | [string](#string) |  | Backend echoes the provisioner&#39;s configured backend type (&#34;kubernetes&#34;, &#34;docker&#34;, ...). |
+| auto_upgrade | [bool](#bool) |  | AutoUpgrade echoes the provisioner&#39;s config flag: when true the manager auto-triggers binary upgrades for this provisioner&#39;s machines. |
+| config_digest | [string](#string) |  | ConfigDigest is a short hash of the provisioner&#39;s effective config, reported for drift visibility (e.g. manager_url_override in effect). |
+
+
+
+
+
+
+<a name="laelia-store-ProvisioningStatus"></a>
+
+### ProvisioningStatus
+ProvisioningStatus is the storage-layer provisioning state carried on the
+machine row (machine.provisioning). Epoch-second timestamps follow the
+store-proto convention (see MachineStatus).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| phase | [ProvisioningPhase](#laelia-store-ProvisioningPhase) |  |  |
+| error | [string](#string) |  | Error is the last failure reason (phase FAILED or DEPROVISIONING issues). |
+| workload_name | [string](#string) |  | WorkloadName is the backend-specific locator, e.g. &#34;namespace/name&#34;. |
+| workload_labels | [ProvisioningStatus.WorkloadLabelsEntry](#laelia-store-ProvisioningStatus-WorkloadLabelsEntry) | repeated |  |
+| pending_at | [int64](#int64) |  |  |
+| provisioned_at | [int64](#int64) |  |  |
+| failed_at | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-store-ProvisioningStatus-WorkloadLabelsEntry"></a>
+
+### ProvisioningStatus.WorkloadLabelsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+ 
+
+
+<a name="laelia-store-ProvisioningPhase"></a>
+
+### ProvisioningPhase
+ProvisioningPhase is the lifecycle of one provisioning job. The manager
+records the phase on machine.provisioning; the provisioner drives the
+transitions through ProvisionJobProgress frames.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| PROVISIONING_PHASE_UNSPECIFIED | 0 |  |
+| PROVISIONING_PHASE_PENDING | 1 | PENDING: the job is recorded but not yet acked by the provisioner (pushed on the next ProvisionerChannel connect). |
+| PROVISIONING_PHASE_PROVISIONING | 2 | PROVISIONING: the provisioner acked and is creating the workload. |
+| PROVISIONING_PHASE_PROVISIONED | 3 | PROVISIONED: the workload exists and the pod is running (the machine itself may still be OFFLINE until it connects). |
+| PROVISIONING_PHASE_FAILED | 4 | FAILED is terminal: workload creation failed; error carries the reason. |
+| PROVISIONING_PHASE_DEPROVISIONING | 5 | DEPROVISIONING: delete accepted, teardown in progress. |
+| PROVISIONING_PHASE_DELETED | 6 | DELETED is terminal for the delete path: the workload is removed. |
+
+
+ 
+
+ 
+
+ 
+
+
+
 <a name="store_role-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -1106,6 +1210,22 @@ server URLs.
 | require_special_character | [bool](#bool) |  | require_uppercase_letter requires the password must contains at least one special character. |
 | require_reset_password_for_first_login | [bool](#bool) |  | require_reset_password_for_first_login requires users to reset their password after the 1st login. |
 | password_rotation | [google.protobuf.Duration](#google-protobuf-Duration) |  | password_rotation requires users to reset their password after the duration. |
+
+
+
+
+
+
+<a name="laelia-store-ProvisioningSetting"></a>
+
+### ProvisioningSetting
+ProvisioningSetting configures machine provisioning via provisioners.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| runtime_image | [string](#string) |  | runtime_image is the container image that provides the agent runtime environment for provisioned machine pods. It must NOT contain the laelia-machine binary — the binary is downloaded at pod start from this manager into the machine&#39;s data volume. ProvisionMachine refuses to run while this is empty. |
+| binary_target | [string](#string) |  | binary_target is the machine binary target installed into provisioned pods (the manager&#39;s embedded manifest target). Default &#34;linux-x64&#34;. |
 
 
 
@@ -1276,6 +1396,7 @@ Scope selects which MCP servers the policy applies to.
 | LLM_AGENT_CONFIG | 12 |  |
 | USER_MCP_CONFIG | 13 |  |
 | SMTP_CONFIG | 14 |  |
+| PROVISIONING | 15 |  |
 
 
  

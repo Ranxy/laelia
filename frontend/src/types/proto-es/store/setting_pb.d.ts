@@ -431,3 +431,35 @@ export enum McpIpPolicy_Scope {
  */
 export declare const McpIpPolicy_ScopeSchema: GenEnum<McpIpPolicy_Scope>;
 
+/**
+ * ProvisioningSetting configures machine provisioning via provisioners.
+ *
+ * @generated from message laelia.store.ProvisioningSetting
+ */
+export declare type ProvisioningSetting = Message<"laelia.store.ProvisioningSetting"> & {
+  /**
+   * runtime_image is the container image that provides the agent runtime
+   * environment for provisioned machine pods. It must NOT contain the
+   * laelia-machine binary — the binary is downloaded at pod start from this
+   * manager into the machine's data volume. ProvisionMachine refuses to run
+   * while this is empty.
+   *
+   * @generated from field: string runtime_image = 1;
+   */
+  runtimeImage: string;
+
+  /**
+   * binary_target is the machine binary target installed into provisioned
+   * pods (the manager's embedded manifest target). Default "linux-x64".
+   *
+   * @generated from field: string binary_target = 2;
+   */
+  binaryTarget: string;
+};
+
+/**
+ * Describes the message laelia.store.ProvisioningSetting.
+ * Use `create(ProvisioningSettingSchema)` to create a new message.
+ */
+export declare const ProvisioningSettingSchema: GenMessage<ProvisioningSetting>;
+

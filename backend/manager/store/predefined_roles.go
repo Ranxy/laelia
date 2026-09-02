@@ -21,6 +21,13 @@ const (
 	// by component/iam.machineRolePermissions and it is deliberately not in
 	// PredefinedRoles (so it never appears on the management Roles page).
 	MachineAgentCreatorRole = "machineAgentCreator"
+	// MachineProvisionerRole is the predefined role for self-service machine
+	// provisioning: holders may pick a provisioner (provisioners.get) and call
+	// ProvisionMachine (provisioners.provision), so an enterprise can grant
+	// "create a provisioned machine" without any other management rights.
+	// Bound to users/groups through the regular IAM policy machinery; default
+	// membership is nobody (workspaceAdmin holds everything).
+	MachineProvisionerRole = "machineProvisioner"
 )
 
 func permissionSet(perms ...permission.Permission) map[permission.Permission]bool {
@@ -99,6 +106,15 @@ var PredefinedRoles = []*RoleMessage{
 		Name:        "Workspace member",
 		Predefined:  true,
 		Permissions: memberBaselinePermissions,
+	},
+	{
+		ResourceID: MachineProvisionerRole,
+		Name:       "Machine provisioner",
+		Predefined: true,
+		Permissions: permissionSet(
+			permission.ProvisionersGet,
+			permission.ProvisionersProvision,
+		),
 	},
 }
 

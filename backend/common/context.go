@@ -17,6 +17,7 @@ const (
 	ServiceDataKey
 	AgentContextKey
 	MachineContextKey
+	ProvisionerContextKey
 	SessionContextKey
 	SourceIPContextKey
 	AccessTokenExpiresAtContextKey

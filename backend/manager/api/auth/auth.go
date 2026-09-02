@@ -37,6 +37,10 @@ const (
 	AccessTokenAudienceFmt        = "ll.user.access.%s"
 	AgentAccessTokenAudienceFmt   = "ll.agent.access.%s"
 	MachineAccessTokenAudienceFmt = "ll.machine.access.%s"
+	// ProvisionerAccessTokenAudienceFmt authenticates provisioner tokens: the
+	// long-lived, no-expiry credentials minted by CreateProvisioner. Unlike
+	// machine tokens there is a single token kind, so no token_type claim.
+	ProvisionerAccessTokenAudienceFmt = "ll.provisioner.access.%s"
 
 	apiTokenDuration     = 1 * time.Hour
 	DefaultTokenDuration = 7 * 24 * time.Hour
@@ -73,13 +77,20 @@ type MachineStore interface {
 	GetMachineByResourceID(ctx context.Context, resourceID string) (*store.MachineMessage, error)
 }
 
+// ProvisionerStore is the subset of *store.Store needed to authenticate
+// provisioner tokens.
+type ProvisionerStore interface {
+	GetProvisionerByResourceID(ctx context.Context, resourceID string) (*store.ProvisionerMessage, error)
+}
+
 // Store is the auth package's view of the manager store. Keeping it to the
-// three lookups above (instead of *store.Store) lets tests substitute a small
-// fake without mocking the whole store.
+// principal lookups above (instead of *store.Store) lets tests substitute a
+// small fake without mocking the whole store.
 type Store interface {
 	UserStore
 	AgentStore
 	MachineStore
+	ProvisionerStore
 }
 
 // TokenExpireCache is the subset of *state.State used to reject revoked/expired
@@ -115,6 +126,7 @@ type authResult struct {
 	user                 *store.UserMessage
 	agent                *store.AgentMessage
 	machine              *store.MachineMessage
+	provisioner          *store.ProvisionerMessage
 	accessTokenExpiresAt int64
 }
 
@@ -209,6 +221,9 @@ func (in *APIAuthInterceptor) injectAuthResult(
 			ctx = context.WithValue(ctx, common.AgentContextKey, declared)
 		}
 	}
+	if result.provisioner != nil {
+		ctx = context.WithValue(ctx, common.ProvisionerContextKey, result.provisioner)
+	}
 	if result.accessTokenExpiresAt > 0 {
 		ctx = context.WithValue(ctx, common.AccessTokenExpiresAtContextKey, result.accessTokenExpiresAt)
 	}
@@ -272,19 +287,21 @@ func (in *APIAuthInterceptor) getUserOrAgentConnect(ctx context.Context, accessT
 	}
 
 	// Branch on the audience so a request pays for exactly one signature
-	// verification instead of three (user/agent/machine) parses. peekAudience
-	// only decodes the unsigned payload to select the claims struct; the
-	// signature is always verified below, and the audience is re-checked, so a
-	// forged payload can only fall through to the generic invalid-token error.
+	// verification instead of four (agent/machine/user/provisioner) parses.
+	// peekAudience only decodes the unsigned payload to select the claims
+	// struct; the signature is always verified below, and the audience is
+	// re-checked, so a forged payload can only fall through to the generic
+	// invalid-token error.
 	expected := []string{
 		fmt.Sprintf(AgentAccessTokenAudienceFmt, in.profile.Mode),
 		fmt.Sprintf(MachineAccessTokenAudienceFmt, in.profile.Mode),
 		fmt.Sprintf(AccessTokenAudienceFmt, in.profile.Mode),
+		fmt.Sprintf(ProvisionerAccessTokenAudienceFmt, in.profile.Mode),
 	}
 	kind := audienceKind(peekTokenAudience(accessTokenStr), expected)
 	if kind < 0 {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("invalid access token, audience mismatch, expected %q, %q or %q",
-			expected[2], expected[0], expected[1]))
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("invalid access token, audience mismatch, expected %q, %q, %q or %q",
+			expected[2], expected[0], expected[1], expected[3]))
 	}
 	switch kind {
 	case 0: // agent
@@ -329,6 +346,20 @@ func (in *APIAuthInterceptor) getUserOrAgentConnect(ctx context.Context, accessT
 			return nil, err
 		}
 		return &authResult{user: user, accessTokenExpiresAt: userClaims.ExpiresAt.Unix()}, nil
+	case 3: // provisioner
+		provisionerClaims := &provisionerClaimsMessage{}
+		provisionerToken, err := jwt.ParseWithClaims(accessTokenStr, provisionerClaims, keyFunc)
+		if err != nil || provisionerToken == nil || !provisionerToken.Valid || !audienceContains(provisionerClaims.Audience, expected[3]) {
+			if errors.Is(err, jwt.ErrTokenExpired) {
+				return nil, connect.NewError(connect.CodeUnauthenticated, errs.New("access token expired"))
+			}
+			return nil, connect.NewError(connect.CodeUnauthenticated, invalidTokenError("provisioner", err))
+		}
+		provisioner, err := in.authenticateProvisionerByClaims(ctx, provisionerClaims)
+		if err != nil {
+			return nil, err
+		}
+		return &authResult{provisioner: provisioner}, nil
 	default:
 		// Unreachable: audienceKind returns -1 only when no branch matches,
 		// which is handled before the switch. Kept to satisfy the compiler.
@@ -400,6 +431,25 @@ func (in *APIAuthInterceptor) authenticateMachineByClaims(ctx context.Context, c
 
 	in.profile.LastActiveTS.Store(time.Now().Unix())
 	return machine, nil
+}
+
+func (in *APIAuthInterceptor) authenticateProvisionerByClaims(ctx context.Context, claims *provisionerClaimsMessage) (*store.ProvisionerMessage, error) {
+	provisioner, err := in.store.GetProvisionerByResourceID(ctx, claims.Subject)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("failed to find provisioner %s", claims.Subject))
+	}
+	if provisioner == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("provisioner %s not exists", claims.Subject))
+	}
+	if provisioner.Deleted {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("provisioner %s has been deactivated", claims.Subject))
+	}
+	if provisioner.TokenVersion != claims.TokenVersion {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("provisioner token version mismatch"))
+	}
+
+	in.profile.LastActiveTS.Store(time.Now().Unix())
+	return provisioner, nil
 }
 
 // resolveDeclaredAgent resolves the agent a machine caller is acting on behalf
@@ -567,6 +617,16 @@ type machineClaimsMessage struct {
 	TokenType    string `json:"token_type"`
 	SessionID    string `json:"session_id,omitempty"`
 	TokenFamily  string `json:"token_family,omitempty"`
+	jwt.RegisteredClaims
+}
+
+// provisionerClaimsMessage carries a provisioner token's claims. Provisioner
+// tokens have exactly one kind (no token_type) and no expiry: revocation is
+// version-based (RotateProvisionerToken / DeleteProvisioner bump the row's
+// token_version, which invalidates every outstanding token at its next use).
+type provisionerClaimsMessage struct {
+	Name         string `json:"name"`
+	TokenVersion int    `json:"token_version"`
 	jwt.RegisteredClaims
 }
 
@@ -755,6 +815,39 @@ func signMachineToken(machineName string, resourceID string, tokenVersion int, t
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    issuer,
 			Subject:   resourceID,
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token.Header["kid"] = keyID
+
+	tokenString, err := token.SignedString(secret)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+// GenerateProvisionerToken mints a provisioner token: a long-lived JWT with
+// NO expiry (revocation is version-based), audience
+// ll.provisioner.access.<mode>, subject = provisioner resource id. Mirrors
+// GenerateMachineToken.
+func GenerateProvisionerToken(provisionerName string, resourceID string, tokenVersion int, mode common.ReleaseMode, secret string) (string, error) {
+	return signProvisionerToken(provisionerName, resourceID, tokenVersion, fmt.Sprintf(ProvisionerAccessTokenAudienceFmt, mode), []byte(secret))
+}
+
+func signProvisionerToken(provisionerName string, resourceID string, tokenVersion int, aud string, secret []byte) (string, error) {
+	claims := &provisionerClaimsMessage{
+		Name:         provisionerName,
+		TokenVersion: tokenVersion,
+		RegisteredClaims: jwt.RegisteredClaims{
+			// jti makes every minted token unique; see signAgentToken for why.
+			ID:       uuid.NewString(),
+			Audience: jwt.ClaimStrings{aud},
+			IssuedAt: jwt.NewNumericDate(time.Now()),
+			Issuer:   issuer,
+			Subject:  resourceID,
 		},
 	}
 

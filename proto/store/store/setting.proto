@@ -22,6 +22,7 @@ enum SettingName {
   LLM_AGENT_CONFIG = 12;
   USER_MCP_CONFIG = 13;
   SMTP_CONFIG = 14;
+  PROVISIONING = 15;
 }
 
 message WorkspaceProfileSetting {
@@ -243,4 +244,17 @@ message McpIpPolicy {
   // deny_cidrs is the deny list: a target IP matching any of these CIDR
   // prefixes is rejected, taking precedence over the allow list.
   repeated string deny_cidrs = 4;
+}
+
+// ProvisioningSetting configures machine provisioning via provisioners.
+message ProvisioningSetting {
+  // runtime_image is the container image that provides the agent runtime
+  // environment for provisioned machine pods. It must NOT contain the
+  // laelia-machine binary — the binary is downloaded at pod start from this
+  // manager into the machine's data volume. ProvisionMachine refuses to run
+  // while this is empty.
+  string runtime_image = 1;
+  // binary_target is the machine binary target installed into provisioned
+  // pods (the manager's embedded manifest target). Default "linux-x64".
+  string binary_target = 2;
 }

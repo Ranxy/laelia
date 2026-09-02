@@ -96,6 +96,7 @@ type SettingValue struct {
 	//	*SettingValue_WorkspaceProfile
 	//	*SettingValue_PasswordRestriction
 	//	*SettingValue_SmtpConfig
+	//	*SettingValue_Provisioning
 	Value         isSettingValue_Value `protobuf_oneof:"value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -192,6 +193,15 @@ func (x *SettingValue) GetSmtpConfig() *store.SMTPSetting {
 	return nil
 }
 
+func (x *SettingValue) GetProvisioning() *store.ProvisioningSetting {
+	if x != nil {
+		if x, ok := x.Value.(*SettingValue_Provisioning); ok {
+			return x.Provisioning
+		}
+	}
+	return nil
+}
+
 type isSettingValue_Value interface {
 	isSettingValue_Value()
 }
@@ -220,6 +230,10 @@ type SettingValue_SmtpConfig struct {
 	SmtpConfig *store.SMTPSetting `protobuf:"bytes,6,opt,name=smtp_config,json=smtpConfig,proto3,oneof"`
 }
 
+type SettingValue_Provisioning struct {
+	Provisioning *store.ProvisioningSetting `protobuf:"bytes,7,opt,name=provisioning,proto3,oneof"`
+}
+
 func (*SettingValue_S3Config) isSettingValue_Value() {}
 
 func (*SettingValue_LlmAgentConfig) isSettingValue_Value() {}
@@ -231,6 +245,8 @@ func (*SettingValue_WorkspaceProfile) isSettingValue_Value() {}
 func (*SettingValue_PasswordRestriction) isSettingValue_Value() {}
 
 func (*SettingValue_SmtpConfig) isSettingValue_Value() {}
+
+func (*SettingValue_Provisioning) isSettingValue_Value() {}
 
 type GetSettingRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -781,7 +797,7 @@ const file_v1_setting_proto_rawDesc = "" +
 	"\x10v1/setting.proto\x12\tlaelia.v1\x1a\x1fgoogle/api/field_behavior.proto\x1a google/protobuf/field_mask.proto\x1a\x13store/setting.proto\x1a\x13v1/annotation.proto\"V\n" +
 	"\aSetting\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x122\n" +
-	"\x05value\x18\x02 \x01(\v2\x17.laelia.v1.SettingValueB\x03\xe0A\x02R\x05value\"\xe7\x03\n" +
+	"\x05value\x18\x02 \x01(\v2\x17.laelia.v1.SettingValueB\x03\xe0A\x02R\x05value\"\xb0\x04\n" +
 	"\fSettingValue\x12<\n" +
 	"\ts3_config\x18\x01 \x01(\v2\x1d.laelia.store.S3ConfigSettingH\x00R\bs3Config\x12O\n" +
 	"\x10llm_agent_config\x18\x02 \x01(\v2#.laelia.store.LlmAgentConfigSettingH\x00R\x0ellmAgentConfig\x12L\n" +
@@ -789,7 +805,8 @@ const file_v1_setting_proto_rawDesc = "" +
 	"\x11workspace_profile\x18\x04 \x01(\v2%.laelia.store.WorkspaceProfileSettingH\x00R\x10workspaceProfile\x12]\n" +
 	"\x14password_restriction\x18\x05 \x01(\v2(.laelia.store.PasswordRestrictionSettingH\x00R\x13passwordRestriction\x12<\n" +
 	"\vsmtp_config\x18\x06 \x01(\v2\x19.laelia.store.SMTPSettingH\x00R\n" +
-	"smtpConfigB\a\n" +
+	"smtpConfig\x12G\n" +
+	"\fprovisioning\x18\a \x01(\v2!.laelia.store.ProvisioningSettingH\x00R\fprovisioningB\a\n" +
 	"\x05value\",\n" +
 	"\x11GetSettingRequest\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x02R\x04name\"\x86\x01\n" +
@@ -862,7 +879,8 @@ var file_v1_setting_proto_goTypes = []any{
 	(*store.WorkspaceProfileSetting)(nil),    // 16: laelia.store.WorkspaceProfileSetting
 	(*store.PasswordRestrictionSetting)(nil), // 17: laelia.store.PasswordRestrictionSetting
 	(*store.SMTPSetting)(nil),                // 18: laelia.store.SMTPSetting
-	(*fieldmaskpb.FieldMask)(nil),            // 19: google.protobuf.FieldMask
+	(*store.ProvisioningSetting)(nil),        // 19: laelia.store.ProvisioningSetting
+	(*fieldmaskpb.FieldMask)(nil),            // 20: google.protobuf.FieldMask
 }
 var file_v1_setting_proto_depIdxs = []int32{
 	1,  // 0: laelia.v1.Setting.value:type_name -> laelia.v1.SettingValue
@@ -872,26 +890,27 @@ var file_v1_setting_proto_depIdxs = []int32{
 	16, // 4: laelia.v1.SettingValue.workspace_profile:type_name -> laelia.store.WorkspaceProfileSetting
 	17, // 5: laelia.v1.SettingValue.password_restriction:type_name -> laelia.store.PasswordRestrictionSetting
 	18, // 6: laelia.v1.SettingValue.smtp_config:type_name -> laelia.store.SMTPSetting
-	0,  // 7: laelia.v1.UpdateSettingRequest.setting:type_name -> laelia.v1.Setting
-	19, // 8: laelia.v1.UpdateSettingRequest.update_mask:type_name -> google.protobuf.FieldMask
-	5,  // 9: laelia.v1.GetSetupStatusResponse.items:type_name -> laelia.v1.SetupItem
-	2,  // 10: laelia.v1.SettingService.GetSetting:input_type -> laelia.v1.GetSettingRequest
-	3,  // 11: laelia.v1.SettingService.UpdateSetting:input_type -> laelia.v1.UpdateSettingRequest
-	4,  // 12: laelia.v1.SettingService.GetSetupStatus:input_type -> laelia.v1.GetSetupStatusRequest
-	7,  // 13: laelia.v1.SettingService.GetDebugConfig:input_type -> laelia.v1.GetDebugConfigRequest
-	9,  // 14: laelia.v1.SettingService.UpdateDebugConfig:input_type -> laelia.v1.UpdateDebugConfigRequest
-	11, // 15: laelia.v1.SettingService.GetWorkspaceInfo:input_type -> laelia.v1.GetWorkspaceInfoRequest
-	0,  // 16: laelia.v1.SettingService.GetSetting:output_type -> laelia.v1.Setting
-	0,  // 17: laelia.v1.SettingService.UpdateSetting:output_type -> laelia.v1.Setting
-	6,  // 18: laelia.v1.SettingService.GetSetupStatus:output_type -> laelia.v1.GetSetupStatusResponse
-	8,  // 19: laelia.v1.SettingService.GetDebugConfig:output_type -> laelia.v1.GetDebugConfigResponse
-	10, // 20: laelia.v1.SettingService.UpdateDebugConfig:output_type -> laelia.v1.UpdateDebugConfigResponse
-	12, // 21: laelia.v1.SettingService.GetWorkspaceInfo:output_type -> laelia.v1.GetWorkspaceInfoResponse
-	16, // [16:22] is the sub-list for method output_type
-	10, // [10:16] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	19, // 7: laelia.v1.SettingValue.provisioning:type_name -> laelia.store.ProvisioningSetting
+	0,  // 8: laelia.v1.UpdateSettingRequest.setting:type_name -> laelia.v1.Setting
+	20, // 9: laelia.v1.UpdateSettingRequest.update_mask:type_name -> google.protobuf.FieldMask
+	5,  // 10: laelia.v1.GetSetupStatusResponse.items:type_name -> laelia.v1.SetupItem
+	2,  // 11: laelia.v1.SettingService.GetSetting:input_type -> laelia.v1.GetSettingRequest
+	3,  // 12: laelia.v1.SettingService.UpdateSetting:input_type -> laelia.v1.UpdateSettingRequest
+	4,  // 13: laelia.v1.SettingService.GetSetupStatus:input_type -> laelia.v1.GetSetupStatusRequest
+	7,  // 14: laelia.v1.SettingService.GetDebugConfig:input_type -> laelia.v1.GetDebugConfigRequest
+	9,  // 15: laelia.v1.SettingService.UpdateDebugConfig:input_type -> laelia.v1.UpdateDebugConfigRequest
+	11, // 16: laelia.v1.SettingService.GetWorkspaceInfo:input_type -> laelia.v1.GetWorkspaceInfoRequest
+	0,  // 17: laelia.v1.SettingService.GetSetting:output_type -> laelia.v1.Setting
+	0,  // 18: laelia.v1.SettingService.UpdateSetting:output_type -> laelia.v1.Setting
+	6,  // 19: laelia.v1.SettingService.GetSetupStatus:output_type -> laelia.v1.GetSetupStatusResponse
+	8,  // 20: laelia.v1.SettingService.GetDebugConfig:output_type -> laelia.v1.GetDebugConfigResponse
+	10, // 21: laelia.v1.SettingService.UpdateDebugConfig:output_type -> laelia.v1.UpdateDebugConfigResponse
+	12, // 22: laelia.v1.SettingService.GetWorkspaceInfo:output_type -> laelia.v1.GetWorkspaceInfoResponse
+	17, // [17:23] is the sub-list for method output_type
+	11, // [11:17] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_v1_setting_proto_init() }
@@ -907,6 +926,7 @@ func file_v1_setting_proto_init() {
 		(*SettingValue_WorkspaceProfile)(nil),
 		(*SettingValue_PasswordRestriction)(nil),
 		(*SettingValue_SmtpConfig)(nil),
+		(*SettingValue_Provisioning)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

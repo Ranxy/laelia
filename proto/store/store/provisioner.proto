@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package laelia.store;
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/store";
+
+// ProvisionerStatus is the storage-layer runtime status of a provisioner,
+// stamped by the manager from ProvisionerChannel stream events. It lives in
+// provisioner.status (jsonb).
+message ProvisionerStatus {
+  // Connected reports whether a ProvisionerChannel stream is live right now.
+  bool connected = 1;
+  // Last connect/ready frame epoch seconds (0 = never seen).
+  int64 last_seen = 2;
+  // Version is the provisioner binary version reported in ProvisionerReady.
+  string version = 3;
+  // Backend echoes the provisioner's configured backend type
+  // ("kubernetes", "docker", ...).
+  string backend = 4;
+  // AutoUpgrade echoes the provisioner's config flag: when true the manager
+  // auto-triggers binary upgrades for this provisioner's machines.
+  bool auto_upgrade = 5;
+  // ConfigDigest is a short hash of the provisioner's effective config,
+  // reported for drift visibility (e.g. manager_url_override in effect).
+  string config_digest = 6;
+}
+
+// ProvisioningPhase is the lifecycle of one provisioning job. The manager
+// records the phase on machine.provisioning; the provisioner drives the
+// transitions through ProvisionJobProgress frames.
+enum ProvisioningPhase {
+  PROVISIONING_PHASE_UNSPECIFIED = 0;
+  // PENDING: the job is recorded but not yet acked by the provisioner
+  // (pushed on the next ProvisionerChannel connect).
+  PROVISIONING_PHASE_PENDING = 1;
+  // PROVISIONING: the provisioner acked and is creating the workload.
+  PROVISIONING_PHASE_PROVISIONING = 2;
+  // PROVISIONED: the workload exists and the pod is running (the machine
+  // itself may still be OFFLINE until it connects).
+  PROVISIONING_PHASE_PROVISIONED = 3;
+  // FAILED is terminal: workload creation failed; error carries the reason.
+  PROVISIONING_PHASE_FAILED = 4;
+  // DEPROVISIONING: delete accepted, teardown in progress.
+  PROVISIONING_PHASE_DEPROVISIONING = 5;
+  // DELETED is terminal for the delete path: the workload is removed.
+  PROVISIONING_PHASE_DELETED = 6;
+}
+
+// ProvisioningStatus is the storage-layer provisioning state carried on the
+// machine row (machine.provisioning). Epoch-second timestamps follow the
+// store-proto convention (see MachineStatus).
+message ProvisioningStatus {
+  ProvisioningPhase phase = 1;
+  // Error is the last failure reason (phase FAILED or DEPROVISIONING issues).
+  string error = 2;
+  // WorkloadName is the backend-specific locator, e.g. "namespace/name".
+  string workload_name = 3;
+  map<string, string> workload_labels = 4;
+  int64 pending_at = 5;
+  int64 provisioned_at = 6;
+  int64 failed_at = 7;
+}

@@ -4,7 +4,7 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { LlmAgentConfigSetting, PasswordRestrictionSetting, S3ConfigSetting, SMTPSetting, UserMcpConfigSetting, WorkspaceProfileSetting } from "../store/setting_pb";
+import type { LlmAgentConfigSetting, PasswordRestrictionSetting, ProvisioningSetting, S3ConfigSetting, SMTPSetting, UserMcpConfigSetting, WorkspaceProfileSetting } from "../store/setting_pb";
 import type { FieldMask } from "@bufbuild/protobuf/wkt";
 
 /**
@@ -90,6 +90,12 @@ export declare type SettingValue = Message<"laelia.v1.SettingValue"> & {
      */
     value: SMTPSetting;
     case: "smtpConfig";
+  } | {
+    /**
+     * @generated from field: laelia.store.ProvisioningSetting provisioning = 7;
+     */
+    value: ProvisioningSetting;
+    case: "provisioning";
   } | { case: undefined; value?: undefined };
 };
 

@@ -1990,6 +1990,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ProvisioningStatus"><span class="badge">M</span>ProvisioningStatus</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ProvisioningStatus.WorkloadLabelsEntry"><span class="badge">M</span>ProvisioningStatus.WorkloadLabelsEntry</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.RefreshMachineModelsRequest"><span class="badge">M</span>RefreshMachineModelsRequest</a>
                 </li>
               
@@ -2060,6 +2068,10 @@
               
                 <li>
                   <a href="#laelia.v1.MachineStatus.ConnectionState"><span class="badge">E</span>MachineStatus.ConnectionState</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ProvisioningPhase"><span class="badge">E</span>ProvisioningPhase</a>
                 </li>
               
               
@@ -2220,6 +2232,101 @@
               
                 <li>
                   <a href="#laelia.v1.NotificationService"><span class="badge">S</span>NotificationService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#v1%2fprovisioner.proto">v1/provisioner.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.v1.CreateProvisionerRequest"><span class="badge">M</span>CreateProvisionerRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CreateProvisionerResponse"><span class="badge">M</span>CreateProvisionerResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DeleteProvisionerRequest"><span class="badge">M</span>DeleteProvisionerRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DeprovisionMachineJob"><span class="badge">M</span>DeprovisionMachineJob</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetProvisionerRequest"><span class="badge">M</span>GetProvisionerRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListProvisionersRequest"><span class="badge">M</span>ListProvisionersRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListProvisionersResponse"><span class="badge">M</span>ListProvisionersResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ManagerProvisionerStreamMessage"><span class="badge">M</span>ManagerProvisionerStreamMessage</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ProvisionJobProgress"><span class="badge">M</span>ProvisionJobProgress</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ProvisionMachineJob"><span class="badge">M</span>ProvisionMachineJob</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ProvisionMachineJob.MachineLabelsEntry"><span class="badge">M</span>ProvisionMachineJob.MachineLabelsEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ProvisionMachineRequest"><span class="badge">M</span>ProvisionMachineRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.Provisioner"><span class="badge">M</span>Provisioner</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ProvisionerDisconnectNotice"><span class="badge">M</span>ProvisionerDisconnectNotice</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ProvisionerReady"><span class="badge">M</span>ProvisionerReady</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ProvisionerStatus"><span class="badge">M</span>ProvisionerStatus</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ProvisionerStreamMessage"><span class="badge">M</span>ProvisionerStreamMessage</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RotateProvisionerTokenRequest"><span class="badge">M</span>RotateProvisionerTokenRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RotateProvisionerTokenResponse"><span class="badge">M</span>RotateProvisionerTokenResponse</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#laelia.v1.ProvisionerService"><span class="badge">S</span>ProvisionerService</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ProvisionerStreamService"><span class="badge">S</span>ProvisionerStreamService</a>
                 </li>
               
             </ul>
@@ -19025,6 +19132,24 @@ is older than latest_version. </p></td>
 self-upgrade triggered via UpgradeMachine. </p></td>
                 </tr>
               
+                <tr>
+                  <td>provisioning</td>
+                  <td><a href="#laelia.v1.ProvisioningStatus">ProvisioningStatus</a></td>
+                  <td></td>
+                  <td><p>provisioning is the lifecycle state of this machine&#39;s provisioning job.
+Set only for machines created through a provisioner; self-hosted machines
+leave it unset. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>provisioner</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>provisioner is the resource name of the provisioner that created (and
+manages the workload of) this machine, provisioners/{id}. Empty for
+self-hosted machines. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -19549,6 +19674,14 @@ Machine.upgrade_available for the list view&#39;s upgrade badge. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>provisioning</td>
+                  <td><a href="#laelia.v1.ProvisioningStatus">ProvisioningStatus</a></td>
+                  <td></td>
+                  <td><p>provisioning mirrors Machine.provisioning for the list view&#39;s provisioning
+phase badge. Set only for provisioned machines. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -19786,6 +19919,103 @@ Machine.upgrade_available for the list view&#39;s upgrade badge. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>probe failure message; empty on success </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvisioningStatus">ProvisioningStatus</h3>
+        <p>ProvisioningStatus is the provisioning state of a machine created through a</p><p>provisioner, carried on Machine.provisioning.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>phase</td>
+                  <td><a href="#laelia.v1.ProvisioningPhase">ProvisioningPhase</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>error</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Last failure reason (phase FAILED or DEPROVISIONING issues). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>workload_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Backend-specific workload locator, e.g. &#34;laelia-machines/m-abc123-0&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>workload_labels</td>
+                  <td><a href="#laelia.v1.ProvisioningStatus.WorkloadLabelsEntry">ProvisioningStatus.WorkloadLabelsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>pending_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>provisioned_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>failed_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvisioningStatus.WorkloadLabelsEntry">ProvisioningStatus.WorkloadLabelsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -20338,6 +20568,59 @@ manager&#39;s manifest; the machine verifies the download against it. </p></td>
               <tr>
                 <td>KICKED</td>
                 <td>4</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+        <h3 id="laelia.v1.ProvisioningPhase">ProvisioningPhase</h3>
+        <p>ProvisioningPhase is the API-level lifecycle of one provisioning job,</p><p>mirroring laelia.store.ProvisioningPhase. The manager records transitions on</p><p>Machine.provisioning; the provisioner drives them through</p><p>ProvisionJobProgress frames.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_PENDING</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_PROVISIONING</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_PROVISIONED</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_FAILED</td>
+                <td>4</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_DEPROVISIONING</td>
+                <td>5</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PROVISIONING_PHASE_DELETED</td>
+                <td>6</td>
                 <td><p></p></td>
               </tr>
             
@@ -21651,6 +21934,866 @@ user must be the caller.</p></td>
     
       
       <div class="file-heading">
+        <h2 id="v1/provisioner.proto">v1/provisioner.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.v1.CreateProvisionerRequest">CreateProvisionerRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>provisioner</td>
+                  <td><a href="#laelia.v1.Provisioner">Provisioner</a></td>
+                  <td></td>
+                  <td><p>The provisioner to create: title, backend, and optional description. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.CreateProvisionerResponse">CreateProvisionerResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>provisioner</td>
+                  <td><a href="#laelia.v1.Provisioner">Provisioner</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The one-time provisioner token; never stored server-side in plaintext and
+never returned again. Shown in a copy-once dialog. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DeleteProvisionerRequest">DeleteProvisionerRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DeprovisionMachineJob">DeprovisionMachineJob</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>machine</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>keep_data</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>keep_data preserves the machine&#39;s data volume when the backend supports
+retention; default (false) deletes it with the workload. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetProvisionerRequest">GetProvisionerRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListProvisionersRequest">ListProvisionersRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>show_deleted</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListProvisionersResponse">ListProvisionersResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>provisioners</td>
+                  <td><a href="#laelia.v1.Provisioner">Provisioner</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ManagerProvisionerStreamMessage">ManagerProvisionerStreamMessage</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>provision_job</td>
+                  <td><a href="#laelia.v1.ProvisionMachineJob">ProvisionMachineJob</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>deprovision_job</td>
+                  <td><a href="#laelia.v1.DeprovisionMachineJob">DeprovisionMachineJob</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>pong</td>
+                  <td><a href="#laelia.v1.Pong">Pong</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>disconnect_notice</td>
+                  <td><a href="#laelia.v1.ProvisionerDisconnectNotice">ProvisionerDisconnectNotice</a></td>
+                  <td></td>
+                  <td><p>DisconnectNotice warns the provisioner its token was rotated or the
+provisioner deleted, so it can stop retrying with a dead credential. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvisionJobProgress">ProvisionJobProgress</h3>
+        <p>ProvisionJobProgress is the provisioner's report on one provisioning job.</p><p>Manager-side phase transitions are driven purely by these frames; the</p><p>manager never guesses cluster state.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>machine</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>phase</td>
+                  <td><a href="#laelia.v1.ProvisioningPhase">ProvisioningPhase</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>error</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>workload_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Backend-specific locator, e.g. &#34;laelia-machines/laelia-machine-abc123&#34;. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvisionMachineJob">ProvisionMachineJob</h3>
+        <p>ProvisionMachineJob carries everything the provisioner needs to create one</p><p>machine workload. The refresh token is the machine's durable credential:</p><p>the provisioner stores it in a backend secret (never in a CR) and the pod</p><p>picks it up at first boot.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>machine</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>machines/{uuid} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>owner_handle</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Owner display handle; display only (the provisioner never needs it). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>refresh_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The machine&#39;s refresh token, minted by the manager for the machine named
+above, bound to fingerprint. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>fingerprint</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The connection fingerprint the machine will present (LAELIA_FINGERPRINT). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>manager_url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>URL pods use to download binaries from and connect to the manager. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>runtime_image</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Runtime image for the pod (no machine binary inside; downloaded at boot). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>binary_target</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Machine binary target to install, e.g. &#34;linux-x64&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_labels</td>
+                  <td><a href="#laelia.v1.ProvisionMachineJob.MachineLabelsEntry">ProvisionMachineJob.MachineLabelsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>bootstrap_script</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The manager-rendered bootstrap script (init container payload). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvisionMachineJob.MachineLabelsEntry">ProvisionMachineJob.MachineLabelsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvisionMachineRequest">ProvisionMachineRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>provisioner</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The provisioner that will create the workload, provisioners/{id}. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Machine title. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>owner</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Target owner, users/{id}. Empty = caller. Naming another user requires a
+workspace admin (checked in the handler, like machine ownership transfer). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.Provisioner">Provisioner</h3>
+        <p>Provisioner is a registered worker that creates machine workloads in one</p><p>virtualization backend on the manager's behalf.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>backend</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Backend type (&#34;kubernetes&#34;, &#34;docker&#34;, ...). Free-form; the UI lists known
+backends and shows others as registered-but-unsupported. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#laelia.v1.ProvisionerStatus">ProvisionerStatus</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>Live (non-deleted) machines bound to this provisioner. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_by</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Creator&#39;s user resource name (users/{id}). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvisionerDisconnectNotice">ProvisionerDisconnectNotice</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvisionerReady">ProvisionerReady</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>backend</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>capabilities</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>config_digest</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Short hash of the provisioner&#39;s effective config, surfaced for drift
+visibility (e.g. a manager_url_override in effect). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>auto_upgrade</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>AutoUpgrade echoes the provisioner&#39;s config flag; persisted in the
+provisioner status and honored by the manager&#39;s auto-upgrade loop. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvisionerStatus">ProvisionerStatus</h3>
+        <p>ProvisionerStatus is the runtime status of a provisioner, derived from its</p><p>ProvisionerChannel stream.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>connected</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_seen</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>backend</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>auto_upgrade</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>config_digest</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvisionerStreamMessage">ProvisionerStreamMessage</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>ready</td>
+                  <td><a href="#laelia.v1.ProvisionerReady">ProvisionerReady</a></td>
+                  <td></td>
+                  <td><p>First frame after connect: version, backend, capabilities, config digest. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>job_progress</td>
+                  <td><a href="#laelia.v1.ProvisionJobProgress">ProvisionJobProgress</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>ping</td>
+                  <td><a href="#laelia.v1.Ping">Ping</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RotateProvisionerTokenRequest">RotateProvisionerTokenRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>audit purpose </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RotateProvisionerTokenResponse">RotateProvisionerTokenResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>provisioner</td>
+                  <td><a href="#laelia.v1.Provisioner">Provisioner</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The new one-time token; see CreateProvisionerResponse.token. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="laelia.v1.ProvisionerService">ProvisionerService</h3>
+        <p>ProvisionerService manages provisioners (management-plane workers that</p><p>create machine workloads in a customer's infrastructure — k8s, docker, ... —</p><p>on behalf of the manager) and the user-facing ProvisionMachine RPC.</p><p>A provisioner authenticates with a dedicated long-lived provisioner token</p><p>(minted once by CreateProvisioner) and connects out to the manager over</p><p>ProvisionerStreamService.ProvisionerChannel; the manager never talks to the</p><p>provisioner's infrastructure directly.</p><p>---- Admin management ----</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>CreateProvisioner</td>
+                <td><a href="#laelia.v1.CreateProvisionerRequest">CreateProvisionerRequest</a></td>
+                <td><a href="#laelia.v1.CreateProvisionerResponse">CreateProvisionerResponse</a></td>
+                <td><p>CreateProvisioner registers a provisioner (title &#43; backend) and mints its
+one-time long-lived token. The token is returned exactly once and never
+stored in plaintext.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ListProvisioners</td>
+                <td><a href="#laelia.v1.ListProvisionersRequest">ListProvisionersRequest</a></td>
+                <td><a href="#laelia.v1.ListProvisionersResponse">ListProvisionersResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>GetProvisioner</td>
+                <td><a href="#laelia.v1.GetProvisionerRequest">GetProvisionerRequest</a></td>
+                <td><a href="#laelia.v1.Provisioner">Provisioner</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>RotateProvisionerToken</td>
+                <td><a href="#laelia.v1.RotateProvisionerTokenRequest">RotateProvisionerTokenRequest</a></td>
+                <td><a href="#laelia.v1.RotateProvisionerTokenResponse">RotateProvisionerTokenResponse</a></td>
+                <td><p>RotateProvisionerToken bumps the provisioner&#39;s token version (killing the
+old token at its next use) and mints a new one-time token.</p></td>
+              </tr>
+            
+              <tr>
+                <td>DeleteProvisioner</td>
+                <td><a href="#laelia.v1.DeleteProvisionerRequest">DeleteProvisionerRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p>DeleteProvisioner soft-deletes the provisioner. Refused while any
+non-deleted machine still references it, so workloads can never silently
+become unmanaged.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ProvisionMachine</td>
+                <td><a href="#laelia.v1.ProvisionMachineRequest">ProvisionMachineRequest</a></td>
+                <td><a href="#laelia.v1.Machine">Machine</a></td>
+                <td><p>ProvisionMachine creates a machine owned by `owner` (defaults to the
+caller; only a workspace admin may name another user) and enqueues a
+provisioning job on the named provisioner. Fully automated: the machine
+appears and connects without any further user action.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+        <h3 id="laelia.v1.ProvisionerStreamService">ProvisionerStreamService</h3>
+        <p>ProvisionerStreamService is the provisioner control channel, mirroring</p><p>MachineStreamService: jobs flow down, status flows up, over the provisioner's</p><p>long-lived token. Machines never depend on this stream after they boot — a</p><p>provisioned machine is a normal machine once its pod is running.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>ProvisionerChannel</td>
+                <td><a href="#laelia.v1.ProvisionerStreamMessage">ProvisionerStreamMessage</a> stream</td>
+                <td><a href="#laelia.v1.ManagerProvisionerStreamMessage">ManagerProvisionerStreamMessage</a> stream</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
         <h2 id="v1/role_service.proto">v1/role_service.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
@@ -22176,6 +23319,13 @@ Example: &#34;settings/s3_config&#34; </p></td>
                 <tr>
                   <td>smtp_config</td>
                   <td><a href="#laelia.store.SMTPSetting">laelia.store.SMTPSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>provisioning</td>
+                  <td><a href="#laelia.store.ProvisioningSetting">laelia.store.ProvisioningSetting</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>

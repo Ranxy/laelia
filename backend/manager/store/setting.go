@@ -57,6 +57,9 @@ var settingPayloadDefaults = map[models.SettingName]func() proto.Message{
 	models.SettingName_SMTP_CONFIG: func() proto.Message {
 		return &models.SMTPSetting{}
 	},
+	models.SettingName_PROVISIONING: func() proto.Message {
+		return &models.ProvisioningSetting{}
+	},
 }
 
 // GetSettingValue reads a typed setting payload by name. A missing row yields

@@ -402,6 +402,16 @@ message Machine {
   // upgrade_status is the live progress of an in-flight (or last completed)
   // self-upgrade triggered via UpgradeMachine.
   UpgradeProgress upgrade_status = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // provisioning is the lifecycle state of this machine's provisioning job.
+  // Set only for machines created through a provisioner; self-hosted machines
+  // leave it unset.
+  ProvisioningStatus provisioning = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // provisioner is the resource name of the provisioner that created (and
+  // manages the workload of) this machine, provisioners/{id}. Empty for
+  // self-hosted machines.
+  string provisioner = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // MachineSummary is the lightweight list-view projection of a Machine returned
@@ -433,6 +443,10 @@ message MachineSummary {
   // Machine.upgrade_available for the list view's upgrade badge.
   string latest_version = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
   bool upgrade_available = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // provisioning mirrors Machine.provisioning for the list view's provisioning
+  // phase badge. Set only for provisioned machines.
+  ProvisioningStatus provisioning = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // UpgradeRequest tells the machine to upgrade itself to the manager's
@@ -458,6 +472,34 @@ message UpgradeProgress {
   string version = 1;
   string stage = 2;
   string error = 3;
+}
+
+// ProvisioningPhase is the API-level lifecycle of one provisioning job,
+// mirroring laelia.store.ProvisioningPhase. The manager records transitions on
+// Machine.provisioning; the provisioner drives them through
+// ProvisionJobProgress frames.
+enum ProvisioningPhase {
+  PROVISIONING_PHASE_UNSPECIFIED = 0;
+  PROVISIONING_PHASE_PENDING = 1;
+  PROVISIONING_PHASE_PROVISIONING = 2;
+  PROVISIONING_PHASE_PROVISIONED = 3;
+  PROVISIONING_PHASE_FAILED = 4;
+  PROVISIONING_PHASE_DEPROVISIONING = 5;
+  PROVISIONING_PHASE_DELETED = 6;
+}
+
+// ProvisioningStatus is the provisioning state of a machine created through a
+// provisioner, carried on Machine.provisioning.
+message ProvisioningStatus {
+  ProvisioningPhase phase = 1;
+  // Last failure reason (phase FAILED or DEPROVISIONING issues).
+  string error = 2;
+  // Backend-specific workload locator, e.g. "laelia-machines/m-abc123-0".
+  string workload_name = 3;
+  map<string, string> workload_labels = 4;
+  google.protobuf.Timestamp pending_at = 5;
+  google.protobuf.Timestamp provisioned_at = 6;
+  google.protobuf.Timestamp failed_at = 7;
 }
 
 message MachineInfo {

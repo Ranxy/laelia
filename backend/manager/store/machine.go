@@ -34,6 +34,12 @@ type MachineMessage struct {
 	// AvatarS3Key is the S3 object key of the machine's uploaded avatar image,
 	// empty when the machine has not uploaded one.
 	AvatarS3Key string
+	// ProvisionerID is the provisioner that created (and manages the workload
+	// of) this machine; 0 for self-hosted machines.
+	ProvisionerID int
+	// Provisioning is the provisioning job state; nil for self-hosted machines
+	// and machines whose provisioning row was never set.
+	Provisioning *models.ProvisioningStatus
 }
 
 // GetResourceID returns the machine's resource name, used to key context-derived
@@ -43,11 +49,12 @@ func (m *MachineMessage) GetResourceID() string {
 }
 
 type FindMachineMessage struct {
-	ID          *int
-	ResourceID  *string
-	ShowDeleted bool
-	Limit       *int
-	Offset      *int
+	ID            *int
+	ResourceID    *string
+	ProvisionerID *int
+	ShowDeleted   bool
+	Limit         *int
+	Offset        *int
 }
 
 type UpdateMachineMessage struct {
@@ -60,6 +67,8 @@ type UpdateMachineMessage struct {
 	Delete             *bool
 	AvatarS3Key        *string
 	CreatedBy          *int
+	ProvisionerID      *int
+	Provisioning       *models.ProvisioningStatus
 }
 
 func (s *Store) GetMachine(ctx context.Context, id int) (*MachineMessage, error) {
@@ -159,6 +168,9 @@ func listMachineImpl(ctx context.Context, txn *sql.Tx, find *FindMachineMessage)
 	if v := find.ResourceID; v != nil {
 		where, args = append(where, fmt.Sprintf("machine.resource_id = $%d", len(args)+1)), append(args, *v)
 	}
+	if v := find.ProvisionerID; v != nil {
+		where, args = append(where, fmt.Sprintf("machine.provisioner_id = $%d", len(args)+1)), append(args, *v)
+	}
 	if !find.ShowDeleted {
 		where, args = append(where, fmt.Sprintf("machine.deleted = $%d", len(args)+1)), append(args, false)
 	}
@@ -174,7 +186,9 @@ func listMachineImpl(ctx context.Context, txn *sql.Tx, find *FindMachineMessage)
 			machine.status,
 			machine.last_token_rotated_at,
 			machine.created_by,
-			machine.avatar_s3_key
+			machine.avatar_s3_key,
+			machine.provisioner_id,
+			machine.provisioning
 		FROM machine
 		WHERE ` + strings.Join(where, " AND ") + ` ORDER BY machine.created_at ASC`
 
@@ -196,6 +210,7 @@ func listMachineImpl(ctx context.Context, txn *sql.Tx, find *FindMachineMessage)
 		var infoBytes []byte
 		var statusBytes []byte
 		var lastTokenRotatedAt sql.NullTime
+		var provisioningBytes []byte
 		if err := rows.Scan(
 			&machineMessage.ID,
 			&machineMessage.ResourceID,
@@ -208,6 +223,8 @@ func listMachineImpl(ctx context.Context, txn *sql.Tx, find *FindMachineMessage)
 			&lastTokenRotatedAt,
 			&machineMessage.CreatedBy,
 			&machineMessage.AvatarS3Key,
+			&machineMessage.ProvisionerID,
+			&provisioningBytes,
 		); err != nil {
 			return nil, err
 		}
@@ -226,6 +243,14 @@ func listMachineImpl(ctx context.Context, txn *sql.Tx, find *FindMachineMessage)
 			return nil, err
 		}
 		machineMessage.Status = status
+
+		if provisioningBytes != nil {
+			provisioning := &models.ProvisioningStatus{}
+			if err := json.Unmarshal(provisioningBytes, provisioning); err != nil {
+				return nil, err
+			}
+			machineMessage.Provisioning = provisioning
+		}
 
 		machineMessages = append(machineMessages, &machineMessage)
 	}
@@ -303,7 +328,9 @@ func (s *Store) CreateMachine(ctx context.Context, create *MachineMessage) (*Mac
 // can never leave a machine row without a credential (which would strand it:
 // the CLI only learns the refresh token from the approval result). The caller
 // generates the resource id so the refresh token JWT can be signed with it
-// before the transaction. Returns the created machine.
+// before the transaction. The machine message may carry ProvisionerID and
+// Provisioning for provisioned machines (the ProvisionMachine path). Returns
+// the created machine.
 func (s *Store) CreateMachineWithToken(ctx context.Context, resourceID string, create *MachineMessage, token *MachineTokenMessage) (*MachineMessage, error) {
 	tx, err := s.GetDB().BeginTx(ctx, nil)
 	if err != nil {
@@ -325,13 +352,21 @@ func (s *Store) CreateMachineWithToken(ctx context.Context, resourceID string, c
 	if err != nil {
 		return nil, err
 	}
+	var provisioningBytes []byte
+	if create.Provisioning != nil {
+		provisioningBytes, err = json.Marshal(create.Provisioning)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	var machineID int
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO machine (
-			resource_id, name, token_version, info, status, created_by
+			resource_id, name, token_version, info, status, created_by,
+			provisioner_id, provisioning
 		)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at
 	`,
 		resourceID,
@@ -340,6 +375,8 @@ func (s *Store) CreateMachineWithToken(ctx context.Context, resourceID string, c
 		infoBytes,
 		statusBytes,
 		create.CreatedBy,
+		create.ProvisionerID,
+		provisioningBytes,
 	).Scan(&machineID, &create.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -355,14 +392,16 @@ func (s *Store) CreateMachineWithToken(ctx context.Context, resourceID string, c
 	}
 
 	machine := &MachineMessage{
-		ID:           machineID,
-		ResourceID:   resourceID,
-		Name:         create.Name,
-		TokenVersion: create.TokenVersion,
-		CreatedAt:    create.CreatedAt,
-		Info:         create.Info,
-		Status:       create.Status,
-		CreatedBy:    create.CreatedBy,
+		ID:            machineID,
+		ResourceID:    resourceID,
+		Name:          create.Name,
+		TokenVersion:  create.TokenVersion,
+		CreatedAt:     create.CreatedAt,
+		Info:          create.Info,
+		Status:        create.Status,
+		CreatedBy:     create.CreatedBy,
+		ProvisionerID: create.ProvisionerID,
+		Provisioning:  create.Provisioning,
 	}
 	s.machineIDCache.Add(machine.ID, machine)
 	s.machineResourceIDCache.Add(machine.ResourceID, machine)
@@ -405,6 +444,16 @@ func (s *Store) UpdateMachine(ctx context.Context, current *MachineMessage, patc
 	}
 	if v := patch.CreatedBy; v != nil {
 		sets, args = append(sets, fmt.Sprintf("created_by = $%d", len(args)+1)), append(args, *v)
+	}
+	if v := patch.ProvisionerID; v != nil {
+		sets, args = append(sets, fmt.Sprintf("provisioner_id = $%d", len(args)+1)), append(args, *v)
+	}
+	if v := patch.Provisioning; v != nil {
+		provisioningBytes, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+		sets, args = append(sets, fmt.Sprintf("provisioning = $%d", len(args)+1)), append(args, provisioningBytes)
 	}
 
 	if len(sets) == 0 {
@@ -518,4 +567,61 @@ func (s *Store) CountAgentsByMachine(ctx context.Context, machineIDs []int) (map
 		counts[id] = count
 	}
 	return counts, rows.Err()
+}
+
+// UpdateMachineProvisioning persists the provisioning job state carried on the
+// machine row. The single write path for machine.provisioning, so the phase
+// transitions recorded here are exactly what the reconnect replay reads back.
+func (s *Store) UpdateMachineProvisioning(ctx context.Context, machineID int, provisioning *models.ProvisioningStatus) error {
+	provisioningBytes, err := json.Marshal(provisioning)
+	if err != nil {
+		return err
+	}
+
+	res, err := s.GetDB().ExecContext(ctx, `
+		UPDATE machine SET provisioning = $2 WHERE id = $1
+	`, machineID, provisioningBytes)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return errors.Errorf("machine %d not found", machineID)
+	}
+
+	s.machineIDCache.Remove(machineID)
+	return nil
+}
+
+// replayableProvisioningPhases are the non-terminal phases whose job is pushed
+// again when the provisioner (re)connects: PENDING (never acked),
+// PROVISIONING (acked, unfinished), DEPROVISIONING (teardown unfinished).
+// Terminal rows (PROVISIONED / FAILED / DELETED) are never replayed: pods
+// self-heal via their StatefulSet without provisioner involvement.
+var replayableProvisioningPhases = map[models.ProvisioningPhase]bool{
+	models.ProvisioningPhase_PROVISIONING_PHASE_PENDING:        true,
+	models.ProvisioningPhase_PROVISIONING_PHASE_PROVISIONING:   true,
+	models.ProvisioningPhase_PROVISIONING_PHASE_DEPROVISIONING: true,
+}
+
+// ListReplayableProvisioningMachines returns the non-deleted machines bound to
+// the provisioner whose provisioning job is in a replayable phase. Bound to
+// one provisioner, so the lookup is small and phases are filtered in Go (the
+// jsonb column stores the enum as a number; no SQL-side phase predicate).
+func (s *Store) ListReplayableProvisioningMachines(ctx context.Context, provisionerID int) ([]*MachineMessage, error) {
+	machines, err := s.ListMachines(ctx, &FindMachineMessage{ProvisionerID: &provisionerID})
+	if err != nil {
+		return nil, err
+	}
+
+	var replayable []*MachineMessage
+	for _, machine := range machines {
+		if machine.Provisioning != nil && replayableProvisioningPhases[machine.Provisioning.Phase] {
+			replayable = append(replayable, machine)
+		}
+	}
+	return replayable, nil
 }

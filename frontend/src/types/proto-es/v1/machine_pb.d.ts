@@ -678,6 +678,24 @@ export declare type Machine = Message<"laelia.v1.Machine"> & {
    * @generated from field: laelia.v1.UpgradeProgress upgrade_status = 17;
    */
   upgradeStatus?: UpgradeProgress | undefined;
+
+  /**
+   * provisioning is the lifecycle state of this machine's provisioning job.
+   * Set only for machines created through a provisioner; self-hosted machines
+   * leave it unset.
+   *
+   * @generated from field: laelia.v1.ProvisioningStatus provisioning = 18;
+   */
+  provisioning?: ProvisioningStatus | undefined;
+
+  /**
+   * provisioner is the resource name of the provisioner that created (and
+   * manages the workload of) this machine, provisioners/{id}. Empty for
+   * self-hosted machines.
+   *
+   * @generated from field: string provisioner = 19;
+   */
+  provisioner: string;
 };
 
 /**
@@ -767,6 +785,14 @@ export declare type MachineSummary = Message<"laelia.v1.MachineSummary"> & {
    * @generated from field: bool upgrade_available = 12;
    */
   upgradeAvailable: boolean;
+
+  /**
+   * provisioning mirrors Machine.provisioning for the list view's provisioning
+   * phase badge. Set only for provisioned machines.
+   *
+   * @generated from field: laelia.v1.ProvisioningStatus provisioning = 13;
+   */
+  provisioning?: ProvisioningStatus | undefined;
 };
 
 /**
@@ -844,6 +870,59 @@ export declare type UpgradeProgress = Message<"laelia.v1.UpgradeProgress"> & {
  * Use `create(UpgradeProgressSchema)` to create a new message.
  */
 export declare const UpgradeProgressSchema: GenMessage<UpgradeProgress>;
+
+/**
+ * ProvisioningStatus is the provisioning state of a machine created through a
+ * provisioner, carried on Machine.provisioning.
+ *
+ * @generated from message laelia.v1.ProvisioningStatus
+ */
+export declare type ProvisioningStatus = Message<"laelia.v1.ProvisioningStatus"> & {
+  /**
+   * @generated from field: laelia.v1.ProvisioningPhase phase = 1;
+   */
+  phase: ProvisioningPhase;
+
+  /**
+   * Last failure reason (phase FAILED or DEPROVISIONING issues).
+   *
+   * @generated from field: string error = 2;
+   */
+  error: string;
+
+  /**
+   * Backend-specific workload locator, e.g. "laelia-machines/m-abc123-0".
+   *
+   * @generated from field: string workload_name = 3;
+   */
+  workloadName: string;
+
+  /**
+   * @generated from field: map<string, string> workload_labels = 4;
+   */
+  workloadLabels: { [key: string]: string };
+
+  /**
+   * @generated from field: google.protobuf.Timestamp pending_at = 5;
+   */
+  pendingAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp provisioned_at = 6;
+   */
+  provisionedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp failed_at = 7;
+   */
+  failedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ProvisioningStatus.
+ * Use `create(ProvisioningStatusSchema)` to create a new message.
+ */
+export declare const ProvisioningStatusSchema: GenMessage<ProvisioningStatus>;
 
 /**
  * @generated from message laelia.v1.MachineInfo
@@ -1469,6 +1548,56 @@ export declare type MachineWorkspaceScanResponse = Message<"laelia.v1.MachineWor
  * Use `create(MachineWorkspaceScanResponseSchema)` to create a new message.
  */
 export declare const MachineWorkspaceScanResponseSchema: GenMessage<MachineWorkspaceScanResponse>;
+
+/**
+ * ProvisioningPhase is the API-level lifecycle of one provisioning job,
+ * mirroring laelia.store.ProvisioningPhase. The manager records transitions on
+ * Machine.provisioning; the provisioner drives them through
+ * ProvisionJobProgress frames.
+ *
+ * @generated from enum laelia.v1.ProvisioningPhase
+ */
+export enum ProvisioningPhase {
+  /**
+   * @generated from enum value: PROVISIONING_PHASE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: PROVISIONING_PHASE_PENDING = 1;
+   */
+  PENDING = 1,
+
+  /**
+   * @generated from enum value: PROVISIONING_PHASE_PROVISIONING = 2;
+   */
+  PROVISIONING = 2,
+
+  /**
+   * @generated from enum value: PROVISIONING_PHASE_PROVISIONED = 3;
+   */
+  PROVISIONED = 3,
+
+  /**
+   * @generated from enum value: PROVISIONING_PHASE_FAILED = 4;
+   */
+  FAILED = 4,
+
+  /**
+   * @generated from enum value: PROVISIONING_PHASE_DEPROVISIONING = 5;
+   */
+  DEPROVISIONING = 5,
+
+  /**
+   * @generated from enum value: PROVISIONING_PHASE_DELETED = 6;
+   */
+  DELETED = 6,
+}
+
+/**
+ * Describes the enum laelia.v1.ProvisioningPhase.
+ */
+export declare const ProvisioningPhaseSchema: GenEnum<ProvisioningPhase>;
 
 /**
  * MachineService manages machines (a long-lived agent-application process a

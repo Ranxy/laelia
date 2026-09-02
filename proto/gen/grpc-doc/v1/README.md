@@ -468,6 +468,8 @@
     - [MachineWorkspaceSummary](#laelia-v1-MachineWorkspaceSummary)
     - [ManagerMachineStreamMessage](#laelia-v1-ManagerMachineStreamMessage)
     - [ModelsDiscovered](#laelia-v1-ModelsDiscovered)
+    - [ProvisioningStatus](#laelia-v1-ProvisioningStatus)
+    - [ProvisioningStatus.WorkloadLabelsEntry](#laelia-v1-ProvisioningStatus-WorkloadLabelsEntry)
     - [RefreshMachineModelsRequest](#laelia-v1-RefreshMachineModelsRequest)
     - [RefreshMachineModelsResponse](#laelia-v1-RefreshMachineModelsResponse)
     - [RefreshMachineProvidersRequest](#laelia-v1-RefreshMachineProvidersRequest)
@@ -487,6 +489,7 @@
     - [UpgradeRequest](#laelia-v1-UpgradeRequest)
   
     - [MachineStatus.ConnectionState](#laelia-v1-MachineStatus-ConnectionState)
+    - [ProvisioningPhase](#laelia-v1-ProvisioningPhase)
   
     - [MachineService](#laelia-v1-MachineService)
     - [MachineStreamService](#laelia-v1-MachineStreamService)
@@ -529,6 +532,30 @@
     - [UpdatePushConfigResponse](#laelia-v1-UpdatePushConfigResponse)
   
     - [NotificationService](#laelia-v1-NotificationService)
+  
+- [v1/provisioner.proto](#v1_provisioner-proto)
+    - [CreateProvisionerRequest](#laelia-v1-CreateProvisionerRequest)
+    - [CreateProvisionerResponse](#laelia-v1-CreateProvisionerResponse)
+    - [DeleteProvisionerRequest](#laelia-v1-DeleteProvisionerRequest)
+    - [DeprovisionMachineJob](#laelia-v1-DeprovisionMachineJob)
+    - [GetProvisionerRequest](#laelia-v1-GetProvisionerRequest)
+    - [ListProvisionersRequest](#laelia-v1-ListProvisionersRequest)
+    - [ListProvisionersResponse](#laelia-v1-ListProvisionersResponse)
+    - [ManagerProvisionerStreamMessage](#laelia-v1-ManagerProvisionerStreamMessage)
+    - [ProvisionJobProgress](#laelia-v1-ProvisionJobProgress)
+    - [ProvisionMachineJob](#laelia-v1-ProvisionMachineJob)
+    - [ProvisionMachineJob.MachineLabelsEntry](#laelia-v1-ProvisionMachineJob-MachineLabelsEntry)
+    - [ProvisionMachineRequest](#laelia-v1-ProvisionMachineRequest)
+    - [Provisioner](#laelia-v1-Provisioner)
+    - [ProvisionerDisconnectNotice](#laelia-v1-ProvisionerDisconnectNotice)
+    - [ProvisionerReady](#laelia-v1-ProvisionerReady)
+    - [ProvisionerStatus](#laelia-v1-ProvisionerStatus)
+    - [ProvisionerStreamMessage](#laelia-v1-ProvisionerStreamMessage)
+    - [RotateProvisionerTokenRequest](#laelia-v1-RotateProvisionerTokenRequest)
+    - [RotateProvisionerTokenResponse](#laelia-v1-RotateProvisionerTokenResponse)
+  
+    - [ProvisionerService](#laelia-v1-ProvisionerService)
+    - [ProvisionerStreamService](#laelia-v1-ProvisionerStreamService)
   
 - [v1/role_service.proto](#v1_role_service-proto)
     - [CreateRoleRequest](#laelia-v1-CreateRoleRequest)
@@ -7768,6 +7795,8 @@ RPC so the model picker reflects an agent&#39;s custom env before saving.
 | latest_version | [string](#string) |  | latest_version is the machine binary version embedded in this manager (from the build manifest). Empty when the manager has no embedded binaries, in which case upgrades are not offered. |
 | upgrade_available | [bool](#bool) |  | upgrade_available reports whether the connected machine&#39;s reported version is older than latest_version. |
 | upgrade_status | [UpgradeProgress](#laelia-v1-UpgradeProgress) |  | upgrade_status is the live progress of an in-flight (or last completed) self-upgrade triggered via UpgradeMachine. |
+| provisioning | [ProvisioningStatus](#laelia-v1-ProvisioningStatus) |  | provisioning is the lifecycle state of this machine&#39;s provisioning job. Set only for machines created through a provisioner; self-hosted machines leave it unset. |
+| provisioner | [string](#string) |  | provisioner is the resource name of the provisioner that created (and manages the workload of) this machine, provisioners/{id}. Empty for self-hosted machines. |
 
 
 
@@ -7971,6 +8000,7 @@ the count of agents bound to the machine.
 | can_delete | [bool](#bool) |  | can_delete reports whether the current caller may delete this machine: the machine&#39;s creator or a holder of laelia.machines.delete. |
 | latest_version | [string](#string) |  | latest_version / upgrade_available mirror Machine.latest_version and Machine.upgrade_available for the list view&#39;s upgrade badge. |
 | upgrade_available | [bool](#bool) |  |  |
+| provisioning | [ProvisioningStatus](#laelia-v1-ProvisioningStatus) |  | provisioning mirrors Machine.provisioning for the list view&#39;s provisioning phase badge. Set only for provisioned machines. |
 
 
 
@@ -8066,6 +8096,44 @@ manager, which hands them to the pending RefreshAgentModels caller.
 | provider | [string](#string) |  |  |
 | models | [AgentModelOption](#laelia-v1-AgentModelOption) | repeated |  |
 | error | [string](#string) |  | probe failure message; empty on success |
+
+
+
+
+
+
+<a name="laelia-v1-ProvisioningStatus"></a>
+
+### ProvisioningStatus
+ProvisioningStatus is the provisioning state of a machine created through a
+provisioner, carried on Machine.provisioning.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| phase | [ProvisioningPhase](#laelia-v1-ProvisioningPhase) |  |  |
+| error | [string](#string) |  | Last failure reason (phase FAILED or DEPROVISIONING issues). |
+| workload_name | [string](#string) |  | Backend-specific workload locator, e.g. &#34;laelia-machines/m-abc123-0&#34;. |
+| workload_labels | [ProvisioningStatus.WorkloadLabelsEntry](#laelia-v1-ProvisioningStatus-WorkloadLabelsEntry) | repeated |  |
+| pending_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| provisioned_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| failed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ProvisioningStatus-WorkloadLabelsEntry"></a>
+
+### ProvisioningStatus.WorkloadLabelsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
 
 
 
@@ -8362,6 +8430,26 @@ verifies the sha256, installs it, and restarts the machine process.
 | OFFLINE | 2 |  |
 | ERROR | 3 |  |
 | KICKED | 4 |  |
+
+
+
+<a name="laelia-v1-ProvisioningPhase"></a>
+
+### ProvisioningPhase
+ProvisioningPhase is the API-level lifecycle of one provisioning job,
+mirroring laelia.store.ProvisioningPhase. The manager records transitions on
+Machine.provisioning; the provisioner drives them through
+ProvisionJobProgress frames.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| PROVISIONING_PHASE_UNSPECIFIED | 0 |  |
+| PROVISIONING_PHASE_PENDING | 1 |  |
+| PROVISIONING_PHASE_PROVISIONING | 2 |  |
+| PROVISIONING_PHASE_PROVISIONED | 3 |  |
+| PROVISIONING_PHASE_FAILED | 4 |  |
+| PROVISIONING_PHASE_DEPROVISIONING | 5 |  |
+| PROVISIONING_PHASE_DELETED | 6 |  |
 
 
  
@@ -8981,6 +9069,394 @@ UpdatePushConfig.
 
 
 
+<a name="v1_provisioner-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/provisioner.proto
+
+
+
+<a name="laelia-v1-CreateProvisionerRequest"></a>
+
+### CreateProvisionerRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| provisioner | [Provisioner](#laelia-v1-Provisioner) |  | The provisioner to create: title, backend, and optional description. |
+
+
+
+
+
+
+<a name="laelia-v1-CreateProvisionerResponse"></a>
+
+### CreateProvisionerResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| provisioner | [Provisioner](#laelia-v1-Provisioner) |  |  |
+| token | [string](#string) |  | The one-time provisioner token; never stored server-side in plaintext and never returned again. Shown in a copy-once dialog. |
+
+
+
+
+
+
+<a name="laelia-v1-DeleteProvisionerRequest"></a>
+
+### DeleteProvisionerRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-DeprovisionMachineJob"></a>
+
+### DeprovisionMachineJob
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| machine | [string](#string) |  |  |
+| keep_data | [bool](#bool) |  | keep_data preserves the machine&#39;s data volume when the backend supports retention; default (false) deletes it with the workload. |
+
+
+
+
+
+
+<a name="laelia-v1-GetProvisionerRequest"></a>
+
+### GetProvisionerRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListProvisionersRequest"></a>
+
+### ListProvisionersRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+| show_deleted | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListProvisionersResponse"></a>
+
+### ListProvisionersResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| provisioners | [Provisioner](#laelia-v1-Provisioner) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ManagerProvisionerStreamMessage"></a>
+
+### ManagerProvisionerStreamMessage
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| provision_job | [ProvisionMachineJob](#laelia-v1-ProvisionMachineJob) |  |  |
+| deprovision_job | [DeprovisionMachineJob](#laelia-v1-DeprovisionMachineJob) |  |  |
+| pong | [Pong](#laelia-v1-Pong) |  |  |
+| disconnect_notice | [ProvisionerDisconnectNotice](#laelia-v1-ProvisionerDisconnectNotice) |  | DisconnectNotice warns the provisioner its token was rotated or the provisioner deleted, so it can stop retrying with a dead credential. |
+
+
+
+
+
+
+<a name="laelia-v1-ProvisionJobProgress"></a>
+
+### ProvisionJobProgress
+ProvisionJobProgress is the provisioner&#39;s report on one provisioning job.
+Manager-side phase transitions are driven purely by these frames; the
+manager never guesses cluster state.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| machine | [string](#string) |  |  |
+| phase | [ProvisioningPhase](#laelia-v1-ProvisioningPhase) |  |  |
+| error | [string](#string) |  |  |
+| workload_name | [string](#string) |  | Backend-specific locator, e.g. &#34;laelia-machines/laelia-machine-abc123&#34;. |
+
+
+
+
+
+
+<a name="laelia-v1-ProvisionMachineJob"></a>
+
+### ProvisionMachineJob
+ProvisionMachineJob carries everything the provisioner needs to create one
+machine workload. The refresh token is the machine&#39;s durable credential:
+the provisioner stores it in a backend secret (never in a CR) and the pod
+picks it up at first boot.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| machine | [string](#string) |  | machines/{uuid} |
+| title | [string](#string) |  |  |
+| owner_handle | [string](#string) |  | Owner display handle; display only (the provisioner never needs it). |
+| refresh_token | [string](#string) |  | The machine&#39;s refresh token, minted by the manager for the machine named above, bound to fingerprint. |
+| fingerprint | [string](#string) |  | The connection fingerprint the machine will present (LAELIA_FINGERPRINT). |
+| manager_url | [string](#string) |  | URL pods use to download binaries from and connect to the manager. |
+| runtime_image | [string](#string) |  | Runtime image for the pod (no machine binary inside; downloaded at boot). |
+| binary_target | [string](#string) |  | Machine binary target to install, e.g. &#34;linux-x64&#34;. |
+| machine_labels | [ProvisionMachineJob.MachineLabelsEntry](#laelia-v1-ProvisionMachineJob-MachineLabelsEntry) | repeated |  |
+| bootstrap_script | [string](#string) |  | The manager-rendered bootstrap script (init container payload). |
+
+
+
+
+
+
+<a name="laelia-v1-ProvisionMachineJob-MachineLabelsEntry"></a>
+
+### ProvisionMachineJob.MachineLabelsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ProvisionMachineRequest"></a>
+
+### ProvisionMachineRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| provisioner | [string](#string) |  | The provisioner that will create the workload, provisioners/{id}. |
+| title | [string](#string) |  | Machine title. |
+| owner | [string](#string) |  | Target owner, users/{id}. Empty = caller. Naming another user requires a workspace admin (checked in the handler, like machine ownership transfer). |
+
+
+
+
+
+
+<a name="laelia-v1-Provisioner"></a>
+
+### Provisioner
+Provisioner is a registered worker that creates machine workloads in one
+virtualization backend on the manager&#39;s behalf.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| title | [string](#string) |  |  |
+| backend | [string](#string) |  | Backend type (&#34;kubernetes&#34;, &#34;docker&#34;, ...). Free-form; the UI lists known backends and shows others as registered-but-unsupported. |
+| description | [string](#string) |  |  |
+| status | [ProvisionerStatus](#laelia-v1-ProvisionerStatus) |  |  |
+| machine_count | [int32](#int32) |  | Live (non-deleted) machines bound to this provisioner. |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}). |
+
+
+
+
+
+
+<a name="laelia-v1-ProvisionerDisconnectNotice"></a>
+
+### ProvisionerDisconnectNotice
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reason | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ProvisionerReady"></a>
+
+### ProvisionerReady
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| version | [string](#string) |  |  |
+| backend | [string](#string) |  |  |
+| capabilities | [string](#string) | repeated |  |
+| config_digest | [string](#string) |  | Short hash of the provisioner&#39;s effective config, surfaced for drift visibility (e.g. a manager_url_override in effect). |
+| auto_upgrade | [bool](#bool) |  | AutoUpgrade echoes the provisioner&#39;s config flag; persisted in the provisioner status and honored by the manager&#39;s auto-upgrade loop. |
+
+
+
+
+
+
+<a name="laelia-v1-ProvisionerStatus"></a>
+
+### ProvisionerStatus
+ProvisionerStatus is the runtime status of a provisioner, derived from its
+ProvisionerChannel stream.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| connected | [bool](#bool) |  |  |
+| last_seen | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| version | [string](#string) |  |  |
+| backend | [string](#string) |  |  |
+| auto_upgrade | [bool](#bool) |  |  |
+| config_digest | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ProvisionerStreamMessage"></a>
+
+### ProvisionerStreamMessage
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| ready | [ProvisionerReady](#laelia-v1-ProvisionerReady) |  | First frame after connect: version, backend, capabilities, config digest. |
+| job_progress | [ProvisionJobProgress](#laelia-v1-ProvisionJobProgress) |  |  |
+| ping | [Ping](#laelia-v1-Ping) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RotateProvisionerTokenRequest"></a>
+
+### RotateProvisionerTokenRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| reason | [string](#string) |  | audit purpose |
+
+
+
+
+
+
+<a name="laelia-v1-RotateProvisionerTokenResponse"></a>
+
+### RotateProvisionerTokenResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| provisioner | [Provisioner](#laelia-v1-Provisioner) |  |  |
+| token | [string](#string) |  | The new one-time token; see CreateProvisionerResponse.token. |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="laelia-v1-ProvisionerService"></a>
+
+### ProvisionerService
+ProvisionerService manages provisioners (management-plane workers that
+create machine workloads in a customer&#39;s infrastructure — k8s, docker, ... —
+on behalf of the manager) and the user-facing ProvisionMachine RPC.
+
+A provisioner authenticates with a dedicated long-lived provisioner token
+(minted once by CreateProvisioner) and connects out to the manager over
+ProvisionerStreamService.ProvisionerChannel; the manager never talks to the
+provisioner&#39;s infrastructure directly.
+
+---- Admin management ----
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| CreateProvisioner | [CreateProvisionerRequest](#laelia-v1-CreateProvisionerRequest) | [CreateProvisionerResponse](#laelia-v1-CreateProvisionerResponse) | CreateProvisioner registers a provisioner (title &#43; backend) and mints its one-time long-lived token. The token is returned exactly once and never stored in plaintext. |
+| ListProvisioners | [ListProvisionersRequest](#laelia-v1-ListProvisionersRequest) | [ListProvisionersResponse](#laelia-v1-ListProvisionersResponse) |  |
+| GetProvisioner | [GetProvisionerRequest](#laelia-v1-GetProvisionerRequest) | [Provisioner](#laelia-v1-Provisioner) |  |
+| RotateProvisionerToken | [RotateProvisionerTokenRequest](#laelia-v1-RotateProvisionerTokenRequest) | [RotateProvisionerTokenResponse](#laelia-v1-RotateProvisionerTokenResponse) | RotateProvisionerToken bumps the provisioner&#39;s token version (killing the old token at its next use) and mints a new one-time token. |
+| DeleteProvisioner | [DeleteProvisionerRequest](#laelia-v1-DeleteProvisionerRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | DeleteProvisioner soft-deletes the provisioner. Refused while any non-deleted machine still references it, so workloads can never silently become unmanaged. |
+| ProvisionMachine | [ProvisionMachineRequest](#laelia-v1-ProvisionMachineRequest) | [Machine](#laelia-v1-Machine) | ProvisionMachine creates a machine owned by `owner` (defaults to the caller; only a workspace admin may name another user) and enqueues a provisioning job on the named provisioner. Fully automated: the machine appears and connects without any further user action. |
+
+
+<a name="laelia-v1-ProvisionerStreamService"></a>
+
+### ProvisionerStreamService
+ProvisionerStreamService is the provisioner control channel, mirroring
+MachineStreamService: jobs flow down, status flows up, over the provisioner&#39;s
+long-lived token. Machines never depend on this stream after they boot — a
+provisioned machine is a normal machine once its pod is running.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| ProvisionerChannel | [ProvisionerStreamMessage](#laelia-v1-ProvisionerStreamMessage) stream | [ManagerProvisionerStreamMessage](#laelia-v1-ManagerProvisionerStreamMessage) stream |  |
+
+ 
+
+
+
 <a name="v1_role_service-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -9268,6 +9744,7 @@ exactly one source of truth.
 | workspace_profile | [laelia.store.WorkspaceProfileSetting](#laelia-store-WorkspaceProfileSetting) |  |  |
 | password_restriction | [laelia.store.PasswordRestrictionSetting](#laelia-store-PasswordRestrictionSetting) |  |  |
 | smtp_config | [laelia.store.SMTPSetting](#laelia-store-SMTPSetting) |  |  |
+| provisioning | [laelia.store.ProvisioningSetting](#laelia-store-ProvisioningSetting) |  |  |
 
 
 

@@ -33,6 +33,7 @@ message SettingValue {
     laelia.store.WorkspaceProfileSetting workspace_profile = 4;
     laelia.store.PasswordRestrictionSetting password_restriction = 5;
     laelia.store.SMTPSetting smtp_config = 6;
+    laelia.store.ProvisioningSetting provisioning = 7;
   }
 }
 
