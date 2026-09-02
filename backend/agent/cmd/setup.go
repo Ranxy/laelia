@@ -25,6 +25,11 @@ import (
 
 func init() {
 	rootCmd.AddCommand(setupCmd)
+	// --provisioned is the headless pod mode (design §8.4): the provisioner
+	// bootstrapped the credential, so a dead or missing one must fail fast
+	// instead of starting the interactive device-code login.
+	setupCmd.Flags().BoolVar(&flags.provisioned, "provisioned", false,
+		"headless provisioned-pod mode: never fall back to the interactive device-code login; fail fast when the saved credential is missing or dead (recovery is delete + re-provision)")
 }
 
 var setupCmd = &cobra.Command{
@@ -37,7 +42,12 @@ On first use it starts a device-code login: it prints an approval URL and a
 user code, waits for a logged-in user to approve in the browser, and registers
 this machine (creating it on the manager if it is not registered yet). On later
 runs it validates the saved login and reports "already logged in" before
-running. Use --force to wipe the local state and register a brand-new machine.`,
+running. Use --force to wipe the local state and register a brand-new machine.
+
+--provisioned is the headless pod mode for provisioned machines: the
+provisioner seeded the credential, so a valid one boots normally while a
+missing or dead one fails fast — the interactive device-code login is never
+started (recovery is deleting and re-provisioning the machine).`,
 	RunE: func(_ *cobra.Command, _ []string) error {
 		return setupMachine()
 	},
@@ -77,6 +87,10 @@ func setupMachine() error {
 		st = nil
 	}
 
+	if flags.provisioned {
+		return setupProvisioned(managerURL, st)
+	}
+
 	if st != nil && st.MachineID != "" && st.RefreshToken != "" {
 		switch probeRefreshToken(managerURL, st) {
 		case probeOK:
@@ -105,6 +119,34 @@ func setupMachine() error {
 		return err
 	}
 	return daemonize()
+}
+
+// setupProvisioned is `setup --provisioned`, the headless pod path (design
+// §8.4). With a valid saved credential it boots like self-hosted setup. With
+// a dead one it fails fast instead of starting the device-code login — nobody
+// watches pod logs to click an approval URL; with a missing one the same
+// applies, since the provisioner is what seeds the credential. Recovery for
+// both is deleting and re-provisioning the machine. An unreachable manager is
+// NOT fatal: booting lets the run loop retry with backoff, like a pod that
+// starts before the manager is reachable.
+func setupProvisioned(managerURL string, st *state.State) error {
+	if st == nil || st.MachineID == "" || st.RefreshToken == "" {
+		return errors.New("no saved machine credential; a provisioned machine is bootstrapped by its provisioner and cannot run the interactive device-code login — delete and re-provision this machine")
+	}
+	switch probeRefreshToken(managerURL, st) {
+	case probeOK:
+		fmt.Printf("Already logged in as machine %s (%s)\n", st.MachineID, st.Hostname)
+		return daemonize()
+	case probePermanent:
+		// The dead credential is kept on purpose: re-provisioning creates a
+		// new machine + pod anyway, and keeping it aids debugging.
+		return errors.New("the machine's saved credential is no longer valid; a provisioned machine cannot re-authenticate itself — delete and re-provision this machine")
+	case probeTransient:
+		slog.Warn("could not validate the saved login (manager unreachable); starting anyway", "manager", managerURL)
+		return daemonize()
+	default:
+		return errors.New("unexpected refresh-token probe result")
+	}
 }
 
 type probeResult int

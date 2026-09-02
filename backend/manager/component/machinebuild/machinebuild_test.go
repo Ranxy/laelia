@@ -78,3 +78,27 @@ func TestLatestPromptBundleVersion(t *testing.T) {
 		t.Fatalf("LatestPromptBundleVersion() = %q, want empty when no manifest", got)
 	}
 }
+
+// The download route must serve the manifest's gz file name: the embed build
+// appends -no-pi to every artifact when pi is not embedded, so the name
+// cannot be derived from the target alone.
+func TestGzFileName(t *testing.T) {
+	SetManifest([]byte(`{"version":"1.0.0","targets":{
+		"linux-x64":{"file":"laelia-machine-linux-x64-no-pi","sha256":"aa","gz":{"file":"laelia-machine-linux-x64-no-pi.gz","sha256":"bb"}},
+		"windows-x64":{"file":"laelia-machine-windows-x64","sha256":"cc","gz":{"file":"laelia-machine-windows-x64.gz","sha256":"dd"}},
+		"darwin-arm64":{"file":"laelia-machine-darwin-arm64","sha256":"ee","gz":{"sha256":"ff"}}
+	}}`))
+	if got, ok := GzFileName("linux-x64"); !ok || got != "laelia-machine-linux-x64-no-pi.gz" {
+		t.Fatalf("GzFileName(linux-x64) = %q,%v; want manifest name", got, ok)
+	}
+	if got, ok := GzFileName("windows-x64"); !ok || got != "laelia-machine-windows-x64.gz" {
+		t.Fatalf("GzFileName(windows-x64) = %q,%v; want manifest name", got, ok)
+	}
+	// A target whose manifest entry lacks gz.file falls back.
+	if _, ok := GzFileName("darwin-arm64"); ok {
+		t.Fatal("GzFileName must fail when the manifest has no gz.file")
+	}
+	if _, ok := GzFileName("unknown"); ok {
+		t.Fatal("GzFileName must fail for unknown targets")
+	}
+}

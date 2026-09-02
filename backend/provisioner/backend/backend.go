@@ -33,7 +33,12 @@ type MachineSpec struct {
 	Fingerprint  string
 	RuntimeImage string
 	BinaryTarget string
-	Labels       map[string]string
+	// BootstrapScript is the manager-rendered init-container script (design
+	// §8.3). Backends that download the binary inside the workload (e.g. the
+	// kubernetes init container) carry it verbatim; the runtime image itself
+	// needs nothing laelia-specific.
+	BootstrapScript string
+	Labels          map[string]string
 }
 
 // Event is a workload status change reported back to the manager as a

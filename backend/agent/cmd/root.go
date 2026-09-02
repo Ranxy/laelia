@@ -17,6 +17,7 @@ var flags struct {
 	noBrowser        bool
 	setupForeground  bool
 	daemonForeground bool
+	provisioned      bool
 	version          bool
 }
 

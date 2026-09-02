@@ -557,7 +557,16 @@ func (c *MachineClient) disconnectWithTimeout() {
 // ComputeFingerprint returns the host fingerprint (hostname:os:arch hash)
 // that binds machine refresh tokens to this device. setup and the connect
 // path must agree on it, so it is exported for the CLI.
+//
+// LAELIA_FINGERPRINT overrides the hash verbatim when set: a provisioned pod
+// receives the manager-minted fingerprint (design §8.4) via env and must
+// present exactly that value — the token was bound to it at mint time, while
+// the pod hostname changes on every reschedule. Self-hosted machines leave
+// the env unset and keep the hostname-derived fingerprint.
 func ComputeFingerprint(hostname, osName, arch string) string {
+	if v := os.Getenv("LAELIA_FINGERPRINT"); v != "" {
+		return v
+	}
 	data := fmt.Sprintf("%s:%s:%s", hostname, osName, arch)
 	h := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(h[:])[:16]

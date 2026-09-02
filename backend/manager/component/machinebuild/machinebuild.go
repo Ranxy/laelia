@@ -79,6 +79,19 @@ func GetTarget(target string) (Target, bool) {
 	return t, ok
 }
 
+// GzFileName returns the manifest's gzipped-binary file name for a target
+// (e.g. "laelia-machine-linux-x64-no-pi.gz"), or false when the target is
+// unknown. The download route serves the manifest-named file: the embed build
+// names the artifacts with a -no-pi suffix when pi is not embedded, so the
+// name cannot be derived from the target alone.
+func GzFileName(target string) (string, bool) {
+	entry, ok := GetTarget(target)
+	if !ok || entry.Gz.File == "" {
+		return "", false
+	}
+	return entry.Gz.File, true
+}
+
 // UpgradeAvailable reports whether the running machine version is older than
 // the embedded latest. Versions that do not parse as dotted numerics (e.g.
 // "dev", "local") never trigger an upgrade prompt.

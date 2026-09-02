@@ -341,13 +341,14 @@ func (c *Client) machineSpecFromJob(job *v1pb.ProvisionMachineJob, machineID str
 		managerURL = c.cfg.ManagerURLOverride
 	}
 	return backend.MachineSpec{
-		MachineID:    machineID,
-		Title:        job.GetTitle(),
-		ManagerURL:   managerURL,
-		Fingerprint:  job.GetFingerprint(),
-		RuntimeImage: job.GetRuntimeImage(),
-		BinaryTarget: job.GetBinaryTarget(),
-		Labels:       job.GetMachineLabels(),
+		MachineID:       machineID,
+		Title:           job.GetTitle(),
+		ManagerURL:      managerURL,
+		Fingerprint:     job.GetFingerprint(),
+		RuntimeImage:    job.GetRuntimeImage(),
+		BinaryTarget:    job.GetBinaryTarget(),
+		BootstrapScript: job.GetBootstrapScript(),
+		Labels:          job.GetMachineLabels(),
 	}
 }
 

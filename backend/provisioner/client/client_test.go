@@ -60,6 +60,7 @@ func TestMachineSpecFromJobAppliesManagerURLOverride(t *testing.T) {
 			"provisioner": "prod-cluster", "owner": "ran",
 		},
 	}
+	job.BootstrapScript = "#!/bin/sh\necho bootstrap\n"
 	spec := c.machineSpecFromJob(job, "1f0a9c2d-4e5b-4c6a-8d7e-0f1a2b3c4d5e")
 	assert.Equal(t, "1f0a9c2d-4e5b-4c6a-8d7e-0f1a2b3c4d5e", spec.MachineID)
 	assert.Equal(t, "http://manager.svc:8181", spec.ManagerURL,
@@ -68,6 +69,8 @@ func TestMachineSpecFromJobAppliesManagerURLOverride(t *testing.T) {
 	assert.Equal(t, "fingerprint-16", spec.Fingerprint)
 	assert.Equal(t, "laelia/machine-runtime:test", spec.RuntimeImage)
 	assert.Equal(t, "linux-x64", spec.BinaryTarget)
+	assert.Equal(t, "#!/bin/sh\necho bootstrap\n", spec.BootstrapScript,
+		"the manager-rendered bootstrap script travels to the backend verbatim")
 	assert.Equal(t, job.GetMachineLabels(), spec.Labels)
 
 	// Without the override the job's URL passes through.
