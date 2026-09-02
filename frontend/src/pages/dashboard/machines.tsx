@@ -9,6 +9,7 @@ import {
   useParams,
 } from "react-router-dom";
 import { MachineConnectionBadge } from "@/components/machine-connection-badge";
+import { ProvisioningPhaseBadge } from "@/components/provisioning-phase-badge";
 import { RailRow } from "@/components/rail-row";
 import { Alert } from "@/components/ui/alert";
 import {
@@ -28,7 +29,10 @@ import { describeError } from "@/lib/connect-errors";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
-import { MachineStatus_ConnectionState } from "@/types/proto-es/v1/machine_pb";
+import {
+  MachineStatus_ConnectionState,
+  ProvisioningPhase,
+} from "@/types/proto-es/v1/machine_pb";
 export function MachinesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -62,6 +66,47 @@ export function MachinesPage() {
     title: string;
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // undefined = not provisioned / still resolving; true/false mirrors the
+  // bound provisioner's retain-data policy once GetProvisioner responds.
+  const [deleteRetainData, setDeleteRetainData] = useState<boolean | undefined>(
+    undefined
+  );
+  const [deleteProvisioned, setDeleteProvisioned] = useState(false);
+
+  // A provisioned machine's delete confirmation states the data-volume
+  // consequence per the provisioner's retention policy (design §10.3). The
+  // summary row only carries the provisioning phase, so resolving the policy
+  // needs the full machine (for the provisioner binding) + the provisioner
+  // (for status.retainData); without the permission or on failure the dialog
+  // keeps a generic workload-teardown line. Runs once per opened target.
+  useEffect(() => {
+    let cancelled = false;
+    setDeleteRetainData(undefined);
+    setDeleteProvisioned(false);
+    if (!deleteTarget) return;
+    const summary = useAppStore
+      .getState()
+      .machines.find((m) => m.name === deleteTarget.name);
+    const phase = summary?.provisioning?.phase;
+    if (!phase || phase === ProvisioningPhase.DELETED) {
+      return;
+    }
+    setDeleteProvisioned(true);
+    void (async () => {
+      const machine = await useAppStore
+        .getState()
+        .getMachine(deleteTarget.name);
+      if (cancelled || !machine?.provisioner) return;
+      const provisioner = await useAppStore
+        .getState()
+        .getProvisioner(machine.provisioner);
+      if (cancelled) return;
+      setDeleteRetainData(provisioner?.status?.retainData);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [deleteTarget]);
 
   const load = useCallback(() => {
     fetchMachines({ pageSize: 100 });
@@ -142,6 +187,14 @@ export function MachinesPage() {
                   {machines.map((machine) => {
                     const resourceId = machine.name.replace(/^machines\//, "");
                     const selected = resourceId === selectedMachineId;
+                    // In-flight provisioning marker for provisioned machines;
+                    // once the machine connects the connection badge alone
+                    // tells the story.
+                    const provisioningPhase = machine.provisioning?.phase;
+                    const showProvisioningBadge =
+                      provisioningPhase === ProvisioningPhase.PENDING ||
+                      provisioningPhase === ProvisioningPhase.PROVISIONING ||
+                      provisioningPhase === ProvisioningPhase.FAILED;
                     return (
                       <li key={machine.name}>
                         <RailRow
@@ -159,6 +212,11 @@ export function MachinesPage() {
                               <MachineConnectionBadge
                                 state={machine.status?.state}
                               />
+                              {showProvisioningBadge && (
+                                <ProvisioningPhaseBadge
+                                  phase={provisioningPhase}
+                                />
+                              )}
                               {machine.upgradeAvailable && (
                                 <Badge variant="warning" className="text-xs">
                                   {t("machine.upgrade-badge")}
@@ -244,6 +302,16 @@ export function MachinesPage() {
             {t("machine.delete-confirm-description", {
               title: deleteTarget?.title ?? "",
             })}
+            {deleteProvisioned && (
+              <>
+                <br />
+                {deleteRetainData === undefined
+                  ? t("machine.delete-provisioned-generic")
+                  : deleteRetainData
+                    ? t("machine.delete-provisioned-retain")
+                    : t("machine.delete-provisioned-delete")}
+              </>
+            )}
           </AlertDialogDescription>
           {actionError && (
             <Alert variant="error" description={actionError} className="mt-2" />

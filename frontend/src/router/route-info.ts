@@ -31,6 +31,7 @@ import {
   SETTINGS_ROUTE_MCP_SERVERS,
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_PROFILE,
+  SETTINGS_ROUTE_PROVISIONERS,
   SETTINGS_ROUTE_ROLES,
   SETTINGS_ROUTE_SMTP,
   SETTINGS_ROUTE_STORAGE,
@@ -76,6 +77,7 @@ export type RouteName =
   | typeof SETTINGS_ROUTE_GROUPS
   | typeof SETTINGS_ROUTE_API_PROVIDERS
   | typeof SETTINGS_ROUTE_IDENTITY_PROVIDERS
+  | typeof SETTINGS_ROUTE_PROVISIONERS
   | typeof SETTINGS_ROUTE_MCP_SERVERS
   | typeof SETTINGS_ROUTE_AUDIT;
 
@@ -207,6 +209,10 @@ export const ROUTE_INFO: Record<RouteName, RouteInfo> = {
   },
   [SETTINGS_ROUTE_IDENTITY_PROVIDERS]: {
     titleKey: "sidebar.settings-identity-providers",
+    backTo: SETTINGS_ROUTE,
+  },
+  [SETTINGS_ROUTE_PROVISIONERS]: {
+    titleKey: "sidebar.settings-provisioners",
     backTo: SETTINGS_ROUTE,
   },
   [SETTINGS_ROUTE_MCP_SERVERS]: {

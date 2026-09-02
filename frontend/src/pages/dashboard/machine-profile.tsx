@@ -21,6 +21,7 @@ import {
 import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { usePolling } from "@/hooks/use-polling";
 import { describeError } from "@/lib/connect-errors";
+import { provisioningActive } from "@/lib/provisioning-status";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import {
@@ -34,7 +35,10 @@ import {
   type AgentSummary,
 } from "@/types/proto-es/v1/agent_pb";
 import { type Group } from "@/types/proto-es/v1/group_service_pb";
-import { type Machine } from "@/types/proto-es/v1/machine_pb";
+import {
+  type Machine,
+  MachineStatus_ConnectionState,
+} from "@/types/proto-es/v1/machine_pb";
 import { MachineAddAgentSheet } from "./machine-add-agent-sheet";
 import {
   MachineAccessCard,
@@ -42,6 +46,7 @@ import {
   MachineAgentRoster,
   MachineIdentityCard,
   MachineProvidersCard,
+  MachineProvisioningCard,
   MachineTokenCard,
 } from "./machine-profile-cards";
 
@@ -211,18 +216,29 @@ export function MachineProfilePage() {
     "restarting",
   ].includes(upgradeStage);
 
+  // Provisioning in flight: the machine profile polls until a provisioned
+  // machine comes ONLINE (or the job hits a terminal phase), so the phase
+  // chip and the identity card flip without a manual refresh. Gated via
+  // enabled like the upgrade poll.
+  const provisioningInProgress =
+    machine?.provisioner !== "" &&
+    machine?.provisioner !== undefined &&
+    provisioningActive(machine?.provisioning?.phase) &&
+    machine?.status?.state !== MachineStatus_ConnectionState.ONLINE;
+
+  // Shared poll body for both in-flight loops (upgrade + provisioning).
+  const refetchMachine = useCallback(async () => {
+    const next = await getMachine(machineName);
+    if (next) setMachine(next);
+  }, [getMachine, machineName]);
+
   // Poll the machine while an upgrade runs: the machine briefly goes offline
   // and reconnects on the new version, so the page keeps refetching until the
   // stage reaches a terminal value or the reported version catches up.
   // Gated via enabled: only polls while an upgrade is in flight.
-  usePolling(
-    useCallback(async () => {
-      const next = await getMachine(machineName);
-      if (next) setMachine(next);
-    }, [getMachine, machineName]),
-    3000,
-    { enabled: upgradeInProgress }
-  );
+  usePolling(refetchMachine, 3000, { enabled: upgradeInProgress });
+
+  usePolling(refetchMachine, 3000, { enabled: provisioningInProgress });
 
   // userTitle resolves a user resource name (users/{id}) to the roster's
   // display title, falling back to the raw name so a stale/deleted user never
@@ -495,6 +511,12 @@ export function MachineProfilePage() {
         <div className="flex flex-col gap-6">
           {/* Identity & host info */}
           <div className="flex flex-col gap-6">
+            {/* Lifecycle of the provisioning job (provisioned machines only;
+                self-hosted machines never carry a provisioner binding). */}
+            {machine.provisioner && (
+              <MachineProvisioningCard machine={machine} />
+            )}
+
             <MachineIdentityCard
               machine={machine}
               userTitle={userTitle}

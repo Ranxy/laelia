@@ -34,6 +34,7 @@ import {
   SETTINGS_ROUTE_MCP_SERVERS,
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_PROFILE,
+  SETTINGS_ROUTE_PROVISIONERS,
   SETTINGS_ROUTE_ROLES,
   SETTINGS_ROUTE_SMTP,
   SETTINGS_ROUTE_STORAGE,
@@ -444,6 +445,17 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         lazy: () =>
           import("@/pages/dashboard/settings-identity-providers").then((m) => ({
             Component: m.SettingsIdentityProvidersPage,
+          })),
+      },
+      {
+        path: "provisioners",
+        handle: {
+          name: SETTINGS_ROUTE_PROVISIONERS,
+          permission: "laelia.provisioners.get",
+        } satisfies RouteHandle,
+        lazy: () =>
+          import("@/pages/dashboard/settings-provisioners").then((m) => ({
+            Component: m.SettingsProvisionersPage,
           })),
       },
       {

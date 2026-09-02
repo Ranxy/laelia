@@ -421,6 +421,149 @@ For a native manager, copy the `build/laelia` binary instead. Machine hosts
 install `laelia-machine` from the manager itself, so as long as they can reach
 the manager they do not need a separate image or binary transfer.
 
+## 8. Machine provisioners (optional)
+
+A *provisioner* is an enterprise worker that creates machine workloads on
+demand. An admin registers it once in the manager UI; afterwards any user with
+the `laelia.provisioners.provision` permission clicks *Create machine* on the
+Provisioned tab, and the machine appears online with no install command and no
+device-code approval. It connects **outbound** to the manager (same direction
+as machines), so nothing must be exposed on the manager or the cluster beyond
+the existing manager endpoint.
+
+How the pieces fit:
+
+- The **manager** owns the provisioner registry, machine rows, and job state.
+  It never talks to the cluster directly — jobs flow down a long-lived
+  provisioner stream, status flows back up.
+- The **provisioner** (`laelia-provisioner`) runs inside the customer's
+  infrastructure (today: a Kubernetes cluster). It turns jobs into
+  `LaeliaMachine` CRs plus their Secret/Service/StatefulSet children and
+  reports pod-driven progress back. Jobs are replayed on reconnect, so killing
+  the provisioner mid-provision is safe.
+- The **machine pod** is a plain laelia machine: the runtime image provides the
+  agent environment only; the machine binary is downloaded from the manager
+  into a PVC by an init container at pod start, and every machine feature
+  (agents, IAM, in-place upgrades) works identically.
+
+### 8.1 Manager-side setup
+
+1. **Register the provisioner** — Settings → Provisioners → *Add provisioner*.
+   The one-time provisioner token is shown in a copy-once dialog; paste it into
+   the provisioner's config (below). Rotating the token kills the old one at
+   its next use; deleting a provisioner is refused while machines are still
+   bound to it.
+2. **Configure the runtime image** — Settings → General → *Machine runtime
+   image* (for example `registry.example.com/laelia/machine-runtime:1.2.3`).
+   Provisioning fails fast until this is set.
+3. **Grant self-service** (optional) — bind the predefined `machineProvisioner`
+   role (or `laelia.provisioners.provision`) to users/groups via Settings →
+   Roles / Access. Workspace admins hold it automatically. The *Provisioned*
+   tab on the Create-machine page appears only for these callers.
+
+### 8.2 Install the provisioner (kubernetes backend)
+
+Requires **kubernetes ≥ 1.27** (StatefulSet PVC auto-delete beta) — 1.32+ GA.
+amd64 nodes only in this release.
+
+Build and load the image:
+
+```bash
+LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_provisioner_docker.sh
+# -> laelia/provisioner:latest (push/transfer it to your cluster's registry)
+```
+
+Or build a plain linux/amd64 binary for non-container installs:
+
+```bash
+GOOS=linux GOARCH=amd64 scripts/build_laelia_provisioner.sh   # -> build/laelia-provisioner
+```
+
+Apply the manifests (cluster admin applies the CRD once; the rest is
+namespace-scoped):
+
+```bash
+cd backend/provisioner/backend/kubernetes/deploy
+kubectl apply -f laelia.sh_laeliamachines.yaml   # CRD (cluster-scoped, once)
+kubectl apply -f rbac.yaml                       # SA + Role + RoleBinding
+kubectl apply -f deployment.yaml                 # namespace/secret/config/deployment
+```
+
+`deployment.yaml` carries a `laelia-provisioner-token` Secret — paste the
+one-time token from step 8.1 into it (`stringData.token`); the config file
+reads the token from the `LAELIA_PROVISIONER_TOKEN` environment variable, so
+the secret never lands in a committed file. For a bare process instead of the
+Deployment:
+
+```bash
+KUBECONFIG=/path/to/kubeconfig ./build/laelia-provisioner run \
+  --config /etc/laelia-provisioner/provisioner.yaml
+```
+
+### 8.3 Provisioner config reference
+
+```yaml
+manager_url: https://laelia.example.com   # or --manager flag
+token: llprov_...                          # one-time token; --token flag or LAELIA_PROVISIONER_TOKEN env
+backend: kubernetes                        # workload backend (kubernetes today)
+namespace: laelia-machines                 # where machine workloads land
+# Optional:
+manager_url_override: http://laelia-manager.laelia-machines.svc:8181
+                                           # pods connect here instead of manager_url (egress-restricted clusters)
+retain_data: false                         # keep machine data PVCs on delete (StatefulSet Retain)
+auto_upgrade: false                        # manager auto-triggers upgrades for this provisioner's machines
+storage: { size: 10Gi, storage_class: "" } # PVC size/class per machine (storage_class defaults to the cluster default)
+resources:
+  requests: { cpu: "1", memory: "2Gi" }
+  limits: { memory: "4Gi" }
+extra_env:                                 # passthrough env on the machine container
+  LAELIA_INSECURE: "true"                  # for https managers with self-signed certs
+```
+
+`--allow-http` is required when `manager_url` is plain HTTP (dev only).
+
+### 8.4 RBAC matrix
+
+The provisioner's Role is namespace-scoped; no cluster-admin and no cluster-wide
+list/watch (design §12). The CRD itself is applied once by a cluster admin.
+
+| Resource | Verbs | Why |
+|---|---|---|
+| `laelia.sh/laeliamachines` (+`/status`, `/finalizers`) | get/list/watch/create/update/patch/delete | One CR per machine; the CR is the workload's desired state |
+| `secrets` | get/list/watch/create/update/patch/delete | Bootstrap secret (`machine.json` + bootstrap script) |
+| `services` | get/list/watch/create/update/patch/delete | Headless Service required by the StatefulSet |
+| `apps/statefulsets` | get/list/watch/create/update/patch/delete | The machine's single-replica workload |
+| `pods` | get/list/watch | Pod status drives the CR phase |
+| `persistentvolumeclaims` | get/list/watch/delete | Explicit PVC cleanup on delete (retention fallback) |
+| `events` | create/patch | `kubectl describe` diagnostics |
+
+### 8.5 Runtime image contract
+
+The runtime image provides the agent environment; it must NOT contain the
+laelia machine binary — the pod downloads it from the manager into the PVC and
+upgrades it in place afterwards. Reference image:
+`scripts/docker/Dockerfile.machine-runtime` (node, python, build-essential,
+git, curl, jq, ripgrep, codex CLI; non-root uid 1001). Any image satisfying the
+contract works:
+
+- POSIX `sh`, `curl`, `gzip`, `sha256sum` (the init container's bootstrap script)
+- an entrypoint that execs `$LAELIA_MACHINE_BIN` (default `/data/bin/laelia-machine`)
+  with `LAELIA_HOME=/data/laelia`, honoring `LAELIA_MANAGER_URL` (+ auto
+  `--allow-http` for `http://`), `LAELIA_PROVISIONED=true` → `--provisioned
+  --no-browser --foreground`, and `CODEX_HOME` (default
+  `/data/laelia/codex`, on the PVC)
+- runs as a non-root uid
+
+### 8.6 What the provisioner creates per machine
+
+All inside the configured namespace, owned by the `LaeliaMachine` CR
+`laelia-machine-<machine-uuid-prefix>`: a bootstrap Secret (the machine's
+credential — CRs never carry tokens), a headless Service, a single-replica
+StatefulSet with `volumeClaimTemplates: [data]` and the amd64 nodeSelector, and
+the data PVC. Deleting the machine in the UI deletes the CR; the finalizer
+removes the Secret and (unless `retain_data: true`) the data PVC. `kubectl get
+laeliamachines -n laelia-machines` is the operator's fleet view.
+
 ## Troubleshooting
 
 - `bind: address already in use` — port 8181 is taken on the host. Stop the
@@ -438,3 +581,27 @@ the manager they do not need a separate image or binary transfer.
 - 502 Bad Gateway — `proxy_pass` must point at the actual manager
   (`127.0.0.1:8181` or the container name), not at the public domain, or the
   proxy loops.
+
+Provisioner-specific:
+
+- ProvisionMachine fails with "runtime image not configured" — set the machine
+  runtime image under Settings → General (section 8.1).
+- A new machine stays at phase *Pending* — the provisioner is offline or not
+  registered. The job is replayed automatically when the provisioner connects;
+  check the provisioner's logs and its Status column on Settings →
+  Provisioners.
+- Machine pod stuck in `ImagePullBackOff` / `ErrImagePull` — the runtime image
+  reference (Settings → General) is not pullable from the nodes (private
+  registry credentials, wrong tag/arch). Fix the image or the pull secret, then
+  delete and recreate the machine.
+- Machine pod stuck in `Creating` — usually a Pending PVC: the configured
+  `storage.storage_class` does not exist or no default StorageClass is
+  bound (`kubectl get pvc -n laelia-machines`). Set `storage.storage_class`
+  in the provisioner config and recreate the machine.
+- Machine shows *Provisioned* but stays offline — the workload exists but the
+  pod is not connecting (bootstrap download failing?). Check
+  `kubectl logs` on the pod's init container and the manager's reachability
+  from the pod (`manager_url` / `manager_url_override`).
+- Deleted machine left a data PVC behind — the provisioner has
+  `retain_data: true`; the PVC is kept on purpose. Remove it manually when no
+  longer needed.

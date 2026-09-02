@@ -1,0 +1,167 @@
+import { Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
+import { Card } from "@/components/profile-common";
+import { Alert } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { describeError } from "@/lib/connect-errors";
+import { cn } from "@/lib/utils";
+import { useAppStore } from "@/stores";
+import type { Provisioner } from "@/types/proto-es/v1/provisioner_pb";
+
+// MachineNewProvisionedPanel is the "Provisioned" tab of the create-machine
+// page: pick a provisioner, name the machine, and the provisioner creates the
+// workload while the user is taken to the machine profile. No install command,
+// no device-code approval — the pod authenticates itself via its seeded
+// machine.json.
+export function MachineNewProvisionedPanel() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const provisioners = useAppStore((s) => s.provisioners);
+  const provisionersLoading = useAppStore((s) => s.provisionersLoading);
+  const fetchProvisioners = useAppStore((s) => s.fetchProvisioners);
+
+  const [selected, setSelected] = useState("");
+  const [title, setTitle] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    void fetchProvisioners({ pageSize: 100 });
+  }, [fetchProvisioners]);
+
+  // The picker only offers connected-or-not registered provisioners; the
+  // backend validates liveness again at ProvisionMachine time (an offline
+  // provisioner parks the job at PENDING for replay on its next connect).
+  const connected = (p: Provisioner): boolean => p.status?.connected ?? false;
+
+  async function handleCreate() {
+    if (!selected) return;
+    setCreating(true);
+    setError("");
+    try {
+      const machine = await useAppStore
+        .getState()
+        .provisionMachine(selected, title.trim());
+      navigate(`/machines/${machine.name.replace(/^machines\//, "")}`);
+    } catch (err) {
+      setError(describeError(err));
+      setCreating(false);
+    }
+  }
+
+  if (provisionersLoading && provisioners.length === 0) {
+    return (
+      <div className="flex items-center gap-2 py-8 text-sm text-control-light">
+        <Loader2 className="size-4 animate-spin" />
+        {t("common.loading")}
+      </div>
+    );
+  }
+
+  if (provisioners.length === 0) {
+    return (
+      <Card title={t("machine.new.provisioned.pick-title")}>
+        <Alert
+          variant="info"
+          description={t("machine.new.provisioned.empty")}
+        />
+      </Card>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Card title={t("machine.new.provisioned.pick-title")}>
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-control-light">
+            {t("machine.new.provisioned.pick-hint")}
+          </p>
+          <div className="flex flex-col gap-2" role="radiogroup">
+            {provisioners.map((p) => {
+              const isSelected = p.name === selected;
+              return (
+                <button
+                  key={p.name}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  data-testid="provisioner-option"
+                  onClick={() => {
+                    setSelected(p.name);
+                    setError("");
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md border px-4 py-3 text-left transition-colors",
+                    isSelected
+                      ? "border-accent bg-accent/5"
+                      : "border-control-border hover:bg-control-bg/60"
+                  )}
+                >
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate text-sm font-medium text-main">
+                      {p.title}
+                    </span>
+                    {p.description && (
+                      <span className="truncate text-xs text-control-light">
+                        {p.description}
+                      </span>
+                    )}
+                  </div>
+                  <Badge variant="secondary">{p.backend}</Badge>
+                  {connected(p) ? (
+                    <Badge variant="success">
+                      {t("machine.new.provisioned.connected")}
+                    </Badge>
+                  ) : (
+                    <Badge variant="default">
+                      {t("machine.new.provisioned.offline")}
+                    </Badge>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </Card>
+
+      <Card title={t("machine.new.provisioned.machine-title")}>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="machine-new-provisioned-title"
+              className="text-sm font-medium text-control"
+            >
+              {t("machine.new.name-label")}
+            </label>
+            <Input
+              id="machine-new-provisioned-title"
+              value={title}
+              placeholder={t("machine.new.name-placeholder")}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setError("");
+              }}
+            />
+          </div>
+          {error && <Alert variant="error" description={error} />}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-control-light">
+              {t("machine.new.provisioned.create-hint")}
+            </p>
+            <Button
+              disabled={creating || !selected || !title.trim()}
+              onClick={() => void handleCreate()}
+            >
+              {creating && <Loader2 className="size-4 animate-spin" />}
+              {t("machine.new.provisioned.create")}
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}

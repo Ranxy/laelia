@@ -9,7 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
-import type { WorkspaceProfileSetting } from "@/types/proto-es/store/setting_pb";
+import type {
+  ProvisioningSetting,
+  WorkspaceProfileSetting,
+} from "@/types/proto-es/store/setting_pb";
 
 interface GeneralForm {
   externalUrl: string;
@@ -97,6 +100,11 @@ export function SettingsGeneralPage() {
   const [loading, setLoading] = useState(true);
   const [savingDomains, setSavingDomains] = useState(false);
   const [savingExternalUrl, setSavingExternalUrl] = useState(false);
+  // Runtime image for provisioned machines (ProvisioningSetting). Separate
+  // setting resource, so it loads and saves independently of the profile.
+  const [runtimeImage, setRuntimeImage] = useState("");
+  const [savedRuntimeImage, setSavedRuntimeImage] = useState("");
+  const [savingRuntimeImage, setSavingRuntimeImage] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,6 +128,17 @@ export function SettingsGeneralPage() {
         void showErrorToast(err, t("settings.general.load-failed"));
       } finally {
         if (!cancelled) setLoading(false);
+      }
+      try {
+        const provisioning = await useAppStore
+          .getState()
+          .fetchProvisioningConfig();
+        if (cancelled) return;
+        setRuntimeImage(provisioning?.runtimeImage ?? "");
+        setSavedRuntimeImage(provisioning?.runtimeImage ?? "");
+      } catch {
+        // The provisioning setting is optional on this page; a failed read
+        // leaves the field empty and the save reports the error itself.
       }
     })();
     return () => {
@@ -229,10 +248,33 @@ export function SettingsGeneralPage() {
     }
   }
 
+  async function handleSaveRuntimeImage() {
+    setSavingRuntimeImage(true);
+    try {
+      const cfg = await useAppStore.getState().updateProvisioningConfig(
+        {
+          runtimeImage: runtimeImage.trim(),
+        } satisfies Partial<ProvisioningSetting>,
+        ["value.provisioning.runtime_image"]
+      );
+      setRuntimeImage(cfg?.runtimeImage ?? runtimeImage.trim());
+      setSavedRuntimeImage(cfg?.runtimeImage ?? runtimeImage.trim());
+      toastManager.add({
+        type: "success",
+        title: t("settings.general.saved"),
+      });
+    } catch (err) {
+      void showErrorToast(err, t("settings.general.save-failed"));
+    } finally {
+      setSavingRuntimeImage(false);
+    }
+  }
+
   const externalUrlDirty = form.externalUrl.trim() !== saved.externalUrl.trim();
   const domainsDirty =
     parseDomains(form.domains).join("\n") !==
     parseDomains(saved.domains).join("\n");
+  const runtimeImageDirty = runtimeImage.trim() !== savedRuntimeImage.trim();
 
   const set = <K extends keyof GeneralForm>(key: K, value: GeneralForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -271,6 +313,40 @@ export function SettingsGeneralPage() {
                 disabled={savingExternalUrl || !externalUrlDirty}
               >
                 {savingExternalUrl ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Save className="size-4" />
+                )}
+                {t("common.save")}
+              </Button>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-control-border bg-background p-5 shadow-xs">
+            <label
+              htmlFor="general-runtime-image"
+              className="block text-sm font-medium text-main"
+            >
+              {t("settings.general.runtime-image")}
+            </label>
+            <Input
+              id="general-runtime-image"
+              value={runtimeImage}
+              placeholder={t("settings.general.runtime-image-placeholder")}
+              onChange={(e) => setRuntimeImage(e.target.value)}
+              spellCheck={false}
+              className="mt-2"
+            />
+            <div className="mt-1.5 flex items-center justify-between gap-3">
+              <p className="text-xs text-control-light">
+                {t("settings.general.runtime-image-hint")}
+              </p>
+              <Button
+                size="sm"
+                onClick={handleSaveRuntimeImage}
+                disabled={savingRuntimeImage || !runtimeImageDirty}
+              >
+                {savingRuntimeImage ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
                   <Save className="size-4" />

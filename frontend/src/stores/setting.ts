@@ -4,6 +4,7 @@ import { settingServiceClient } from "@/connect";
 import type {
   LlmAgentConfigSetting,
   PasswordRestrictionSetting,
+  ProvisioningSetting,
   S3ConfigSetting,
   SMTPSetting,
   UserMcpConfigSetting,
@@ -12,6 +13,7 @@ import type {
 import {
   LlmAgentConfigSettingSchema,
   PasswordRestrictionSettingSchema,
+  ProvisioningSettingSchema,
   S3ConfigSettingSchema,
   SMTPSettingSchema,
   UserMcpConfigSettingSchema,
@@ -36,6 +38,7 @@ export interface SettingSlice {
   llmAgentConfig?: LlmAgentConfigSetting;
   userMcpConfig?: UserMcpConfigSetting;
   passwordRestriction?: PasswordRestrictionSetting;
+  provisioningConfig?: ProvisioningSetting;
 
   fetchWorkspaceProfile: () => Promise<WorkspaceProfileSetting | undefined>;
   fetchSmtpConfig: () => Promise<SMTPSetting | undefined>;
@@ -45,6 +48,7 @@ export interface SettingSlice {
   fetchPasswordRestriction: () => Promise<
     PasswordRestrictionSetting | undefined
   >;
+  fetchProvisioningConfig: () => Promise<ProvisioningSetting | undefined>;
 
   updateWorkspaceProfile: (
     patch: Partial<WorkspaceProfileSetting>,
@@ -70,6 +74,10 @@ export interface SettingSlice {
     patch: Partial<PasswordRestrictionSetting>,
     paths: string[]
   ) => Promise<PasswordRestrictionSetting | undefined>;
+  updateProvisioningConfig: (
+    patch: Partial<ProvisioningSetting>,
+    paths: string[]
+  ) => Promise<ProvisioningSetting | undefined>;
 }
 
 // Update-mask path lists (bytebase-style full paths, e.g.
@@ -128,6 +136,11 @@ export const passwordRestrictionPaths = [
   "value.password_restriction.password_rotation",
 ] as const;
 
+export const provisioningPaths = [
+  "value.provisioning.runtime_image",
+  "value.provisioning.binary_target",
+] as const;
+
 // settingResourceName maps a setting to its resource name, matching the
 // backend's "settings/{name}" convention.
 function settingResourceName(name: string): string {
@@ -144,6 +157,7 @@ export const createSettingSlice: AppSliceCreator<SettingSlice> = (
   llmAgentConfig: undefined,
   userMcpConfig: undefined,
   passwordRestriction: undefined,
+  provisioningConfig: undefined,
 
   async fetchWorkspaceProfile() {
     const res = await settingServiceClient.getSetting({
@@ -202,6 +216,16 @@ export const createSettingSlice: AppSliceCreator<SettingSlice> = (
     const v = res.value?.value;
     const cfg = v?.case === "passwordRestriction" ? v.value : undefined;
     set({ passwordRestriction: cfg });
+    return cfg;
+  },
+
+  async fetchProvisioningConfig() {
+    const res = await settingServiceClient.getSetting({
+      name: settingResourceName("provisioning"),
+    });
+    const v = res.value?.value;
+    const cfg = v?.case === "provisioning" ? v.value : undefined;
+    set({ provisioningConfig: cfg });
     return cfg;
   },
 
@@ -334,6 +358,29 @@ export const createSettingSlice: AppSliceCreator<SettingSlice> = (
     const v = res.value?.value;
     const cfg = v?.case === "passwordRestriction" ? v.value : undefined;
     set({ passwordRestriction: cfg });
+    return cfg;
+  },
+
+  async updateProvisioningConfig(patch, paths) {
+    const base =
+      get().provisioningConfig ?? create(ProvisioningSettingSchema, {});
+    const res = await settingServiceClient.updateSetting(
+      create(UpdateSettingRequestSchema, {
+        setting: create(SettingSchema, {
+          name: settingResourceName("provisioning"),
+          value: create(SettingValueSchema, {
+            value: {
+              case: "provisioning" as const,
+              value: { ...base, ...patch },
+            },
+          }),
+        }),
+        updateMask: create(FieldMaskSchema, { paths: [...paths] }),
+      })
+    );
+    const v = res.value?.value;
+    const cfg = v?.case === "provisioning" ? v.value : undefined;
+    set({ provisioningConfig: cfg });
     return cfg;
   },
 });

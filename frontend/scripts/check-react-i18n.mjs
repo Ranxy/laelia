@@ -40,6 +40,9 @@ const DYNAMIC_PREFIXES = [
   "channelTask.status-",
   "reminders.status-",
   "command.status-",
+  // Provisioning phase map in lib/provisioning-status.ts, translated via
+  // t(labelKey) in components/provisioning-phase-badge.tsx.
+  "machine.provisioning.phase-",
   "command.event-",
   // command-event-toolbar.tsx filter map translated via t(FILTER_LABEL_KEY[f]).
   "command.filter-",

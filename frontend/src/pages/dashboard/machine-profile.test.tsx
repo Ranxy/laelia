@@ -1,3 +1,5 @@
+import { create } from "@bufbuild/protobuf";
+import { TimestampSchema } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router-dom";
@@ -13,6 +15,7 @@ import {
   type MachineInfo,
   type MachineStatus,
   MachineStatus_ConnectionState,
+  ProvisioningStatusSchema,
 } from "@/types/proto-es/v1/machine_pb";
 import { MachineProfilePage } from "./machine-profile";
 
@@ -822,5 +825,45 @@ describe("MachineProfilePage", () => {
     expect(
       await screen.findByText("machine.add-agent-title")
     ).toBeInTheDocument();
+  });
+
+  it("shows the provisioning card for a provisioned machine", async () => {
+    // getProvisioner fails in this suite (no provisionerServiceClient mock),
+    // so the card falls back to the raw resource name.
+    mock.getMachine.mockResolvedValue(
+      machine({
+        provisioner: "provisioners/p1",
+        provisioning: create(ProvisioningStatusSchema, {
+          phase: 2, // PROVISIONING_PHASE_PROVISIONING
+          error: "",
+          workloadName: "laelia-machines/laelia-machine-ab12",
+          pendingAt: create(TimestampSchema, {
+            seconds: BigInt(1700000000),
+            nanos: 0,
+          }),
+        }),
+      })
+    );
+    renderPage();
+
+    expect(
+      await screen.findByText("machine.provisioning.title")
+    ).toBeInTheDocument();
+    expect(screen.getByText("provisioners/p1")).toBeInTheDocument();
+    expect(
+      screen.getByText("laelia-machines/laelia-machine-ab12")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("machine.provisioning.phase-provisioning")
+    ).toBeInTheDocument();
+  });
+
+  it("hides the provisioning card for self-hosted machines", async () => {
+    renderPage();
+
+    expect(await screen.findByText("machine.detail-name")).toBeInTheDocument();
+    expect(
+      screen.queryByText("machine.provisioning.title")
+    ).not.toBeInTheDocument();
   });
 });

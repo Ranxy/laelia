@@ -5,6 +5,7 @@ import {
   Bug,
   ChevronRight,
   ClipboardList,
+  Container,
   Database,
   Languages,
   Lock,
@@ -73,6 +74,7 @@ function useSettingsMenuItems(): MenuItem[] {
   const canViewIdentityProviders = useHasPermission(
     "laelia.identityProviders.list"
   );
+  const canViewProvisioners = useHasPermission("laelia.provisioners.get");
   const canViewAudit = useHasPermission("laelia.auditLogs.search");
   const canViewPushConfig = useHasPermission("laelia.pushConfig.update");
 
@@ -139,6 +141,11 @@ function useSettingsMenuItems(): MenuItem[] {
           icon: Shield,
           label: t("sidebar.settings-identity-providers"),
         },
+        canViewProvisioners && {
+          to: "/settings/provisioners",
+          icon: Container,
+          label: t("sidebar.settings-provisioners"),
+        },
         {
           to: "/settings/mcp-servers",
           icon: Server,
@@ -164,6 +171,7 @@ function useSettingsMenuItems(): MenuItem[] {
       canViewGroups,
       canViewApiProviders,
       canViewIdentityProviders,
+      canViewProvisioners,
       canViewAudit,
       canViewPushConfig,
       canViewMachines,

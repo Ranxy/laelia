@@ -34,5 +34,6 @@ export const SETTINGS_ROUTE_IAM = "settings.iam";
 export const SETTINGS_ROUTE_GROUPS = "settings.groups";
 export const SETTINGS_ROUTE_API_PROVIDERS = "settings.apiProviders";
 export const SETTINGS_ROUTE_IDENTITY_PROVIDERS = "settings.identityProviders";
+export const SETTINGS_ROUTE_PROVISIONERS = "settings.provisioners";
 export const SETTINGS_ROUTE_MCP_SERVERS = "settings.mcpServers";
 export const SETTINGS_ROUTE_AUDIT = "settings.audit";

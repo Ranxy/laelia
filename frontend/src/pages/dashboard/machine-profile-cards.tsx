@@ -1,11 +1,12 @@
 import { Loader2, Plus, Shield, User as UserIcon, X } from "lucide-react";
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { CopyableCommand } from "@/components/copyable-command";
 import { MachineConnectionBadge } from "@/components/machine-connection-badge";
 import { MemberPicker } from "@/components/member-picker";
 import { Card, Field, providerDisplayName } from "@/components/profile-common";
+import { ProvisioningPhaseBadge } from "@/components/provisioning-phase-badge";
 import { Alert } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -34,6 +35,7 @@ import {
 } from "@/lib/machine-token";
 import { formatTimestamp } from "@/lib/time-format";
 import { cn } from "@/lib/utils";
+import { useAppStore } from "@/stores";
 import type {
   AgentProviderInfo,
   AgentSummary,
@@ -84,6 +86,97 @@ function useMemberLabel(users: User[], groups: Group[]) {
     [t, users, groups]
   );
 }
+
+// ---- Provisioning (provisioned machines) -------------------------------------
+// The lifecycle card for machines created through a provisioner: workload
+// locator, phase pill, timestamps and the last error. The provisioner's
+// display title/backend are resolved client-side via GetProvisioner; without
+// laelia.provisioners.get the raw resource name still renders.
+
+interface MachineProvisioningCardProps {
+  machine: Machine;
+}
+
+export const MachineProvisioningCard = memo(function MachineProvisioningCard({
+  machine,
+}: MachineProvisioningCardProps) {
+  const { t } = useTranslation();
+  const getProvisioner = useAppStore((s) => s.getProvisioner);
+  const provisioning = machine.provisioning;
+  const [provTitle, setProvTitle] = useState("");
+  const [backend, setBackend] = useState("");
+  const [retainData, setRetainData] = useState<boolean | undefined>(undefined);
+
+  // Resolve the provisioner's friendly identity once per bound provisioner;
+  // a failed lookup (no permission, provisioner deleted) falls back to the
+  // raw resource name rather than hiding the card.
+  useEffect(() => {
+    let cancelled = false;
+    setProvTitle("");
+    setBackend("");
+    setRetainData(undefined);
+    if (!machine.provisioner) return;
+    void getProvisioner(machine.provisioner).then((p) => {
+      if (cancelled || !p) return;
+      setProvTitle(p.title || machine.provisioner);
+      setBackend(p.status?.backend || p.backend);
+      setRetainData(p.status?.retainData);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [machine.provisioner, getProvisioner]);
+
+  return (
+    <Card title={t("machine.provisioning.title")}>
+      <div className="flex flex-col gap-3">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+          <Field label={t("machine.provisioning.provisioner")}>
+            {provTitle || machine.provisioner}
+          </Field>
+          {backend && (
+            <Field label={t("machine.provisioning.backend")}>{backend}</Field>
+          )}
+          <Field label={t("machine.provisioning.phase")}>
+            <ProvisioningPhaseBadge phase={provisioning?.phase} />
+          </Field>
+          {provisioning?.workloadName && (
+            <Field label={t("machine.provisioning.workload")}>
+              <span className="font-mono text-xs">
+                {provisioning.workloadName}
+              </span>
+            </Field>
+          )}
+          {provisioning?.pendingAt && (
+            <Field label={t("machine.provisioning.pending-at")}>
+              {formatTimestamp(provisioning.pendingAt)}
+            </Field>
+          )}
+          {provisioning?.provisionedAt && (
+            <Field label={t("machine.provisioning.provisioned-at")}>
+              {formatTimestamp(provisioning.provisionedAt)}
+            </Field>
+          )}
+          {provisioning?.failedAt && (
+            <Field label={t("machine.provisioning.failed-at")}>
+              {formatTimestamp(provisioning.failedAt)}
+            </Field>
+          )}
+        </dl>
+        {retainData !== undefined && (
+          <p className="text-xs text-control-light">
+            {retainData
+              ? t("machine.provisioning.retain-data")
+              : t("machine.provisioning.delete-data")}
+          </p>
+        )}
+        {provisioning?.error && (
+          <Alert variant="error" description={provisioning.error} />
+        )}
+      </div>
+    </Card>
+  );
+});
 
 // ---- Identity & host info ---------------------------------------------------
 

@@ -16,6 +16,7 @@ import { McpServerService } from "@/types/proto-es/v1/mcp_pb";
 import { AuditLogService } from "@/types/proto-es/v1/audit_log_service_pb";
 import { NotificationService } from "@/types/proto-es/v1/notification_pb";
 import { IdentityProviderService } from "@/types/proto-es/v1/idp_service_pb";
+import { ProvisionerService } from "@/types/proto-es/v1/provisioner_pb";
 import { createAuthInterceptor } from "./auth-interceptor";
 
 // Guards against a stampede of concurrent 401s each triggering a redirect.
@@ -97,5 +98,10 @@ export const notificationServiceClient = createClient(
 
 export const identityProviderServiceClient = createClient(
   IdentityProviderService,
+  transport
+);
+
+export const provisionerServiceClient = createClient(
+  ProvisionerService,
   transport
 );

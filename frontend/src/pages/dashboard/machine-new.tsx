@@ -6,6 +6,7 @@ import { CopyableCommand } from "@/components/copyable-command";
 import { Card, Field } from "@/components/profile-common";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
 import { usePolling } from "@/hooks/use-polling";
 import { describeError } from "@/lib/connect-errors";
 import {
@@ -14,7 +15,9 @@ import {
   type MachineInstallOS,
 } from "@/lib/machine-token";
 import { useAppStore } from "@/stores";
+import { useHasPermission } from "@/stores/permissions";
 import type { MachineSummary } from "@/types/proto-es/v1/machine_pb";
+import { MachineNewProvisionedPanel } from "./machine-new-provisioned";
 
 function detectInstallOS(): MachineInstallOS {
   const ua = navigator.userAgent.toLowerCase();
@@ -23,13 +26,73 @@ function detectInstallOS(): MachineInstallOS {
   return "linux";
 }
 
-// MachineNewPage is the create-machine waiting page. It no longer creates a
-// machine directly: it shows the install command + `laelia-machine setup`
-// command, then watches ListMachines for a machine that was created by the
-// current user after this page opened (i.e. the machine the user just approved
-// on the device-login page). When one appears, the user confirms/renames it
-// and is taken to its profile.
+// MachineNewPage hosts the two create-machine flows. With the provisioner
+// permission it offers a "Provisioned" tab (pick a provisioner, name the
+// machine, done) next to the classic "Self-hosted" tab (install command +
+// device-code approval); without the permission only the self-hosted content
+// renders, exactly as before this page grew tabs.
 export function MachineNewPage() {
+  const { t } = useTranslation();
+  const canProvision = useHasPermission("laelia.provisioners.provision");
+  const [tab, setTab] = useState<"provisioned" | "self-hosted">(() =>
+    canProvision ? "provisioned" : "self-hosted"
+  );
+
+  return (
+    <div className="h-full overflow-y-auto p-6">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+        <div>
+          <h1 className="text-lg font-semibold text-main">
+            {t("machine.new.title")}
+          </h1>
+          <p className="mt-1 text-sm text-control-light">
+            {t(
+              canProvision && tab === "provisioned"
+                ? "machine.new.provisioned.description"
+                : "machine.new.description"
+            )}
+          </p>
+        </div>
+
+        {canProvision ? (
+          <Tabs
+            value={tab}
+            onValueChange={(value) => {
+              if (value === "provisioned" || value === "self-hosted") {
+                setTab(value);
+              }
+            }}
+          >
+            <TabsList>
+              <TabsTrigger value="provisioned">
+                {t("machine.new.tab-provisioned")}
+              </TabsTrigger>
+              <TabsTrigger value="self-hosted">
+                {t("machine.new.tab-self-hosted")}
+              </TabsTrigger>
+            </TabsList>
+            <TabsPanel value="provisioned">
+              <MachineNewProvisionedPanel />
+            </TabsPanel>
+            <TabsPanel value="self-hosted">
+              <MachineNewSelfHostedPanel />
+            </TabsPanel>
+          </Tabs>
+        ) : (
+          <MachineNewSelfHostedPanel />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// MachineNewSelfHostedPanel is the classic device-code flow. It no longer
+// creates a machine directly: it shows the install command + `laelia-machine
+// setup` command, then watches ListMachines for a machine that was created by
+// the current user after this page opened (i.e. the machine the user just
+// approved on the device-login page). When one appears, the user
+// confirms/renames it and is taken to its profile.
+function MachineNewSelfHostedPanel() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const fetchMachines = useAppStore((s) => s.fetchMachines);
@@ -146,124 +209,113 @@ export function MachineNewPage() {
   ];
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-        <div>
-          <h1 className="text-lg font-semibold text-main">
-            {t("machine.new.title")}
-          </h1>
-          <p className="mt-1 text-sm text-control-light">
-            {t("machine.new.description")}
+    <div className="flex flex-col gap-6">
+      <Card title={t("machine.new.step-install")}>
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-control-light">
+            {t("machine.new.install-hint")}
           </p>
+          <div className="flex flex-wrap gap-1">
+            {installOSOptions.map((opt) => (
+              <Button
+                key={opt.value}
+                variant={installOS === opt.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setInstallOS(opt.value)}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+          <CopyableCommand
+            command={installCommand}
+            copied={installCopied}
+            onCopy={() => void handleCopyInstall()}
+          />
         </div>
+      </Card>
 
-        <Card title={t("machine.new.step-install")}>
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-control-light">
-              {t("machine.new.install-hint")}
-            </p>
-            <div className="flex flex-wrap gap-1">
-              {installOSOptions.map((opt) => (
-                <Button
-                  key={opt.value}
-                  variant={installOS === opt.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setInstallOS(opt.value)}
-                >
-                  {opt.label}
-                </Button>
-              ))}
+      <Card title={t("machine.new.step-command")}>
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-control-light">
+            {t("machine.new.command-hint")}
+          </p>
+          <CopyableCommand
+            command={command}
+            copied={copied}
+            onCopy={() => void handleCopy()}
+          />
+        </div>
+      </Card>
+
+      <Card title={t("machine.new.step-wait")}>
+        {candidate ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <Monitor className="size-5 text-control" />
+              <span className="text-sm font-medium text-main">
+                {candidateInfo?.hostname || candidate.title}
+              </span>
             </div>
-            <CopyableCommand
-              command={installCommand}
-              copied={installCopied}
-              onCopy={() => void handleCopyInstall()}
-            />
+            {candidateInfo && (
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+                <Field label={t("machine.detail-hostname")}>
+                  {candidateInfo.hostname}
+                </Field>
+                <Field label={t("machine.detail-os")}>
+                  {candidateInfo.os}
+                  {candidateInfo.arch ? ` · ${candidateInfo.arch}` : ""}
+                </Field>
+                <Field label={t("machine.detail-ip")}>
+                  {candidateInfo.ip || "-"}
+                </Field>
+              </dl>
+            )}
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="machine-new-name"
+                className="text-sm font-medium text-control"
+              >
+                {t("machine.new.name-label")}
+              </label>
+              <Input
+                id="machine-new-name"
+                value={name}
+                placeholder={t("machine.new.name-placeholder")}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError("");
+                }}
+              />
+            </div>
+            {error && <p className="text-xs text-error">{error}</p>}
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (candidate) dismissedRef.current.add(candidate.name);
+                  setCandidate(undefined);
+                  setCandidateInfo(null);
+                }}
+              >
+                <X className="size-4" />
+                {t("machine.new.not-mine")}
+              </Button>
+              <Button disabled={saving} onClick={() => void handleConfirm()}>
+                {saving && <Loader2 className="size-4 animate-spin" />}
+                {t("machine.new.confirm")}
+              </Button>
+            </div>
           </div>
-        </Card>
-
-        <Card title={t("machine.new.step-command")}>
-          <div className="flex flex-col gap-3">
+        ) : (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <Loader2 className="size-6 animate-spin text-control-light" />
             <p className="text-sm text-control-light">
-              {t("machine.new.command-hint")}
+              {t("machine.new.waiting")}
             </p>
-            <CopyableCommand
-              command={command}
-              copied={copied}
-              onCopy={() => void handleCopy()}
-            />
           </div>
-        </Card>
-
-        <Card title={t("machine.new.step-wait")}>
-          {candidate ? (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2">
-                <Monitor className="size-5 text-control" />
-                <span className="text-sm font-medium text-main">
-                  {candidateInfo?.hostname || candidate.title}
-                </span>
-              </div>
-              {candidateInfo && (
-                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-                  <Field label={t("machine.detail-hostname")}>
-                    {candidateInfo.hostname}
-                  </Field>
-                  <Field label={t("machine.detail-os")}>
-                    {candidateInfo.os}
-                    {candidateInfo.arch ? ` · ${candidateInfo.arch}` : ""}
-                  </Field>
-                  <Field label={t("machine.detail-ip")}>
-                    {candidateInfo.ip || "-"}
-                  </Field>
-                </dl>
-              )}
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="machine-new-name"
-                  className="text-sm font-medium text-control"
-                >
-                  {t("machine.new.name-label")}
-                </label>
-                <Input
-                  id="machine-new-name"
-                  value={name}
-                  placeholder={t("machine.new.name-placeholder")}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    setError("");
-                  }}
-                />
-              </div>
-              {error && <p className="text-xs text-error">{error}</p>}
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (candidate) dismissedRef.current.add(candidate.name);
-                    setCandidate(undefined);
-                    setCandidateInfo(null);
-                  }}
-                >
-                  <X className="size-4" />
-                  {t("machine.new.not-mine")}
-                </Button>
-                <Button disabled={saving} onClick={() => void handleConfirm()}>
-                  {saving && <Loader2 className="size-4 animate-spin" />}
-                  {t("machine.new.confirm")}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-3 py-6 text-center">
-              <Loader2 className="size-6 animate-spin text-control-light" />
-              <p className="text-sm text-control-light">
-                {t("machine.new.waiting")}
-              </p>
-            </div>
-          )}
-        </Card>
-      </div>
+        )}
+      </Card>
     </div>
   );
 }

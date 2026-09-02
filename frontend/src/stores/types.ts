@@ -10,6 +10,7 @@ import type { MachineSlice } from "./machine";
 import type { McpServerSlice } from "./mcp";
 import type { MembersSlice } from "./members";
 import type { PreviewSlice } from "./preview";
+import type { ProvisionerSlice } from "./provisioner";
 import type { SettingSlice } from "./setting";
 import type { TaskSlice } from "./task";
 import type { ThreadSlice } from "./thread";
@@ -26,6 +27,7 @@ export type AppStoreState = AuthSlice &
   AgentSlice &
   MachineSlice &
   WorkspaceSlice &
+  ProvisionerSlice &
   MembersSlice &
   CommandSlice &
   ChatSlice &
