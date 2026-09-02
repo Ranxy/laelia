@@ -109,12 +109,13 @@ func (*PiProvider) ProbeModels(ctx context.Context, _ string) ([]ModelOption, bo
 
 var piVersionRe = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
 
-func piVersionAtLeast(version, min string) bool {
+//nolint:unparam
+func piVersionAtLeast(version, minVersion string) bool {
 	got, ok := parsePiVersion(version)
 	if !ok {
 		return false
 	}
-	want, ok := parsePiVersion(min)
+	want, ok := parsePiVersion(minVersion)
 	if !ok {
 		return false
 	}
@@ -143,8 +144,4 @@ func parsePiVersion(version string) ([3]int, bool) {
 		out[i] = n
 	}
 	return out, true
-}
-
-func piVersion(ctx context.Context, bin string) string {
-	return runVersionCmd(ctx, bin, "--version")
 }

@@ -2,21 +2,22 @@ package v1
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"log/slog"
-	"math/rand"
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/Ranxy/laelia/backend/common"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
 	"github.com/Ranxy/laelia/backend/manager/store"
-	"github.com/pkg/errors"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (s *AgentService) RotateAgentToken(ctx context.Context, req *connect.Request[v1pb.RotateAgentTokenRequest]) (*connect.Response[v1pb.RotateAgentTokenResponse], error) {
@@ -133,10 +134,8 @@ func (s *AgentService) RevokeAgentToken(ctx context.Context, req *connect.Reques
 
 func (s *AgentService) RefreshAgentToken(ctx context.Context, req *connect.Request[v1pb.RefreshAgentTokenRequest]) (*connect.Response[v1pb.RefreshAgentTokenResponse], error) {
 	principal, stored, err := validateRefreshToken(
-		ctx,
 		req.Msg.RefreshToken,
 		req.Msg.Fingerprint,
-		s.secret,
 		func(token string) (int, string, error) {
 			claims, err := auth.ParseAgentToken(token, s.secret)
 			if err != nil {

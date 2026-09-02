@@ -7,14 +7,15 @@ import (
 	"unicode/utf8"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
+
 	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/common/permission"
 	models "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/store"
-	"github.com/google/uuid"
-	"github.com/pkg/errors"
 )
 
 func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Request[v1pb.SearchChatHistoryRequest]) (*connect.Response[v1pb.SearchChatHistoryResponse], error) {

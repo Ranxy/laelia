@@ -6,6 +6,11 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/common/log"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
@@ -14,10 +19,6 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/store"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/pkg/errors"
-	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (s *AgentService) ForceDisconnectAgent(ctx context.Context, req *connect.Request[v1pb.ForceDisconnectAgentRequest]) (*connect.Response[emptypb.Empty], error) {

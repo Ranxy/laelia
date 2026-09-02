@@ -3,8 +3,9 @@ package dispatcher
 import (
 	"sync"
 
-	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/pkg/errors"
+
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
 // sessionRegistry owns the live agent/machine session maps and their locking.

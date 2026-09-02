@@ -304,7 +304,7 @@ func TestSessionUpdateInterleavedToolCalls(t *testing.T) {
 	// FIFO pairing: STARTED order is A, B; FINISHED order is A, B.
 	var startedTitles, finishedOutputs []string
 	startedIDs := map[string]string{}           // tool_call_id -> title
-	finishedByToolCallId := map[string]string{} // tool_call_id -> output
+	finishedByToolCallID := map[string]string{} // tool_call_id -> output
 	for _, ev := range events {
 		switch ev.Type {
 		case v1pb.CommandEventType_TOOL_CALL_STARTED:
@@ -312,7 +312,9 @@ func TestSessionUpdateInterleavedToolCalls(t *testing.T) {
 			startedIDs[ev.ToolCallStarted.GetToolCallId()] = ev.ToolCallStarted.GetTitle()
 		case v1pb.CommandEventType_TOOL_CALL_FINISHED:
 			finishedOutputs = append(finishedOutputs, ev.ToolCallFinished.GetRawOutput().AsMap()["output"].(string))
-			finishedByToolCallId[ev.ToolCallFinished.GetToolCallId()] = ev.ToolCallFinished.GetRawOutput().AsMap()["output"].(string)
+			var ok bool
+			finishedByToolCallID[ev.ToolCallFinished.GetToolCallId()], ok = ev.ToolCallFinished.GetRawOutput().AsMap()["output"].(string)
+			require.True(t, ok)
 		default:
 		}
 	}
@@ -321,5 +323,5 @@ func TestSessionUpdateInterleavedToolCalls(t *testing.T) {
 	// The runtime tool call id must reach both payloads so a concurrent
 	// interleaving whose events arrive out of order can still be paired by id.
 	assert.Equal(t, map[string]string{"A": "cmdA", "B": "cmdB"}, startedIDs)
-	assert.Equal(t, map[string]string{"A": "outA", "B": "outB"}, finishedByToolCallId)
+	assert.Equal(t, map[string]string{"A": "outA", "B": "outB"}, finishedByToolCallID)
 }

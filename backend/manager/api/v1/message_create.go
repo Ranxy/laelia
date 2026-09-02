@@ -6,10 +6,11 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
-	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
-	"github.com/Ranxy/laelia/backend/manager/store"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
+	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
 // createMessageInput carries the sender-specific differences between the user

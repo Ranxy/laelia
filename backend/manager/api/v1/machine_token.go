@@ -5,13 +5,14 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/Ranxy/laelia/backend/common"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
 	"github.com/Ranxy/laelia/backend/manager/store"
-	"github.com/pkg/errors"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (s *MachineService) RevokeMachineToken(ctx context.Context, req *connect.Request[v1pb.RevokeMachineTokenRequest]) (*connect.Response[v1pb.RevokeMachineTokenResponse], error) {
@@ -59,10 +60,8 @@ func (s *MachineService) RevokeMachineToken(ctx context.Context, req *connect.Re
 }
 func (s *MachineService) RefreshMachineToken(ctx context.Context, req *connect.Request[v1pb.RefreshMachineTokenRequest]) (*connect.Response[v1pb.RefreshMachineTokenResponse], error) {
 	principal, stored, err := validateRefreshToken(
-		ctx,
 		req.Msg.RefreshToken,
 		req.Msg.Fingerprint,
-		s.secret,
 		func(token string) (int, string, error) {
 			claims, err := auth.ParseMachineToken(token, s.secret)
 			if err != nil {

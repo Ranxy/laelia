@@ -472,19 +472,19 @@ func (s *CommandService) postTeamAssignmentMessage(ctx context.Context, convID, 
 // thread when a team is assigned.
 func buildTeamAssignmentMessage(team *store.AgentTeamMessage, msg *store.ChatMessage) string {
 	var b strings.Builder
-	b.WriteString("[TEAM ASSIGNMENT]\n")
-	b.WriteString("Team: " + team.Title + "\n")
-	b.WriteString("Team ID: " + common.FormatAgentTeamName(team.ResourceID) + "\n")
+	_, _ = b.WriteString("[TEAM ASSIGNMENT]\n")
+	_, _ = b.WriteString("Team: " + team.Title + "\n")
+	_, _ = b.WriteString("Team ID: " + common.FormatAgentTeamName(team.ResourceID) + "\n")
 	for _, m := range team.Members {
 		if m.Role == store.AgentTeamRoleLeader {
-			b.WriteString("Leader: " + agentNameForTeam(m) + "\n")
+			_, _ = b.WriteString("Leader: " + agentNameForTeam(m) + "\n")
 		}
 	}
 	if team.TeamPrompt != "" {
-		b.WriteString("Team Prompt: " + team.TeamPrompt + "\n")
+		_, _ = b.WriteString("Team Prompt: " + team.TeamPrompt + "\n")
 	}
-	b.WriteString("\nTask Instruction: " + msg.Content + "\n\n")
-	b.WriteString("Roles:\n")
+	_, _ = b.WriteString("\nTask Instruction: " + msg.Content + "\n\n")
+	_, _ = b.WriteString("Roles:\n")
 	for _, m := range team.Members {
 		role := "member"
 		if m.Role == store.AgentTeamRoleLeader {
@@ -499,7 +499,7 @@ func buildTeamAssignmentMessage(team *store.AgentTeamMessage, msg *store.ChatMes
 		} else {
 			line += ". Follow the leader's coordination and complete the assigned subtasks."
 		}
-		b.WriteString(line + "\n")
+		_, _ = b.WriteString(line + "\n")
 	}
 	return b.String()
 }

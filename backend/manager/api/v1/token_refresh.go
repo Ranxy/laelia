@@ -1,12 +1,12 @@
 package v1
 
 import (
-	"context"
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/Ranxy/laelia/backend/manager/api/auth"
 	"github.com/pkg/errors"
+
+	"github.com/Ranxy/laelia/backend/manager/api/auth"
 )
 
 type refreshPrincipal struct {
@@ -33,10 +33,8 @@ type refreshStoredToken struct {
 // entity-specific lookups and revoke actions, then perform their own
 // access/refresh-token generation.
 func validateRefreshToken(
-	ctx context.Context,
 	tokenStr string,
 	fingerprint string,
-	secret string,
 	parse func(token string) (tokenVersion int, tokenType string, err error),
 	lookup func(hash string) (refreshStoredToken, error),
 	reuseAction func(state int32) refreshAction,

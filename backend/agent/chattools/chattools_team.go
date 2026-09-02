@@ -52,16 +52,16 @@ func GetTeamByID(ctx context.Context, d Deps, in GetTeamByIDInput) (string, erro
 // formatTeam renders a team's members and roles for the agent.
 func formatTeam(t *v1pb.AgentTeam) string {
 	var b strings.Builder
-	b.WriteString("Team: " + t.GetTitle() + "\n")
-	b.WriteString("Team ID: " + t.GetName() + "\n")
+	_, _ = b.WriteString("Team: " + t.GetTitle() + "\n")
+	_, _ = b.WriteString("Team ID: " + t.GetName() + "\n")
 	if d := t.GetDescription(); d != "" {
-		b.WriteString("Description: " + d + "\n")
+		_, _ = b.WriteString("Description: " + d + "\n")
 	}
 	if p := t.GetTeamPrompt(); p != "" {
-		b.WriteString("Team Prompt: " + p + "\n")
+		_, _ = b.WriteString("Team Prompt: " + p + "\n")
 	}
-	b.WriteString("Leader: " + teamMemberName(t, t.GetLeaderAgent()) + "\n")
-	b.WriteString("Members:\n")
+	_, _ = b.WriteString("Leader: " + teamMemberName(t, t.GetLeaderAgent()) + "\n")
+	_, _ = b.WriteString("Members:\n")
 	for _, m := range t.GetMembers() {
 		role := "member"
 		if m.GetRole() == v1pb.AgentTeamRole_AGENT_TEAM_ROLE_LEADER {
@@ -71,7 +71,7 @@ func formatTeam(t *v1pb.AgentTeam) string {
 		if m.GetResponsibility() != "" {
 			line += ": " + m.GetResponsibility()
 		}
-		b.WriteString(line + "\n")
+		_, _ = b.WriteString(line + "\n")
 	}
 	return b.String()
 }

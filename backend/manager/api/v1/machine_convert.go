@@ -4,13 +4,14 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/Ranxy/laelia/backend/common"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/component/machinebuild"
 	"github.com/Ranxy/laelia/backend/manager/store"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (s *MachineService) convertToMachine(ctx context.Context, m *store.MachineMessage) *v1pb.Machine {

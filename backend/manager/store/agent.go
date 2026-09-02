@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -453,7 +453,7 @@ func (s *Store) TouchAgentHeartbeats(ctx context.Context, heartbeats []AgentHear
 	for id := range latest {
 		ids = append(ids, id)
 	}
-	sort.Ints(ids)
+	slices.Sort(ids)
 
 	// Two parameters per row; 5000 rows => 10,000 parameters, safely under
 	// Postgres' 65,535 parameter limit.
@@ -632,7 +632,8 @@ func (s *Store) UpdateAgentPromptVersion(ctx context.Context, agentID int, promp
 	if agent == nil {
 		return nil
 	}
-	info := proto.Clone(agent.Info).(*models.AgentInfo)
+
+	info := proto.CloneOf(agent.Info)
 	info.PromptVersion = promptVersion
 	info.PendingPromptNotice = nil
 	_, err = s.UpdateAgent(ctx, agent, &UpdateAgentMessage{Info: info})
@@ -652,7 +653,7 @@ func (s *Store) SetPendingPromptNotice(ctx context.Context, agentID int, notice 
 	if agent == nil {
 		return nil
 	}
-	info := proto.Clone(agent.Info).(*models.AgentInfo)
+	info := proto.CloneOf(agent.Info)
 	info.PendingPromptNotice = notice
 	_, err = s.UpdateAgent(ctx, agent, &UpdateAgentMessage{Info: info})
 	return err
@@ -668,7 +669,7 @@ func (s *Store) ClearPendingPromptNotice(ctx context.Context, agentID int) error
 	if agent == nil {
 		return nil
 	}
-	info := proto.Clone(agent.Info).(*models.AgentInfo)
+	info := proto.CloneOf(agent.Info)
 	info.PendingPromptNotice = nil
 	_, err = s.UpdateAgent(ctx, agent, &UpdateAgentMessage{Info: info})
 	return err

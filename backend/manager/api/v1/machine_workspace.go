@@ -5,14 +5,15 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/Ranxy/laelia/backend/agent/pi"
 	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/component/machinebuild"
 	"github.com/Ranxy/laelia/backend/manager/store"
-	"github.com/google/uuid"
-	"github.com/pkg/errors"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func (s *MachineService) ListMachineAgents(ctx context.Context, req *connect.Request[v1pb.ListMachineAgentsRequest]) (*connect.Response[v1pb.ListMachineAgentsResponse], error) {

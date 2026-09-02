@@ -216,7 +216,7 @@ func reanchorPrompt(ctxState *executor.ContextState, name, ownerDisplayName, tea
 // machine-binary prompt bundle version, the dynamic part is the hash of
 // persona/team/owner. It updates ctxState.PromptVersion to the newly confirmed
 // value (the caller persists it via persistContextState).
-func (c *commandStream) applyPromptVersion(ctxState *executor.ContextState, promptVersion, turnPrompt string) string {
+func (*commandStream) applyPromptVersion(ctxState *executor.ContextState, promptVersion, turnPrompt string) string {
 	if ctxState == nil || promptVersion == "" || ctxState.PromptVersion == promptVersion {
 		return turnPrompt
 	}

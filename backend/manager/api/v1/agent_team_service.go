@@ -306,7 +306,7 @@ func (s *AgentTeamService) validateAndConvertMembers(ctx context.Context, user *
 		if !isAdmin && agent.OwnerID != user.ID {
 			return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("only the owner of agent %q can add it to a team", m.GetAgent()))
 		}
-		role := store.AgentTeamRoleMember
+		var role int16
 		switch m.GetRole() {
 		case v1pb.AgentTeamRole_AGENT_TEAM_ROLE_LEADER:
 			role = store.AgentTeamRoleLeader
@@ -385,6 +385,7 @@ func (s *AgentTeamService) convertToV1AgentTeam(ctx context.Context, team *store
 			role = v1pb.AgentTeamRole_AGENT_TEAM_ROLE_LEADER
 		case store.AgentTeamRoleMember:
 			role = v1pb.AgentTeamRole_AGENT_TEAM_ROLE_MEMBER
+		default:
 		}
 		agentName := common.FormatAgentUID(m.AgentResourceID)
 		out.Members = append(out.Members, &v1pb.AgentTeamMember{

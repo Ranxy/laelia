@@ -280,7 +280,7 @@ UPDATE agent_team SET %s, updated_at = now() WHERE id = $%d
 // replaceTeamMembersTx deletes and re-inserts a team's members inside a
 // transaction. It validates that exactly one leader is present and that no
 // agent is already a member of another team.
-func (s *Store) replaceTeamMembersTx(ctx context.Context, tx *sql.Tx, teamID string, members []*AgentTeamMemberMessage) error {
+func (*Store) replaceTeamMembersTx(ctx context.Context, tx *sql.Tx, teamID string, members []*AgentTeamMemberMessage) error {
 	if len(members) == 0 {
 		return errors.New("agent team must have at least one member")
 	}

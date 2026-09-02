@@ -7,12 +7,13 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
-	"github.com/Ranxy/laelia/backend/common"
-	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
-	"github.com/Ranxy/laelia/backend/manager/store"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/Ranxy/laelia/backend/common"
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
+	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
 func (s *CommandService) requireReactionCaller(ctx context.Context, convID, msgID uuid.UUID) (principalID, agentID *int, err error) {

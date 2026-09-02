@@ -3,7 +3,6 @@ package daemon
 import (
 	"context"
 
-	"connectrpc.com/connect"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -11,6 +10,8 @@ import (
 	"net"
 	"net/http"
 	"strings"
+
+	"connectrpc.com/connect"
 
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/structpb"

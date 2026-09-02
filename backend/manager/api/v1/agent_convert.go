@@ -4,14 +4,15 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/Ranxy/laelia/backend/agent/executor"
 	"github.com/Ranxy/laelia/backend/agent/pi"
 	"github.com/Ranxy/laelia/backend/common"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (s *AgentService) convertToAgent(ctx context.Context, agent *store.AgentMessage, connected bool) *v1pb.Agent {

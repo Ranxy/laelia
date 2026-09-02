@@ -5,9 +5,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
 // commandBus owns the live command output/event watchers and their broadcast

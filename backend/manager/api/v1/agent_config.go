@@ -7,6 +7,10 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/Ranxy/laelia/backend/agent/executor"
 	"github.com/Ranxy/laelia/backend/agent/pi"
 	"github.com/Ranxy/laelia/backend/agent/provider"
@@ -15,9 +19,6 @@ import (
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
-	"github.com/google/uuid"
-	"github.com/pkg/errors"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Request[v1pb.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error) {

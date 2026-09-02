@@ -6,7 +6,7 @@ import "testing"
 // Start must not spawn a second set of scan loops on the same WaitGroup.
 // The loops are cancelled immediately, before the 1s ticker can fire, so no
 // store/dispatcher is needed.
-func TestSchedulerStartSingleFlight(t *testing.T) {
+func TestSchedulerStartSingleFlight(*testing.T) {
 	s := New(nil, nil)
 	s.Start()
 	s.Start() // must be a no-op, not a second set of loops.

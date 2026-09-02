@@ -7,12 +7,13 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/Ranxy/laelia/backend/common"
-	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
-	"github.com/Ranxy/laelia/backend/manager/store"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/Ranxy/laelia/backend/common"
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
+	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
 func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, ownerHandle string, peerName string, peerResourceName string, memberCount int, unreadCount int32, title string, readVersion int64) *v1pb.Conversation {
