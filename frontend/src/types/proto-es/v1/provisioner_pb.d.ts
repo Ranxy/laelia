@@ -310,6 +310,14 @@ export declare type ProvisionerStatus = Message<"laelia.v1.ProvisionerStatus"> &
    * @generated from field: string config_digest = 6;
    */
   configDigest: string;
+
+  /**
+   * RetainData echoes the provisioner's configured data retention; the
+   * manager sends it as keep_data on teardown jobs (design §6.4).
+   *
+   * @generated from field: bool retain_data = 7;
+   */
+  retainData: boolean;
 };
 
 /**
@@ -431,6 +439,14 @@ export declare type ProvisionerReady = Message<"laelia.v1.ProvisionerReady"> & {
    * @generated from field: bool auto_upgrade = 5;
    */
   autoUpgrade: boolean;
+
+  /**
+   * RetainData echoes the provisioner's config flag; persisted in the
+   * provisioner status and used as keep_data on teardown jobs (design §6.4).
+   *
+   * @generated from field: bool retain_data = 6;
+   */
+  retainData: boolean;
 };
 
 /**

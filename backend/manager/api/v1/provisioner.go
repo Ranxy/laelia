@@ -281,6 +281,7 @@ func (s *ProvisionerService) convertToProvisioner(ctx context.Context, p *store.
 			Version:      st.Version,
 			Backend:      st.Backend,
 			AutoUpgrade:  st.AutoUpgrade,
+			RetainData:   st.RetainData,
 			ConfigDigest: st.ConfigDigest,
 		}
 		if st.LastSeen > 0 {

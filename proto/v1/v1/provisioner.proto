@@ -184,6 +184,9 @@ message ProvisionerStatus {
   string backend = 4;
   bool auto_upgrade = 5;
   string config_digest = 6;
+  // RetainData echoes the provisioner's configured data retention; the
+  // manager sends it as keep_data on teardown jobs (design §6.4).
+  bool retain_data = 7;
 }
 
 // ========== Provisioner Control Channel messages ==========
@@ -218,6 +221,9 @@ message ProvisionerReady {
   // AutoUpgrade echoes the provisioner's config flag; persisted in the
   // provisioner status and honored by the manager's auto-upgrade loop.
   bool auto_upgrade = 5;
+  // RetainData echoes the provisioner's config flag; persisted in the
+  // provisioner status and used as keep_data on teardown jobs (design §6.4).
+  bool retain_data = 6;
 }
 
 // ProvisionMachineJob carries everything the provisioner needs to create one

@@ -53,6 +53,9 @@ type Config struct {
 	// AutoUpgrade is echoed in ProvisionerReady; the manager's auto-upgrade
 	// loop honors it for this provisioner's machines.
 	AutoUpgrade bool
+	// RetainData is echoed in ProvisionerReady; the manager sends it back as
+	// keep_data on teardown jobs so it can honor the configured retention.
+	RetainData bool
 	// ManagerURLOverride replaces job manager_url so pods reach the manager
 	// through an in-cluster URL instead of the public one.
 	ManagerURLOverride string
@@ -194,6 +197,7 @@ func (c *Client) runOnce(ctx context.Context) error {
 			Backend:      c.cfg.Backend,
 			ConfigDigest: c.cfg.ConfigDigest,
 			AutoUpgrade:  c.cfg.AutoUpgrade,
+			RetainData:   c.cfg.RetainData,
 		}},
 	}); err != nil {
 		return err

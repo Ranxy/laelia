@@ -58,6 +58,14 @@ type Resources struct {
 	Limits   map[string]string `yaml:"limits,omitempty"`
 }
 
+// Storage is the passthrough data-volume sizing for machine workloads (the
+// kubernetes PVC). Size is a k8s quantity ("10Gi"); an empty size means the
+// backend default.
+type Storage struct {
+	Size             string `yaml:"size"`
+	StorageClassName string `yaml:"storage_class,omitempty"`
+}
+
 // Config is the backend-neutral slice of the provisioner configuration,
 // handed to every backend factory. Backend-specific validation (e.g. a
 // required namespace) belongs to the backend implementation.
@@ -65,6 +73,7 @@ type Config struct {
 	Namespace  string
 	RetainData bool
 	Resources  Resources
+	Storage    Storage
 	ExtraEnv   map[string]string
 }
 

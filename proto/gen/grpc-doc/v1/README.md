@@ -9335,6 +9335,7 @@ virtualization backend on the manager&#39;s behalf.
 | capabilities | [string](#string) | repeated |  |
 | config_digest | [string](#string) |  | Short hash of the provisioner&#39;s effective config, surfaced for drift visibility (e.g. a manager_url_override in effect). |
 | auto_upgrade | [bool](#bool) |  | AutoUpgrade echoes the provisioner&#39;s config flag; persisted in the provisioner status and honored by the manager&#39;s auto-upgrade loop. |
+| retain_data | [bool](#bool) |  | RetainData echoes the provisioner&#39;s config flag; persisted in the provisioner status and used as keep_data on teardown jobs (design §6.4). |
 
 
 
@@ -9356,6 +9357,7 @@ ProvisionerChannel stream.
 | backend | [string](#string) |  |  |
 | auto_upgrade | [bool](#bool) |  |  |
 | config_digest | [string](#string) |  |  |
+| retain_data | [bool](#bool) |  | RetainData echoes the provisioner&#39;s configured data retention; the manager sends it as keep_data on teardown jobs (design §6.4). |
 
 
 

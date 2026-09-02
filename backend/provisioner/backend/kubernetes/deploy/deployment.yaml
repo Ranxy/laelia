@@ -1,0 +1,94 @@
+# laelia-provisioner Deployment: one replica running `laelia-provisioner run`
+# in-cluster with the namespace-scoped RBAC above. The configuration arrives
+# via a ConfigMap (manager URL, backend, namespace, sizing) plus the
+# provisioner token, which is injected as an environment variable from a
+# Secret and referenced in the config file — never committed to a repo.
+#
+# Apply order: crd.yaml → this file's namespace/serviceaccount/rbac →
+# secret (token) → deployment. manager_url must be reachable from the pods
+# the provisioner creates (set manager_url_override to an in-cluster service
+# URL when the public URL is not routable from pods).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: laelia-machines
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: laelia-provisioner-token
+  namespace: laelia-machines
+type: Opaque
+stringData:
+  # Paste the one-time token from Settings → Provisioners here.
+  token: "REPLACE_WITH_PROVISIONER_TOKEN"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: laelia-provisioner-config
+  namespace: laelia-machines
+data:
+  provisioner.yaml: |
+    manager_url: https://laelia.example.com
+    backend: kubernetes
+    namespace: laelia-machines
+    # Optional knobs:
+    # manager_url_override: http://laelia-manager.laelia-machines.svc:8181
+    # retain_data: false
+    # auto_upgrade: false
+    # storage:
+    #   size: 10Gi
+    #   storage_class: ""
+    # resources:
+    #   requests: {cpu: "1", memory: "2Gi"}
+    #   limits: {memory: "4Gi"}
+    # extra_env:
+    #   LAELIA_INSECURE: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laelia-provisioner
+  namespace: laelia-machines
+  labels:
+    app.kubernetes.io/name: laelia-provisioner
+    app.kubernetes.io/managed-by: laelia-provisioner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: laelia-provisioner
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: laelia-provisioner
+        app.kubernetes.io/managed-by: laelia-provisioner
+    spec:
+      serviceAccountName: laelia-provisioner
+      containers:
+        - name: provisioner
+          image: laelia/provisioner:latest
+          imagePullPolicy: IfNotPresent
+          args: ["run", "--config", "/etc/laelia-provisioner/provisioner.yaml"]
+          env:
+            # The manager client token, injected from a Secret; the config
+            # file intentionally carries no token (LAELIA_PROVISIONER_TOKEN
+            # applies when the file and flags leave it empty).
+            - name: LAELIA_PROVISIONER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: laelia-provisioner-token
+                  key: token
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/laelia-provisioner
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: laelia-provisioner-config

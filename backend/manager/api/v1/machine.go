@@ -316,7 +316,7 @@ func (s *MachineService) DeleteMachine(ctx context.Context, req *connect.Request
 	if provisioner != nil && s.dispatcher != nil && s.dispatcher.IsProvisionerConnected(provisioner.ID) {
 		if err := s.dispatcher.SendDeprovisionMachineJob(provisioner.ID, &v1pb.DeprovisionMachineJob{
 			Machine:  common.FormatMachineUID(resourceID),
-			KeepData: false,
+			KeepData: provisioner.Status.GetRetainData(),
 		}); err != nil {
 			slog.Warn("failed to push deprovision job; it will replay on reconnect",
 				slog.String("machine", resourceID), log.WithError(err))

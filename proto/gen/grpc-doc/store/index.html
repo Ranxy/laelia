@@ -2722,6 +2722,15 @@ auto-triggers binary upgrades for this provisioner&#39;s machines. </p></td>
 reported for drift visibility (e.g. manager_url_override in effect). </p></td>
                 </tr>
               
+                <tr>
+                  <td>retain_data</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>RetainData echoes the provisioner&#39;s config flag; the manager sends it as
+keep_data on DeprovisionMachineJob so teardown honors the retention the
+provisioner was configured with (design §6.4). </p></td>
+                </tr>
+              
             </tbody>
           </table>
 

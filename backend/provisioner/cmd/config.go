@@ -36,6 +36,9 @@ type Config struct {
 	AutoUpgrade bool `yaml:"auto_upgrade"`
 	// Resources sizes machine workloads (backend passthrough).
 	Resources backend.Resources `yaml:"resources"`
+	// Storage sizes machine data volumes (backend passthrough; the kubernetes
+	// backend uses it for the data PVC). Empty size = backend default.
+	Storage backend.Storage `yaml:"storage"`
 	// ExtraEnv passes additional environment entries into machine workloads
 	// (e.g. LAELIA_INSECURE for a self-signed manager certificate).
 	ExtraEnv map[string]string `yaml:"extra_env"`
@@ -59,6 +62,14 @@ func loadConfig() (*Config, error) {
 	}
 	if flags.token != "" {
 		cfg.Token = flags.token
+	}
+	// In-cluster deployments inject the token as an environment variable from
+	// a Secret (deploy/deployment.yaml); it applies last so file/flag values
+	// always win.
+	if cfg.Token == "" {
+		if envToken := os.Getenv("LAELIA_PROVISIONER_TOKEN"); envToken != "" {
+			cfg.Token = envToken
+		}
 	}
 	if flags.backend != "" {
 		cfg.Backend = flags.backend
@@ -89,6 +100,7 @@ func (c *Config) backendConfig() backend.Config {
 		Namespace:  c.Namespace,
 		RetainData: c.RetainData,
 		Resources:  c.Resources,
+		Storage:    c.Storage,
 		ExtraEnv:   c.ExtraEnv,
 	}
 }
@@ -102,6 +114,8 @@ func (c *Config) Digest() string {
 	_, _ = fmt.Fprintf(h, "namespace=%s\n", c.Namespace)
 	_, _ = fmt.Fprintf(h, "manager_url_override=%s\n", c.ManagerURLOverride)
 	_, _ = fmt.Fprintf(h, "retain_data=%t\n", c.RetainData)
+	_, _ = fmt.Fprintf(h, "storage_size=%s\n", c.Storage.Size)
+	_, _ = fmt.Fprintf(h, "storage_class=%s\n", c.Storage.StorageClassName)
 	writeSortedEntries := func(label string, entries map[string]string) {
 		keys := make([]string, 0, len(entries))
 		for k := range entries {

@@ -601,13 +601,16 @@ func (x *Provisioner) GetCreatedBy() string {
 // ProvisionerStatus is the runtime status of a provisioner, derived from its
 // ProvisionerChannel stream.
 type ProvisionerStatus struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Connected     bool                   `protobuf:"varint,1,opt,name=connected,proto3" json:"connected,omitempty"`
-	LastSeen      *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=last_seen,json=lastSeen,proto3" json:"last_seen,omitempty"`
-	Version       string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
-	Backend       string                 `protobuf:"bytes,4,opt,name=backend,proto3" json:"backend,omitempty"`
-	AutoUpgrade   bool                   `protobuf:"varint,5,opt,name=auto_upgrade,json=autoUpgrade,proto3" json:"auto_upgrade,omitempty"`
-	ConfigDigest  string                 `protobuf:"bytes,6,opt,name=config_digest,json=configDigest,proto3" json:"config_digest,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Connected    bool                   `protobuf:"varint,1,opt,name=connected,proto3" json:"connected,omitempty"`
+	LastSeen     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=last_seen,json=lastSeen,proto3" json:"last_seen,omitempty"`
+	Version      string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
+	Backend      string                 `protobuf:"bytes,4,opt,name=backend,proto3" json:"backend,omitempty"`
+	AutoUpgrade  bool                   `protobuf:"varint,5,opt,name=auto_upgrade,json=autoUpgrade,proto3" json:"auto_upgrade,omitempty"`
+	ConfigDigest string                 `protobuf:"bytes,6,opt,name=config_digest,json=configDigest,proto3" json:"config_digest,omitempty"`
+	// RetainData echoes the provisioner's configured data retention; the
+	// manager sends it as keep_data on teardown jobs (design §6.4).
+	RetainData    bool `protobuf:"varint,7,opt,name=retain_data,json=retainData,proto3" json:"retain_data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -682,6 +685,13 @@ func (x *ProvisionerStatus) GetConfigDigest() string {
 		return x.ConfigDigest
 	}
 	return ""
+}
+
+func (x *ProvisionerStatus) GetRetainData() bool {
+	if x != nil {
+		return x.RetainData
+	}
+	return false
 }
 
 type ProvisionerStreamMessage struct {
@@ -910,7 +920,10 @@ type ProvisionerReady struct {
 	ConfigDigest string `protobuf:"bytes,4,opt,name=config_digest,json=configDigest,proto3" json:"config_digest,omitempty"`
 	// AutoUpgrade echoes the provisioner's config flag; persisted in the
 	// provisioner status and honored by the manager's auto-upgrade loop.
-	AutoUpgrade   bool `protobuf:"varint,5,opt,name=auto_upgrade,json=autoUpgrade,proto3" json:"auto_upgrade,omitempty"`
+	AutoUpgrade bool `protobuf:"varint,5,opt,name=auto_upgrade,json=autoUpgrade,proto3" json:"auto_upgrade,omitempty"`
+	// RetainData echoes the provisioner's config flag; persisted in the
+	// provisioner status and used as keep_data on teardown jobs (design §6.4).
+	RetainData    bool `protobuf:"varint,6,opt,name=retain_data,json=retainData,proto3" json:"retain_data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -976,6 +989,13 @@ func (x *ProvisionerReady) GetConfigDigest() string {
 func (x *ProvisionerReady) GetAutoUpgrade() bool {
 	if x != nil {
 		return x.AutoUpgrade
+	}
+	return false
+}
+
+func (x *ProvisionerReady) GetRetainData() bool {
+	if x != nil {
+		return x.RetainData
 	}
 	return false
 }
@@ -1325,14 +1345,16 @@ const file_v1_provisioner_proto_rawDesc = "" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\tcreatedAt\x12\"\n" +
 	"\n" +
 	"created_by\x18\b \x01(\tB\x03\xe0A\x03R\tcreatedBy:3\xeaA0\n" +
-	"\x12laelia/Provisioner\x12\x1aprovisioners/{provisioner}\"\xe6\x01\n" +
+	"\x12laelia/Provisioner\x12\x1aprovisioners/{provisioner}\"\x87\x02\n" +
 	"\x11ProvisionerStatus\x12\x1c\n" +
 	"\tconnected\x18\x01 \x01(\bR\tconnected\x127\n" +
 	"\tlast_seen\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\blastSeen\x12\x18\n" +
 	"\aversion\x18\x03 \x01(\tR\aversion\x12\x18\n" +
 	"\abackend\x18\x04 \x01(\tR\abackend\x12!\n" +
 	"\fauto_upgrade\x18\x05 \x01(\bR\vautoUpgrade\x12#\n" +
-	"\rconfig_digest\x18\x06 \x01(\tR\fconfigDigest\"\xc7\x01\n" +
+	"\rconfig_digest\x18\x06 \x01(\tR\fconfigDigest\x12\x1f\n" +
+	"\vretain_data\x18\a \x01(\bR\n" +
+	"retainData\"\xc7\x01\n" +
 	"\x18ProvisionerStreamMessage\x123\n" +
 	"\x05ready\x18\x01 \x01(\v2\x1b.laelia.v1.ProvisionerReadyH\x00R\x05ready\x12D\n" +
 	"\fjob_progress\x18\x02 \x01(\v2\x1f.laelia.v1.ProvisionJobProgressH\x00R\vjobProgress\x12%\n" +
@@ -1343,13 +1365,15 @@ const file_v1_provisioner_proto_rawDesc = "" +
 	"\x0fdeprovision_job\x18\x02 \x01(\v2 .laelia.v1.DeprovisionMachineJobH\x00R\x0edeprovisionJob\x12%\n" +
 	"\x04pong\x18\x03 \x01(\v2\x0f.laelia.v1.PongH\x00R\x04pong\x12U\n" +
 	"\x11disconnect_notice\x18\x04 \x01(\v2&.laelia.v1.ProvisionerDisconnectNoticeH\x00R\x10disconnectNoticeB\t\n" +
-	"\amessage\"\xb2\x01\n" +
+	"\amessage\"\xd3\x01\n" +
 	"\x10ProvisionerReady\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x18\n" +
 	"\abackend\x18\x02 \x01(\tR\abackend\x12\"\n" +
 	"\fcapabilities\x18\x03 \x03(\tR\fcapabilities\x12#\n" +
 	"\rconfig_digest\x18\x04 \x01(\tR\fconfigDigest\x12!\n" +
-	"\fauto_upgrade\x18\x05 \x01(\bR\vautoUpgrade\"\xe1\x03\n" +
+	"\fauto_upgrade\x18\x05 \x01(\bR\vautoUpgrade\x12\x1f\n" +
+	"\vretain_data\x18\x06 \x01(\bR\n" +
+	"retainData\"\xe1\x03\n" +
 	"\x13ProvisionMachineJob\x12\x18\n" +
 	"\amachine\x18\x01 \x01(\tR\amachine\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12!\n" +

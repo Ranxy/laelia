@@ -1,0 +1,67 @@
+# Namespace-scoped RBAC for the laelia provisioner (design §12): the
+# minimum set to drive LaeliaMachine workloads inside one namespace — CRD
+# cluster-scoped access is separate (see crd.yaml + the clusterrolebinding
+# note below) and no cluster-admin is required.
+#
+# The CRD itself (crd.yaml) is a cluster-scoped object and must be applied by
+# a cluster admin once; the provisioner's Role only needs the CR *instances*,
+# which are namespaced.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: laelia-provisioner
+  namespace: laelia-machines
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: laelia-provisioner
+  namespace: laelia-machines
+rules:
+  # LaeliaMachine CRs, their status, and the finalizer the reconciler manages.
+  - apiGroups: ["laelia.sh"]
+    resources: ["laeliamachines"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["laelia.sh"]
+    resources: ["laeliamachines/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["laelia.sh"]
+    resources: ["laeliamachines/finalizers"]
+    verbs: ["update"]
+  # The bootstrap secret (machine.json + bootstrap script) is written by the
+  # provisioner and read by the pod's init container.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Workload objects owned by the CRs.
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Pods are read for status; PVCs are deleted by the retention policy.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "delete"]
+  # Kubernetes events recorded by the reconciler (kubectl describe).
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: laelia-provisioner
+  namespace: laelia-machines
+subjects:
+  - kind: ServiceAccount
+    name: laelia-provisioner
+    namespace: laelia-machines
+roleRef:
+  kind: Role
+  name: laelia-provisioner
+  apiGroup: rbac.authorization.k8s.io

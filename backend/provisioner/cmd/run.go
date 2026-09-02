@@ -52,6 +52,7 @@ func runProvisioner() error {
 		Token:              cfg.Token,
 		Backend:            cfg.Backend,
 		AutoUpgrade:        cfg.AutoUpgrade,
+		RetainData:         cfg.RetainData,
 		ManagerURLOverride: cfg.ManagerURLOverride,
 		ConfigDigest:       cfg.Digest(),
 		Insecure:           flags.insecure,

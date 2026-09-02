@@ -150,6 +150,7 @@ func (s *ProvisionerStreamService) handleReady(provisioner *store.ProvisionerMes
 		Version:      ready.GetVersion(),
 		Backend:      ready.GetBackend(),
 		AutoUpgrade:  ready.GetAutoUpgrade(),
+		RetainData:   ready.GetRetainData(),
 		ConfigDigest: ready.GetConfigDigest(),
 	}
 	if ready.GetBackend() != "" && ready.GetBackend() != provisioner.Backend {

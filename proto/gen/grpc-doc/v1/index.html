@@ -22538,6 +22538,14 @@ visibility (e.g. a manager_url_override in effect). </p></td>
 provisioner status and honored by the manager&#39;s auto-upgrade loop. </p></td>
                 </tr>
               
+                <tr>
+                  <td>retain_data</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>RetainData echoes the provisioner&#39;s config flag; persisted in the
+provisioner status and used as keep_data on teardown jobs (design §6.4). </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -22595,6 +22603,14 @@ provisioner status and honored by the manager&#39;s auto-upgrade loop. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>retain_data</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>RetainData echoes the provisioner&#39;s configured data retention; the
+manager sends it as keep_data on teardown jobs (design §6.4). </p></td>
                 </tr>
               
             </tbody>

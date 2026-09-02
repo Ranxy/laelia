@@ -112,7 +112,11 @@ type ProvisionerStatus struct {
 	AutoUpgrade bool `protobuf:"varint,5,opt,name=auto_upgrade,json=autoUpgrade,proto3" json:"auto_upgrade,omitempty"`
 	// ConfigDigest is a short hash of the provisioner's effective config,
 	// reported for drift visibility (e.g. manager_url_override in effect).
-	ConfigDigest  string `protobuf:"bytes,6,opt,name=config_digest,json=configDigest,proto3" json:"config_digest,omitempty"`
+	ConfigDigest string `protobuf:"bytes,6,opt,name=config_digest,json=configDigest,proto3" json:"config_digest,omitempty"`
+	// RetainData echoes the provisioner's config flag; the manager sends it as
+	// keep_data on DeprovisionMachineJob so teardown honors the retention the
+	// provisioner was configured with (design §6.4).
+	RetainData    bool `protobuf:"varint,7,opt,name=retain_data,json=retainData,proto3" json:"retain_data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -187,6 +191,13 @@ func (x *ProvisionerStatus) GetConfigDigest() string {
 		return x.ConfigDigest
 	}
 	return ""
+}
+
+func (x *ProvisionerStatus) GetRetainData() bool {
+	if x != nil {
+		return x.RetainData
+	}
+	return false
 }
 
 // ProvisioningStatus is the storage-layer provisioning state carried on the
@@ -290,14 +301,16 @@ var File_store_provisioner_proto protoreflect.FileDescriptor
 
 const file_store_provisioner_proto_rawDesc = "" +
 	"\n" +
-	"\x17store/provisioner.proto\x12\flaelia.store\"\xca\x01\n" +
+	"\x17store/provisioner.proto\x12\flaelia.store\"\xeb\x01\n" +
 	"\x11ProvisionerStatus\x12\x1c\n" +
 	"\tconnected\x18\x01 \x01(\bR\tconnected\x12\x1b\n" +
 	"\tlast_seen\x18\x02 \x01(\x03R\blastSeen\x12\x18\n" +
 	"\aversion\x18\x03 \x01(\tR\aversion\x12\x18\n" +
 	"\abackend\x18\x04 \x01(\tR\abackend\x12!\n" +
 	"\fauto_upgrade\x18\x05 \x01(\bR\vautoUpgrade\x12#\n" +
-	"\rconfig_digest\x18\x06 \x01(\tR\fconfigDigest\"\x8b\x03\n" +
+	"\rconfig_digest\x18\x06 \x01(\tR\fconfigDigest\x12\x1f\n" +
+	"\vretain_data\x18\a \x01(\bR\n" +
+	"retainData\"\x8b\x03\n" +
 	"\x12ProvisioningStatus\x125\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x1f.laelia.store.ProvisioningPhaseR\x05phase\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12#\n" +

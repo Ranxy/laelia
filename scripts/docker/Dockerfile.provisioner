@@ -1,0 +1,51 @@
+# syntax=docker/dockerfile:1
+# Build context must be the repo root (.). Builds the laelia-provisioner
+# image: a small runtime carrying the provisioner binary only — the operator
+# that turns ProvisionMachineJob frames into LaeliaMachine CRs, headless
+# Services, and single-replica StatefulSets in its namespace (design §7, §8).
+#
+# The provisioner talks to the manager over an outbound HTTPS stream and to
+# the k8s API server with its service account, so the runtime image needs
+# nothing beyond the binary and CA certificates.
+
+FROM golang:1.26.5-alpine3.23 AS build
+ARG VERSION=local
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+# LAELIA_BUILD_PROXY is a custom arg so the proxy only reaches the build
+# stage; BuildKit would otherwise auto-inject standard proxy args into every
+# stage, including the final runtime image.
+ARG LAELIA_BUILD_PROXY
+ENV VERSION=${VERSION} GIT_COMMIT=${GIT_COMMIT} BUILD_TIME=${BUILD_TIME}
+ENV http_proxy=${LAELIA_BUILD_PROXY} https_proxy=${LAELIA_BUILD_PROXY} no_proxy=localhost,127.0.0.1
+ENV HTTP_PROXY=${LAELIA_BUILD_PROXY} HTTPS_PROXY=${LAELIA_BUILD_PROXY} NO_PROXY=localhost,127.0.0.1
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -trimpath \
+	-ldflags "-w -s \
+	-X github.com/Ranxy/laelia/backend/provisioner/version.Version=${VERSION} \
+	-X github.com/Ranxy/laelia/backend/provisioner/version.GitCommit=${GIT_COMMIT} \
+	-X github.com/Ranxy/laelia/backend/provisioner/version.BuildTime=${BUILD_TIME}" \
+	-o /out/laelia-provisioner \
+	./backend/provisioner/bin/provisioner
+
+FROM debian:bookworm-slim
+ARG VERSION=local
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+LABEL org.opencontainers.image.version=${VERSION}
+LABEL org.opencontainers.image.revision=${GIT_COMMIT}
+LABEL org.opencontainers.image.created=${BUILD_TIME}
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends ca-certificates \
+	&& rm -rf /var/lib/apt/lists/* \
+	&& useradd --create-home --uid 1001 laelia
+COPY --from=build /out/laelia-provisioner /usr/local/bin/laelia-provisioner
+USER laelia
+# `run` reads the yaml config (deploy/deployment.yaml mounts it) and the
+# token from the LAELIA_PROVISIONER_TOKEN environment (injected from a
+# Secret); in-cluster kubeconfig comes from the service account.
+ENTRYPOINT ["/usr/local/bin/laelia-provisioner"]
+CMD ["run"]

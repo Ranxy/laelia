@@ -19,9 +19,11 @@ import (
 	"github.com/Ranxy/laelia/backend/provisioner/client"
 	provisionercmd "github.com/Ranxy/laelia/backend/provisioner/cmd"
 
-	// Registry stubs: known backend names fail with a clear
-	// ErrUnsupportedBackend message until their implementations land.
+	// The kubernetes backend hosts the operator; the docker stub registers
+	// under the same name and fails fast with ErrUnsupportedBackend until its
+	// implementation lands.
 	_ "github.com/Ranxy/laelia/backend/provisioner/backend/docker"
+	_ "github.com/Ranxy/laelia/backend/provisioner/backend/kubernetes"
 )
 
 func main() {

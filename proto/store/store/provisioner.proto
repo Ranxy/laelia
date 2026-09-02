@@ -23,6 +23,10 @@ message ProvisionerStatus {
   // ConfigDigest is a short hash of the provisioner's effective config,
   // reported for drift visibility (e.g. manager_url_override in effect).
   string config_digest = 6;
+  // RetainData echoes the provisioner's config flag; the manager sends it as
+  // keep_data on DeprovisionMachineJob so teardown honors the retention the
+  // provisioner was configured with (design §6.4).
+  bool retain_data = 7;
 }
 
 // ProvisioningPhase is the lifecycle of one provisioning job. The manager

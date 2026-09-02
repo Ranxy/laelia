@@ -974,6 +974,7 @@ provisioner.status (jsonb).
 | backend | [string](#string) |  | Backend echoes the provisioner&#39;s configured backend type (&#34;kubernetes&#34;, &#34;docker&#34;, ...). |
 | auto_upgrade | [bool](#bool) |  | AutoUpgrade echoes the provisioner&#39;s config flag: when true the manager auto-triggers binary upgrades for this provisioner&#39;s machines. |
 | config_digest | [string](#string) |  | ConfigDigest is a short hash of the provisioner&#39;s effective config, reported for drift visibility (e.g. manager_url_override in effect). |
+| retain_data | [bool](#bool) |  | RetainData echoes the provisioner&#39;s config flag; the manager sends it as keep_data on DeprovisionMachineJob so teardown honors the retention the provisioner was configured with (design §6.4). |
 
 
 
