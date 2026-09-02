@@ -316,6 +316,103 @@ docker load < laelia-manager-image.tar.gz
 
 对于原生 Manager，请改为复制 `build/laelia` 二进制。machine 宿主机从 Manager 本身安装 `laelia-machine`，因此只要它们能访问 Manager，就不需要单独传输镜像或二进制。
 
+## 8. 机器 Provisioner（可选）
+
+*Provisioner* 是按需创建 machine 工作负载的企业级 worker。管理员在 Manager UI 中注册一次之后，任何持有 `laelia.provisioners.provision` 权限的用户在创建 Machine 页面的“预置机器”标签页中点击创建，机器即可自动上线——无需安装命令，也无需设备码审批。它与 Manager 的连接方向和 machine 一样是**出站**连接，因此 Manager 或集群除了现有 Manager 端点之外不需要再暴露任何东西。
+
+各组件的分工：
+
+- **Manager** 持有 provisioner 注册表、machine 行和任务状态。它从不直接访问集群——任务通过一条长连的 provisioner 流下发，状态再回传上来。
+- **Provisioner**（`laelia-provisioner`）运行在客户的基础设施中（当前为 Kubernetes 集群）。它把任务转换成 `LaeliaMachine` CR 及其 Secret/Service/StatefulSet 子资源，并把 pod 驱动的进度上报。任务在重连时会重放，因此 provisioner 在预置过程中被杀掉是安全的。
+- **machine pod** 就是一台普通的 laelia machine：运行时镜像只提供 agent 环境；machine 二进制由 init 容器在 pod 启动时从 Manager 下载到 PVC 中，之后的升级全部原地完成。
+
+### 8.1 Manager 侧配置
+
+1. **注册 provisioner** — 设置 → Provisioners → *添加 provisioner*。一次性 provisioner token 会在“仅展示一次”的对话框中显示；请把它粘贴到 provisioner 的配置文件中（见下文）。轮换 token 会让旧 token 在下次使用时失效；删除 provisioner 时若仍有机器绑定会被拒绝。
+2. **配置运行时镜像** — 设置 → 通用 → *机器运行时镜像*（例如 `registry.example.com/laelia/machine-runtime:1.2.3`）。未配置该项时预置机器会快速失败。
+3. **开放自助（可选）** — 通过 设置 → 角色 / 访问控制，将预定义的 `machineProvisioner` 角色（或 `laelia.provisioners.provision` 权限）绑定给用户/用户组。工作空间管理员自动持有。只有这些用户才能看到创建 Machine 页面的“预置机器”标签页。
+
+### 8.2 安装 provisioner（kubernetes 后端）
+
+要求 **kubernetes ≥ 1.27**（StatefulSet PVC 自动删除为 beta 特性）——1.32+ 转正。本版本仅支持 amd64 节点。
+
+构建并加载镜像：
+
+```bash
+LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_provisioner_docker.sh
+# -> laelia/provisioner:latest（推送/传输到集群的 registry）
+```
+
+或构建 linux/amd64 原生二进制（用于非容器安装）：
+
+```bash
+GOOS=linux GOARCH=amd64 scripts/build_laelia_provisioner.sh   # -> build/laelia-provisioner
+```
+
+应用清单（CRD 由集群管理员一次性应用；其余均为 namespace 级）：
+
+```bash
+cd backend/provisioner/backend/kubernetes/deploy
+kubectl apply -f laelia.sh_laeliamachines.yaml   # CRD（集群级，仅一次）
+kubectl apply -f rbac.yaml                       # SA + Role + RoleBinding
+kubectl apply -f deployment.yaml                 # namespace/secret/config/deployment
+```
+
+`deployment.yaml` 中包含 `laelia-provisioner-token` Secret——请把 8.1 步的一次性 token 粘贴进去（`stringData.token`）；配置文件通过 `LAELIA_PROVISIONER_TOKEN` 环境变量读取 token，因此密钥不会落入受版本控制的文件。若以裸进程代替 Deployment 运行：
+
+```bash
+KUBECONFIG=/path/to/kubeconfig ./build/laelia-provisioner run \
+  --config /etc/laelia-provisioner/provisioner.yaml
+```
+
+### 8.3 provisioner 配置参考
+
+```yaml
+manager_url: https://laelia.example.com   # 或 --manager 参数
+token: llprov_...                          # 一次性 token；--token 参数或 LAELIA_PROVISIONER_TOKEN 环境变量
+backend: kubernetes                        # 工作负载后端（当前为 kubernetes）
+namespace: laelia-machines                 # 机器工作负载落地的 namespace
+# 可选项：
+manager_url_override: http://laelia-manager.laelia-machines.svc:8181
+                                           # pod 改用该地址连接 Manager（集群出口受限时）
+retain_data: false                         # 删除时保留机器数据 PVC（StatefulSet Retain）
+auto_upgrade: false                        # Manager 自动为该 provisioner 的机器触发升级
+storage: { size: 10Gi, storage_class: "" } # 每台机器的 PVC 大小/存储类（storage_class 缺省为集群默认）
+resources:
+  requests: { cpu: "1", memory: "2Gi" }
+  limits: { memory: "4Gi" }
+extra_env:                                 # 透传到机器容器的环境变量
+  LAELIA_INSECURE: "true"                  # Manager 使用自签名 https 证书时
+```
+
+`manager_url` 为纯 HTTP 时需要 `--allow-http`（仅开发用）。
+
+### 8.4 RBAC 矩阵
+
+provisioner 的 Role 为 namespace 级；无需 cluster-admin，也没有任何集群范围的 list/watch（设计 §12）。CRD 本身由集群管理员一次性应用。
+
+| 资源 | 动词 | 用途 |
+|---|---|---|
+| `laelia.sh/laeliamachines`（含 `/status`、`/finalizers`） | get/list/watch/create/update/patch/delete | 每台机器一个 CR；CR 即工作负载的期望状态 |
+| `secrets` | get/list/watch/create/update/patch/delete | 引导 Secret（`machine.json` + 引导脚本） |
+| `services` | get/list/watch/create/update/patch/delete | StatefulSet 所需的 headless Service |
+| `apps/statefulsets` | get/list/watch/create/update/patch/delete | 机器的单副本工作负载 |
+| `pods` | get/list/watch | Pod 状态驱动 CR 阶段 |
+| `persistentvolumeclaims` | get/list/watch/delete | 删除时显式清理 PVC（保留策略兜底） |
+| `events` | create/patch | `kubectl describe` 诊断信息 |
+
+### 8.5 运行时镜像契约
+
+运行时镜像提供 agent 运行环境；它**不得**包含 laelia machine 二进制——pod 启动时从 Manager 把二进制下载到 PVC，之后的升级在原地完成。参考镜像：`scripts/docker/Dockerfile.machine-runtime`（node、python、build-essential、git、curl、jq、ripgrep、codex CLI；非 root uid 1001）。任何满足以下契约的镜像均可使用：
+
+- POSIX `sh`、`curl`、`gzip`、`sha256sum`（init 容器的引导脚本）
+- entrypoint 以 exec 方式启动 `$LAELIA_MACHINE_BIN`（默认 `/data/bin/laelia-machine`），并设置 `LAELIA_HOME=/data/laelia`，正确处理 `LAELIA_MANAGER_URL`（`http://` 自动追加 `--allow-http`）、`LAELIA_PROVISIONED=true` → `--provisioned --no-browser --foreground`，以及 `CODEX_HOME`（默认 `/data/laelia/codex`，位于 PVC 上）
+- 以非 root uid 运行
+
+### 8.6 provisioner 为每台机器创建的对象
+
+全部位于所配置的 namespace 中，属主为 `LaeliaMachine` CR `laelia-machine-<machine-uuid-prefix>`：引导 Secret（机器的凭据——CR 上绝不携带 token）、headless Service、带 `volumeClaimTemplates: [data]` 和 amd64 nodeSelector 的单副本 StatefulSet，以及数据 PVC。在 UI 中删除机器会删除 CR；finalizer 会移除 Secret，并（除非 `retain_data: true`）删除数据 PVC。`kubectl get laeliamachines -n laelia-machines` 是集群管理员的机队视图。
+
 ## 故障排查
 
 - `bind: address already in use` — 主机上的 8181 端口已被占用。请停止冲突进程或映射不同的主机端口（`-p 8080:8181`）。
@@ -324,3 +421,12 @@ docker load < laelia-manager-image.tar.gz
 - Machine 无法连接 — 请检查 `--manager` URL 是否可达，以及 HTTP/2 是否在代理中保留；对于自签名证书，请使用 `--insecure`（仅开发用）。如果本地 machine 状态丢失，请重新运行 `laelia-machine --manager <url> setup` 重新认证。
 - Web UI 在 Nginx 后面命令输出卡住 — 请使用 `proxy_buffering off` 以及较长的 `proxy_read_timeout`/`proxy_send_timeout`。
 - 502 Bad Gateway — `proxy_pass` 必须指向实际的 Manager（`127.0.0.1:8181` 或容器名），而不是公共域名，否则代理会循环。
+
+Provisioner 相关：
+
+- 创建机器时报 "runtime image not configured" — 请在 设置 → 通用 中配置机器运行时镜像（第 8.1 节）。
+- 新机器一直停留在 *等待中（Pending）* 阶段 — provisioner 离线或未注册。provisioner 连接后任务会自动重放；请检查 provisioner 日志以及 设置 → Provisioners 中它的状态列。
+- 机器 pod 卡在 `ImagePullBackOff` / `ErrImagePull` — 设置 → 通用 中的运行时镜像在节点上不可拉取（私有 registry 凭据、镜像标签或架构不对）。修正镜像或拉取凭据后删除并重建机器。
+- 机器 pod 卡在 `Creating` — 通常是 PVC 一直 Pending：所配置的 `storage.storage_class` 不存在或集群没有默认 StorageClass（`kubectl get pvc -n laelia-machines`）。在 provisioner 配置中设置 `storage.storage_class` 并重建机器。
+- 机器显示 *已创建（Provisioned）* 但一直离线 — 工作负载已存在但 pod 未接入（引导下载失败？）。请查看 pod init 容器日志，并确认 pod 能访问 `manager_url`（或 `manager_url_override`）。
+- 已删除的机器留下数据 PVC — provisioner 配置了 `retain_data: true`，PVC 是有意保留的。不再需要时请手动清理。
