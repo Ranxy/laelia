@@ -211,6 +211,7 @@ func listMachineImpl(ctx context.Context, txn *sql.Tx, find *FindMachineMessage)
 		var statusBytes []byte
 		var lastTokenRotatedAt sql.NullTime
 		var provisioningBytes []byte
+		var provisionerID sql.NullInt64
 		if err := rows.Scan(
 			&machineMessage.ID,
 			&machineMessage.ResourceID,
@@ -223,13 +224,16 @@ func listMachineImpl(ctx context.Context, txn *sql.Tx, find *FindMachineMessage)
 			&lastTokenRotatedAt,
 			&machineMessage.CreatedBy,
 			&machineMessage.AvatarS3Key,
-			&machineMessage.ProvisionerID,
+			&provisionerID,
 			&provisioningBytes,
 		); err != nil {
 			return nil, err
 		}
 		if lastTokenRotatedAt.Valid {
 			machineMessage.LastTokenRotatedAt = lastTokenRotatedAt.Time
+		}
+		if provisionerID.Valid {
+			machineMessage.ProvisionerID = int(provisionerID.Int64)
 		}
 
 		info := &models.MachineInfo{}
