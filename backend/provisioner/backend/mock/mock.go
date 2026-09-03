@@ -30,6 +30,7 @@ type Backend struct {
 	workloads           map[string]string // machineID → workload name
 	provisionCalls      int
 	deprovisionCalls    int
+	shutdownCalls       int
 	deprovisionKeepData map[string]bool
 	gate                chan struct{} // when set, Provision blocks before PROVISIONED
 	failNext            error         // one-shot: the next Provision returns it
@@ -118,6 +119,14 @@ func (m *Backend) Deprovision(_ context.Context, machineID string, keepData bool
 	return nil
 }
 
+// Shutdown records the call; the mock has no hosting to tear down.
+func (m *Backend) Shutdown(_ context.Context) error {
+	m.mu.Lock()
+	m.shutdownCalls++
+	m.mu.Unlock()
+	return nil
+}
+
 // emit delivers one event without ever blocking the caller.
 func (*Backend) emit(ch chan<- backend.Event, e backend.Event) {
 	if ch == nil {
@@ -143,6 +152,13 @@ func (m *Backend) DeprovisionCalls() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.deprovisionCalls
+}
+
+// ShutdownCalls reports how many times Shutdown ran.
+func (m *Backend) ShutdownCalls() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.shutdownCalls
 }
 
 // DeprovisionKeepData reports the keepData flag recorded for one machine.

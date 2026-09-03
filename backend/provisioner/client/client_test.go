@@ -201,3 +201,4 @@ func (*fakeBackend) Provision(context.Context, backend.MachineSpec, string) erro
 	return nil
 }
 func (*fakeBackend) Deprovision(context.Context, string, bool) error { return nil }
+func (*fakeBackend) Shutdown(context.Context) error                  { return nil }

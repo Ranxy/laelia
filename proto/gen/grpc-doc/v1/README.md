@@ -9317,6 +9317,7 @@ virtualization backend on the manager&#39;s behalf.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | reason | [string](#string) |  |  |
+| deleted | [bool](#bool) |  | deleted is true when the provisioner was permanently deleted (not just rotated): the operator should tear down its own hosting (scale its Deployment to 0) so it stops crash-looping with a dead credential. The Deployment/CRD/RBAC/namespace remain for the user to clean up manually. |
 
 
 

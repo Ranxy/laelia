@@ -1255,8 +1255,13 @@ func (x *ProvisionJobProgress) GetWorkloadName() string {
 }
 
 type ProvisionerDisconnectNotice struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Reason        string                 `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Reason string                 `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
+	// deleted is true when the provisioner was permanently deleted (not just
+	// rotated): the operator should tear down its own hosting (scale its
+	// Deployment to 0) so it stops crash-looping with a dead credential. The
+	// Deployment/CRD/RBAC/namespace remain for the user to clean up manually.
+	Deleted       bool `protobuf:"varint,2,opt,name=deleted,proto3" json:"deleted,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1296,6 +1301,13 @@ func (x *ProvisionerDisconnectNotice) GetReason() string {
 		return x.Reason
 	}
 	return ""
+}
+
+func (x *ProvisionerDisconnectNotice) GetDeleted() bool {
+	if x != nil {
+		return x.Deleted
+	}
+	return false
 }
 
 var File_v1_provisioner_proto protoreflect.FileDescriptor
@@ -1397,9 +1409,10 @@ const file_v1_provisioner_proto_rawDesc = "" +
 	"\amachine\x18\x01 \x01(\tR\amachine\x122\n" +
 	"\x05phase\x18\x02 \x01(\x0e2\x1c.laelia.v1.ProvisioningPhaseR\x05phase\x12\x14\n" +
 	"\x05error\x18\x03 \x01(\tR\x05error\x12#\n" +
-	"\rworkload_name\x18\x04 \x01(\tR\fworkloadName\"5\n" +
+	"\rworkload_name\x18\x04 \x01(\tR\fworkloadName\"O\n" +
 	"\x1bProvisionerDisconnectNotice\x12\x16\n" +
-	"\x06reason\x18\x01 \x01(\tR\x06reason2\xa6\x06\n" +
+	"\x06reason\x18\x01 \x01(\tR\x06reason\x12\x18\n" +
+	"\adeleted\x18\x02 \x01(\bR\adeleted2\xa6\x06\n" +
 	"\x12ProvisionerService\x12\x86\x01\n" +
 	"\x11CreateProvisioner\x12#.laelia.v1.CreateProvisionerRequest\x1a$.laelia.v1.CreateProvisionerResponse\"&\x8a\xea0\x1alaelia.provisioners.create\x90\xea0\x01\x98\xea0\x01\x12|\n" +
 	"\x10ListProvisioners\x12\".laelia.v1.ListProvisionersRequest\x1a#.laelia.v1.ListProvisionersResponse\"\x1f\x8a\xea0\x17laelia.provisioners.get\x90\xea0\x01\x12r\n" +

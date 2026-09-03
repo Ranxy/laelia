@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { useAppStore } from "@/stores";
 import { renderWithQueryClient } from "@/test/query";
 import type { Provisioner } from "@/types/proto-es/v1/provisioner_pb";
@@ -57,8 +57,23 @@ function provisioner(overrides?: Partial<Provisioner>): Provisioner {
 
 function renderPage() {
   return renderWithQueryClient(
-    <MemoryRouter>
-      <SettingsProvisionersPage />
+    <MemoryRouter initialEntries={["/settings/provisioners"]}>
+      <Routes>
+        <Route
+          path="/settings/provisioners"
+          element={<SettingsProvisionersPage />}
+        />
+        {/* Row clicks navigate to the detail path; keep the page mounted so
+            the rotate/delete actions stay reachable in the test. */}
+        <Route
+          path="/settings/provisioners/:provisionerId"
+          element={<SettingsProvisionersPage />}
+        />
+        <Route
+          path="/settings/provisioners/:provisionerId/cleanup"
+          element={<div>cleanup-page</div>}
+        />
+      </Routes>
     </MemoryRouter>
   );
 }
@@ -264,7 +279,7 @@ describe("settings-provisioners", () => {
     expect(mock.deleteProvisioner).not.toHaveBeenCalled();
   });
 
-  it("deletes a provisioner and refreshes the table", async () => {
+  it("deletes a provisioner, refreshes the table, and opens the cleanup guide", async () => {
     mock.listProvisioners.mockResolvedValue({
       provisioners: [provisioner()],
     });
@@ -286,5 +301,7 @@ describe("settings-provisioners", () => {
         title: "settings.provisioners.deleted",
       });
     });
+    // After deletion the user is taken to the full-page cleanup guide.
+    expect(await screen.findByText("cleanup-page")).toBeInTheDocument();
   });
 });

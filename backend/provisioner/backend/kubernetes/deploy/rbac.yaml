@@ -40,6 +40,14 @@ rules:
   - apiGroups: ["apps"]
     resources: ["statefulsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # The operator's own Deployment/ReplicaSet, read and scaled to 0 when the
+  # manager deletes the provisioner (Shutdown), so it stops crash-looping.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get"]
   # Pods are read for status; PVCs are deleted by the retention policy.
   - apiGroups: [""]
     resources: ["pods"]

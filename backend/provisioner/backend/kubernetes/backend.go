@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -287,6 +288,62 @@ func (b *Backend) Deprovision(ctx context.Context, machineID string, keepData bo
 	// The DELETED event comes from the reconciler's finalizer path once
 	// cleanup ran; keepData==true there leaves the PVCs in place.
 	return nil
+}
+
+// Shutdown is called when the manager permanently deletes this provisioner.
+// The operator scales its own Deployment to 0 so it stops crash-looping with
+// a dead credential; the Deployment/CRD/RBAC/namespace remain for the user to
+// clean up manually (see the cleanup guide). Best-effort: a failure only logs.
+func (b *Backend) Shutdown(ctx context.Context) error {
+	podName := os.Getenv("LAELIA_POD_NAME")
+	if podName == "" {
+		return errors.New("LAELIA_POD_NAME is not set; cannot locate the operator deployment")
+	}
+	ns := b.namespace
+
+	pod := &corev1.Pod{}
+	if err := b.mgr.GetAPIReader().Get(ctx, client.ObjectKey{Namespace: ns, Name: podName}, pod); err != nil {
+		return errors.Wrap(err, "failed to read the operator pod")
+	}
+	rsName := ownerRefName(pod, "ReplicaSet")
+	if rsName == "" {
+		return errors.New("operator pod has no owning ReplicaSet; nothing to scale down")
+	}
+	rs := &appsv1.ReplicaSet{}
+	if err := b.mgr.GetAPIReader().Get(ctx, client.ObjectKey{Namespace: ns, Name: rsName}, rs); err != nil {
+		return errors.Wrap(err, "failed to read the operator ReplicaSet")
+	}
+	depName := ownerRefName(rs, "Deployment")
+	if depName == "" {
+		return errors.New("operator ReplicaSet has no owning Deployment; nothing to scale down")
+	}
+
+	dep := &appsv1.Deployment{}
+	if err := b.mgr.GetAPIReader().Get(ctx, client.ObjectKey{Namespace: ns, Name: depName}, dep); err != nil {
+		return errors.Wrap(err, "failed to read the operator deployment")
+	}
+	if dep.Spec.Replicas != nil && *dep.Spec.Replicas == 0 {
+		return nil // already scaled down
+	}
+	zero := int32(0)
+	patch := dep.DeepCopy()
+	patch.Spec.Replicas = &zero
+	if err := b.mgr.GetClient().Patch(ctx, dep, client.MergeFrom(patch)); err != nil {
+		return errors.Wrap(err, "failed to scale the operator deployment to 0")
+	}
+	slog.Info("scaled the operator deployment to 0 after provisioner deletion", "namespace", ns, "deployment", depName)
+	return nil
+}
+
+// ownerRefName returns the name of the first owner reference of the given
+// kind, or "" when absent.
+func ownerRefName(obj metav1.Object, kind string) string {
+	for _, ref := range obj.GetOwnerReferences() {
+		if ref.Kind == kind {
+			return ref.Name
+		}
+	}
+	return ""
 }
 
 // deleteDataPVCs removes PVCs labeled for one machine workload.

@@ -188,7 +188,7 @@ func (s *ProvisionerService) RotateProvisionerToken(ctx context.Context, req *co
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to generate provisioner token"))
 	}
 
-	s.closeProvisionerStream(updated.ID, "token_rotated")
+	s.closeProvisionerStream(updated.ID, false)
 	return connect.NewResponse(&v1pb.RotateProvisionerTokenResponse{
 		Provisioner: s.convertToProvisioner(ctx, updated, -1),
 		Token:       token,
@@ -214,7 +214,7 @@ func (s *ProvisionerService) DeleteProvisioner(ctx context.Context, req *connect
 			errors.Errorf("provisioner %q still has %d machine(s) bound; delete or reassign them first", provisioner.Name, n))
 	}
 
-	s.closeProvisionerStream(provisioner.ID, "provisioner_deleted")
+	s.closeProvisionerStream(provisioner.ID, true)
 
 	newVersion := provisioner.TokenVersion + 1
 	deleted := true
@@ -246,13 +246,18 @@ func (s *ProvisionerService) getProvisionerByName(ctx context.Context, name stri
 
 // closeProvisionerStream warns a connected provisioner and tears its stream
 // down (token rotated or provisioner deleted). Best-effort: the version bump
-// already invalidated the credential.
-func (s *ProvisionerService) closeProvisionerStream(provisionerID int, reason string) {
+// already invalidated the credential. deleted tells the operator to scale its
+// own Deployment to 0 (stop crash-looping) rather than merely exit.
+func (s *ProvisionerService) closeProvisionerStream(provisionerID int, deleted bool) {
 	if s.dispatcher == nil {
 		return
 	}
+	reason := "token_rotated"
+	if deleted {
+		reason = "provisioner_deleted"
+	}
 	if s.dispatcher.IsProvisionerConnected(provisionerID) {
-		if err := s.dispatcher.SendProvisionerDisconnectNotice(provisionerID, reason); err != nil {
+		if err := s.dispatcher.SendProvisionerDisconnectNotice(provisionerID, reason, deleted); err != nil {
 			slog.Warn("failed to send provisioner disconnect notice", "provisionerID", provisionerID, "error", err)
 		}
 	}

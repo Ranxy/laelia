@@ -285,6 +285,12 @@ export function SettingsProvisionersPage() {
         type: "success",
         title: t("settings.provisioners.deleted"),
       });
+      // The operator in the user's cluster is not removed automatically; take
+      // them to the full-page cleanup guide.
+      navigate(
+        `/settings/provisioners/${target.name.replace(/^provisioners\//, "")}/cleanup`,
+        { state: { title: target.title } }
+      );
     } catch (err) {
       setDeleteError(describeError(err));
     } finally {

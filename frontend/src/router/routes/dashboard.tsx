@@ -36,6 +36,7 @@ import {
   SETTINGS_ROUTE_PROFILE,
   SETTINGS_ROUTE_PROVISIONERS,
   SETTINGS_ROUTE_PROVISIONER_DETAIL,
+  SETTINGS_ROUTE_PROVISIONER_CLEANUP,
   SETTINGS_ROUTE_ROLES,
   SETTINGS_ROUTE_SMTP,
   SETTINGS_ROUTE_STORAGE,
@@ -468,6 +469,17 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         lazy: () =>
           import("@/pages/dashboard/settings-provisioner-detail").then((m) => ({
             Component: m.SettingsProvisionerDetailPage,
+          })),
+      },
+      {
+        path: "provisioners/:provisionerId/cleanup",
+        handle: {
+          name: SETTINGS_ROUTE_PROVISIONER_CLEANUP,
+          permission: "laelia.provisioners.get",
+        } satisfies RouteHandle,
+        lazy: () =>
+          import("@/pages/dashboard/settings-provisioner-cleanup").then((m) => ({
+            Component: m.SettingsProvisionerCleanupPage,
           })),
       },
       {

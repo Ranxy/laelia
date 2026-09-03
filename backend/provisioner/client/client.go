@@ -233,6 +233,14 @@ func (c *Client) runOnce(ctx context.Context) error {
 
 			case *v1pb.ManagerProvisionerStreamMessage_DisconnectNotice:
 				slog.Warn("manager requested provisioner shutdown", "reason", m.DisconnectNotice.GetReason())
+				if m.DisconnectNotice.GetDeleted() {
+					// The provisioner was permanently deleted: tear down our own
+					// hosting (scale the operator Deployment to 0) so we stop
+					// crash-looping with a dead credential. Best-effort.
+					if err := c.backend.Shutdown(streamCtx); err != nil {
+						slog.Warn("failed to tear down the operator after provisioner deletion", "error", err)
+					}
+				}
 				res.set(ErrShutdown)
 				return
 

@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Settings2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -177,6 +177,18 @@ export function SettingsProvisionerDetailPage() {
               <h3 className="text-sm font-semibold text-main">
                 {t("settings.provisioner-detail.machines-title")}
               </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  navigate(
+                    `/settings/provisioners/${provisionerId ?? ""}/cleanup`
+                  )
+                }
+              >
+                <Settings2 className="size-4" />
+                {t("settings.provisioner-detail.cleanup-guide")}
+              </Button>
             </div>
             {machinesQuery.initialLoading ? (
               <div className="p-6">

@@ -80,6 +80,12 @@ spec:
                 secretKeyRef:
                   name: laelia-provisioner-token
                   key: token
+            # The operator's own pod name, so it can locate and scale its
+            # Deployment to 0 when the manager deletes the provisioner.
+            - name: LAELIA_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
           resources:
             requests:
               cpu: 50m

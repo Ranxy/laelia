@@ -92,6 +92,13 @@ type Backend interface {
 	// Deprovision removes the workload; keepData preserves machine data
 	// volumes when the backend supports retention.
 	Deprovision(ctx context.Context, machineID string, keepData bool) error
+	// Shutdown is called when the manager permanently deletes this provisioner
+	// (not on a token rotate). Backends should tear down their own hosting so
+	// the process does not crash-loop with a dead credential — e.g. the
+	// kubernetes operator scales its own Deployment to 0. Best-effort: a
+	// failure only logs; the Deployment/CRD/RBAC/namespace remain for the user
+	// to clean up manually.
+	Shutdown(ctx context.Context) error
 }
 
 // Factory builds one backend from the backend-neutral configuration.

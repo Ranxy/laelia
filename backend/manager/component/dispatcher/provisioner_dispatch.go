@@ -45,11 +45,13 @@ func (d *Dispatcher) SendPongToProvisioner(provisionerID int) error {
 
 // SendProvisionerDisconnectNotice warns a connected provisioner that its token
 // was rotated or the provisioner deleted, so it can stop retrying with a dead
-// credential before the manager tears the stream down.
-func (d *Dispatcher) SendProvisionerDisconnectNotice(provisionerID int, reason string) error {
+// credential before the manager tears the stream down. deleted tells the
+// operator to tear down its own hosting (scale its Deployment to 0) instead of
+// merely exiting, so a deleted provisioner stops crash-looping.
+func (d *Dispatcher) SendProvisionerDisconnectNotice(provisionerID int, reason string, deleted bool) error {
 	return d.sendToProvisioner(provisionerID, &v1pb.ManagerProvisionerStreamMessage{
 		Message: &v1pb.ManagerProvisionerStreamMessage_DisconnectNotice{
-			DisconnectNotice: &v1pb.ProvisionerDisconnectNotice{Reason: reason},
+			DisconnectNotice: &v1pb.ProvisionerDisconnectNotice{Reason: reason, Deleted: deleted},
 		},
 	})
 }

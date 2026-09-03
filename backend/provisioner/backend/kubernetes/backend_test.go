@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/Ranxy/laelia/backend/provisioner/backend"
 	laeliav1 "github.com/Ranxy/laelia/backend/provisioner/backend/kubernetes/api/v1"
@@ -81,4 +82,15 @@ func TestLabelsCarryMachineIdentity(t *testing.T) {
 
 	secret := secretLabels(spec)
 	assert.Equal(t, "laelia-machine-a1b2c3d4", secret[laeliav1.MachineNameLabel])
+}
+
+func TestOwnerRefName(t *testing.T) {
+	pod := &corev1.Pod{}
+	pod.SetOwnerReferences([]metav1.OwnerReference{
+		{Kind: "ReplicaSet", Name: "laelia-provisioner-7b8c9d"},
+		{Kind: "ConfigMap", Name: "ignored"},
+	})
+	assert.Equal(t, "laelia-provisioner-7b8c9d", ownerRefName(pod, "ReplicaSet"))
+	assert.Equal(t, "", ownerRefName(pod, "Deployment"))
+	assert.Equal(t, "", ownerRefName(&corev1.Pod{}, "ReplicaSet"))
 }

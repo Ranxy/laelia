@@ -607,6 +607,16 @@ export declare type ProvisionerDisconnectNotice = Message<"laelia.v1.Provisioner
    * @generated from field: string reason = 1;
    */
   reason: string;
+
+  /**
+   * deleted is true when the provisioner was permanently deleted (not just
+   * rotated): the operator should tear down its own hosting (scale its
+   * Deployment to 0) so it stops crash-looping with a dead credential. The
+   * Deployment/CRD/RBAC/namespace remain for the user to clean up manually.
+   *
+   * @generated from field: bool deleted = 2;
+   */
+  deleted: boolean;
 };
 
 /**
