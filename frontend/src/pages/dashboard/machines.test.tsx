@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores";
 import { invalidateMachinesCache } from "@/stores/machine";
@@ -61,6 +61,17 @@ function renderPage() {
         </Route>
       </Routes>
     </MemoryRouter>
+  );
+}
+
+// GoToMachine renders a button that navigates to a machine detail, standing in
+// for the create-machine flows that jump straight to the new machine's profile.
+function GoToMachine({ to }: { to: string }) {
+  const navigate = useNavigate();
+  return (
+    <button onClick={() => navigate(to)} data-testid="go-machine">
+      go
+    </button>
   );
 }
 
@@ -143,6 +154,43 @@ describe("machines", () => {
     );
 
     expect(await screen.findByTestId("new-page")).toBeInTheDocument();
+  });
+
+  it("refetches the roster when a machine detail is opened", async () => {
+    // First load (mount on the create page) returns nothing; the second load
+    // (triggered by navigating to the new machine's profile) returns it.
+    mock.listMachines
+      .mockResolvedValueOnce({ machines: [], nextPageToken: "" })
+      .mockResolvedValueOnce({
+        machines: [machine("machines/m1", "Build box")],
+        nextPageToken: "",
+      });
+
+    renderWithQueryClient(
+      <MemoryRouter initialEntries={["/machines/new"]}>
+        <Routes>
+          <Route path="/machines" element={<MachinesPage />}>
+            <Route
+              path="new"
+              element={
+                <div data-testid="new-page">
+                  <GoToMachine to="/machines/m1" />
+                </div>
+              }
+            />
+            <Route path=":machineId" element={<div data-testid="detail" />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await screen.findByTestId("new-page");
+    // Simulate the provisioned flow: navigate straight to the new machine's
+    // profile. The left rail must refetch and show it.
+    fireEvent.click(screen.getByTestId("go-machine"));
+
+    expect(await screen.findByText("Build box")).toBeInTheDocument();
+    expect(mock.listMachines).toHaveBeenCalledTimes(2);
   });
 
   it("deletes a machine after confirmation", async () => {

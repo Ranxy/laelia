@@ -116,6 +116,16 @@ export function MachinesPage() {
     load();
   }, [load]);
 
+  // Refetch the roster whenever a machine detail is opened so a freshly
+  // created machine (e.g. the provisioned flow, which navigates straight to
+  // the profile) appears in the left rail immediately instead of waiting for
+  // the next poll. Silent so the list doesn't flash "Loading…" on every
+  // navigation; the query cache dedupes this against the mount load.
+  useEffect(() => {
+    if (!selectedMachineId) return;
+    void fetchMachines({ pageSize: 100 }, { silent: true });
+  }, [selectedMachineId, fetchMachines]);
+
   // Refresh while any machine is not yet online so the list flips to "online"
   // promptly once the machine app connects. Silent refreshes skip the loading
   // flag and skip the state update when nothing changed.
