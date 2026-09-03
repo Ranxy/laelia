@@ -539,6 +539,7 @@
     "loading": "Loading...",
     "name": "Name",
     "next": "Next",
+    "no": "No",
     "no-data": "No data yet.",
     "offline-reconnecting": "You're offline — reconnecting…",
     "password": "Password",
@@ -560,7 +561,8 @@
     "toggle-password-visibility": "Toggle password visibility",
     "toggle-secret-visibility": "Toggle visibility",
     "type-to-search": "Type to search...",
-    "version": "Version"
+    "version": "Version",
+    "yes": "Yes"
   },
   "globalSearch": {
     "all-channels": "All conversations",
@@ -1264,11 +1266,24 @@
       "section-notifications": "Notifications",
       "title": "Profile"
     },
+    "provisioner-detail": {
+      "auto-upgrade": "Auto-upgrade",
+      "back": "Back to provisioners",
+      "description": "Machines created by this provisioner and its connection details.",
+      "header-machine": "Machine",
+      "header-provisioning": "Provisioning",
+      "machines-load-failed": "Failed to load machines",
+      "machines-title": "Machines",
+      "no-machines": "No machines provisioned by this provisioner yet.",
+      "not-found": "Provisioner not found.",
+      "title": "Provisioner"
+    },
     "provisioners": {
       "auto-upgrade": "Auto-upgrade enabled",
       "backend-docker": "Docker",
       "backend-kubernetes": "Kubernetes",
       "backend-unavailable": "backend not yet available",
+      "configure-runtime-image": "Go to Machine runtime image",
       "create": "Add provisioner",
       "create-description": "Registers a worker that provisions machines. The one-time token is shown right after creation.",
       "create-failed": "Failed to create provisioner",
@@ -1295,6 +1310,7 @@
       "rotate-confirm-description": "{{title}}'s current token stops working at its next use; the new one-time token is shown after rotating.",
       "rotate-confirm-title": "Rotate provisioner token?",
       "rotate-failed": "Failed to rotate token",
+      "runtime-image-required": "A Machine runtime image is required before machines can be provisioned. Configure it in the General settings first.",
       "status-connected": "Connected",
       "status-offline": "Offline",
       "title": "Provisioners",

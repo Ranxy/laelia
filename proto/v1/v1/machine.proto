@@ -336,6 +336,9 @@ message ListMachinesRequest {
   int32 page_size = 1;
   string page_token = 2;
   bool show_deleted = 3;
+  // Restrict the listing to machines created by the given provisioner
+  // (provisioners/{id}). Empty lists every machine the caller may see.
+  string provisioner = 4 [(google.api.resource_reference) = {type: "laelia/Provisioner"}];
 }
 
 message ListMachinesResponse {

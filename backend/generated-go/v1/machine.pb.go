@@ -1296,10 +1296,13 @@ func (x *RefreshMachineTokenResponse) GetAccessTokenExpiresAt() *timestamppb.Tim
 }
 
 type ListMachinesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageSize      int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	ShowDeleted   bool                   `protobuf:"varint,3,opt,name=show_deleted,json=showDeleted,proto3" json:"show_deleted,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	PageSize    int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken   string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	ShowDeleted bool                   `protobuf:"varint,3,opt,name=show_deleted,json=showDeleted,proto3" json:"show_deleted,omitempty"`
+	// Restrict the listing to machines created by the given provisioner
+	// (provisioners/{id}). Empty lists every machine the caller may see.
+	Provisioner   string `protobuf:"bytes,4,opt,name=provisioner,proto3" json:"provisioner,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1353,6 +1356,13 @@ func (x *ListMachinesRequest) GetShowDeleted() bool {
 		return x.ShowDeleted
 	}
 	return false
+}
+
+func (x *ListMachinesRequest) GetProvisioner() string {
+	if x != nil {
+		return x.Provisioner
+	}
+	return ""
 }
 
 type ListMachinesResponse struct {
@@ -3426,12 +3436,14 @@ const file_v1_machine_proto_rawDesc = "" +
 	"\x1bRefreshMachineTokenResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12Q\n" +
-	"\x17access_token_expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x14accessTokenExpiresAt\"t\n" +
+	"\x17access_token_expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x14accessTokenExpiresAt\"\xaf\x01\n" +
 	"\x13ListMachinesRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\x12!\n" +
-	"\fshow_deleted\x18\x03 \x01(\bR\vshowDeleted\"u\n" +
+	"\fshow_deleted\x18\x03 \x01(\bR\vshowDeleted\x129\n" +
+	"\vprovisioner\x18\x04 \x01(\tB\x17\xfaA\x14\n" +
+	"\x12laelia/ProvisionerR\vprovisioner\"u\n" +
 	"\x14ListMachinesResponse\x125\n" +
 	"\bmachines\x18\x01 \x03(\v2\x19.laelia.v1.MachineSummaryR\bmachines\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"?\n" +

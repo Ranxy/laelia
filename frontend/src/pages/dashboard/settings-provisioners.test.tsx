@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { useAppStore } from "@/stores";
 import { renderWithQueryClient } from "@/test/query";
 import type { Provisioner } from "@/types/proto-es/v1/provisioner_pb";
@@ -10,6 +11,7 @@ const mock = vi.hoisted(() => ({
   createProvisioner: vi.fn(),
   rotateProvisionerToken: vi.fn(),
   deleteProvisioner: vi.fn(),
+  getProvisioningConfig: vi.fn(),
 }));
 
 vi.mock("@/connect", () => ({
@@ -18,6 +20,9 @@ vi.mock("@/connect", () => ({
     createProvisioner: mock.createProvisioner,
     rotateProvisionerToken: mock.rotateProvisionerToken,
     deleteProvisioner: mock.deleteProvisioner,
+  },
+  settingServiceClient: {
+    getSetting: mock.getProvisioningConfig,
   },
 }));
 
@@ -47,7 +52,18 @@ function provisioner(overrides?: Partial<Provisioner>): Provisioner {
 }
 
 function renderPage() {
-  return renderWithQueryClient(<SettingsProvisionersPage />);
+  return renderWithQueryClient(
+    <MemoryRouter>
+      <SettingsProvisionersPage />
+    </MemoryRouter>
+  );
+}
+
+// provisioning config with the given runtime image.
+function provisioningConfig(runtimeImage: string) {
+  return {
+    value: { value: { case: "provisioning", value: { runtimeImage } } },
+  };
 }
 
 beforeEach(() => {
@@ -67,7 +83,13 @@ beforeEach(() => {
   mock.createProvisioner.mockReset();
   mock.rotateProvisionerToken.mockReset();
   mock.deleteProvisioner.mockReset();
+  mock.getProvisioningConfig.mockReset();
   mock.listProvisioners.mockResolvedValue({ provisioners: [] });
+  // A runtime image is configured by default so the non-gating tests exercise
+  // the normal flow.
+  mock.getProvisioningConfig.mockResolvedValue(
+    provisioningConfig("registry.example.com/laelia/machine-runtime:1.2.3")
+  );
   toastMock.add.mockReset();
 });
 
@@ -99,6 +121,21 @@ describe("settings-provisioners", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("v0.0.9")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  it("disables add and prompts to configure the runtime image when none is set", async () => {
+    mock.getProvisioningConfig.mockResolvedValue(provisioningConfig(""));
+
+    renderPage();
+
+    expect(
+      await screen.findByText("settings.provisioners.runtime-image-required")
+    ).toBeInTheDocument();
+    const add = await screen.findByText("settings.provisioners.create");
+    expect(add.closest("button")).toBeDisabled();
+    expect(add.closest("button")).toHaveAccessibleName(
+      "settings.provisioners.create"
+    );
   });
 
   it("creates a provisioner and shows the one-time token dialog", async () => {

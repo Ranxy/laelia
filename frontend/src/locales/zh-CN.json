@@ -539,6 +539,7 @@
     "loading": "加载中...",
     "name": "名称",
     "next": "下一步",
+    "no": "否",
     "no-data": "暂无数据",
     "offline-reconnecting": "当前离线，正在重新连接…",
     "password": "密码",
@@ -560,7 +561,8 @@
     "toggle-password-visibility": "切换密码可见性",
     "toggle-secret-visibility": "切换可见性",
     "type-to-search": "输入以搜索...",
-    "version": "版本"
+    "version": "版本",
+    "yes": "是"
   },
   "globalSearch": {
     "all-channels": "全部会话",
@@ -1264,11 +1266,24 @@
       "section-notifications": "通知",
       "title": "个人资料"
     },
+    "provisioner-detail": {
+      "auto-upgrade": "自动升级",
+      "back": "返回 Provisioners",
+      "description": "该 Provisioner 创建的机器及其连接详情。",
+      "header-machine": "机器",
+      "header-provisioning": "供应状态",
+      "machines-load-failed": "加载机器列表失败",
+      "machines-title": "机器",
+      "no-machines": "该 Provisioner 尚未创建任何机器。",
+      "not-found": "未找到该 Provisioner。",
+      "title": "Provisioner"
+    },
     "provisioners": {
       "auto-upgrade": "已启用自动升级",
       "backend-docker": "Docker",
       "backend-kubernetes": "Kubernetes",
       "backend-unavailable": "后端暂未支持",
+      "configure-runtime-image": "前往配置 Machine runtime image",
       "create": "添加 provisioner",
       "create-description": "注册一个负责预置机器的 worker。一次性 token 会在创建完成后立即展示。",
       "create-failed": "创建 provisioner 失败",
@@ -1295,6 +1310,7 @@
       "rotate-confirm-description": "{{title}} 当前的 token 将在其下次使用时失效;轮换后会展示新的一次性 token。",
       "rotate-confirm-title": "轮换 provisioner token?",
       "rotate-failed": "轮换 token 失败",
+      "runtime-image-required": "在配置 Machine runtime image 之前,无法创建机器。请先在“常规”设置中完成配置。",
       "status-connected": "已连接",
       "status-offline": "离线",
       "title": "Provisioners",

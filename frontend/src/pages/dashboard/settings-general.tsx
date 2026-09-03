@@ -1,13 +1,16 @@
 import { Loader2, Save } from "lucide-react";
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { PageLoading, SettingsPage } from "@/components/settings-page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { RUNTIME_IMAGE_FOCUS_PARAM } from "@/lib/runtime-image-focus";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
+import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type {
   ProvisioningSetting,
@@ -95,6 +98,7 @@ function useSettingToggle(
 
 export function SettingsGeneralPage() {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState<GeneralForm>(EMPTY);
   const [saved, setSaved] = useState<GeneralForm>(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -105,6 +109,25 @@ export function SettingsGeneralPage() {
   const [runtimeImage, setRuntimeImage] = useState("");
   const [savedRuntimeImage, setSavedRuntimeImage] = useState("");
   const [savingRuntimeImage, setSavingRuntimeImage] = useState(false);
+  // Highlighted while the cross-page link from the provisioners page focuses
+  // the Machine runtime image field.
+  const [runtimeImageFocused, setRuntimeImageFocused] = useState(false);
+
+  // When the provisioners page links here with ?focus=runtime-image, scroll to
+  // and focus the Machine runtime image input once it has mounted (after the
+  // initial load) and briefly highlight it.
+  useEffect(() => {
+    if (loading) return;
+    if (searchParams.get("focus") !== RUNTIME_IMAGE_FOCUS_PARAM.split("=")[1])
+      return;
+    const el = document.getElementById("general-runtime-image");
+    if (!(el instanceof HTMLInputElement)) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.focus();
+    setRuntimeImageFocused(true);
+    const timer = window.setTimeout(() => setRuntimeImageFocused(false), 2500);
+    return () => window.clearTimeout(timer);
+  }, [loading, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -322,7 +345,12 @@ export function SettingsGeneralPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-control-border bg-background p-5 shadow-xs">
+          <div
+            className={cn(
+              "rounded-lg border border-control-border bg-background p-5 shadow-xs",
+              runtimeImageFocused && "ring-2 ring-accent"
+            )}
+          >
             <label
               htmlFor="general-runtime-image"
               className="block text-sm font-medium text-main"

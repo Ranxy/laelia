@@ -80,7 +80,15 @@ func (s *MachineService) ListMachines(ctx context.Context, req *connect.Request[
 	// machine), so the whole roster is fetched and filtered in the handler and
 	// then paginated in memory. Machine counts are small (a workspace has a
 	// handful of hosts), so this stays cheap.
-	machines, err := s.store.ListMachines(ctx, &store.FindMachineMessage{ShowDeleted: req.Msg.ShowDeleted})
+	find := &store.FindMachineMessage{ShowDeleted: req.Msg.ShowDeleted}
+	if req.Msg.Provisioner != "" {
+		provisionerID, err := s.provisionerIDByName(ctx, req.Msg.Provisioner)
+		if err != nil {
+			return nil, err
+		}
+		find.ProvisionerID = &provisionerID
+	}
+	machines, err := s.store.ListMachines(ctx, find)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to list machines, error: %v", err))
 	}
@@ -140,6 +148,25 @@ func (s *MachineService) ListMachines(ctx context.Context, req *connect.Request[
 // isMachineCreator reports whether the caller created the machine.
 func isMachineCreator(user *store.UserMessage, machine *store.MachineMessage) bool {
 	return user != nil && machine.CreatedBy != 0 && machine.CreatedBy == user.ID
+}
+
+// provisionerIDByName resolves a provisioners/{id} resource name to a live
+// (non-deleted) provisioner row's numeric id, mirroring ProvisionerService's
+// getProvisionerByName. Used by ListMachines when a caller narrows the listing
+// to one provisioner.
+func (s *MachineService) provisionerIDByName(ctx context.Context, name string) (int, error) {
+	resourceID, err := common.GetProvisionerResourceID(name)
+	if err != nil {
+		return 0, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	provisioner, err := s.store.GetProvisionerByResourceID(ctx, resourceID)
+	if err != nil {
+		return 0, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get provisioner: %v", err))
+	}
+	if provisioner == nil || provisioner.Deleted {
+		return 0, connect.NewError(connect.CodeNotFound, errors.Errorf("provisioner %s not found", resourceID))
+	}
+	return provisioner.ID, nil
 }
 
 // canDeleteMachineByPermission reports whether the caller holds

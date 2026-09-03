@@ -1,6 +1,7 @@
-import { Copy, KeyRound, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Copy, KeyRound, Plus, Settings2, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { ConfirmActionDialog } from "@/components/settings/confirm-action-dialog";
 import { ResourceSheet } from "@/components/settings/resource-sheet";
 import {
@@ -47,6 +48,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { provisionerServiceClient } from "@/connect";
 import { useResourceQuery } from "@/hooks/use-resource-query";
 import { describeError } from "@/lib/connect-errors";
+import { RUNTIME_IMAGE_FOCUS_PARAM } from "@/lib/runtime-image-focus";
 import { formatTimestamp } from "@/lib/time-format";
 import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
@@ -130,9 +132,31 @@ function TokenDialog({
 
 export function SettingsProvisionersPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const canList = useHasPermission("laelia.provisioners.get");
   const canCreate = useHasPermission("laelia.provisioners.create");
   const canRotateOrDelete = useHasPermission("laelia.provisioners.delete");
+
+  // The provisioning setting's runtime image is required before a provisioner
+  // can actually create machines, so the add entry stays disabled until it is
+  // configured. null = not resolved yet (avoid flashing the disabled state).
+  const [runtimeImage, setRuntimeImage] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const cfg = await useAppStore.getState().fetchProvisioningConfig();
+        if (!cancelled) setRuntimeImage(cfg?.runtimeImage ?? "");
+      } catch {
+        if (!cancelled) setRuntimeImage("");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const runtimeImageKnown = runtimeImage !== null;
+  const hasRuntimeImage = runtimeImageKnown && runtimeImage.trim() !== "";
 
   const provisionersQuery = useResourceQuery<Provisioner>({
     enabled: canList,
@@ -247,13 +271,33 @@ export function SettingsProvisionersPage() {
       description={t("settings.provisioners.description")}
       actions={
         canCreate && (
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button
+            onClick={() => setCreateOpen(true)}
+            disabled={runtimeImageKnown && !hasRuntimeImage}
+          >
             <Plus className="size-4" />
             {t("settings.provisioners.create")}
           </Button>
         )
       }
     >
+      {runtimeImageKnown && !hasRuntimeImage && (
+        <Alert
+          variant="warning"
+          description={t("settings.provisioners.runtime-image-required")}
+        >
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              navigate(`/settings/general?${RUNTIME_IMAGE_FOCUS_PARAM}`)
+            }
+          >
+            <Settings2 className="size-4" />
+            {t("settings.provisioners.configure-runtime-image")}
+          </Button>
+        </Alert>
+      )}
       {provisionersQuery.initialLoading ? (
         <PageLoading />
       ) : (
@@ -273,7 +317,15 @@ export function SettingsProvisionersPage() {
           </TableHeader>
           <TableBody>
             {provisionersQuery.items.map((p) => (
-              <TableRow key={p.name}>
+              <TableRow
+                key={p.name}
+                className="cursor-pointer"
+                onClick={() =>
+                  navigate(
+                    `/settings/provisioners/${p.name.replace(/^provisioners\//, "")}`
+                  )
+                }
+              >
                 <TableCell className="font-medium text-main">
                   <div className="flex flex-col">
                     <span className="truncate">{p.title}</span>
@@ -316,7 +368,8 @@ export function SettingsProvisionersPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setDeleteError("");
                           setRotateTarget(p);
                         }}
@@ -329,7 +382,8 @@ export function SettingsProvisionersPage() {
                         variant="ghost"
                         size="sm"
                         className="text-error"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setDeleteError("");
                           setDeleteTarget(p);
                         }}

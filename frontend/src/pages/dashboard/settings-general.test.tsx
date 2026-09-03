@@ -7,6 +7,7 @@ import {
   within,
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { useAppStore } from "@/stores";
 import {
   WorkspaceProfileSetting,
@@ -75,7 +76,11 @@ function settingResponse(value: WorkspaceProfileSetting) {
 }
 
 function renderPage() {
-  return render(<SettingsGeneralPage />);
+  return render(
+    <MemoryRouter>
+      <SettingsGeneralPage />
+    </MemoryRouter>
+  );
 }
 
 // rowSwitch finds the switch inside the settings row whose heading matches

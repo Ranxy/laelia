@@ -522,6 +522,14 @@ export declare type ListMachinesRequest = Message<"laelia.v1.ListMachinesRequest
    * @generated from field: bool show_deleted = 3;
    */
   showDeleted: boolean;
+
+  /**
+   * Restrict the listing to machines created by the given provisioner
+   * (provisioners/{id}). Empty lists every machine the caller may see.
+   *
+   * @generated from field: string provisioner = 4;
+   */
+  provisioner: string;
 };
 
 /**
