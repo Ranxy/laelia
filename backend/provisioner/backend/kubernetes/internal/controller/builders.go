@@ -135,7 +135,7 @@ func statefulSetFor(m *laeliav1.LaeliaMachine) *appsv1.StatefulSet {
 			Labels:    childLabels(m),
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas:    ptr(int32(1)),
+			Replicas:    new(int32(1)),
 			ServiceName: m.Name,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: selectorLabels(m),
@@ -167,10 +167,10 @@ func statefulSetFor(m *laeliav1.LaeliaMachine) *appsv1.StatefulSet {
 				Spec: corev1.PodSpec{
 					NodeSelector: map[string]string{"kubernetes.io/arch": "amd64"},
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot:        ptr(true),
-						RunAsUser:           ptr(machineUID),
-						FSGroup:             ptr(machineUID),
-						FSGroupChangePolicy: ptr(corev1.FSGroupChangeOnRootMismatch),
+						RunAsNonRoot:        new(true),
+						RunAsUser:           new(machineUID),
+						FSGroup:             new(machineUID),
+						FSGroupChangePolicy: new(corev1.FSGroupChangeOnRootMismatch),
 					},
 					InitContainers: []corev1.Container{bootstrap},
 					Containers:     []corev1.Container{main},
@@ -179,7 +179,7 @@ func statefulSetFor(m *laeliav1.LaeliaMachine) *appsv1.StatefulSet {
 						VolumeSource: corev1.VolumeSource{
 							Secret: &corev1.SecretVolumeSource{
 								SecretName:  m.Spec.BootstrapSecret,
-								DefaultMode: ptr(int32(0o444)),
+								DefaultMode: new(int32(0o444)),
 							},
 						},
 					}},
@@ -271,5 +271,3 @@ func optionalString(s string) *string {
 	}
 	return &s
 }
-
-func ptr[T any](v T) *T { return &v }
