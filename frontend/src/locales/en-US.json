@@ -647,10 +647,14 @@
         "create-hint": "After creating, the machine appears in the list and connects on its own.",
         "description": "Pick a provisioner and name the machine. The provisioner creates the workload and the machine connects on its own.",
         "empty": "No provisioner is registered yet. A workspace admin can add one in Settings → Provisioners.",
+        "enter-name": "Please give the machine a name.",
         "machine-title": "Name the machine",
         "offline": "Offline",
+        "offline-hint": "Offline provisioners can't create machines until they connect.",
         "pick-hint": "The machine's workload is created by the selected provisioner in its backend.",
-        "pick-title": "Choose a provisioner"
+        "pick-title": "Choose a provisioner",
+        "provisioner-offline": "This provisioner is offline. It must be connected to provision a machine.",
+        "select-provisioner": "Please choose a provisioner first."
       },
       "step-command": "1. Run this on the machine",
       "step-install": "1. Install the machine app",

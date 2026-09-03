@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-i18next", () => ({
@@ -61,13 +67,45 @@ afterEach(() => {
 });
 
 describe("MachineNewPage tabs", () => {
-  it("defaults to the provisioned tab when the permission is held", async () => {
+  it("defaults to the provisioned tab when the permission is held and a provisioner is registered", async () => {
+    useAppStore.setState({
+      provisioners: [provisioner("provisioners/p1", "Prod Cluster")],
+    });
     render(<MachineNewPage />);
     expect(
       await screen.findByText("machine.new.provisioned.pick-title")
     ).toBeInTheDocument();
     expect(
       screen.queryByText("machine.new.step-install")
+    ).not.toBeInTheDocument();
+  });
+
+  it("defaults to the self-hosted tab when the permission is held but no provisioner is registered", async () => {
+    render(<MachineNewPage />);
+    expect(
+      await screen.findByText("machine.new.step-install")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("machine.new.provisioned.pick-title")
+    ).not.toBeInTheDocument();
+    // The provisioned tab is still reachable (where the empty state shows).
+    expect(screen.getByText("machine.new.tab-provisioned")).toBeInTheDocument();
+  });
+
+  it("defaults to the self-hosted tab when provisioners exist but none are connected", async () => {
+    useAppStore.setState({
+      provisioners: [
+        provisioner("provisioners/p1", "Prod Cluster", {
+          status: { connected: false, version: "" } as never,
+        }),
+      ],
+    });
+    render(<MachineNewPage />);
+    expect(
+      await screen.findByText("machine.new.step-install")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("machine.new.provisioned.pick-title")
     ).not.toBeInTheDocument();
   });
 
@@ -95,7 +133,7 @@ describe("MachineNewProvisionedPanel", () => {
     expect(mockedActions.fetchProvisioners).toHaveBeenCalled();
   });
 
-  it("lists provisioners with backend and connection badges and creates on click", async () => {
+  it("lists provisioners with backend and connection badges and creates once valid", async () => {
     mockedActions.provisionMachine.mockResolvedValue({
       name: "machines/m1",
       title: "Cloud Box",
@@ -119,16 +157,42 @@ describe("MachineNewProvisionedPanel", () => {
     expect(screen.getAllByText("machine.new.provisioned.offline").length).toBe(
       1
     );
+    // Offline provisioners are disabled and explained by the offline hint.
+    expect(
+      screen.getByText("machine.new.provisioned.offline-hint")
+    ).toBeInTheDocument();
+    const edgeOption = screen
+      .getAllByRole("radio")
+      .find((el) => el.textContent?.includes("Edge"));
+    expect(edgeOption).toBeDisabled();
 
-    // Create is gated on a selection + a title.
     const create = screen.getByText("machine.new.provisioned.create");
-    expect(create).toBeDisabled();
+    // Clicking without a selection prompts instead of silently doing nothing.
+    fireEvent.click(create);
+    expect(
+      screen.getByText("machine.new.provisioned.select-provisioner")
+    ).toBeInTheDocument();
+    expect(mockedActions.provisionMachine).not.toHaveBeenCalled();
+
+    // An offline provisioner can't be selected, so it must never reach create.
+    fireEvent.click(screen.getByText("Edge"));
+    fireEvent.click(create);
+    expect(
+      screen.getByText("machine.new.provisioned.select-provisioner")
+    ).toBeInTheDocument();
+    expect(mockedActions.provisionMachine).not.toHaveBeenCalled();
+
+    // Selecting a provisioner but leaving the name blank prompts for a name.
     fireEvent.click(screen.getByText("Prod Cluster"));
-    expect(create).toBeDisabled();
+    fireEvent.click(create);
+    expect(
+      screen.getByText("machine.new.provisioned.enter-name")
+    ).toBeInTheDocument();
+    expect(mockedActions.provisionMachine).not.toHaveBeenCalled();
+
     fireEvent.change(screen.getByLabelText("machine.new.name-label"), {
       target: { value: "  Cloud Box  " },
     });
-    expect(create).not.toBeDisabled();
     fireEvent.click(create);
 
     await waitFor(() => {
@@ -138,6 +202,39 @@ describe("MachineNewProvisionedPanel", () => {
       );
       expect(mockRouter.navigate).toHaveBeenCalledWith("/machines/m1");
     });
+  });
+
+  it("rejects creating when the selected provisioner goes offline after selection", async () => {
+    mockedActions.provisionMachine.mockResolvedValue({
+      name: "machines/m1",
+      title: "Cloud Box",
+    });
+    useAppStore.setState({
+      provisioners: [provisioner("provisioners/p1", "Prod Cluster")],
+    });
+    render(<MachineNewProvisionedPanel />);
+
+    fireEvent.click(await screen.findByText("Prod Cluster"));
+    fireEvent.change(screen.getByLabelText("machine.new.name-label"), {
+      target: { value: "Cloud Box" },
+    });
+
+    // The provisioner disconnects after the user picked it.
+    act(() => {
+      useAppStore.setState({
+        provisioners: [
+          provisioner("provisioners/p1", "Prod Cluster", {
+            status: { connected: false, version: "" } as never,
+          }),
+        ],
+      });
+    });
+
+    fireEvent.click(screen.getByText("machine.new.provisioned.create"));
+    expect(
+      screen.getByText("machine.new.provisioned.provisioner-offline")
+    ).toBeInTheDocument();
+    expect(mockedActions.provisionMachine).not.toHaveBeenCalled();
   });
 
   it("surfaces a provisioning failure inline without navigating", async () => {

@@ -647,10 +647,14 @@
         "create-hint": "创建后,机器会出现在列表中并自动接入。",
         "description": "选择一个 provisioner 并为机器命名。Provisioner 会创建工作负载,机器随后自动接入。",
         "empty": "尚未注册任何 provisioner。工作空间管理员可以在 设置 → Provisioners 中添加。",
+        "enter-name": "请给机器起个名字。",
         "machine-title": "命名机器",
         "offline": "离线",
+        "offline-hint": "离线的 provisioner 在连接之前无法创建机器。",
         "pick-hint": "机器的工作负载由所选 provisioner 在其后端中创建。",
-        "pick-title": "选择 provisioner"
+        "pick-title": "选择 provisioner",
+        "provisioner-offline": "此 provisioner 处于离线状态。请先将其连接后再创建机器。",
+        "select-provisioner": "请先选择一个 provisioner。"
       },
       "step-command": "1. 在机器上运行此命令",
       "step-install": "1. 安装机器应用",

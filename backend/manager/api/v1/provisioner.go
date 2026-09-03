@@ -319,6 +319,13 @@ func (s *ProvisionerService) ProvisionMachine(ctx context.Context, req *connect.
 		return nil, connect.NewError(connect.CodeFailedPrecondition,
 			errors.Errorf("provisioner backend %q is not implemented yet; known backends: kubernetes", provisioner.Backend))
 	}
+	// A machine can only be created on a connected provisioner: an offline one
+	// would park the job at PENDING with no worker to pick it up, so fail fast
+	// instead of enqueuing work nothing executes.
+	if s.dispatcher == nil || !s.dispatcher.IsProvisionerConnected(provisioner.ID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition,
+			errors.Errorf("provisioner %q is offline; connect it before provisioning a machine", provisioner.Name))
+	}
 
 	owner, err := s.resolveProvisionedMachineOwner(ctx, req.Msg.GetOwner())
 	if err != nil {

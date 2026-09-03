@@ -34,9 +34,32 @@ function detectInstallOS(): MachineInstallOS {
 export function MachineNewPage() {
   const { t } = useTranslation();
   const canProvision = useHasPermission("laelia.provisioners.provision");
-  const [tab, setTab] = useState<"provisioned" | "self-hosted">(() =>
-    canProvision ? "provisioned" : "self-hosted"
-  );
+  const provisioners = useAppStore((s) => s.provisioners);
+  const provisionersLoading = useAppStore((s) => s.provisionersLoading);
+  const fetchProvisioners = useAppStore((s) => s.fetchProvisioners);
+  // Default to the self-hosted flow until the provisioner roster resolves: when
+  // none are available the provisioned tab would only show an empty warning, so
+  // the user lands on the always-workable self-hosted flow instead. The effect
+  // below switches to the provisioned tab once one actually exists.
+  const [tab, setTab] = useState<"provisioned" | "self-hosted">("self-hosted");
+  const tabTouched = useRef(false);
+
+  useEffect(() => {
+    if (!canProvision) return;
+    void fetchProvisioners({ pageSize: 100 });
+  }, [canProvision, fetchProvisioners]);
+
+  // Settle on the provisioned tab as soon as we know a provisioner is connected
+  // (offline ones can't create machines), unless the user already picked a tab.
+  useEffect(() => {
+    if (!canProvision || tabTouched.current) return;
+    if (
+      !provisionersLoading &&
+      provisioners.some((p) => p.status?.connected ?? false)
+    ) {
+      setTab("provisioned");
+    }
+  }, [canProvision, provisionersLoading, provisioners]);
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -59,6 +82,7 @@ export function MachineNewPage() {
             value={tab}
             onValueChange={(value) => {
               if (value === "provisioned" || value === "self-hosted") {
+                tabTouched.current = true;
                 setTab(value);
               }
             }}

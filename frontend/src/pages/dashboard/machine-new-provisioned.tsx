@@ -33,13 +33,24 @@ export function MachineNewProvisionedPanel() {
     void fetchProvisioners({ pageSize: 100 });
   }, [fetchProvisioners]);
 
-  // The picker only offers connected-or-not registered provisioners; the
-  // backend validates liveness again at ProvisionMachine time (an offline
-  // provisioner parks the job at PENDING for replay on its next connect).
+  // The picker only offers connected provisioners; offline ones are shown but
+  // disabled. The backend validates liveness again at ProvisionMachine time.
   const connected = (p: Provisioner): boolean => p.status?.connected ?? false;
 
   async function handleCreate() {
-    if (!selected) return;
+    if (!selected) {
+      setError(t("machine.new.provisioned.select-provisioner"));
+      return;
+    }
+    const picked = provisioners.find((p) => p.name === selected);
+    if (picked && !connected(picked)) {
+      setError(t("machine.new.provisioned.provisioner-offline"));
+      return;
+    }
+    if (!title.trim()) {
+      setError(t("machine.new.provisioned.enter-name"));
+      return;
+    }
     setCreating(true);
     setError("");
     try {
@@ -80,8 +91,14 @@ export function MachineNewProvisionedPanel() {
           <p className="text-sm text-control-light">
             {t("machine.new.provisioned.pick-hint")}
           </p>
+          {provisioners.some((p) => !connected(p)) && (
+            <p className="text-xs text-control-light">
+              {t("machine.new.provisioned.offline-hint")}
+            </p>
+          )}
           <div className="flex flex-col gap-2" role="radiogroup">
             {provisioners.map((p) => {
+              const isConnected = connected(p);
               const isSelected = p.name === selected;
               return (
                 <button
@@ -89,6 +106,7 @@ export function MachineNewProvisionedPanel() {
                   type="button"
                   role="radio"
                   aria-checked={isSelected}
+                  disabled={!isConnected}
                   data-testid="provisioner-option"
                   onClick={() => {
                     setSelected(p.name);
@@ -96,13 +114,21 @@ export function MachineNewProvisionedPanel() {
                   }}
                   className={cn(
                     "flex items-center gap-3 rounded-md border px-4 py-3 text-left transition-colors",
-                    isSelected
-                      ? "border-accent bg-accent/5"
-                      : "border-control-border hover:bg-control-bg/60"
+                    !isConnected &&
+                      "cursor-not-allowed border-control-border opacity-60",
+                    isConnected && isSelected && "border-accent bg-accent/5",
+                    isConnected &&
+                      !isSelected &&
+                      "border-control-border hover:bg-control-bg/60"
                   )}
                 >
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate text-sm font-medium text-main">
+                    <span
+                      className={cn(
+                        "truncate text-sm font-medium text-main",
+                        !isConnected && "opacity-75"
+                      )}
+                    >
                       {p.title}
                     </span>
                     {p.description && (
@@ -112,7 +138,7 @@ export function MachineNewProvisionedPanel() {
                     )}
                   </div>
                   <Badge variant="secondary">{p.backend}</Badge>
-                  {connected(p) ? (
+                  {isConnected ? (
                     <Badge variant="success">
                       {t("machine.new.provisioned.connected")}
                     </Badge>
@@ -152,10 +178,7 @@ export function MachineNewProvisionedPanel() {
             <p className="text-xs text-control-light">
               {t("machine.new.provisioned.create-hint")}
             </p>
-            <Button
-              disabled={creating || !selected || !title.trim()}
-              onClick={() => void handleCreate()}
-            >
+            <Button disabled={creating} onClick={() => void handleCreate()}>
               {creating && <Loader2 className="size-4 animate-spin" />}
               {t("machine.new.provisioned.create")}
             </Button>

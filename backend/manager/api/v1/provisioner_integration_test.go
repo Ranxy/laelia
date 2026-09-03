@@ -524,25 +524,46 @@ func TestProvisionMachineFailsFast(t *testing.T) {
 	adminClient := env.provisionerServiceClient(t, env.adminToken(t))
 	memberClient := env.provisionerServiceClient(t, env.memberToken(t))
 
-	newProvisioner := func(t *testing.T, backend string) string {
+	newProvisioner := func(t *testing.T, backend string) (string, string) {
 		t.Helper()
 		resp, err := adminClient.CreateProvisioner(ctx, connect.NewRequest(&v1pb.CreateProvisionerRequest{
 			Provisioner: &v1pb.Provisioner{Title: "p-" + uuid8(), Backend: backend},
 		}))
 		require.NoError(t, err)
-		return resp.Msg.GetProvisioner().GetName()
+		return resp.Msg.GetProvisioner().GetName(), resp.Msg.GetToken()
 	}
 
 	// Unknown backend: the registry accepts it, provisioning rejects it.
-	unknown := newProvisioner(t, "docker")
+	unknown, _ := newProvisioner(t, "docker")
 	_, err := memberClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
 		Provisioner: unknown, Title: "m",
 	}))
 	require.Error(t, err)
 	assert.Equal(t, connect.CodeFailedPrecondition, connectErrCode(t, err))
 
+	// Offline (registered but never connected) provisioner: provisioning is
+	// rejected before any job is enqueued.
+	offlineName, _ := newProvisioner(t, "kubernetes")
+	_, err = memberClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: offlineName, Title: "m",
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeFailedPrecondition, connectErrCode(t, err))
+	require.Contains(t, err.Error(), "offline")
+
+	// The remaining fail-fast cases need a connected provisioner so they hit
+	// the specific guard under test rather than the offline rejection.
+	k8sProv, k8sToken := newProvisioner(t, "kubernetes")
+	k8sFake := env.dialFakeProvisioner(t, k8sToken, &v1pb.ProvisionerReady{
+		Version: "0.9.0", Backend: "kubernetes", AutoUpgrade: true, ConfigDigest: "cfg-1",
+	})
+	defer k8sFake.close()
+	require.Eventually(t, func() bool {
+		st := env.provisionerStatus(t, k8sProv)
+		return st != nil && st.Connected
+	}, 5*time.Second, 50*time.Millisecond, "the k8s provisioner must connect before the guard checks run")
+
 	// Missing runtime image.
-	k8sProv := newProvisioner(t, "kubernetes")
 	setting, err := env.store.GetProvisioningSetting(ctx)
 	require.NoError(t, err)
 	runtimeImage := setting.RuntimeImage
