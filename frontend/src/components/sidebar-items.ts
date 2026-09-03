@@ -26,6 +26,7 @@ import {
   SETTINGS_ROUTE_MCP_SERVERS,
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_PROFILE,
+  SETTINGS_ROUTE_PROVISIONERS,
   SETTINGS_ROUTE_ROLES,
   SETTINGS_ROUTE_SMTP,
   SETTINGS_ROUTE_STORAGE,
@@ -74,6 +75,7 @@ export function useSidebarItems(): SidebarItem[] {
   const canViewIdentityProviders = useHasPermission(
     "laelia.identityProviders.list"
   );
+  const canViewProvisioners = useHasPermission("laelia.provisioners.get");
   const canViewAudit = useHasPermission("laelia.auditLogs.search");
   const canViewPushConfig = useHasPermission("laelia.pushConfig.update");
 
@@ -188,6 +190,12 @@ export function useSidebarItems(): SidebarItem[] {
             hide: !canViewIdentityProviders,
           },
           {
+            title: t("sidebar.settings-provisioners"),
+            name: SETTINGS_ROUTE_PROVISIONERS,
+            type: "route",
+            hide: !canViewProvisioners,
+          },
+          {
             title: t("sidebar.settings-mcp-servers"),
             name: SETTINGS_ROUTE_MCP_SERVERS,
             type: "route",
@@ -211,6 +219,7 @@ export function useSidebarItems(): SidebarItem[] {
       canViewGroups,
       canViewApiProviders,
       canViewIdentityProviders,
+      canViewProvisioners,
       canViewAudit,
       canViewPushConfig,
     ]
