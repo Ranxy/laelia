@@ -440,7 +440,7 @@ func TestProvisionerControlPlane(t *testing.T) {
 	require.Equal(t, "https://manager.test", job.GetManagerUrl())
 	require.Equal(t, "laelia/machine-runtime:test", job.GetRuntimeImage())
 	require.Equal(t, "linux-x64", job.GetBinaryTarget())
-	require.Contains(t, job.GetBootstrapScript(), `MANAGER_URL="https://manager.test"`)
+	require.Contains(t, job.GetBootstrapScript(), `MANAGER_URL="${LAELIA_MANAGER_URL:-https://manager.test}"`)
 	require.Contains(t, job.GetBootstrapScript(), testManifestGzSha)
 
 	// ---- 5. a progress frame moves the machine into PROVISIONING ----

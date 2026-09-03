@@ -21,7 +21,7 @@ func TestRenderBootstrapScript(t *testing.T) {
 	for _, want := range []string{
 		"#!/bin/sh",
 		"set -eu",
-		`MANAGER_URL="https://laelia.example.com"`,
+		`MANAGER_URL="${LAELIA_MANAGER_URL:-https://laelia.example.com}"`,
 		`TARGET="linux-x64"`,
 		`WANT_GZ_SHA256="gzsha"`,
 		`WANT_SHA256="rawsha"`,

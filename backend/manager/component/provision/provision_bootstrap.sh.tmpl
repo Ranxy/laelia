@@ -9,7 +9,10 @@
 # the credential is seeded from the secret, both into the data volume.
 set -eu
 
-MANAGER_URL="{{.ManagerURL}}"
+# Prefer the LAELIA_MANAGER_URL env var (set by the provisioner, which may
+# override the manager's public URL with an in-cluster service URL); fall back
+# to the manager-rendered URL for backends that don't set it.
+MANAGER_URL="${LAELIA_MANAGER_URL:-{{.ManagerURL}}}"
 TARGET="{{.BinaryTarget}}"
 WANT_GZ_SHA256="{{.GzSha256}}"
 WANT_SHA256="{{.Sha256}}"
