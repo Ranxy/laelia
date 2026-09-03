@@ -1290,6 +1290,7 @@
       "create-title": "添加 provisioner",
       "delete-confirm-description": "{{title}} 将被删除且其 token 失效。仍绑定到它的机器必须先删除或重新分配。",
       "delete-confirm-title": "删除 provisioner?",
+      "delete-machines-bound": "仍有 {{count}} 台机器绑定到此 provisioner。请先删除这些机器,再删除该 provisioner。",
       "deleted": "Provisioner 已删除",
       "description": "代表管理器在其自身后端(如 Kubernetes)中创建机器工作负载的 worker。",
       "field-backend": "后端",

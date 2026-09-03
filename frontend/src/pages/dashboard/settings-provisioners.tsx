@@ -45,7 +45,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { provisionerServiceClient } from "@/connect";
+import { machineServiceClient, provisionerServiceClient } from "@/connect";
 import { useResourceQuery } from "@/hooks/use-resource-query";
 import { describeError } from "@/lib/connect-errors";
 import { RUNTIME_IMAGE_FOCUS_PARAM } from "@/lib/runtime-image-focus";
@@ -54,6 +54,7 @@ import { toastManager } from "@/lib/toast";
 import { showErrorToast } from "@/lib/toast-errors";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
+import type { MachineSummary } from "@/types/proto-es/v1/machine_pb";
 import type { Provisioner } from "@/types/proto-es/v1/provisioner_pb";
 
 // BACKEND_OPTIONS lists the registry's backend types: kubernetes is the only
@@ -186,6 +187,38 @@ export function SettingsProvisionersPage() {
   const [deleteTarget, setDeleteTarget] = useState<Provisioner | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  // Machines still bound to the delete target, listed in the confirm dialog so
+  // the user sees exactly what must be removed first. Empty = deletable.
+  const [deleteMachines, setDeleteMachines] = useState<MachineSummary[]>([]);
+  const [deleteMachinesLoading, setDeleteMachinesLoading] = useState(false);
+
+  // Fetch the bound machines whenever a delete target is opened. The backend
+  // refuses deletion while any machine references the provisioner, so the
+  // dialog surfaces them up front and disables the confirm until they are gone.
+  useEffect(() => {
+    let cancelled = false;
+    setDeleteMachines([]);
+    setDeleteMachinesLoading(false);
+    if (!deleteTarget) return;
+    setDeleteMachinesLoading(true);
+    void (async () => {
+      try {
+        const res = await machineServiceClient.listMachines({
+          pageSize: 100,
+          pageToken: "",
+          provisioner: deleteTarget.name,
+        });
+        if (!cancelled) setDeleteMachines(res.machines ?? []);
+      } catch {
+        // Leave the list empty; the backend still refuses deletion.
+      } finally {
+        if (!cancelled) setDeleteMachinesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [deleteTarget]);
 
   async function handleCreate(form: ProvisionerForm) {
     if (!form.title.trim()) {
@@ -458,6 +491,26 @@ export function SettingsProvisionersPage() {
               title: deleteTarget?.title ?? "",
             })}
           </AlertDialogDescription>
+          {deleteMachinesLoading ? (
+            <p className="mt-2 text-sm text-control-light">
+              {t("common.loading")}
+            </p>
+          ) : deleteMachines.length > 0 ? (
+            <div className="mt-2 rounded-md border border-warning/40 bg-warning/10 p-3">
+              <p className="text-sm font-medium text-warning">
+                {t("settings.provisioners.delete-machines-bound", {
+                  count: deleteMachines.length,
+                })}
+              </p>
+              <ul className="mt-2 flex flex-col gap-1">
+                {deleteMachines.map((m) => (
+                  <li key={m.name} className="truncate text-sm text-control">
+                    {m.title}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {deleteError && (
             <Alert variant="error" description={deleteError} className="mt-2" />
           )}
@@ -469,7 +522,7 @@ export function SettingsProvisionersPage() {
             </AlertDialogClose>
             <Button
               variant="destructive"
-              disabled={deleting}
+              disabled={deleting || deleteMachines.length > 0}
               onClick={() => void handleDelete()}
             >
               {deleting ? t("common.deleting") : t("common.delete")}

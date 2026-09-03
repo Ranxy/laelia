@@ -1290,6 +1290,7 @@
       "create-title": "Add provisioner",
       "delete-confirm-description": "{{title}} will be deleted and its token invalidated. Machines still bound to it must be deleted or reassigned first.",
       "delete-confirm-title": "Delete provisioner?",
+      "delete-machines-bound": "{{count}} machine(s) are still bound to this provisioner. Delete them before removing the provisioner.",
       "deleted": "Provisioner deleted",
       "description": "Workers that create machine workloads in their own backend (kubernetes) on the manager's behalf.",
       "field-backend": "Backend",

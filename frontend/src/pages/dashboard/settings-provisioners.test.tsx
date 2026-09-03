@@ -12,6 +12,7 @@ const mock = vi.hoisted(() => ({
   rotateProvisionerToken: vi.fn(),
   deleteProvisioner: vi.fn(),
   getProvisioningConfig: vi.fn(),
+  listMachines: vi.fn(),
 }));
 
 vi.mock("@/connect", () => ({
@@ -23,6 +24,9 @@ vi.mock("@/connect", () => ({
   },
   settingServiceClient: {
     getSetting: mock.getProvisioningConfig,
+  },
+  machineServiceClient: {
+    listMachines: mock.listMachines,
   },
 }));
 
@@ -84,7 +88,10 @@ beforeEach(() => {
   mock.rotateProvisionerToken.mockReset();
   mock.deleteProvisioner.mockReset();
   mock.getProvisioningConfig.mockReset();
+  mock.listMachines.mockReset();
   mock.listProvisioners.mockResolvedValue({ provisioners: [] });
+  // No bound machines by default so the delete confirm stays enabled.
+  mock.listMachines.mockResolvedValue({ machines: [], nextPageToken: "" });
   // A runtime image is configured by default so the non-gating tests exercise
   // the normal flow.
   mock.getProvisioningConfig.mockResolvedValue(
@@ -228,6 +235,33 @@ describe("settings-provisioners", () => {
     expect(
       screen.getByText("settings.provisioners.delete-confirm-title")
     ).toBeInTheDocument();
+  });
+
+  it("lists the bound machines and disables delete while any exist", async () => {
+    mock.listProvisioners.mockResolvedValue({
+      provisioners: [provisioner()],
+    });
+    mock.listMachines.mockResolvedValue({
+      machines: [
+        { name: "machines/m1", title: "Machine One" },
+        { name: "machines/m2", title: "Machine Two" },
+      ],
+      nextPageToken: "",
+    });
+
+    renderPage();
+
+    fireEvent.click(await screen.findByText("Prod Cluster"));
+    fireEvent.click(screen.getByLabelText("common.delete"));
+
+    expect(
+      await screen.findByText("settings.provisioners.delete-machines-bound")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Machine One")).toBeInTheDocument();
+    expect(screen.getByText("Machine Two")).toBeInTheDocument();
+    const confirm = screen.getByText("common.delete").closest("button");
+    expect(confirm).toBeDisabled();
+    expect(mock.deleteProvisioner).not.toHaveBeenCalled();
   });
 
   it("deletes a provisioner and refreshes the table", async () => {
