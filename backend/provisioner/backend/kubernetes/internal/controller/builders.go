@@ -39,6 +39,41 @@ const dataMountPath = "/data"
 // init container (same uid) write into the fresh PVC.
 const machineUID int64 = 1001
 
+// machineCommand is the main-container command that runs the machine binary
+// the init container downloaded onto the data volume. It is set explicitly so
+// the runtime image needs no laelia-specific entrypoint — any user image
+// works (the pod contract guarantees POSIX sh). It mirrors
+// scripts/docker/machine-runtime-entrypoint.sh: maps the pod env to CLI flags
+// and execs the binary. Keep the two in sync.
+const machineCommand = `#!/bin/sh
+set -eu
+BIN="${LAELIA_MACHINE_BIN:-/data/bin/laelia-machine}"
+if [ ! -x "$BIN" ]; then
+  echo "machine-runtime: $BIN is missing or not executable; the init container must run the bootstrap script before this entrypoint" >&2
+  exit 1
+fi
+set -- setup --no-browser --foreground
+if [ "${LAELIA_PROVISIONED:-false}" = "true" ]; then
+  set -- "$@" --provisioned
+fi
+if [ -n "${LAELIA_MANAGER_URL:-}" ]; then
+  set -- "$@" --manager "$LAELIA_MANAGER_URL"
+  case "$LAELIA_MANAGER_URL" in
+    http://*) set -- "$@" --allow-http ;;
+  esac
+fi
+if [ "${LAELIA_INSECURE:-false}" = "true" ]; then
+  set -- "$@" --insecure
+fi
+if [ "${LAELIA_DEBUG:-false}" = "true" ]; then
+  set -- "$@" --debug
+fi
+if [ -n "${LAELIA_CODEX_HOME:-}" ]; then
+  export CODEX_HOME="$LAELIA_CODEX_HOME"
+fi
+exec "$BIN" "$@"
+`
+
 // serviceFor builds the desired headless Service required by StatefulSet pod
 // identity. It carries no ports: machine pods only use unix sockets and
 // outbound connections.
@@ -72,11 +107,13 @@ func statefulSetFor(m *laeliav1.LaeliaMachine) *appsv1.StatefulSet {
 	}
 
 	// Runtime images run the machine binary from the data volume (the init
-	// container installs it); the entrypoint maps the env vars to flags.
+	// container installs it); the command maps the env vars to flags. It is
+	// set explicitly so the image needs no laelia-specific entrypoint.
 	main := corev1.Container{
 		Name:            "laelia-machine",
 		Image:           m.Spec.RuntimeImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command:         []string{"/bin/sh", "-c", machineCommand},
 		Env:             containerEnv(m),
 		Resources:       containerResources(m.Spec.Resources),
 		VolumeMounts: []corev1.VolumeMount{

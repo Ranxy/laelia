@@ -60,6 +60,14 @@ func TestStatefulSetPodContract(t *testing.T) {
 	main := sts.Spec.Template.Spec.Containers[0]
 	assert.Equal(t, "laelia-machine", main.Name)
 	assert.Equal(t, corev1.PullIfNotPresent, main.ImagePullPolicy)
+	// The command is set explicitly (not the image entrypoint) so any user
+	// runtime image works; it runs the machine binary via POSIX sh.
+	require.Len(t, main.Command, 3)
+	assert.Equal(t, "/bin/sh", main.Command[0])
+	assert.Equal(t, "-c", main.Command[1])
+	assert.Contains(t, main.Command[2], `exec "$BIN" "$@"`)
+	assert.Contains(t, main.Command[2], `--provisioned`)
+	assert.Contains(t, main.Command[2], `--manager "$LAELIA_MANAGER_URL"`)
 	env := envByName(main.Env)
 	assert.Equal(t, "/data/laelia", env["LAELIA_HOME"].Value)
 	assert.Equal(t, "0123456789abcdef", env["LAELIA_FINGERPRINT"].Value)
