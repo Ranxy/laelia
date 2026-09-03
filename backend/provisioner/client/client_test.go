@@ -119,6 +119,48 @@ func TestIsPermanentAuthFailure(t *testing.T) {
 	assert.False(t, IsPermanentAuthFailure(context.DeadlineExceeded))
 }
 
+func TestDescribeAuthFailureMapsDistinctCauses(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+		want string // a fragment unique to each remediation
+	}{
+		{
+			name: "wrong signing secret",
+			msg:  "invalid provisioner access token: token signature is invalid: signature is invalid",
+			want: "was NOT issued by this manager",
+		},
+		{
+			name: "deleted provisioner",
+			msg:  "provisioner 7bb54271-8f83-4110-afc6-9501bf0b6126 not exists",
+			want: "no longer exists on this manager",
+		},
+		{
+			name: "rotated provisioner",
+			msg:  "provisioner token version mismatch",
+			want: "was rotated on the manager",
+		},
+		{
+			name: "audience mismatch",
+			msg:  "invalid access token, audience mismatch, expected ...",
+			want: "different release mode or environment",
+		},
+		{
+			name: "generic rejection",
+			msg:  "credential rejected for an unrelated auth reason",
+			want: "the provisioner credential was rejected",
+		},
+	}
+	for _, tt := range tests {
+		got := DescribeAuthFailure(connect.NewError(connect.CodeUnauthenticated, errors.New(tt.msg)))
+		assert.Contains(t, got, tt.want, tt.name)
+	}
+
+	// Non-auth errors (and nil) fall back to the raw error / a neutral message.
+	assert.Contains(t, DescribeAuthFailure(errors.New("raw boom")), "raw boom")
+	assert.Contains(t, DescribeAuthFailure(nil), "unknown authentication error")
+}
+
 func TestStreamResult(t *testing.T) {
 	res := &streamResult{}
 	require.NoError(t, res.get())

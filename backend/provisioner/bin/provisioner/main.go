@@ -30,10 +30,15 @@ func main() {
 	if err := provisionercmd.Execute(); err != nil {
 		// A manager-requested shutdown (token rotated / provisioner deleted)
 		// exits with a specific log line instead of retrying with a dead
-		// credential; anything else logs the failure.
-		if errors.Is(err, client.ErrShutdown) {
-			slog.Error("provisioner stopped: its credential is no longer valid; register or rotate the provisioner to get a new token")
-		} else {
+		// credential; a permanent auth rejection logs why it was rejected and
+		// how to fix it; anything else logs the failure.
+		switch {
+		case errors.Is(err, client.ErrShutdown):
+			slog.Error("provisioner stopped: the manager shut it down; register or rotate the provisioner to get a new token")
+		case client.IsPermanentAuthFailure(err):
+			slog.Error("laelia-provisioner will not start: the manager rejected its credential; fix the token and restart, see REASON",
+				"error", err, "REASON", client.DescribeAuthFailure(err))
+		default:
 			slog.Error("laelia-provisioner exited", "error", err)
 		}
 		os.Exit(1)

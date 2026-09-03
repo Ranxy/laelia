@@ -403,6 +403,55 @@ func IsPermanentAuthFailure(err error) bool {
 	}
 }
 
+// DescribeAuthFailure maps a permanent (unauthenticated/permission-denied)
+// credential rejection to a plain-language cause and the exact steps an
+// operator should take. The manager rejects a provisioner token for a few
+// distinct reasons (token signed by a different manager secret, deleted
+// provisioner, rotated token, wrong environment); surfacing each with its fix
+// turns a CrashLoopBackOff into an actionable message. Returns the raw error
+// for non-auth errors so callers can always log something useful.
+func DescribeAuthFailure(err error) string {
+	if err == nil {
+		return "unknown authentication error"
+	}
+	var ce *connect.Error
+	if !errors.As(err, &ce) {
+		return err.Error()
+	}
+	msg := ce.Message()
+	switch {
+	case strings.Contains(msg, "signature is invalid"):
+		return "the provisioner token was NOT issued by this manager — it was signed " +
+			"with a different JWT secret than the one stored in the manager's database " +
+			"(wrong environment, database reset, or a token pasted from another instance). " +
+			"Fix: on the target manager open Settings → Provisioners, create or rotate a " +
+			"provisioner, copy the new token into the k8s Secret token field " +
+			"(deploy/deployment.yaml, 'laelia-provisioner-token'), apply it, and restart: " +
+			"kubectl -n laelia-machines rollout restart deployment/laelia-provisioner"
+	case strings.Contains(msg, "not exists"),
+		strings.Contains(msg, "has been deactivated"),
+		strings.Contains(msg, "failed to find provisioner"):
+		return "the token's provisioner no longer exists on this manager (it was deleted or " +
+			"deactivated, or was registered on a different instance). Fix: create a provisioner " +
+			"under Settings → Provisioners and put its token into the k8s Secret, then restart " +
+			"deployment/laelia-provisioner"
+	case strings.Contains(msg, "token version mismatch"):
+		return "the provisioner token was rotated on the manager; the version pinned in this " +
+			"deployment is stale. Fix: copy the latest token from Settings → Provisioners into " +
+			"the k8s Secret and restart deployment/laelia-provisioner"
+	case strings.Contains(msg, "audience mismatch"),
+		strings.Contains(msg, "invalid provisioner access token"):
+		return "the manager does not recognize this token — it may have been minted for a " +
+			"different release mode or environment. Fix: mint a fresh provisioner token on the " +
+			"manager this provisioner is configured to connect to, put it into the k8s Secret, " +
+			"and restart"
+	default:
+		return "the provisioner credential was rejected (" + msg + "). Recreate or rotate the " +
+			"provisioner under Settings → Provisioners, put the new token into the k8s Secret, " +
+			"and restart deployment/laelia-provisioner"
+	}
+}
+
 // streamResult carries the receive pump's terminal error to the run loop.
 type streamResult struct {
 	mu  sync.Mutex
