@@ -669,6 +669,7 @@
       "offline-command-hint": "Open a terminal on the target computer and run:",
       "offline-install-hint": "Run this on the computer you want to connect:",
       "offline-install-note": "Only run this if the machine app is not installed on the machine, or if you want to reinstall it.",
+      "provisioned-managed-note": "This machine is managed by a provisioner. Its token and connection are handled automatically.",
       "section-identity": "Identity & Status",
       "section-token": "Token & Connection"
     },

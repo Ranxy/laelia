@@ -355,6 +355,44 @@ describe("MachineProfilePage", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("hides token actions and reconnection commands for a provisioned machine", async () => {
+    mock.getMachine.mockResolvedValue(
+      machine({
+        provisioner: "provisioners/p1",
+        status: {
+          state: MachineStatus_ConnectionState.OFFLINE,
+          lastHeartbeatTime: undefined,
+          connectedTime: undefined,
+          errorMessage: "",
+          activeSessionId: "",
+        } as unknown as MachineStatus,
+      })
+    );
+    renderPage();
+
+    expect(
+      await screen.findByText("machine.profile.provisioned-managed-note")
+    ).toBeInTheDocument();
+    // No manual token/connection actions for provisioned machines.
+    expect(
+      screen.queryByRole("button", { name: "machine.revoke-token" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "machine.force-disconnect" })
+    ).not.toBeInTheDocument();
+    // The offline reconnection commands are meaningless for provisioned machines.
+    expect(
+      screen.queryByText("machine.profile.offline-install-note")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("machine.profile.offline-command-hint")
+    ).not.toBeInTheDocument();
+    // Ownership transfer remains available.
+    expect(
+      screen.getByRole("button", { name: "machine.transfer-owner" })
+    ).toBeInTheDocument();
+  });
+
   it("shows the edit-not-allowed alert when the caller has no capability", async () => {
     mock.getMachine.mockResolvedValue(
       machine({ canEdit: false, canCreateAgent: false, canManage: false })

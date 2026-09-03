@@ -460,6 +460,12 @@ func (s *MachineService) ForceDisconnectMachine(ctx context.Context, req *connec
 	if machine == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
 	}
+	// Provisioned machines are managed by a provisioner that recreates the
+	// workload; force-disconnecting would leave it in a state the provisioner
+	// does not reconcile. The provisioner owns the connection lifecycle.
+	if machine.ProvisionerID != 0 {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("cannot force-disconnect a provisioned machine; the provisioner manages its connection"))
+	}
 	user, _ := GetUserFromContext(ctx)
 	if !isMachineAdmin(ctx, s.iam, user, machine) {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can force-disconnect this machine"))

@@ -669,6 +669,7 @@
       "offline-command-hint": "在目标电脑的终端中运行：",
       "offline-install-hint": "在要连接的电脑上运行：",
       "offline-install-note": "仅当机器上尚未安装机器应用，或你想重新安装时才需要执行此命令。",
+      "provisioned-managed-note": "此机器由 provisioner 管理。其令牌与连接由系统自动处理。",
       "section-identity": "身份与状态",
       "section-token": "令牌与连接"
     },

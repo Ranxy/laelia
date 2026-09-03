@@ -27,6 +27,12 @@ func (s *MachineService) RevokeMachineToken(ctx context.Context, req *connect.Re
 	if machine == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
 	}
+	// Provisioned machines authenticate via a provisioner-seeded credential and
+	// have no device-approval path to re-establish a revoked token, so revoking
+	// would strand the workload permanently. The provisioner manages rotation.
+	if machine.ProvisionerID != 0 {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("cannot revoke tokens of a provisioned machine; the provisioner manages its credentials"))
+	}
 	user, _ := GetUserFromContext(ctx)
 	if !isMachineAdmin(ctx, s.iam, user, machine) {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can revoke this machine's tokens"))

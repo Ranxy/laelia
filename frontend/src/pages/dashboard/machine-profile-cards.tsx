@@ -292,6 +292,12 @@ export const MachineTokenCard = memo(function MachineTokenCard({
   const setupCommand = buildMachineSetupCommand();
   const isOffline =
     machine.status?.state === MachineStatus_ConnectionState.OFFLINE;
+  // Provisioned machines are created and managed by a provisioner: they
+  // authenticate via a provisioner-seeded credential (no device-code flow), so
+  // the manual reconnection commands and the token/connection actions are
+  // meaningless and must not be offered.
+  const isProvisioned =
+    machine.provisioner !== "" && machine.provisioner !== undefined;
 
   async function handleCopyInstall() {
     if (!installCommand) return;
@@ -350,60 +356,72 @@ export const MachineTokenCard = memo(function MachineTokenCard({
           </p>
         ) : (
           <div className="flex flex-col gap-4">
-            {isOffline && (
-              <div className="flex flex-col gap-4">
-                {installCommand && (
+            {isProvisioned ? (
+              <p className="text-sm text-control-light">
+                {t("machine.profile.provisioned-managed-note")}
+              </p>
+            ) : (
+              isOffline && (
+                <div className="flex flex-col gap-4">
+                  {installCommand && (
+                    <div className="flex flex-col gap-2">
+                      <p className="text-sm text-control-light">
+                        {t("machine.profile.offline-install-note")}
+                      </p>
+                      <p className="text-sm text-control-light">
+                        {t("machine.profile.offline-install-hint")}
+                      </p>
+                      <CopyableCommand
+                        command={installCommand}
+                        copied={installCopied}
+                        onCopy={() => void handleCopyInstall()}
+                      />
+                    </div>
+                  )}
                   <div className="flex flex-col gap-2">
                     <p className="text-sm text-control-light">
-                      {t("machine.profile.offline-install-note")}
-                    </p>
-                    <p className="text-sm text-control-light">
-                      {t("machine.profile.offline-install-hint")}
+                      {t("machine.profile.offline-command-hint")}
                     </p>
                     <CopyableCommand
-                      command={installCommand}
-                      copied={installCopied}
-                      onCopy={() => void handleCopyInstall()}
+                      command={setupCommand}
+                      copied={setupCopied}
+                      onCopy={() => void handleCopySetup()}
                     />
                   </div>
-                )}
-                <div className="flex flex-col gap-2">
-                  <p className="text-sm text-control-light">
-                    {t("machine.profile.offline-command-hint")}
-                  </p>
-                  <CopyableCommand
-                    command={setupCommand}
-                    copied={setupCopied}
-                    onCopy={() => void handleCopySetup()}
-                  />
                 </div>
-              </div>
+              )
             )}
             {/* Management actions. On touch layouts the buttons stack
                 full-width (large, well-separated targets) with the two
                 destructive ones error-tinted; from sm up they share one
-                compact row. */}
+                compact row. Provisioned machines only offer ownership
+                transfer — token revocation and force-disconnect are
+                provisioner-managed. */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Button
-                variant="destructive-outline"
-                className={TOKEN_ACTION_BTN}
-                onClick={() => {
-                  setActionError("");
-                  setRevokeOpen(true);
-                }}
-              >
-                {t("machine.revoke-token")}
-              </Button>
-              <Button
-                variant="destructive-outline"
-                className={TOKEN_ACTION_BTN}
-                onClick={() => {
-                  setActionError("");
-                  setForceOpen(true);
-                }}
-              >
-                {t("machine.force-disconnect")}
-              </Button>
+              {!isProvisioned && (
+                <Button
+                  variant="destructive-outline"
+                  className={TOKEN_ACTION_BTN}
+                  onClick={() => {
+                    setActionError("");
+                    setRevokeOpen(true);
+                  }}
+                >
+                  {t("machine.revoke-token")}
+                </Button>
+              )}
+              {!isProvisioned && (
+                <Button
+                  variant="destructive-outline"
+                  className={TOKEN_ACTION_BTN}
+                  onClick={() => {
+                    setActionError("");
+                    setForceOpen(true);
+                  }}
+                >
+                  {t("machine.force-disconnect")}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 className={TOKEN_ACTION_BTN}
