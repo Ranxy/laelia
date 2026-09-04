@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores";
 import { renderWithQueryClient } from "@/test/query";
 import { SettingsProvisionerCleanupPage } from "./settings-provisioner-cleanup";

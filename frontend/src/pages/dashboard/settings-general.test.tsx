@@ -6,8 +6,8 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores";
 import {
   WorkspaceProfileSetting,

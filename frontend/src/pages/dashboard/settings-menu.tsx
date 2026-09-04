@@ -74,7 +74,7 @@ function useSettingsMenuItems(): MenuItem[] {
   const canViewIdentityProviders = useHasPermission(
     "laelia.identityProviders.list"
   );
-  const canViewProvisioners = useHasPermission("laelia.provisioners.get");
+  const canViewProvisioners = useHasPermission("laelia.provisioners.create");
   const canViewAudit = useHasPermission("laelia.auditLogs.search");
   const canViewPushConfig = useHasPermission("laelia.pushConfig.update");
 

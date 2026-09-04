@@ -122,6 +122,24 @@ describe("MachineNewPage tabs", () => {
       screen.queryByText("machine.new.provisioned.pick-title")
     ).not.toBeInTheDocument();
   });
+
+  it("shows the provisioned tab for a per-provisioner grant without the workspace permission", async () => {
+    // A normal user bound to roles/provisionerMachineCreator on a provisioner
+    // holds laelia.provisioners.provision per-resource, which is absent from the
+    // workspace-scope permission set. The roster (filtered by the backend to
+    // provisioners the caller may provision on) is what surfaces the tab.
+    setSession([]);
+    useAppStore.setState({
+      provisioners: [provisioner("provisioners/p1", "Prod Cluster")],
+    });
+    render(<MachineNewPage />);
+    expect(
+      await screen.findByText("machine.new.tab-provisioned")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("machine.new.provisioned.pick-title")
+    ).toBeInTheDocument();
+  });
 });
 
 describe("MachineNewProvisionedPanel", () => {

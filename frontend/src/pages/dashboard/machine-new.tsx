@@ -33,10 +33,20 @@ function detectInstallOS(): MachineInstallOS {
 // renders, exactly as before this page grew tabs.
 export function MachineNewPage() {
   const { t } = useTranslation();
-  const canProvision = useHasPermission("laelia.provisioners.provision");
   const provisioners = useAppStore((s) => s.provisioners);
   const provisionersLoading = useAppStore((s) => s.provisionersLoading);
   const fetchProvisioners = useAppStore((s) => s.fetchProvisioners);
+  // The provisioned tab is available when the caller can create a machine on a
+  // provisioner: a workspace-scope holder of laelia.provisioners.provision
+  // (workspaceAdmin / roles/machineProvisioner) or a principal bound to
+  // roles/provisionerMachineCreator in a provisioner's IAM policy. The latter
+  // is per-resource and absent from the workspace-scope permission set, so it
+  // is detected via the roster: ListProvisioners already filters to the
+  // provisioners the caller may provision on, so a non-empty roster is the
+  // signal.
+  const canProvision =
+    useHasPermission("laelia.provisioners.provision") ||
+    provisioners.length > 0;
   // Default to the self-hosted flow until the provisioner roster resolves: when
   // none are available the provisioned tab would only show an empty warning, so
   // the user lands on the always-workable self-hosted flow instead. The effect
@@ -45,9 +55,8 @@ export function MachineNewPage() {
   const tabTouched = useRef(false);
 
   useEffect(() => {
-    if (!canProvision) return;
     void fetchProvisioners({ pageSize: 100 });
-  }, [canProvision, fetchProvisioners]);
+  }, [fetchProvisioners]);
 
   // Settle on the provisioned tab as soon as we know a provisioner is connected
   // (offline ones can't create machines), unless the user already picked a tab.

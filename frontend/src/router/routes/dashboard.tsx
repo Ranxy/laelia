@@ -34,9 +34,9 @@ import {
   SETTINGS_ROUTE_MCP_SERVERS,
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_PROFILE,
-  SETTINGS_ROUTE_PROVISIONERS,
-  SETTINGS_ROUTE_PROVISIONER_DETAIL,
   SETTINGS_ROUTE_PROVISIONER_CLEANUP,
+  SETTINGS_ROUTE_PROVISIONER_DETAIL,
+  SETTINGS_ROUTE_PROVISIONERS,
   SETTINGS_ROUTE_ROLES,
   SETTINGS_ROUTE_SMTP,
   SETTINGS_ROUTE_STORAGE,
@@ -258,7 +258,11 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         path: "new",
         handle: {
           name: MACHINE_ROUTE_NEW,
-          permission: "laelia.machines.create",
+          // Ordinary users can create their own machines (the backend allows
+          // it by default unless the workspace disallows user-created
+          // machines), so gate the page on the view permission rather than
+          // laelia.machines.create, which is a grant that bypasses that policy.
+          permission: ["laelia.machines.get", "laelia.machines.create"],
         } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/machine-new").then((m) => ({
@@ -453,7 +457,10 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         path: "provisioners",
         handle: {
           name: SETTINGS_ROUTE_PROVISIONERS,
-          permission: "laelia.provisioners.get",
+          // The provisioners page is the management surface (create/rotate/
+          // delete), so it requires the management-tier permission rather than
+          // laelia.provisioners.get, which ordinary users hold as a baseline.
+          permission: "laelia.provisioners.create",
         } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-provisioners").then((m) => ({
@@ -464,7 +471,7 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         path: "provisioners/:provisionerId",
         handle: {
           name: SETTINGS_ROUTE_PROVISIONER_DETAIL,
-          permission: "laelia.provisioners.get",
+          permission: "laelia.provisioners.create",
         } satisfies RouteHandle,
         lazy: () =>
           import("@/pages/dashboard/settings-provisioner-detail").then((m) => ({
@@ -475,12 +482,14 @@ export const dashboardChildrenRoutes: RouteObject[] = [
         path: "provisioners/:provisionerId/cleanup",
         handle: {
           name: SETTINGS_ROUTE_PROVISIONER_CLEANUP,
-          permission: "laelia.provisioners.get",
+          permission: "laelia.provisioners.create",
         } satisfies RouteHandle,
         lazy: () =>
-          import("@/pages/dashboard/settings-provisioner-cleanup").then((m) => ({
-            Component: m.SettingsProvisionerCleanupPage,
-          })),
+          import("@/pages/dashboard/settings-provisioner-cleanup").then(
+            (m) => ({
+              Component: m.SettingsProvisionerCleanupPage,
+            })
+          ),
       },
       {
         path: "mcp-servers",
