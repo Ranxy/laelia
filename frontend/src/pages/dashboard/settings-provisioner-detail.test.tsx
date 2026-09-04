@@ -1,6 +1,6 @@
-import { screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores";
 import { renderWithQueryClient } from "@/test/query";
 import type { MachineSummary } from "@/types/proto-es/v1/machine_pb";
@@ -11,6 +11,9 @@ const mock = vi.hoisted(() => ({
   getProvisioner: vi.fn(),
   listProvisioners: vi.fn(),
   listMachines: vi.fn(),
+  getProvisionerIamPolicy: vi.fn(),
+  setProvisionerIamPolicy: vi.fn(),
+  listGroups: vi.fn(),
 }));
 
 vi.mock("@/connect", () => ({
@@ -20,6 +23,13 @@ vi.mock("@/connect", () => ({
   },
   machineServiceClient: {
     listMachines: mock.listMachines,
+  },
+  iamServiceClient: {
+    getProvisionerIamPolicy: mock.getProvisionerIamPolicy,
+    setProvisionerIamPolicy: mock.setProvisionerIamPolicy,
+  },
+  groupServiceClient: {
+    listGroups: mock.listGroups,
   },
 }));
 
@@ -79,11 +89,19 @@ beforeEach(() => {
   mock.getProvisioner.mockReset();
   mock.listProvisioners.mockReset();
   mock.listMachines.mockReset();
+  mock.getProvisionerIamPolicy.mockReset();
+  mock.setProvisionerIamPolicy.mockReset();
+  mock.listGroups.mockReset();
   mock.getProvisioner.mockResolvedValue(provisioner());
   mock.listMachines.mockResolvedValue({
     machines: [machine("m1", "Machine One"), machine("m2", "Machine Two")],
     nextPageToken: "",
   });
+  mock.getProvisionerIamPolicy.mockResolvedValue({
+    policy: { bindings: [] },
+    etag: "v1",
+  });
+  mock.listGroups.mockResolvedValue({ groups: [], nextPageToken: "" });
 });
 
 describe("settings-provisioner-detail", () => {
@@ -139,6 +157,59 @@ describe("settings-provisioner-detail", () => {
 
     expect(
       await screen.findByText("settings.provisioner-detail.not-found")
+    ).toBeInTheDocument();
+  });
+
+  it("hides the access card without the admin permission", async () => {
+    renderPage();
+
+    await screen.findByText("Prod Cluster");
+
+    expect(
+      screen.queryByText("settings.provisioner-detail.access-title")
+    ).not.toBeInTheDocument();
+    expect(mock.getProvisionerIamPolicy).not.toHaveBeenCalled();
+  });
+
+  it("shows who can create machines and opens the manage sheet for an admin", async () => {
+    useAppStore.setState({
+      currentUser: {
+        name: "users/1",
+        title: "Admin",
+        permissions: ["laelia.provisioners.get", "laelia.provisioners.delete"],
+      } as never,
+    });
+    mock.getProvisionerIamPolicy.mockResolvedValue({
+      policy: {
+        bindings: [
+          {
+            role: "roles/provisionerMachineCreator",
+            members: ["users/1", "groups/eng@example.com"],
+          },
+        ],
+      },
+      etag: "v1",
+    });
+
+    renderPage();
+
+    expect(
+      await screen.findByText("settings.provisioner-detail.access-title")
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mock.getProvisionerIamPolicy).toHaveBeenCalledTimes(1);
+      expect(mock.getProvisionerIamPolicy.mock.calls[0][0].name).toBe(
+        "provisioners/p1"
+      );
+    });
+    expect(await screen.findByText("users/1")).toBeInTheDocument();
+
+    // Opening the manage sheet populates the bound members.
+    fireEvent.click(
+      screen.getByText("settings.provisioner-detail.access-manage")
+    );
+    expect(
+      await screen.findByText("settings.provisioner-detail.access-manage-title")
     ).toBeInTheDocument();
   });
 });

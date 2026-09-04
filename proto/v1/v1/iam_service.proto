@@ -103,6 +103,24 @@ message SetMachineIamPolicyRequest {
   string etag = 3;
 }
 
+message GetProvisionerIamPolicyRequest {
+  // The provisioner resource name, in the form `provisioners/{provisioner}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Provisioner"}
+  ];
+}
+
+message SetProvisionerIamPolicyRequest {
+  // The provisioner resource name, in the form `provisioners/{provisioner}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Provisioner"}
+  ];
+  laelia.store.IamPolicy policy = 2 [(google.api.field_behavior) = REQUIRED];
+  string etag = 3;
+}
+
 // IamService exposes the workspace, per-agent, and per-machine IAM policies for
 // management. Get reads the full policy; Set replaces it whole, guarded by an
 // etag. The workspace/agent RPCs are gated by the IAM interceptor with
@@ -143,6 +161,18 @@ service IamService {
 
   // Set the IAM policy attached to a machine (full replace, etag-guarded).
   rpc SetMachineIamPolicy(SetMachineIamPolicyRequest) returns (IamPolicyView) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
+  // Get the IAM policy attached to a provisioner (who may create machines on
+  // it).
+  rpc GetProvisionerIamPolicy(GetProvisionerIamPolicyRequest) returns (IamPolicyView) {
+    option (laelia.v1.auth_method) = IAM;
+  }
+
+  // Set the IAM policy attached to a provisioner (full replace, etag-guarded).
+  rpc SetProvisionerIamPolicy(SetProvisionerIamPolicyRequest) returns (IamPolicyView) {
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }

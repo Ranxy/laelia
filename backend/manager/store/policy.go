@@ -55,6 +55,17 @@ func (s *Store) GetMachineIamPolicy(ctx context.Context, machineName string) (*I
 	})
 }
 
+// GetProvisionerIamPolicy returns the IAM policy attached to a provisioner
+// (resource name provisioners/{resource_id}). An absent policy is returned as
+// an empty IamPolicyMessage, not an error.
+func (s *Store) GetProvisionerIamPolicy(ctx context.Context, provisionerName string) (*IamPolicyMessage, error) {
+	resourceType := models.Policy_PROVISIONER
+	return s.getIamPolicy(ctx, &FindPolicyMessage{
+		ResourceType: &resourceType,
+		Resource:     &provisionerName,
+	})
+}
+
 // applyIamPolicyPatch mutates policy in place: for each existing binding it adds
 // patch.Member when the binding's role is in patch.Roles and removes it
 // otherwise; then it creates a new binding for any role in patch.Roles that had
@@ -146,6 +157,13 @@ func (s *Store) SetAgentIamPolicy(ctx context.Context, agentName string, policy 
 // name machines/{resource_id}). See SetWorkspaceIamPolicy for etag semantics.
 func (s *Store) SetMachineIamPolicy(ctx context.Context, machineName string, policy *models.IamPolicy, etag string) (*IamPolicyMessage, error) {
 	return s.setIamPolicy(ctx, models.Policy_MACHINE, machineName, policy, etag)
+}
+
+// SetProvisionerIamPolicy replaces the IAM policy attached to a provisioner
+// (resource name provisioners/{resource_id}). See SetWorkspaceIamPolicy for
+// etag semantics.
+func (s *Store) SetProvisionerIamPolicy(ctx context.Context, provisionerName string, policy *models.IamPolicy, etag string) (*IamPolicyMessage, error) {
+	return s.setIamPolicy(ctx, models.Policy_PROVISIONER, provisionerName, policy, etag)
 }
 
 func (s *Store) setIamPolicy(ctx context.Context, resourceType models.Policy_Resource, resource string, policy *models.IamPolicy, etag string) (*IamPolicyMessage, error) {

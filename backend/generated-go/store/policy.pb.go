@@ -98,21 +98,26 @@ const (
 	// machine. Machine-scoped access (laelia.machines.createAgent) is
 	// authorized from this policy at authorization time.
 	Policy_MACHINE Policy_Resource = 9
+	// PROVISIONER is a per-provisioner IAM policy: who may create a machine on
+	// the provisioner. Provisioner-scoped access (laelia.provisioners.provision)
+	// is authorized from this policy at authorization time.
+	Policy_PROVISIONER Policy_Resource = 10
 )
 
 // Enum value maps for Policy_Resource.
 var (
 	Policy_Resource_name = map[int32]string{
-		0: "RESOURCE_UNSPECIFIED",
-		1: "WORKSPACE",
-		2: "ENVIRONMENT",
-		3: "PROJECT",
-		4: "CONVERSATION",
-		5: "AGENT",
-		6: "COMMAND",
-		7: "REMINDER",
-		8: "FILE",
-		9: "MACHINE",
+		0:  "RESOURCE_UNSPECIFIED",
+		1:  "WORKSPACE",
+		2:  "ENVIRONMENT",
+		3:  "PROJECT",
+		4:  "CONVERSATION",
+		5:  "AGENT",
+		6:  "COMMAND",
+		7:  "REMINDER",
+		8:  "FILE",
+		9:  "MACHINE",
+		10: "PROVISIONER",
 	}
 	Policy_Resource_value = map[string]int32{
 		"RESOURCE_UNSPECIFIED": 0,
@@ -125,6 +130,7 @@ var (
 		"REMINDER":             7,
 		"FILE":                 8,
 		"MACHINE":              9,
+		"PROVISIONER":          10,
 	}
 )
 
@@ -457,12 +463,12 @@ var File_store_policy_proto protoreflect.FileDescriptor
 
 const file_store_policy_proto_rawDesc = "" +
 	"\n" +
-	"\x12store/policy.proto\x12\flaelia.store\x1a\x16google/type/expr.proto\"\xdb\x01\n" +
+	"\x12store/policy.proto\x12\flaelia.store\x1a\x16google/type/expr.proto\"\xec\x01\n" +
 	"\x06Policy\".\n" +
 	"\x04Type\x12\x14\n" +
 	"\x10TYPE_UNSPECIFIED\x10\x00\x12\a\n" +
 	"\x03IAM\x10\x01\x12\a\n" +
-	"\x03TAG\x10\x02\"\xa0\x01\n" +
+	"\x03TAG\x10\x02\"\xb1\x01\n" +
 	"\bResource\x12\x18\n" +
 	"\x14RESOURCE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tWORKSPACE\x10\x01\x12\x0f\n" +
@@ -473,7 +479,9 @@ const file_store_policy_proto_rawDesc = "" +
 	"\aCOMMAND\x10\x06\x12\f\n" +
 	"\bREMINDER\x10\a\x12\b\n" +
 	"\x04FILE\x10\b\x12\v\n" +
-	"\aMACHINE\x10\t\"{\n" +
+	"\aMACHINE\x10\t\x12\x0f\n" +
+	"\vPROVISIONER\x10\n" +
+	"\"{\n" +
 	"\tTagPolicy\x125\n" +
 	"\x04tags\x18\x01 \x03(\v2!.laelia.store.TagPolicy.TagsEntryR\x04tags\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +

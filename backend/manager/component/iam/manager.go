@@ -129,6 +129,17 @@ func (m *Manager) checkResourcePermission(ctx context.Context, perm permission.P
 			}
 		}
 		return false, nil
+	case models.Policy_PROVISIONER:
+		p, err := m.store.GetProvisionerIamPolicy(ctx, resource.Name)
+		if err != nil {
+			return false, err
+		}
+		for _, binding := range utils.GetCallerIAMPolicyBindings(ctx, m.store, user, agent, p.Policy) {
+			if rolePerms := m.provisionerRolePermissions(ctx, binding.Role); rolePerms != nil && rolePerms[perm] {
+				return true, nil
+			}
+		}
+		return false, nil
 	case models.Policy_COMMAND:
 		return m.checkCommandPermission(ctx, perm, user, agent, resource.Name)
 	case models.Policy_REMINDER:
@@ -271,6 +282,27 @@ func (m *Manager) machineRolePermissions(ctx context.Context, role string) map[p
 // management Roles page as a workspace-bindable role).
 var machineAgentCreatorPermissions = permSet(
 	permission.MachinesCreateAgent,
+)
+
+// provisionerRolePermissions resolves an IAM binding role on a provisioner to its
+// permission set: the built-in provisionerMachineCreator role maps to the
+// provisioner machine-creator set; any other role resolves through the normal
+// role catalog (custom roles).
+func (m *Manager) provisionerRolePermissions(ctx context.Context, role string) map[permission.Permission]bool {
+	if role == common.FormatRole(store.ProvisionerMachineCreatorRole) {
+		return provisionerMachineCreatorPermissions
+	}
+	return m.rolePermissions(ctx, role)
+}
+
+// provisionerMachineCreatorPermissions is the permission set of the
+// provisioner-scope roles/provisionerMachineCreator marker role: it grants
+// creating a machine on the provisioner whose IAM policy binds it. Like the
+// machine/conversation roles it is deliberately not in store.PredefinedRoles
+// (so it never appears on the management Roles page as a workspace-bindable
+// role).
+var provisionerMachineCreatorPermissions = permSet(
+	permission.ProvisionersProvision,
 )
 
 // chatRolePermissions maps a conversation chat role value to its permission

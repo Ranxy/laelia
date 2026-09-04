@@ -290,6 +290,52 @@ export declare type SetMachineIamPolicyRequest = Message<"laelia.v1.SetMachineIa
 export declare const SetMachineIamPolicyRequestSchema: GenMessage<SetMachineIamPolicyRequest>;
 
 /**
+ * @generated from message laelia.v1.GetProvisionerIamPolicyRequest
+ */
+export declare type GetProvisionerIamPolicyRequest = Message<"laelia.v1.GetProvisionerIamPolicyRequest"> & {
+  /**
+   * The provisioner resource name, in the form `provisioners/{provisioner}`.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetProvisionerIamPolicyRequest.
+ * Use `create(GetProvisionerIamPolicyRequestSchema)` to create a new message.
+ */
+export declare const GetProvisionerIamPolicyRequestSchema: GenMessage<GetProvisionerIamPolicyRequest>;
+
+/**
+ * @generated from message laelia.v1.SetProvisionerIamPolicyRequest
+ */
+export declare type SetProvisionerIamPolicyRequest = Message<"laelia.v1.SetProvisionerIamPolicyRequest"> & {
+  /**
+   * The provisioner resource name, in the form `provisioners/{provisioner}`.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: laelia.store.IamPolicy policy = 2;
+   */
+  policy?: IamPolicy | undefined;
+
+  /**
+   * @generated from field: string etag = 3;
+   */
+  etag: string;
+};
+
+/**
+ * Describes the message laelia.v1.SetProvisionerIamPolicyRequest.
+ * Use `create(SetProvisionerIamPolicyRequestSchema)` to create a new message.
+ */
+export declare const SetProvisionerIamPolicyRequestSchema: GenMessage<SetProvisionerIamPolicyRequest>;
+
+/**
  * IamService exposes the workspace, per-agent, and per-machine IAM policies for
  * management. Get reads the full policy; Set replaces it whole, guarded by an
  * etag. The workspace/agent RPCs are gated by the IAM interceptor with
@@ -358,6 +404,27 @@ export declare const IamService: GenService<{
   setMachineIamPolicy: {
     methodKind: "unary";
     input: typeof SetMachineIamPolicyRequestSchema;
+    output: typeof IamPolicyViewSchema;
+  },
+  /**
+   * Get the IAM policy attached to a provisioner (who may create machines on
+   * it).
+   *
+   * @generated from rpc laelia.v1.IamService.GetProvisionerIamPolicy
+   */
+  getProvisionerIamPolicy: {
+    methodKind: "unary";
+    input: typeof GetProvisionerIamPolicyRequestSchema;
+    output: typeof IamPolicyViewSchema;
+  },
+  /**
+   * Set the IAM policy attached to a provisioner (full replace, etag-guarded).
+   *
+   * @generated from rpc laelia.v1.IamService.SetProvisionerIamPolicy
+   */
+  setProvisionerIamPolicy: {
+    methodKind: "unary";
+    input: typeof SetProvisionerIamPolicyRequestSchema;
     output: typeof IamPolicyViewSchema;
   },
 }>;

@@ -38,6 +38,10 @@ message Policy {
     // machine. Machine-scoped access (laelia.machines.createAgent) is
     // authorized from this policy at authorization time.
     MACHINE = 9;
+    // PROVISIONER is a per-provisioner IAM policy: who may create a machine on
+    // the provisioner. Provisioner-scoped access (laelia.provisioners.provision)
+    // is authorized from this policy at authorization time.
+    PROVISIONER = 10;
   }
 }
 

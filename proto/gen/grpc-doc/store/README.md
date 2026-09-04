@@ -928,6 +928,7 @@ EnvironmentTierPolicy is the tier of an environment.
 | REMINDER | 7 |  |
 | FILE | 8 |  |
 | MACHINE | 9 | MACHINE is a per-machine IAM policy: who may create agents on the machine. Machine-scoped access (laelia.machines.createAgent) is authorized from this policy at authorization time. |
+| PROVISIONER | 10 | PROVISIONER is a per-provisioner IAM policy: who may create a machine on the provisioner. Provisioner-scoped access (laelia.provisioners.provision) is authorized from this policy at authorization time. |
 
 
 

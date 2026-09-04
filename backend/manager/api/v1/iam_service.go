@@ -155,6 +155,60 @@ func (s *IamService) SetMachineIamPolicy(ctx context.Context, req *connect.Reque
 	return connect.NewResponse(toIamPolicyView(p)), nil
 }
 
+// requireProvisionerAdmin validates the provisioner resource name, loads the
+// provisioner (rejecting deleted provisioners), and verifies the caller may
+// manage its IAM policy (the provisioner's creator or a workspace admin).
+// Returns a connect error describing any failure, or nil when the caller may
+// proceed.
+func (s *IamService) requireProvisionerAdmin(ctx context.Context, name string) error {
+	resourceID, err := common.GetProvisionerResourceID(name)
+	if err != nil {
+		return connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	provisioner, err := s.store.GetProvisionerByResourceID(ctx, resourceID)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get provisioner %s", resourceID))
+	}
+	if provisioner == nil || provisioner.Deleted {
+		return connect.NewError(connect.CodeNotFound, errors.Errorf("provisioner %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !isProvisionerAdmin(ctx, s.iam, user, provisioner) {
+		return connect.NewError(connect.CodePermissionDenied, errors.New("only the provisioner's creator or a workspace admin can manage this provisioner's IAM policy"))
+	}
+	return nil
+}
+
+func (s *IamService) GetProvisionerIamPolicy(ctx context.Context, req *connect.Request[v1pb.GetProvisionerIamPolicyRequest]) (*connect.Response[v1pb.IamPolicyView], error) {
+	if err := s.requireProvisionerAdmin(ctx, req.Msg.GetName()); err != nil {
+		return nil, err
+	}
+	p, err := s.store.GetProvisionerIamPolicy(ctx, req.Msg.GetName())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get provisioner iam policy"))
+	}
+	return connect.NewResponse(toIamPolicyView(p)), nil
+}
+
+func (s *IamService) SetProvisionerIamPolicy(ctx context.Context, req *connect.Request[v1pb.SetProvisionerIamPolicyRequest]) (*connect.Response[v1pb.IamPolicyView], error) {
+	if err := s.requireProvisionerAdmin(ctx, req.Msg.GetName()); err != nil {
+		return nil, err
+	}
+	if err := validateIamPolicy(ctx, s.store, req.Msg.GetPolicy(), storepb.Policy_PROVISIONER); err != nil {
+		return nil, err
+	}
+	oldPolicy, err := s.store.GetProvisionerIamPolicy(ctx, req.Msg.GetName())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get provisioner iam policy"))
+	}
+	p, err := s.store.SetProvisionerIamPolicy(ctx, req.Msg.GetName(), req.Msg.GetPolicy(), req.Msg.GetEtag())
+	if err != nil {
+		return nil, translateSetIamError(err)
+	}
+	recordIamPolicyChange(ctx, req.Msg.GetName(), findIamPolicyDeltas(oldPolicy.Policy, p.Policy))
+	return connect.NewResponse(toIamPolicyView(p)), nil
+}
+
 // toIamPolicyView wraps a store IamPolicyMessage into the v1 view, carrying the
 // etag the client must round-trip on its next Set.
 func toIamPolicyView(p *store.IamPolicyMessage) *v1pb.IamPolicyView {
@@ -196,11 +250,19 @@ var machineOnlyRoles = map[string]bool{
 	store.MachineAgentCreatorRole: true,
 }
 
+// provisionerOnlyRoles are only meaningful on a provisioner IAM policy. Like
+// machineAgentCreator they are marker roles (resolved by the IAM engine, not
+// the role table), so they are exempt from the GetRoleSnapshot existence check.
+var provisionerOnlyRoles = map[string]bool{
+	store.ProvisionerMachineCreatorRole: true,
+}
+
 // validateIamPolicy checks every binding before a Set. scope is the policy's
-// resource kind (workspace, agent, or machine). It rejects unknown roles,
-// chat-role labels (which are chat-membership markers, never IAM bindings),
-// workspace/machine-scoped roles bound on a different resource, and malformed
-// member strings — so a management UI cannot corrupt the engine.
+// resource kind (workspace, agent, machine, or provisioner). It rejects unknown
+// roles, chat-role labels (which are chat-membership markers, never IAM
+// bindings), workspace/machine/provisioner-scoped roles bound on a different
+// resource, and malformed member strings — so a management UI cannot corrupt
+// the engine.
 func validateIamPolicy(ctx context.Context, s *store.Store, policy *storepb.IamPolicy, scope storepb.Policy_Resource) error {
 	if policy == nil {
 		return nil // an empty policy is a valid "clear all" write.
@@ -219,7 +281,10 @@ func validateIamPolicy(ctx context.Context, s *store.Store, policy *storepb.IamP
 		if machineOnlyRoles[resourceID] && scope != storepb.Policy_MACHINE {
 			return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("role %q is machine-scoped and cannot be bound on a %s", binding.GetRole(), scope.String()))
 		}
-		if !machineOnlyRoles[resourceID] {
+		if provisionerOnlyRoles[resourceID] && scope != storepb.Policy_PROVISIONER {
+			return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("role %q is provisioner-scoped and cannot be bound on a %s", binding.GetRole(), scope.String()))
+		}
+		if !machineOnlyRoles[resourceID] && !provisionerOnlyRoles[resourceID] {
 			role, err := s.GetRoleSnapshot(ctx, resourceID)
 			if err != nil {
 				return connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to resolve role %q", binding.GetRole()))

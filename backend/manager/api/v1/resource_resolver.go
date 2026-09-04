@@ -119,6 +119,8 @@ func classifyResource(name string) *iam.ResourceRef {
 		return &iam.ResourceRef{ResourceType: models.Policy_REMINDER, Name: name}
 	case strings.HasPrefix(name, "files/"):
 		return &iam.ResourceRef{ResourceType: models.Policy_FILE, Name: name}
+	case strings.HasPrefix(name, common.ProvisionerNamePrefix):
+		return &iam.ResourceRef{ResourceType: models.Policy_PROVISIONER, Name: name}
 	}
 	return nil
 }

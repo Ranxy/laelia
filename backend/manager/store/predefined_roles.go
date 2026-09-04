@@ -21,6 +21,13 @@ const (
 	// by component/iam.machineRolePermissions and it is deliberately not in
 	// PredefinedRoles (so it never appears on the management Roles page).
 	MachineAgentCreatorRole = "machineAgentCreator"
+	// ProvisionerMachineCreatorRole is the provisioner-scope IAM role granting
+	// laelia.provisioners.provision on the provisioner whose IAM policy binds it
+	// (who may create a machine on that provisioner). Like machineAgentCreator
+	// it is a marker role: its permission set is resolved by
+	// component/iam.provisionerRolePermissions and it is deliberately not in
+	// PredefinedRoles (so it never appears on the management Roles page).
+	ProvisionerMachineCreatorRole = "provisionerMachineCreator"
 	// MachineProvisionerRole is the predefined role for self-service machine
 	// provisioning: holders may pick a provisioner (provisioners.get) and call
 	// ProvisionMachine (provisioners.provision), so an enterprise can grant
@@ -67,6 +74,7 @@ var allPermissionSet = func() map[permission.Permission]bool {
 var memberBaselinePermissions = permissionSet(
 	permission.AgentsGet,
 	permission.MachinesGet,
+	permission.ProvisionersGet,
 	permission.ConversationsCreate,
 	permission.ConversationsList,
 	permission.CommandsList,

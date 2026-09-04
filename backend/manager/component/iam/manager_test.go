@@ -155,3 +155,27 @@ func TestMachineRolePermissionsResolve(t *testing.T) {
 		t.Error("machineAgentCreator must not be a predefined workspace role")
 	}
 }
+
+// TestProvisionerRolePermissionsResolve checks the provisioner-scope marker role
+// → permission map. provisionerMachineCreator is not a predefined role (it must
+// not appear on the management Roles page), but provisionerRolePermissions must
+// still grant laelia.provisioners.provision. (The non-marker fallback to the
+// role catalog needs a store, so it is not unit-tested here.)
+func TestProvisionerRolePermissionsResolve(t *testing.T) {
+	m := newManagerWithoutStore()
+
+	perms := m.provisionerRolePermissions(
+		context.Background(),
+		common.FormatRole(store.ProvisionerMachineCreatorRole),
+	)
+	if perms == nil || !perms[permission.ProvisionersProvision] {
+		t.Error("provisionerMachineCreator must grant laelia.provisioners.provision")
+	}
+	if perms == nil || perms[permission.ProvisionersGet] {
+		t.Error("provisionerMachineCreator must not grant unrelated permissions")
+	}
+
+	if store.GetPredefinedRole(store.ProvisionerMachineCreatorRole) != nil {
+		t.Error("provisionerMachineCreator must not be a predefined workspace role")
+	}
+}

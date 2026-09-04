@@ -191,9 +191,11 @@ func newProvisionerTestEnv(t *testing.T) *provisionerTestEnv {
 	provisionerService := NewProvisionerService(stores, secret, profile, d, iam.NewManager(stores))
 	provisionerStreamService := NewProvisionerStreamService(stores, secret, profile, d)
 	machineService := NewMachineService(stores, secret, profile, nil, d, iam.NewManager(stores))
+	iamService := NewIamService(stores, iam.NewManager(stores))
 	mux.Handle(v1connect.NewProvisionerServiceHandler(provisionerService, handlerOpts))
 	mux.Handle(v1connect.NewProvisionerStreamServiceHandler(provisionerStreamService, handlerOpts))
 	mux.Handle(v1connect.NewMachineServiceHandler(machineService, handlerOpts))
+	mux.Handle(v1connect.NewIamServiceHandler(iamService, handlerOpts))
 
 	// The Connect protocol's bidi streaming (the provisioner channel) runs over
 	// HTTP/2; httptest's default server is HTTP/1.1 only, which kills the
@@ -660,4 +662,144 @@ func connectErrCode(t *testing.T, err error) connect.Code {
 	var connectErr *connect.Error
 	require.ErrorAs(t, err, &connectErr)
 	return connectErr.Code()
+}
+
+// createEndUser seeds an additional end-user and binds it to nothing
+// workspace-wide (so it only gets the member baseline).
+func createEndUser(t *testing.T, stores *store.Store, label string) *store.UserMessage {
+	t.Helper()
+	u, err := stores.CreateUser(context.Background(), &store.UserMessage{
+		Name:  label,
+		Email: fmt.Sprintf("%s-%s@laelia.test", label, uuid8()),
+		Type:  storepb.PrincipalType_END_USER,
+	})
+	require.NoError(t, err)
+	return u
+}
+
+func (e *provisionerTestEnv) endUserToken(t *testing.T, id int) string {
+	t.Helper()
+	token, err := auth.GenerateAccessToken("test", id, common.ReleaseModeDev, e.secret, time.Hour)
+	require.NoError(t, err)
+	return token
+}
+
+// connectFake brings a provisioner online with a fake client so the
+// ProvisionMachine "offline" guard passes, and waits until the manager has
+// stamped it connected.
+func (e *provisionerTestEnv) connectFake(t *testing.T, provName, token string) *fakeProvisioner {
+	t.Helper()
+	fake := e.dialFakeProvisioner(t, token, &v1pb.ProvisionerReady{Version: "0.9.0", Backend: "kubernetes"})
+	t.Cleanup(fake.close)
+	require.Eventually(t, func() bool {
+		st := e.provisionerStatus(t, provName)
+		return st != nil && st.Connected
+	}, 5*time.Second, 50*time.Millisecond, "the provisioner must come online")
+	return fake
+}
+
+// TestProvisionerIamPolicy verifies the per-provisioner access-control model:
+// a coarse workspace grant (roles/machineProvisioner) provisions on any
+// provisioner; a per-provisioner roles/provisionerMachineCreator binding grants
+// provisioning (and its visibility) on the bound provisioner only; a member
+// with no grant sees nothing. Only the provisioner's creator or a workspace
+// admin may manage the provisioner IAM policy.
+func TestProvisionerIamPolicy(t *testing.T) {
+	env := newProvisionerTestEnv(t)
+	ctx := context.Background()
+
+	adminToken := env.adminToken(t)
+	adminClient := env.provisionerServiceClient(t, adminToken)
+	iamAdmin := v1connect.NewIamServiceClient(authedHTTPClient(env.server, adminToken), env.server.URL)
+
+	newProv := func(title string) (string, string) {
+		created, err := adminClient.CreateProvisioner(ctx, connect.NewRequest(&v1pb.CreateProvisionerRequest{
+			Provisioner: &v1pb.Provisioner{Title: title, Backend: "kubernetes"},
+		}))
+		require.NoError(t, err)
+		return created.Msg.GetProvisioner().GetName(), created.Msg.GetToken()
+	}
+	p1Name, p1Token := newProv("iam-p1")
+	p2Name, p2Token := newProv("iam-p2")
+	fakes := []*fakeProvisioner{
+		env.connectFake(t, p1Name, p1Token),
+		env.connectFake(t, p2Name, p2Token),
+	}
+	defer func() {
+		for _, f := range fakes {
+			f.close()
+		}
+	}()
+
+	// ---- coarse member (machineProvisioner) sees and uses any provisioner ----
+	memberClient := env.provisionerServiceClient(t, env.memberToken(t))
+	mlist, err := memberClient.ListProvisioners(ctx, connect.NewRequest(&v1pb.ListProvisionersRequest{}))
+	require.NoError(t, err)
+	require.Len(t, mlist.Msg.GetProvisioners(), 2, "machineProvisioner holder sees every provisioner")
+
+	// ---- a plain member sees nothing ----
+	plain := createEndUser(t, env.store, "plain")
+	plainClient := env.provisionerServiceClient(t, env.endUserToken(t, plain.ID))
+	plist, err := plainClient.ListProvisioners(ctx, connect.NewRequest(&v1pb.ListProvisionersRequest{}))
+	require.NoError(t, err)
+	require.Empty(t, plist.Msg.GetProvisioners(), "a member with no grant sees no provisioner")
+	_, err = plainClient.GetProvisioner(ctx, connect.NewRequest(&v1pb.GetProvisionerRequest{Name: p1Name}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeNotFound, connectErrCode(t, err), "an invisible provisioner is NotFound")
+	_, err = plainClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{Provisioner: p1Name, Title: "x"}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodePermissionDenied, connectErrCode(t, err))
+
+	// ---- grant the plain-equivalent user provisionerMachineCreator on p1 only ----
+	fine := createEndUser(t, env.store, "fine")
+	_, err = iamAdmin.SetProvisionerIamPolicy(ctx, connect.NewRequest(&v1pb.SetProvisionerIamPolicyRequest{
+		Name: p1Name,
+		Policy: &storepb.IamPolicy{Bindings: []*storepb.Binding{
+			{Role: common.FormatRole(store.ProvisionerMachineCreatorRole), Members: []string{common.FormatUserHandle(fine.Handle)}},
+		}},
+	}))
+	require.NoError(t, err)
+
+	fineClient := env.provisionerServiceClient(t, env.endUserToken(t, fine.ID))
+	flist, err := fineClient.ListProvisioners(ctx, connect.NewRequest(&v1pb.ListProvisionersRequest{}))
+	require.NoError(t, err)
+	require.Len(t, flist.Msg.GetProvisioners(), 1, "visibility follows the provision right")
+	assert.Equal(t, "iam-p1", flist.Msg.GetProvisioners()[0].GetTitle())
+
+	// can provision on p1, denied on p2.
+	provResp, err := fineClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: p1Name,
+		Title:       "fine workload",
+	}))
+	require.NoError(t, err)
+	require.Equal(t, p1Name, provResp.Msg.GetProvisioner())
+
+	_, err = fineClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: p2Name,
+		Title:       "denied workload",
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodePermissionDenied, connectErrCode(t, err), "no over-grant to unbound provisioner")
+
+	// ---- only creator or admin may edit the policy ----
+	memberIAM := v1connect.NewIamServiceClient(authedHTTPClient(env.server, env.memberToken(t)), env.server.URL)
+	_, err = memberIAM.SetProvisionerIamPolicy(ctx, connect.NewRequest(&v1pb.SetProvisionerIamPolicyRequest{
+		Name: p1Name,
+		Policy: &storepb.IamPolicy{Bindings: []*storepb.Binding{
+			{Role: common.FormatRole(store.ProvisionerMachineCreatorRole), Members: []string{common.FormatUserHandle(env.admin.Handle)}},
+		}},
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodePermissionDenied, connectErrCode(t, err), "machineProvisioner is not a provisioner admin")
+
+	// The marker role must be scoped to a provisioner policy (rejected on an
+	// agent policy by validateIamPolicy).
+	_, err = iamAdmin.SetAgentIamPolicy(ctx, connect.NewRequest(&v1pb.SetAgentIamPolicyRequest{
+		Name: common.FormatAgentUID(uuid.NewString()),
+		Policy: &storepb.IamPolicy{Bindings: []*storepb.Binding{
+			{Role: common.FormatRole(store.ProvisionerMachineCreatorRole), Members: []string{common.FormatUserHandle(env.admin.Handle)}},
+		}},
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeInvalidArgument, connectErrCode(t, err), "provisionerMachineCreator must be provisioner-scoped")
 }

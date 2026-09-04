@@ -395,12 +395,14 @@
     - [BindingDelta](#laelia-v1-BindingDelta)
     - [GetAgentIamPolicyRequest](#laelia-v1-GetAgentIamPolicyRequest)
     - [GetMachineIamPolicyRequest](#laelia-v1-GetMachineIamPolicyRequest)
+    - [GetProvisionerIamPolicyRequest](#laelia-v1-GetProvisionerIamPolicyRequest)
     - [GetWorkspaceIamPolicyRequest](#laelia-v1-GetWorkspaceIamPolicyRequest)
     - [IamPolicyChange](#laelia-v1-IamPolicyChange)
     - [IamPolicyView](#laelia-v1-IamPolicyView)
     - [PolicyDelta](#laelia-v1-PolicyDelta)
     - [SetAgentIamPolicyRequest](#laelia-v1-SetAgentIamPolicyRequest)
     - [SetMachineIamPolicyRequest](#laelia-v1-SetMachineIamPolicyRequest)
+    - [SetProvisionerIamPolicyRequest](#laelia-v1-SetProvisionerIamPolicyRequest)
     - [SetWorkspaceIamPolicyRequest](#laelia-v1-SetWorkspaceIamPolicyRequest)
   
     - [BindingDelta.Action](#laelia-v1-BindingDelta-Action)
@@ -6951,6 +6953,21 @@ operator can see who granted or removed what.
 
 
 
+<a name="laelia-v1-GetProvisionerIamPolicyRequest"></a>
+
+### GetProvisionerIamPolicyRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The provisioner resource name, in the form `provisioners/{provisioner}`. |
+
+
+
+
+
+
 <a name="laelia-v1-GetWorkspaceIamPolicyRequest"></a>
 
 ### GetWorkspaceIamPolicyRequest
@@ -7046,6 +7063,23 @@ PolicyDelta describes the changes between two IAM policies.
 
 
 
+<a name="laelia-v1-SetProvisionerIamPolicyRequest"></a>
+
+### SetProvisionerIamPolicyRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The provisioner resource name, in the form `provisioners/{provisioner}`. |
+| policy | [laelia.store.IamPolicy](#laelia-store-IamPolicy) |  |  |
+| etag | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-SetWorkspaceIamPolicyRequest"></a>
 
 ### SetWorkspaceIamPolicyRequest
@@ -7099,6 +7133,8 @@ cannot express the creator&#39;s implicit authority.
 | SetAgentIamPolicy | [SetAgentIamPolicyRequest](#laelia-v1-SetAgentIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Set the IAM policy attached to an agent (full replace, etag-guarded). |
 | GetMachineIamPolicy | [GetMachineIamPolicyRequest](#laelia-v1-GetMachineIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Get the IAM policy attached to a machine (who may create agents on it). |
 | SetMachineIamPolicy | [SetMachineIamPolicyRequest](#laelia-v1-SetMachineIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Set the IAM policy attached to a machine (full replace, etag-guarded). |
+| GetProvisionerIamPolicy | [GetProvisionerIamPolicyRequest](#laelia-v1-GetProvisionerIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Get the IAM policy attached to a provisioner (who may create machines on it). |
+| SetProvisionerIamPolicy | [SetProvisionerIamPolicyRequest](#laelia-v1-SetProvisionerIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Set the IAM policy attached to a provisioner (full replace, etag-guarded). |
 
  
 

@@ -1708,6 +1708,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.GetProvisionerIamPolicyRequest"><span class="badge">M</span>GetProvisionerIamPolicyRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.GetWorkspaceIamPolicyRequest"><span class="badge">M</span>GetWorkspaceIamPolicyRequest</a>
                 </li>
               
@@ -1729,6 +1733,10 @@
               
                 <li>
                   <a href="#laelia.v1.SetMachineIamPolicyRequest"><span class="badge">M</span>SetMachineIamPolicyRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SetProvisionerIamPolicyRequest"><span class="badge">M</span>SetProvisionerIamPolicyRequest</a>
                 </li>
               
                 <li>
@@ -17304,6 +17312,30 @@ see the impact of deleting it.</p></td>
 
         
       
+        <h3 id="laelia.v1.GetProvisionerIamPolicyRequest">GetProvisionerIamPolicyRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The provisioner resource name, in the form `provisioners/{provisioner}`. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.GetWorkspaceIamPolicyRequest">GetWorkspaceIamPolicyRequest</h3>
         <p></p>
 
@@ -17474,6 +17506,44 @@ policy or &#34;agents/{agent}&#34; for an agent policy. </p></td>
 
         
       
+        <h3 id="laelia.v1.SetProvisionerIamPolicyRequest">SetProvisionerIamPolicyRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The provisioner resource name, in the form `provisioners/{provisioner}`. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>policy</td>
+                  <td><a href="#laelia.store.IamPolicy">laelia.store.IamPolicy</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>etag</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.SetWorkspaceIamPolicyRequest">SetWorkspaceIamPolicyRequest</h3>
         <p></p>
 
@@ -17588,6 +17658,21 @@ policy or &#34;agents/{agent}&#34; for an agent policy. </p></td>
                 <td><a href="#laelia.v1.SetMachineIamPolicyRequest">SetMachineIamPolicyRequest</a></td>
                 <td><a href="#laelia.v1.IamPolicyView">IamPolicyView</a></td>
                 <td><p>Set the IAM policy attached to a machine (full replace, etag-guarded).</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetProvisionerIamPolicy</td>
+                <td><a href="#laelia.v1.GetProvisionerIamPolicyRequest">GetProvisionerIamPolicyRequest</a></td>
+                <td><a href="#laelia.v1.IamPolicyView">IamPolicyView</a></td>
+                <td><p>Get the IAM policy attached to a provisioner (who may create machines on
+it).</p></td>
+              </tr>
+            
+              <tr>
+                <td>SetProvisionerIamPolicy</td>
+                <td><a href="#laelia.v1.SetProvisionerIamPolicyRequest">SetProvisionerIamPolicyRequest</a></td>
+                <td><a href="#laelia.v1.IamPolicyView">IamPolicyView</a></td>
+                <td><p>Set the IAM policy attached to a provisioner (full replace, etag-guarded).</p></td>
               </tr>
             
           </tbody>

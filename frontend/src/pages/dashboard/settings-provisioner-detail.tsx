@@ -2,7 +2,6 @@ import { ArrowLeft, Settings2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { machineServiceClient } from "@/connect";
 import { MachineConnectionBadge } from "@/components/machine-connection-badge";
 import { ProvisioningPhaseBadge } from "@/components/provisioning-phase-badge";
 import {
@@ -21,15 +20,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { machineServiceClient } from "@/connect";
 import { usePolling } from "@/hooks/use-polling";
 import { useResourceQuery } from "@/hooks/use-resource-query";
-import { formatTimestamp } from "@/lib/time-format";
 import { provisioningActive } from "@/lib/provisioning-status";
+import { formatTimestamp } from "@/lib/time-format";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
 import type { MachineSummary } from "@/types/proto-es/v1/machine_pb";
 import { ProvisioningPhase } from "@/types/proto-es/v1/machine_pb";
 import type { Provisioner } from "@/types/proto-es/v1/provisioner_pb";
+import { ProvisionerAccessCard } from "./settings-provisioner-access";
 
 // SettingsProvisionerDetailPage is the detail view reachable from the
 // provisioners settings table. It shows the provisioner's basic information
@@ -38,6 +39,7 @@ export function SettingsProvisionerDetailPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const canGet = useHasPermission("laelia.provisioners.get");
+  const canManageIam = useHasPermission("laelia.provisioners.delete");
   const { provisionerId } = useParams<{ provisionerId: string }>();
   const name = `provisioners/${provisionerId ?? ""}`;
 
@@ -171,6 +173,12 @@ export function SettingsProvisionerDetailPage() {
               />
             </dl>
           </div>
+
+          <ProvisionerAccessCard
+            name={name}
+            title={provisioner.title}
+            canManage={canManageIam}
+          />
 
           <div className="rounded-lg border border-control-border bg-background shadow-xs">
             <div className="flex items-center justify-between border-b border-control-border px-5 py-4">

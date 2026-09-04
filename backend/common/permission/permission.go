@@ -67,6 +67,7 @@ var resourceScopedPermissions = map[Permission]bool{
 	FilesDownload:              true,
 	FilesList:                  true,
 	MachinesCreateAgent:        true,
+	ProvisionersProvision:      true,
 }
 
 // IsResourceScoped reports whether perm is authorized by a per-resource IAM

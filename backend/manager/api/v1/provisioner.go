@@ -61,6 +61,46 @@ func NewProvisionerService(s *store.Store, secret string, profile *config.Profil
 	}
 }
 
+// isProvisionerCreator reports whether the caller created the provisioner.
+func isProvisionerCreator(user *store.UserMessage, p *store.ProvisionerMessage) bool {
+	return user != nil && p.CreatedBy != 0 && p.CreatedBy == user.ID
+}
+
+// isProvisionerAdmin reports whether the caller may manage a provisioner's IAM
+// policy: the provisioner's creator or a workspace admin (laelia.provisioners.delete,
+// the admin-tier management permission). Mirrors machine's isMachineAdmin
+// (creator or laelia.machines.edit). Fail-closed.
+func isProvisionerAdmin(ctx context.Context, im *iam.Manager, user *store.UserMessage, p *store.ProvisionerMessage) bool {
+	if isProvisionerCreator(user, p) {
+		return true
+	}
+	if user == nil || im == nil {
+		return false
+	}
+	ok, err := im.CheckPermission(ctx, permission.ProvisionersDelete, user, nil, nil)
+	if err != nil {
+		return false
+	}
+	return ok
+}
+
+// canProvisionOnProvisioner reports whether the caller may create a machine on
+// the provisioner: a workspace-scope holder of laelia.provisioners.provision
+// (workspaceAdmin or roles/machineProvisioner) or a principal bound to
+// roles/provisionerMachineCreator in the provisioner's IAM policy.
+// CheckPermission consults the workspace scope first (coarse grant short
+// circuits) and then the per-provisioner policy, so one call expresses both
+// the coarse and fine paths. Fail-closed: a nil caller, nil manager, or a
+// lookup error denies.
+func canProvisionOnProvisioner(ctx context.Context, im *iam.Manager, user *store.UserMessage, p *store.ProvisionerMessage) bool {
+	if user == nil || im == nil {
+		return false
+	}
+	ok, err := im.CheckPermission(ctx, permission.ProvisionersProvision, user, nil,
+		&iam.ResourceRef{ResourceType: storepb.Policy_PROVISIONER, Name: common.FormatProvisionerUID(p.ResourceID)})
+	return err == nil && ok
+}
+
 // CreateProvisioner registers a provisioner and mints its one-time token. The
 // store keeps only token_version; the plaintext token exists in this response
 // alone.
@@ -122,18 +162,30 @@ func (s *ProvisionerService) ListProvisioners(ctx context.Context, req *connect.
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to list provisioners"))
 	}
 
+	// Visibility follows the create-machine rule: a caller only sees the
+	// provisioners they may create a machine on (coarse workspace grant or a
+	// per-provisioner roles/provisionerMachineCreator binding). Workspace admins
+	// and machineProvisioner holders see every provisioner.
+	caller, _ := GetUserFromContext(ctx)
+	visible := make([]*store.ProvisionerMessage, 0, len(provisioners))
+	for _, p := range provisioners {
+		if canProvisionOnProvisioner(ctx, s.iam, caller, p) {
+			visible = append(visible, p)
+		}
+	}
+
 	start := offset.offset
-	if start > len(provisioners) {
-		start = len(provisioners)
+	if start > len(visible) {
+		start = len(visible)
 	}
 	end := start + offset.limit
-	if end > len(provisioners) {
-		end = len(provisioners)
+	if end > len(visible) {
+		end = len(visible)
 	}
-	page := provisioners[start:end]
+	page := visible[start:end]
 
 	nextPageToken := ""
-	if end < len(provisioners) {
+	if end < len(visible) {
 		if nextPageToken, err = offset.getNextPageToken(); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to marshal next page token"))
 		}
@@ -160,6 +212,13 @@ func (s *ProvisionerService) GetProvisioner(ctx context.Context, req *connect.Re
 	provisioner, err := s.getProvisionerByName(ctx, req.Msg.GetName())
 	if err != nil {
 		return nil, err
+	}
+	// Visibility follows the create-machine rule: an invisible provisioner is
+	// indistinguishable from a missing one (NotFound), so existence is not
+	// leaked to users without access to create machines on it.
+	caller, _ := GetUserFromContext(ctx)
+	if !canProvisionOnProvisioner(ctx, s.iam, caller, provisioner) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("provisioner %s not found", provisioner.ResourceID))
 	}
 	counts, err := s.store.CountMachinesByProvisioner(ctx, []int{provisioner.ID})
 	if err != nil {
