@@ -1,10 +1,12 @@
 # HTML 文件预览 + 选区评论 设计文档
 
+> 状态:2026-09-06 已对照当前代码核对更新。主要变化:方案已落地并重构——三个预览浮层(html/markdown/image)的公共外壳抽成了 `file-preview-shell.tsx`,父侧 iframe 桥接逻辑抽成 `html-preview-bridge.ts` 的 `useHtmlPreviewBridge` hook,评论 UI 抽成共享 `comments-panel.tsx`(`CommentsPanel` + `usePreviewComments`);链接打开改走 `safeOpenExternal`(scheme 白名单)。
+
 ## Context
 
 当前 chat / activity / agent workspace 三个场景已经支持 markdown 预览:
 
-- **chat / activity**:`FileCard` 预览入口 → `openFilePreview`(全屏浮层 + `markstream-react` 渲染 + outline + 锚点评论)。
+- **chat / activity**:`FileCard` 预览入口 → `openFilePreview`(全屏浮层 + markdown 渲染 + outline + 锚点评论;设计时经 `markstream-react`,现经 `lib/markdown.tsx` 的 `MarkdownRenderer`/streamdown)。
 - **agent workspace**:文件面板内联渲染(`workspace-file-panel.tsx`)。
 
 HTML 文件此前只能下载(chat/activity)或按纯文本展示(workspace),无法像 markdown 一样预览,更无法在渲染后的页面上评论。
@@ -83,7 +85,7 @@ document.addEventListener("click", (e) => {
 }, true);
 ```
 
-父页面收到 `link-clicked` 后 `window.open(href, "_blank", "noopener,noreferrer")`。这样预览不会因点击链接而导航走(导航走后桥接脚本丢失,预览变白页),所有出站 href 截断到 4097 字并视为不可信数据。
+父页面收到 `link-clicked` 后经 `lib/open-external.ts` 的 `safeOpenExternal(href)` 打开:`new URL(href, window.location.href)` 解析后仅放行 `http:`/`https:`/`mailto:` scheme(拒绝 `javascript:`/`data:`/`vbscript:` 等),再 `window.open(url.href, "_blank", "noopener,noreferrer")`。这样预览不会因点击链接而导航走(导航走后桥接脚本丢失,预览变白页),所有出站 href 截断到 4097 字并视为不可信数据。
 
 ### 5. 评论数据模型:复用 Attachment 锚点字段,零 proto / 后端改动
 
@@ -101,16 +103,18 @@ markdown 评论已把锚点数据塞进 `Attachment` 的三个可选字段,后�
 
 ### 6. 评论 UI:与 markdown 预览一致(右侧 aside 按需展开)
 
-- 顶栏"评论"按钮切换右侧 `w-80` aside,结构复刻 markdown 的 `CommentsAside`(`html-comments-aside.tsx`);
+(2026-09-06 重构后,评论 UI 抽成了共享组件 `frontend/src/components/preview/comments-panel.tsx`:`CommentsPanel` 负责评论列表 + composer + 发送,hook `usePreviewComments` 负责按 root 线程过滤锚点评论;markdown 的 `comments-aside.tsx` 与 html 的 `html-comments-aside.tsx` 都只是薄适配器。)
+
+- 顶栏"评论"按钮切换右侧 aside,`html-comments-aside.tsx` 适配桥接语义:pendingAnchor 来自桥接 `selection` 消息、跳转走 `locate` + `scroll-to`;
 - aside 打开时,iframe 内选区 → 浮出"添加评论"按钮 → 引用填入 composer(带可移除的引用 chip);
-- 评论列表 = thread 回复(过滤 `sectionAnchor !== "" && id === attachment.id`),复用 `AttachmentCommentCard`,支持回复与 Enter 发送键位;
+- 评论列表 = thread 回复(过滤 `sectionAnchor !== "" && id === attachment.id`,`usePreviewComments` 用 `loadThreadMessages` 拉取线程,不弹出 thread 面板),复用 `AttachmentCommentCard`,支持回复与 Enter 发送键位;
 - 点击评论卡片锚点 chip → `locate` + `scroll-to`,iframe 滚动到锚点并显示 2s 渐隐的 accent 高亮矩形;
-- 评论标记:iframe 之上 `absolute` 层画小 pin(位置 = 内容坐标 − 当前 scroll,由桥接 `state` 消息驱动刷新)。
+- 评论标记:iframe 之上 `absolute` 层画小 pin(`MapPin`,位置 = 内容坐标 − 当前 scroll,由桥接 `state` 消息驱动刷新);aside 打开时对每条既有评论 `locate` 求 pin 位置。
 
 ### 7. 大小限制与入口
 
 - chat/activity:10 MiB,与 markdown 一致。`sizeBytes` 超限不触发下载,浮层显示 too-large 提示 + 下载按钮(复用现有 store 逻辑);
-- workspace:后端 `policy.go` 的 `textExtensions` 已含 `.html`(1MB 文本上限),`workspace.Read` 已按文本返回 → **后端零改动**;前端面板按扩展名(`.html/.htm/.xhtml`)加 html 分支。
+- workspace:后端 `backend/agent/workspace/policy.go` 的 `textExtensions` 已含 `.html`(1MB 文本上限),`workspace.Read` 已按文本返回 → **后端零改动**;前端面板按扩展名(`.html/.htm/.xhtml`)加 html 分支。
 
 ## 桥接脚本协议
 
@@ -183,11 +187,14 @@ export function parseHtmlAnchor(sectionId: string): { y: number } | null;
 
 ### 新增文件
 
-1. **`frontend/src/lib/html-file.ts`**:`isHtmlAttachment` / `isHtmlPreviewable` / `MAX_HTML_PREVIEW_BYTES` / `randomId`(secure context 下 `crypto.randomUUID`,否则时间+随机数兜底)/ `buildHtmlPreviewDoc` / 锚点编解码 / `htmlBridgeSource` 桥接脚本常量。
-2. **`frontend/src/lib/html-file.test.ts`**:13 个用例(扩展名/mime/大小边界、`buildHtmlPreviewDoc` 各种文档形态、锚点 round-trip)。
-3. **`frontend/src/components/preview/html-preview-overlay.tsx`**:与 `markdown-preview-overlay.tsx` 同构的浮层——顶栏(文件名/大小/评论开关/下载/关闭,无大纲)+ iframe 主体 + 标记/高亮层 + "添加评论"按钮 + 右侧 aside。负责 nonce/epoch 生成、`activate-document`、消息校验分发、`locate` 请求表(3s 超时)、跨场景锚点跳转。Esc 关闭(父页面 keydown + iframe 内 Esc 经桥接转发)。
-4. **`frontend/src/components/preview/html-comments-aside.tsx`**:评论列表 + composer + `useHtmlComments` hook(按 root 线程过滤锚点评论)。与 `comments-aside.tsx` 的差异:pendingAnchor 来自桥接消息而非本地 DOM 选区;跳转走 `locate` + `scroll-to` 而非 `scrollIntoView`。
-5. **`frontend/src/components/workspace/html-file-view.tsx`**:workspace 内联 iframe,复用 `buildHtmlPreviewDoc`;激活桥接,仅处理 `link-clicked`(无评论,与 markdown 内联一致)。
+1. **`frontend/src/lib/html-file.ts`**:`isHtmlAttachment` / `isHtmlPreviewable` / `MAX_HTML_PREVIEW_BYTES` / `randomId`(secure context 下 `crypto.randomUUID`,否则时间+随机数兜底)/ `buildHtmlPreviewDoc` / 锚点编解码 / `htmlBridgeSource` 桥接脚本常量(桥接脚本仍在该文件内,随 `buildHtmlPreviewDoc` 注入)。
+2. **`frontend/src/lib/html-file.test.ts`**:扩展名/mime/大小边界、`buildHtmlPreviewDoc` 各种文档形态、锚点 round-trip 用例(落地时 13 个,后续增至 16 个)。
+3. **`frontend/src/components/preview/html-preview-bridge.ts`**(后加):父侧桥接 hook `useHtmlPreviewBridge`——nonce/epoch 生成与轮换(resetKey 变化时)、`activate-document` 下发、入站消息校验(source + `slockAcBridge` + nonce + epoch)、`locate` 请求表(3s 超时)与 `scroll-to`;配套 `html-preview-bridge.test.tsx`。
+4. **`frontend/src/components/preview/html-preview-overlay.tsx`**:与 `markdown-preview-overlay.tsx` 同构的浮层——顶栏(文件名/大小/评论开关/下载/关闭,无大纲)+ iframe 主体 + 标记/高亮层 + "添加评论"按钮 + 右侧 aside。桥接细节委托给 `useHtmlPreviewBridge`,浮层只消费其返回的 `nonce/activate/scrollTo/locateQuote` 并处理选区→pendingAnchor、跨场景锚点跳转(`parseHtmlAnchor` + `locate(quote, y)`)。外壳用共享 `FilePreviewShell`。Esc 关闭(父页面 keydown + iframe 内 Esc 经桥接转发)。
+5. **`frontend/src/components/preview/html-comments-aside.tsx`**:共享 `CommentsPanel` 的 html 适配器(pendingAnchor 来自桥接消息、跳转走 `locate` + `scroll-to`);评论过滤 hook 是共享的 `usePreviewComments`(`comments-panel.tsx`)。设计稿里的 `useHtmlComments` 未单独存在。
+6. **`frontend/src/components/preview/file-preview-shell.tsx`**(后加,重构产物):三个浮层(html/markdown/image)共享的外壳——overlay 层 portal + `LAYER_SURFACE_CLASS` + 顶栏 + Esc 关闭。
+7. **`frontend/src/components/preview/comments-panel.tsx`**(后加,重构产物):共享 `CommentsPanel` + `usePreviewComments`,markdown/html 评论 aside 的公共实现。
+8. **`frontend/src/components/workspace/html-file-view.tsx`**:workspace 内联 iframe,复用 `buildHtmlPreviewDoc`;激活桥接,仅处理 `link-clicked`(无评论,与 markdown 内联一致)。
 
 ### 修改文件
 
@@ -197,7 +204,7 @@ export function parseHtmlAnchor(sectionId: string): { y: number } | null;
 4. **`frontend/src/pages/dashboard/chat-conversation.tsx` / `activity-detail.tsx`**:`handleJumpToSection` 把 `att.quotedText` 作为 `scrollToQuote` 透传给 `openFilePreview`。
 5. **`frontend/src/components/workspace/workspace-file-panel.tsx`**:`isHtmlFile(name)`(扩展名集合 `.html/.htm/.xhtml`)分支 → `<HtmlFileView>`。
 6. **`frontend/src/locales/en-US.json` / `zh-CN.json`**:新增 `preview.html-add-comment`("Add comment" / "添加评论");其余文案全部复用现有 `preview.*` / `comments-*`。
-7. **顺带合规改动**:三个浮层(`html`/`markdown`/`image` preview overlay)把裸 `z-10` 换为共享层原语 `LAYER_SURFACE_CLASS`(来自 `src/components/ui/layer.ts`,值即 `"z-10"`,输出无变化),通过 `check-react-layering.mjs` 门禁。
+7. **顺带合规改动(后被重构取代)**:三个浮层先把裸 `z-10` 换为共享层原语 `LAYER_SURFACE_CLASS`(来自 `src/components/ui/layer.ts`);2026-09-06 时进一步抽成共享 `file-preview-shell.tsx`,portal 进 overlay 层并统一使用 `LAYER_SURFACE_CLASS`,三个 overlay 只保留差异化的主体内容。
 
 ### 零改动
 
@@ -205,10 +212,10 @@ proto、后端、DB(`Attachment` 锚点字段与 `resolveAttachments`/`SendMessa
 
 ## 验证
 
-1. **单测**(`pnpm --dir frontend test`):33 个文件 / 126 个用例全部通过,含 `html-file.test.ts` 的 13 个用例。
-2. **静态检查**:`pnpm --dir frontend biome:check`(212 文件,无问题)、`pnpm --dir frontend type-check`(exit 0)。
-3. **layering 门禁**:`node scripts/check-react-layering.mjs` 全部通过。
-4. **手动 E2E**(真实浏览器):chat 上传 `.html` → 浮层 iframe 渲染、页面 JS 正常执行、链接新标签打开且预览不导航走、Esc 关闭;开启评论 → 拖选文本 → 添加评论 → thread 中评论带锚点 chip、从 thread 点锚点可重开预览并滚动高亮;>10MiB 文件 too-large 提示;workspace 内联渲染正常。**用户已实测确认无问题。**
+1. **单测**(`pnpm --dir frontend test`):含 `html-file.test.ts`(16 个用例)与 `html-preview-bridge.test.tsx`(7 个用例);落地时全量套件为 33 文件 / 126 用例,当前仓库规模已增长,以 CI 为准。
+2. **静态检查**:`pnpm --dir frontend biome:check`、`pnpm --dir frontend type-check`。
+3. **layering 门禁**:`node frontend/scripts/check-react-layering.mjs`(现为 `pnpm --dir frontend check` 的一部分)。
+4. **手动 E2E**(真实浏览器):chat 上传 `.html` → 浮层 iframe 渲染、页面 JS 正常执行、链接新标签打开且预览不导航走、Esc 关闭;开启评论 → 拖选文本 → 添加评论 → thread 中评论带锚点 chip、从 thread 点锚点可重开预览并滚动高亮;>10MiB 文件 too-large 提示;workspace 内联渲染正常。**落地时用户已实测确认无问题。**
 
 ## 已知限制与后续增强
 
@@ -219,18 +226,24 @@ proto、后端、DB(`Attachment` 锚点字段与 `resolveAttachments`/`SendMessa
 
 ## 受影响 / 新增文件清单
 
-**新增**:
+**新增**(落地时):
 - `frontend/src/lib/html-file.ts`(含桥接脚本常量)
 - `frontend/src/lib/html-file.test.ts`
 - `frontend/src/components/preview/html-preview-overlay.tsx`
 - `frontend/src/components/preview/html-comments-aside.tsx`
 - `frontend/src/components/workspace/html-file-view.tsx`
 
+**新增**(2026-09-06 前的重构产物):
+- `frontend/src/components/preview/file-preview-shell.tsx`(三浮层共享外壳)
+- `frontend/src/components/preview/comments-panel.tsx`(共享 `CommentsPanel` + `usePreviewComments`)
+- `frontend/src/components/preview/html-preview-bridge.ts` + `html-preview-bridge.test.tsx`(父侧桥接 hook)
+- `frontend/src/lib/open-external.ts`(`safeOpenExternal`,桥接链接打开的 scheme 白名单)
+
 **修改**:
 - `frontend/src/stores/preview.ts`、`frontend/src/stores/types.ts`
 - `frontend/src/app/layouts/dashboard-layout.tsx`
 - `frontend/src/components/chat/message-row.tsx`
-- `frontend/src/components/preview/markdown-preview-overlay.tsx`、`image-preview-overlay.tsx`(LAYER_SURFACE_CLASS 合规)
+- `frontend/src/components/preview/markdown-preview-overlay.tsx`、`image-preview-overlay.tsx`(统一改走 `FilePreviewShell`)
 - `frontend/src/components/workspace/workspace-file-panel.tsx`
 - `frontend/src/pages/dashboard/chat-conversation.tsx`、`activity-detail.tsx`
 - `frontend/src/locales/en-US.json`、`zh-CN.json`

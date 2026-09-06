@@ -1,5 +1,7 @@
 # Laelia Agent 基于 ACP 调用 LLM Agent 的详细设计方案
 
+> 状态：2026-09-06 已对照当前代码核对更新。主要变化：本方案已落地——结构化事件/WatchCommandEvents/command_event 表等按设计实现，但执行模型已演进为消息驱动的 drain 会话（无 SendCommand），agent 守护进程重构为 machine 守护进程（每 agent 一条 AgentChannel），shell 执行器被整体移除，并新增 acp-v2（codex）与 pi 运行时。
+
 ## 设计目标
 
 本文档描述如何在保留现有 Laelia manager ↔ agent 控制链路的前提下，引入 [Agent Client Protocol (ACP)](https://agentclientprotocol.com/) 和 `acp-go-sdk`，使 Laelia agent 能够在目标主机上调用本机 LLM agent 执行任务，并将执行过程、工具调用、diff、最终结果等信息稳定回报到 manager。
@@ -15,39 +17,41 @@
 
 ## 一、背景与现状分析
 
-### 1.1 当前执行链路
+### 1.1 当前执行链路（已随实现更新）
 
 当前 Laelia 的远程执行链路如下：
 
-1. manager 通过 [proto/v1/v1/command.proto](/home/ran/gocode/laelia/proto/v1/v1/command.proto) 定义的 `CommandService.SendCommand` 创建任务。
-2. manager 在 [backend/manager/api/v1/command.go](/home/ran/gocode/laelia/backend/manager/api/v1/command.go) 中落库 `command` 记录，并交由 [backend/manager/component/dispatcher/dispatcher.go](/home/ran/gocode/laelia/backend/manager/component/dispatcher/dispatcher.go) 调度。
-3. agent 通过 [backend/agent/client/command_stream.go](/home/ran/gocode/laelia/backend/agent/client/command_stream.go) 建立双向流，收到 `CommandRequest` 后直接创建 `BashExecutor` 执行 shell 命令。
-4. agent 把 stdout/stderr 分片作为 `CommandProgress` 回传，最终结果作为 `CommandResult` 回传。
-5. manager 将输出写入 `command_output`，前端详情页通过 `WatchCommand` 订阅文本流。
+1. 用户/agent 在会话（channel/DM）中发消息（`SendMessage`/`PostMessage`），或 reminder 到期；这些进展都会累积到 agent 的 durable per-channel cursor 之后的 `room_version` 上。
+2. agent 客户端经 [backend/agent/client/command_stream.go](/home/ran/gocode/laelia/backend/agent/client/command_stream.go) 持有 `AgentStreamService.AgentChannel` 双向流，发 `BeginSession` 询问是否有工作；manager 在 [backend/manager/component/dispatcher/dispatcher.go](/home/ran/gocode/laelia/backend/manager/component/dispatcher/dispatcher.go) 的 `HandleBeginSession` 中检查会话游标与到期 reminder，有工作则创建一条 RUNNING 的 `command` 记录并返回 `command_id`（无 `SendCommand` RPC——命令由会话消息驱动创建）。
+3. agent 客户端按该 command_id 启动 executor 运行时并执行本轮任务：ACP v1（`backend/agent/executor/acp_executor.go`，opencode/claude-code）、ACP v2 线程协议（`backend/agent/executor/thread_executor.go` + `backend/agent/acp2/`，codex）或 pi RPC 运行时（`backend/agent/pi/`）。
+4. agent 把文本分片作为 `CommandProgress`、结构化过程作为 `CommandEvent`、最终结果作为 `CommandResult` 回传。
+5. manager 将文本写入 `command_output`、事件写入 `command_event`，前端详情页通过 `WatchCommand` / `WatchCommandEvents`（均支持 `after_seq_no`）订阅。
+
+> 历史注：本方案撰写时的 shell（`BashExecutor`）链路已整体移除——`command` 资源保留，但所有执行器都是 LLM agent 运行时，"shell 与 ACP 双模共存"的过渡态不复存在。
 
 ### 1.2 现状优点
 
-1. 任务调度链路已经完整，支持排队、运行中状态、取消、输出回放、结果收口。
-2. manager/agent 已经有成熟的连接、鉴权、心跳、断开和恢复骨架。
-3. 前端已有列表页、详情页、流式终端组件，无需另起一套任务系统。
+1. 任务调度链路已经完整，支持会话收口、运行中状态、取消（`CancelCommand`）、中途注入（`SteerCommand`）、输出/事件回放、结果收口。
+2. manager/machine 已经有成熟的连接、鉴权、心跳、断开和恢复骨架（machine 级 `MachineChannel` 控制面 + 每 agent 一条 `AgentChannel` 数据面）。
+3. 前端已有列表页、详情页、事件账本组件，无需另起一套任务系统。
 
-### 1.3 现状不足
+### 1.3 现状不足（历史评估，落地结果见括号内）
 
-1. **执行器强绑定 shell**：agent 直接依赖 `BashExecutor`，无法优雅接入 ACP。
-2. **输出模型过于扁平**：当前仅有 `STDOUT/STDERR/SYSTEM` 三类输出，不足以表达工具调用、diff、raw event 等结构化过程。
-3. **manager 侧缺少 ACP 专属权限与策略控制**：当前 `SendCommand` 对执行内容和执行类型的约束较弱。
-4. **恢复语义仅覆盖简单命令输出**：对多阶段 LLM agent 过程、session 恢复、事件去重支持不足。
-5. **高风险参数边界未定义**：如果直接把模型、工具、二进制路径暴露给 manager，会引入过大的攻击面。
+1. **执行器强绑定 shell**（已解决：shell 执行器移除，统一 `executor.Runtime` 接口，见 `backend/agent/executor/runtime.go`）。
+2. **输出模型过于扁平**（已解决：`STDOUT/STDERR/SYSTEM/ASSISTANT` 四类文本输出 + `CommandEvent` 结构化事件流）。
+3. **manager 侧缺少 ACP 专属权限与策略控制**（部分落地：provider/model 由 server 在 `UpdateAgentACPConfig`/`CreateAgent` 校验（`backend/manager/api/v1/agent_config.go` 的 `validateAgentACPConfig`），raw event 有独立权限 `laelia.conversations.reviewAll`；完整的审批/策略面未建设）。
+4. **恢复语义仅覆盖简单命令输出**（部分落地：`AgentReady` 携带 `last_command_id/last_ack_seq/last_event_seq`，agent 本地 `command-state.json` 持久化已上报位点；断连时仍在跑的命令被标 FAILED 不续播，会话级恢复以 agent 的 channel cursor 为真相源）。
+5. **高风险参数边界未定义**（已解决：manager 不可传二进制路径/工具白名单/敏感 env；ACP 配置由 manager 侧 `AgentACPConfig` 模板集中管理，启动命令由 agent 侧 provider registry 派生）。
 
 ### 1.4 ACP 集成边界
 
 本方案明确采用以下边界：
 
-1. **首版仅支持本机 ACP agent 子进程 + stdio**。
-2. **Laelia agent 作为 ACP Client，不作为 ACP Agent**。
-3. **manager 继续通过现有 Laelia 协议与 agent 通信，不直接与 ACP 对接**。
-4. **每个 Laelia agent 首版仍保持单任务串行执行，不引入多会话并发调度**。
-5. **高风险运行参数由 agent 本地 profile 控制，manager 仅选择 profile 或默认能力**。
+1. 仅支持本机 ACP agent 子进程 + stdio（未引入远程 transport）。
+2. Laelia agent 作为 ACP Client，不作为 ACP Agent。
+3. manager 继续通过现有 Laelia 协议与 agent 通信，不直接与 ACP 对接。
+4. 每个 Laelia agent 同一时刻单会话串行执行（drain 循环逐会话推进），不引入多会话并发调度。
+5. 高风险运行参数由 manager 侧 server-owned `AgentACPConfig` 模板集中管理（原设计的"agent 本地 profile YAML"未采用，见 §5.7），启动命令由 agent 侧 provider registry 派生。
 
 ---
 
@@ -55,47 +59,46 @@
 
 ### 2.1 保留现有 command 资源，扩展为通用 execution 容器
 
-首版不重命名 `command` 资源，也不重构整个 manager UI 和数据模型。`command` 继续作为统一任务实例，内部通过 `executor_kind` 区分 shell 与 ACP。
+首版不重命名 `command` 资源，也不重构整个 manager UI 和数据模型。`command` 继续作为统一任务实例。
 
-这样做的理由：
+原设计的 `executor_kind` 区分字段在落地后被**移除**（proto 中已 `reserved`，见 [proto/v1/v1/command.proto](/home/ran/gocode/laelia/proto/v1/v1/command.proto) 的 `Command` 消息）：shell 执行器不复存在，所有执行器都是 LLM agent 运行时，执行类型改由 `LifecyclePayload.executor_kind` 在事件载荷中表达。这样做的理由：
 
 1. 当前列表、详情、watch、存储、调度都围绕 `command` 建立，复用成本最低。
-2. shell 与 ACP 能平滑共存，便于灰度上线。
+2. 数据库迁移最小（`instruction/profile/allow_diff/result_json/final_summary` 等列直接落在 `command` 表上）。
 3. 后续如果需要统一对外文案为 task/run/execution，可以在不破坏存量实现的基础上渐进演进。
 
 ### 2.2 过程真相源应当是结构化事件，而不是纯文本输出
 
 ACP 的核心价值不只是“返回一段文本”，而是“能稳定表达执行过程”。
 
-因此必须新增结构化事件流，将以下信息独立建模：
+已落地为独立的结构化事件流（`CommandEvent` + `WatchCommandEvents`），覆盖：
 
-1. 生命周期事件
-2. 文本增量
-3. 工具调用开始/结束
-4. diff 产出
-5. warning / policy hit
-6. raw ACP event 归档
-7. 最终摘要 / usage / artifact
+1. 生命周期事件（`LIFECYCLE`）
+2. 文本增量（`TEXT_DELTA`）
+3. 工具调用开始/结束（`TOOL_CALL_STARTED/FINISHED`）
+4. diff 产出（`DIFF_EMITTED`）
+5. warning（`WARNING`）
+6. raw ACP event 归档（`RAW_ACP`，批量聚合写入）
+7. 最终摘要（`FINAL_SUMMARY`）
+8. 上下文/用量观测（`CONTEXT_COMPACTION_*`、`CONTEXT_USAGE_UPDATE`、`TOKEN_USAGE`，落地时新增）
 
-现有 `command_output` 保留，但只作为终端文本投影视图。
+现有 `command_output` 保留，作为终端文本投影视图（含落地时新增的 `ASSISTANT` 输出类型）。
 
 ### 2.3 manager 控制权限，agent 控制能力边界
 
 manager 负责：
 
-1. 谁可以发起任务
-2. 允许发什么类型的任务
-3. 是否允许代码修改类任务
-4. 是否允许查看 raw event
-5. 任务是否超出平台策略限制
+1. 谁可以发起任务（IAM + 会话策略）
+2. agent 是否具备执行能力（`AgentCapability.supports_acp / supports_pi` 门禁，见 dispatcher 的 `HandleBeginSession`）
+3. ACP 配置的合法性与 provider/model 可用性（`validateAgentACPConfig`）
+4. 谁可以查看结构化事件/raw event（`laelia.conversations.reviewAll`）
 
 agent 负责：
 
-1. 允许使用哪个 ACP agent 二进制
-2. 允许哪些工具
-3. 默认模型与系统提示词
-4. 本地环境变量白名单
-5. 本地最大输出、最大事件数、最大运行时长
+1. 允许使用哪个 ACP agent 二进制（provider registry，machine 守护进程侧）
+2. 启动命令与进程环境（`buildRuntimeEnv` 的 allow_env/custom_env/`LAELIA_*` 引导变量）
+3. 输出与事件上限（`executor.Limits` 模板默认值）
+4. 本地会话状态与会话恢复（`command-state.json` / `acp-session.json`）
 
 这两层边界不能混淆。
 
@@ -103,163 +106,106 @@ agent 负责：
 
 ## 三、总体架构
 
-### 3.1 目标架构
+### 3.1 目标架构（已按实现更新）
 
 ```mermaid
 flowchart LR
-    U[Manager User/API] --> MCS[CommandService]
-    MCS --> DB[(command / command_event / command_output)]
-    MCS --> DSP[Dispatcher]
-    DSP --> STRM[AgentCommandService Stream]
-    STRM --> AGT[Laelia Agent]
+    U[User / Chat UI] --> M[Manager API]
+    M --> D[Dispatcher + Store]
+    D --> STRM[AgentStreamService.AgentChannel]
+    STRM --> AGT[Machine 守护进程 per-agent runner]
 
-    AGT --> RT[Executor Runtime]
-    RT --> SH[ShellExecutor]
-    RT --> ACP[ACPExecutor]
+    AGT --> BS[BeginSession / HandleBeginSession]
+    BS --> DB[(command / command_event / command_output / command_token_usage)]
+    DB --> D
 
-    ACP --> LAUNCH[ACP Process Launcher]
+    AGT --> RT[executor.Runtime]
+    RT --> ACP[ACPExecutor v1]
+    RT --> THR[ThreadExecutor v2]
+    RT --> PI[pi RPC runtime]
+
+    ACP --> LAUNCH[provider registry 派生命令]
     LAUNCH --> SUB[Local ACP Agent Process]
 
-    ACP --> EVT[Structured Events]
+    RT --> EVT[Structured Events]
     EVT --> STRM
-    STRM --> DSP
-    DSP --> DB
 
-    DB --> UI[Command Detail UI]
+    DB --> UI[Command Detail UI 事件账本]
 ```
 
 ### 3.2 关键抽象
 
-1. **Command**：统一任务实例，兼容 shell 与 ACP。
-2. **Executor**：agent 内统一执行器接口。
-3. **CommandEvent**：结构化过程事件。
-4. **Text Projection**：从结构化事件投影为文本终端输出。
-5. **ACP Profile**：agent 本地能力配置。
+1. **Command**：统一任务实例（会话驱动的 drain 会话锚点）。
+2. **Runtime**：agent 内统一执行器接口（`backend/agent/executor/runtime.go`；实现：`ACPExecutor` / `ThreadExecutor` / `pi.Pi`）。
+3. **CommandEvent**：结构化过程事件（`proto/v1/v1/command.proto` 的 `CommandEventType` + oneof 载荷）。
+4. **Text Projection**：从运行时输出投影为文本终端输出（`CommandOutput` STDOUT/STDERR/SYSTEM/ASSISTANT；`drain_runner.go` 的 `mergedText` 负责合并）。
+5. **AgentACPConfig**：manager 侧 server-owned 能力配置（模板 + provider registry 派生启动命令）。
 
 ---
 
 ## 四、协议与数据模型设计
 
-### 4.1 `command.proto` 扩展方向
+### 4.1 `command.proto` 落地状态
 
-建议在 [proto/v1/v1/command.proto](/home/ran/gocode/laelia/proto/v1/v1/command.proto) 中新增以下概念。
+[proto/v1/v1/command.proto](/home/ran/gocode/laelia/proto/v1/v1/command.proto) 已按设计扩展并落地，与原设计的差异如下。
 
-#### 4.1.1 执行类型
+#### 4.1.1 执行类型（原设计字段，已移除）
 
-```protobuf
-enum ExecutorKind {
-  EXECUTOR_KIND_UNSPECIFIED = 0;
-  SHELL = 1;
-  ACP = 2;
-}
-```
+原设计的 `ExecutorKind` enum 未落地——`Command.executor_kind` 已 `reserved`（连同 `source`）。执行类型改由 `LifecyclePayload.executor_kind` 表达（drain 会话统一写 `"ACP"`）。
 
-#### 4.1.2 任务请求扩展
+#### 4.1.2 任务请求（已落地）
 
-在 `SendCommandRequest` / `CommandRequest` 中新增：
+`Command` 资源与 `CommandRequest`（agent ↔ manager 流内消息）实际携带：
 
-1. `executor_kind`
-2. `instruction` 或 `task_payload`
-3. `profile`
-4. `allow_diff` 或同类受控布尔开关
-5. `metadata`（仅允许安全的上层元数据，不允许下发底层子进程参数）
+1. `instruction`（Command 字段 16；CommandRequest 字段 2）— 本设计的 `instruction/task_payload` 已落地为 `instruction`
+2. `profile`（Command 字段 17；CommandRequest 字段 3）— 原设计 `profile` 已落地
+3. `allow_diff`（Command 字段 20；CommandRequest 字段 7）
+4. `env` / `working_dir` / `timeout_seconds`（CommandRequest 字段 4/5/6）
+5. `principal_id` / `conversation_id` / `reply_to_message_id` / `agent_display_name`（CommandRequest 字段 8-11，会话关联与提示词注入用）
 
-约束如下：
+命令不再由 `SendCommand` 下发：`CommandService` 现仅有 `ListCommands / GetCommand / CancelCommand / SteerCommand / WatchCommand / WatchCommandEvents / GetCommandContext` 等读取/控制 RPC；命令创建发生在 dispatcher 的 `HandleBeginSession`（见 §6.1）。`metadata` 与 manager 可传底层子进程参数的设计未被采纳（`env` 仅保留且生产路径为空）。
 
-1. 当 `executor_kind == SHELL` 时，沿用 `command` 字段。
-2. 当 `executor_kind == ACP` 时，优先使用 `instruction` / `task_payload`。
-3. `profile` 只能引用 agent 已声明能力中的 profile。
-4. manager 不可传入二进制路径、任意 CLI args、任意工具白名单、敏感 env。
+#### 4.1.3 结果与统计（已落地）
 
-#### 4.1.3 结果与统计扩展
+`Command` 实际字段：`final_summary`（18）、`result`（19，`google.protobuf.Struct`，DB 列 `result_json`）、`exit_code/duration_ms/status` 等；`usage_stats/artifact_refs` 未落地，token 用量改为独立结构化事件 `TOKEN_USAGE` 并落 `command_token_usage` 表。
 
-建议在 `Command` 或 `CommandResult` 中增加：
+### 4.2 `CommandEvent`（已落地）
 
-1. `final_summary`
-2. `result_json`
-3. `artifact_refs`
-4. `usage_stats`
-5. `executor_kind`
-
-这些字段主要服务于：
-
-1. 列表页显示任务类型
-2. 详情页展示最终答复和摘要
-3. 后续统计 token/cost
-4. 审计和排障
-
-### 4.2 新增 `CommandEvent`
-
-建议新增独立消息和 watch 接口，而不是复用 `CommandOutput.SYSTEM`：
+以独立消息 + watch 接口实现（不复用 `CommandOutput.SYSTEM`）：
 
 ```protobuf
 message CommandEvent {
   string command_id = 1;
   int32 seq_no = 2;
-  EventType type = 3;
+  CommandEventType type = 3;
   string summary = 4;
-  string payload_json = 5;
   google.protobuf.Timestamp timestamp = 6;
+  oneof payload { ... }  // 生命周期/文本/工具/diff/warning/raw/摘要/上下文/用量
 }
 ```
 
-推荐事件类型：
+与原设计的差异：`payload_json` 字段改为 **oneof 强类型载荷**（DB 仍存 `payload_json` JSONB 列，由 `marshalEventPayload` 从 oneof 序列化而来）。
 
-1. `LIFECYCLE`
-2. `TEXT_DELTA`
-3. `TOOL_CALL_STARTED`
-4. `TOOL_CALL_FINISHED`
-5. `DIFF_EMITTED`
-6. `WARNING`
-7. `RAW_ACP`
-8. `FINAL_SUMMARY`
+实际事件类型（`CommandEventType`）：`LIFECYCLE / TEXT_DELTA / TOOL_CALL_STARTED / TOOL_CALL_FINISHED / DIFF_EMITTED / WARNING / RAW_ACP / FINAL_SUMMARY`（1-8 与设计一致），落地时新增 `CONTEXT_COMPACTION_STARTED/FINISHED / CONTEXT_USAGE_UPDATE / TOKEN_USAGE`（12-15）；原设计的权限事件（`PERMISSION_REQUESTED` 等，9-11）已实现后被移除（权限改为运行时自动授予）。
 
-新增接口：
+已落地接口：
 
-1. `WatchCommandEvents`
-2. `ListCommandEvents` 或 `GetCommandEvents`
+1. `WatchCommandEvents`（支持 `after_seq_no`）✓
+2. `GetCommandContext`（一次性返回 command + outputs + events）✓；`ListCommandEvents` 未单独建 RPC
 
-都应支持 `after_seq_no`。
+### 4.3 `agent.proto` 能力面（已落地为 `AgentCapability`）
 
-### 4.3 `agent.proto` 能力面扩展
+[proto/v1/v1/agent.proto](/home/ran/gocode/laelia/proto/v1/v1/agent.proto) 的 `AgentCapability` 实际字段：`supports_acp`、`max_timeout_seconds`、`supports_diff`、`supports_raw_events`、`supports_tool_traces`、`max_event_count`、`max_output_bytes`、`supports_autonomous_decision`、`supports_pi`（非 ACP pi 运行时的门禁位）。
 
-建议在 [proto/v1/v1/agent.proto](/home/ran/gocode/laelia/proto/v1/v1/agent.proto) 中引入明确 capability 结构，例如：
+原设计的 `default_profile / available_profiles` 未落地：profile 概念被 server-owned `AgentACPConfig`（manager 集中下发）+ agent 侧 provider registry（派生启动命令）取代。能力由 `BuildCapability`（`backend/agent/executor/acp_config.go`）从配置推导并在连接时上报。
 
-1. `supports_acp`
-2. `default_profile`
-3. `available_profiles`
-4. `max_timeout_seconds`
-5. `supports_diff`
-6. `supports_raw_events`
-7. `supports_tool_traces`
-8. `max_event_count`
-9. `max_output_bytes`
-
-不建议继续把这些能力藏在 `labels` 中，因为：
-
-1. 缺少类型约束
-2. 前后端兼容困难
-3. UI 不易消费
-4. 容易失控扩展
-
-### 4.4 存储模型
+### 4.4 存储模型（已落地）
 
 #### 4.4.1 `command` 表
 
-保留现有 [backend/manager/migration/latest.sql](/home/ran/gocode/laelia/backend/manager/migration/latest.sql) 中 `command` 表主体，新增或扩展：
+[backend/manager/migration/migration/LATEST.sql](/home/ran/gocode/laelia/backend/manager/migration/migration/LATEST.sql) 的 `command` 表实际新增/扩展列：`instruction`、`profile`、`allow_diff`、`timeout_seconds`、`final_summary`、`last_ack_seq`、`machine_id`（machine 重构后冗余）、`conversation_id`；最终结构化摘要继续存 `result_json`。`executor_kind` 列未建（见 §4.1.1）。
 
-1. `executor_kind`
-2. `instruction`
-3. `profile`
-4. `result_json`
-5. `final_summary`
-6. 可能新增 `artifact_refs_json`
-
-如果不想改动过多字段，也可将扩展结果继续存入 `result_json`，首版优先减少 schema 扰动。
-
-#### 4.4.2 `command_event` 表
-
-建议新增：
+#### 4.4.2 `command_event` 表（已落地，与设计一致）
 
 ```sql
 CREATE TABLE command_event (
@@ -276,549 +222,334 @@ CREATE UNIQUE INDEX idx_command_event_seq ON command_event(command_id, seq_no);
 CREATE INDEX idx_command_event_created_at ON command_event(command_id, created_at);
 ```
 
-设计要点：
-
-1. 以 `(command_id, seq_no)` 做幂等写入。
-2. 读取严格按 `seq_no` 排序，不依赖时间戳。
-3. `payload_json` 保留结构化事件原始载荷。
+设计要点全部保留：`(command_id, seq_no)` 幂等写入、按 `seq_no` 读取、`payload_json` 存结构化原始载荷。
 
 #### 4.4.3 `command_output` 表
 
-保留原有 `command_output` 表，不删除。其职责调整为：
+保留原 `command_output` 表。`StreamType` 增至四类：`STDOUT/STDERR/SYSTEM/ASSISTANT`（ASSISTANT 为落地时新增，承载 agent 助手输出）。
 
-1. shell 命令的原始 stdout/stderr 文本
-2. ACP 任务的人类可读文本投影
+另有落地时新增的 `command_token_usage` 表：每命令一行 token 用量（input/output/cache/total），由 `TOKEN_USAGE` 事件幂等写入，供按 agent/principal/machine 聚合。
 
-这能保持旧 UI 和旧 watch API 兼容。
+### 4.5 回放与确认位点（已落地）
 
-### 4.5 回放与确认位点
-
-建议首版统一以结构化事件的 `seq_no` 作为确认位点，而不是拆分文本流与事件流双轨确认。原因是：
-
-1. 结构化事件是 ACP 任务的过程真相源。
-2. 文本输出只是事件投影。
-3. 统一确认位点有利于恢复和去重。
-
-如果未来出现文本输出与事件流完全独立的高吞吐场景，再考虑拆分 ack。
+`command.last_ack_seq` 统一解释为事件/输出确认位点（dispatcher 的 `HandleEvent`/`HandleResult` 会更新它），文本流与事件流共用同一序列空间但各自独立持久化（`command_output.seq_no` / `command_event.seq_no`），agent 侧以 `LocalState.last_seq_sent / last_event_seq_sent` 跟踪上报进度。
 
 ---
 
-## 五、Agent Runtime 设计
+## 五、Agent Runtime 设计（已按实现更新）
 
 ### 5.1 执行器统一接口
 
-建议在 agent 侧抽象统一运行时接口：
+已落地为 `backend/agent/executor/runtime.go` 的 `Runtime` 接口：
 
 ```go
-type Executor interface {
-    Start(ctx context.Context) error
-    Cancel(ctx context.Context) error
-    Events() <-chan Event
-    Result() <-chan Result
+type Runtime interface {
+    Start()
+    Cancel()
+    OutputChannel() <-chan OutputChunk
+    EventChannel() <-chan Event
+    ResultChannel() <-chan Result
     Done() <-chan struct{}
-    Snapshot() (*ExecutionSnapshot, error)
 }
 ```
 
 设计要点：
 
-1. `command_stream` 不再直接依赖 `BashExecutor`。
-2. shell 与 ACP 统一通过事件通道回传。
-3. `Snapshot` 用于本地恢复与 manager 重连恢复。
+1. `command_stream`（drain 循环）只依赖 `Runtime`，实现为 `ACPExecutor` / `ThreadExecutor`（acp-v2）/ `pi.Pi`。
+2. shell 与 ACP 统一通过事件/输出通道回传（shell 实现已移除，见 §5.2）。
+3. 原设计的 `Snapshot()` 未实现；本地恢复以 `LocalState`（§5.8）+ 事件序列跟踪实现。另落地了 `SteerResolver`（仅 thread 执行器支持 mid-turn steering）。
 
-### 5.2 `ShellExecutor`
+### 5.2 `ShellExecutor`（已移除）
 
-将当前 [backend/agent/executor/executor.go](/home/ran/gocode/laelia/backend/agent/executor/executor.go) 收敛为 `ShellExecutor`。
-
-其职责：
-
-1. 兼容当前 `bash -c` 行为
-2. 将 stdout/stderr 映射为 `TEXT_DELTA` 或文本型内部事件
-3. 保持现有 shell watch 行为不变
-
-首版不建议顺手重写 shell 执行器，以降低回归风险。
+已移除/已变更：原设计"把当时的 shell 执行器文件收敛为 `ShellExecutor`"的方案未实施——shell 执行器已整体删除，shell 命令执行路径不复存在。当前所有会话都由 LLM agent 运行时执行。
 
 ### 5.3 `ACPExecutor`
 
-`ACPExecutor` 是本次核心新增能力，负责：
+`backend/agent/executor/acp_executor.go` 的 `ACPExecutor` 已落地，职责：
 
-1. 读取本地 profile
-2. 启动 ACP agent 子进程
+1. 读取 `ACPConfig`（manager 下发模板 + provider registry 派生的启动命令）
+2. 启动 ACP agent 子进程（进程组隔离 + `PDEATHSIG`）
 3. 基于 `acp-go-sdk` 建立 stdio 连接
-4. 发送 `Initialize → NewSession → Prompt`
-5. 将 ACP update 转换为内部事件
-6. 在取消或异常时完成优雅中断与兜底回收
+4. 发送 `Initialize` → `ResumeSession`（可复用时）/ `NewSession` → 应用所选 model（`applySelectedModel`）→ `Prompt`
+5. 将 ACP update 转换为内部事件（经 provider 的 `ToolCallAdapter` 适配各 agent 的工具调用 wire shape）
+6. 在取消或异常时完成进程组回收与兜底结果收口
 
 ### 5.4 ACP 子进程启动器
 
-建议引入单独 launcher，而不是让 `ACPExecutor` 直接拼命令。
+原设计的独立 launcher 包未单独落地：启动逻辑内联在 `ACPExecutor.run()`（`NewACP` 构造 `exec.Cmd`）与 provider registry 的 `BuildCommand` 中。职责与安全要求均已实现：
 
-launcher 负责：
-
-1. 从本地 profile 选择可执行路径和固定参数
-2. 设置工作目录
-3. 设置 env 白名单
+1. 从 provider registry / `custom` 配置选择可执行路径和固定参数（manager 不可指定任意路径）
+2. 设置工作目录（每 agent 独立目录 `~/.laelia/<machineID>/<agentID>/`）
+3. 设置 env 白名单（`allow_env` → `custom_env` 叠加 → `LAELIA_*` 引导变量，见 `buildRuntimeEnv`）
 4. 建立 stdio pipe
-5. 返回进程句柄与清理函数
+5. 进程组管理（`SetProcessGroup` + `KillGroup`）与清理
 
-安全要求：
+### 5.5 ACP 事件映射（已落地）
 
-1. 不允许 manager 传入任意可执行路径。
-2. 不允许 manager 拼接任意 CLI args。
-3. 不允许默认继承全部环境变量。
-
-### 5.5 ACP 事件映射
-
-`ACPExecutor` 需要把 ACP 语义映射到 Laelia 内部事件。建议如下：
+`ACPExecutor`/`ThreadExecutor` 把 ACP 语义映射到内部事件，实际映射：
 
 1. ACP 文本更新 → `TEXT_DELTA`
-2. ACP 工具开始 → `TOOL_CALL_STARTED`
-3. ACP 工具结束 → `TOOL_CALL_FINISHED`
-4. ACP diff 输出 → `DIFF_EMITTED`
-5. ACP warning / policy notice → `WARNING`
-6. ACP 原始 update → `RAW_ACP`
-7. ACP 最终响应 → `FINAL_SUMMARY`
+2. ACP 工具开始/结束 → `TOOL_CALL_STARTED/FINISHED`（按 provider 适配 tool_call_id 关联）
+3. ACP diff 输出 → `DIFF_EMITTED`
+4. ACP warning → `WARNING`
+5. ACP 原始 update → `RAW_ACP`（批量聚合，最多 256 条/事件）
+6. ACP 最终响应 → `FINAL_SUMMARY`
+7. 落地时新增：usage 更新 → `CONTEXT_USAGE_UPDATE`（5s 限频）、压缩观测 → `CONTEXT_COMPACTION_*`、用量 → `TOKEN_USAGE`
 
-### 5.6 文本投影策略
+### 5.6 文本投影策略（已落地）
 
-需要单独定义 `TextProjection` 规则，避免详情页终端变成噪音源。
+投影由 `backend/agent/client/drain_runner.go` 的 `mergedText` 与 executor 的输出通道完成，规则：
 
-建议投影以下内容到 `command_output`：
+1. 助手文本/思考 → `ASSISTANT`/`STDOUT` 输出类型，合并后作为 `TEXT_DELTA` 事件
+2. 工具调用只投影摘要（事件 `summary`），不投影全部参数与返回体（原始值在事件载荷里）
+3. diff 只投影简短说明，详细内容在 `DIFF_EMITTED` 载荷里
+4. 原始 ACP JSON event 不投影到终端，只经 `RAW_ACP` 事件归档
 
-1. 用户可读的阶段说明
-2. 工具调用摘要
-3. 最终答复摘要
-4. 高优先级 warning
+### 5.7 本地 profile 配置（未采用，已变更）
 
-建议不直接投影：
+已移除/已变更：原设计的"agent 本地 YAML profile"未实施。落地改为 **manager 集中管理的 server-owned `AgentACPConfig`**（`UpdateAgentACPConfig` 持久化，连接时经 `AgentAssignment.acp_config` 下发），agent 用 `BuildACPConfig` 套用内置模板生成完整配置。用户可配置项为 provider/model/custom_env/allow_env（+ persona prompt 与 pi 的 API 配置），其余（超时/上限/读写文件/diff/raw event 等）由模板默认值填充。详见本文档下半部分"ACP 配置模型"一节与 `docs/plan/agent-acp-provider-discovery-design.md`。
 
-1. 原始 ACP JSON event
-2. 详细工具参数
-3. 大段 diff payload
+### 5.8 本地状态与恢复（已落地）
 
-### 5.7 本地 profile 配置
+`backend/agent/executor/state.go` 的 `LocalState`（`command-state.json`，每 agent 一份，路径 `<data root>/<machineID>/<agentID>/command-state.json`）实际字段：
 
-首版建议在 agent 本地维护 ACP profile，例如：
+1. `command_id`
+2. `executor_kind`
+3. `status` / `started_at`
+4. `last_seq_sent`（文本输出位点）/ `last_event_seq_sent`（事件位点）
+5. `session_id`
+6. `output_buffer`
 
-```yaml
-profiles:
-  - name: default-acp
-    command: /usr/local/bin/my-acp-agent
-    args: ["--mode", "stdio"]
-    defaultModel: claude-sonnet
-    allowDiff: true
-    allowRawEvents: true
-    allowedTools: ["read_file", "apply_patch"]
-    envAllowList: ["HOME", "PATH", "LANG"]
-    maxTimeoutSeconds: 1800
-    maxEventCount: 20000
-    maxOutputBytes: 10485760
-```
+ACP 会话级恢复独立于命令状态，存 `<data root>/<machineID>/<agentID>/acp-session.json`（`backend/agent/executor/acp_session.go`）：`session_id` + 配置指纹（`sessionFingerprint`）+ 创建时间。
 
-约束：
+恢复策略（实际实现）：
 
-1. manager 只能选择 `profile name`。
-2. manager 不能覆盖 `command` / `args` / `allowedTools`。
-3. agent 启动时上报可用 profile 和能力摘要。
-
-### 5.8 本地状态与恢复
-
-扩展 [backend/agent/executor/state.go](/home/ran/gocode/laelia/backend/agent/executor/state.go) 的状态结构，新增：
-
-1. `executor_kind`
-2. `profile`
-3. `last_event_seq`
-4. `acp_session_id`
-5. `resume_metadata`
-
-恢复策略：
-
-1. 如果 ACP agent 支持 `session/load`，则尝试恢复会话。
-2. 如果不支持，也要恢复 manager 侧续播位点，确保重连后状态一致。
-3. 如果恢复失败，应生成系统事件并将任务显式收口为失败，而不是静默丢失。
+1. 若存在指纹匹配的持久化 ACP session，则经 ACP `session/resume`（`ResumeSession`）恢复会话，跳过 init prompt（省 token）。
+2. resume 失败（agent 丢会话/配置漂移）则丢弃旧 id 冷启动；连续失败 3 次发 `WARNING` 事件提示。
+3. 断连恢复：重连后 `AgentReady` 上报 `last_command_id/last_ack_seq/last_event_seq`；manager 对断连时仍在跑的 RUNNING 命令显式标 FAILED（"agent disconnected during execution"）而不是静默悬挂，会话级进度由 agent 的 durable channel cursor 保证不丢。
 
 ---
 
-## 六、Manager Control Plane 设计
+## 六、Manager Control Plane 设计（已按实现更新）
 
-### 6.1 任务创建入口
+### 6.1 任务创建入口（已变更：无 SendCommand，改为 BeginSession 流程）
 
-在 [backend/manager/api/v1/command.go](/home/ran/gocode/laelia/backend/manager/api/v1/command.go) 中，`SendCommand` 需要扩展以下能力：
+`SendCommand` 未落地（且已被移除出 proto）。实际任务创建入口是 [backend/manager/component/dispatcher/dispatcher.go](/home/ran/gocode/laelia/backend/manager/component/dispatcher/dispatcher.go) 的 `HandleBeginSession`：
 
-1. 解析 `executor_kind`
-2. 解析 `instruction/profile`
-3. 根据 agent capability 校验是否支持 ACP
-4. 校验 profile 是否可用
-5. 校验超时、diff 类开关是否超出策略
-6. 将新增字段落库
+1. agent 发 `BeginSession` 询问工作。
+2. dispatcher 检查各会话游标（`HasUpdates`）与到期 reminder（`HasDueReminders`），无工作则回 `idle=true`。
+3. 有工作时校验 agent 未被 Stop（`enabled`）、具备运行时能力（`supports_acp || supports_pi`），然后创建一条 RUNNING 的 `command`（`instruction` 留空，agent-first prompt 由 agent 客户端组装），返回 `command_id` 及 agent 显示名/owner 显示名/team/prompt_version。
 
-对于 ACP 任务，必须拒绝以下输入：
+ACP 任务的高风险输入防护改在**配置面**完成：`UpdateAgentACPConfig`/`CreateAgent` 的 `validateAgentACPConfig`（`backend/manager/api/v1/agent_config.go`）校验 provider 必须在所属 machine 已发现列表内（或 `"custom"`/builtin-pi）、model 必填（当 provider 暴露 model 选择时）；执行面不接收可执行路径/CLI args/工具白名单/敏感 env。
 
-1. 任意可执行路径
-2. 任意 CLI args
-3. 任意工具白名单
-4. 任意敏感 env 注入
+### 6.2 Dispatcher 扩展（已落地）
 
-### 6.2 Dispatcher 扩展
+dispatcher 实际能力（`backend/manager/component/dispatcher/`）：
 
-在 [backend/manager/component/dispatcher/dispatcher.go](/home/ran/gocode/laelia/backend/manager/component/dispatcher/dispatcher.go) 中新增：
+1. `HandleEvent`：事件落库（`AppendCommandEvent`）+ `command.last_ack_seq` 更新 + `broadcastEvent`；`TOKEN_USAGE` 事件额外落 `command_token_usage`。
+2. `SubscribeEvents`/`UnsubscribeEvents`/`broadcastEvent`：结构化事件 watcher 管理。
+3. `HandleProgress`：兼容文本输出（`AppendCommandOutput` + `broadcast`）。
+4. `HandleResult`：状态收口、`exit_code/duration_ms`、`final_summary/result` 摘要更新、ack 更新、watcher 延迟关闭。**不再 push 下一条命令**——是否开下一会话由 agent 的 drain 循环自行 `BeginSession`（manager 侧注释明确此语义）。
+5. 事件广播不进结果逻辑；结果落库/收口独立（`command_handler.go`）。
 
-1. `HandleEvent`
-2. `broadcastEvent`
-3. 结构化事件 watcher 管理
+未落地：断线重连时基于 `last_ack_seq` 的续播补发——实际实现是断连时在跑命令标 FAILED + agent 侧游标兜底（见 §5.8）。
 
-保留现有职责边界：
+### 6.3 Agent 回报协议扩展（已落地）
 
-1. `HandleProgress` 继续处理兼容文本输出
-2. `HandleResult` 只负责最终状态收口、ack 更新、next dispatch
-3. 事件落库和广播不应塞进最终结果逻辑
+[backend/manager/api/v1/agent_command.go](/home/ran/gocode/laelia/backend/manager/api/v1/agent_command.go) 的 `AgentChannel` 实际消息面：
 
-### 6.3 Agent 回报协议扩展
+1. `AgentStreamMessage.event`（`CommandEvent`）✓
+2. `AgentReady` 携带 `session_id / last_command_id / last_ack_seq / last_event_seq / agent_name` ✓
+3. 未落地：`resume_token` / `resume_hint`（恢复语义见 §5.8）
+4. 另落地（超出原设计）：`BeginSession`/`BeginSessionResponse`（含 `agent_display_name/owner_display_name/team/prompt_version/prompt_release_notice`）、`SteerMessage`、`PromptReleaseNotice(+Ack)`、`Ping/Pong`、workspace 读写请求/响应
 
-在 [backend/manager/api/v1/agent_command.go](/home/ran/gocode/laelia/backend/manager/api/v1/agent_command.go) 中，双向流消息需要扩展 event 类型承载面。
+### 6.4 Store 扩展（已落地，个别未实现）
 
-建议引入：
+[backend/manager/store/command.go](/home/ran/gocode/laelia/backend/manager/store/command.go) 实际能力：
 
-1. `CommandEventMessage`
-2. `AgentReady` 中的 `last_event_seq`
-3. 可能的 `resume_token` / `resume_hint`
+1. `AppendCommandEvent` ✓（`(command_id, seq_no)` 幂等）
+2. `GetCommandEvents` ✓（按 `seq_no` 排序 + `after_seq` 增量）
+3. `UpdateCommandResultSummary` ✓
+4. `RecordCommandTokenUsage` ✓（超出原设计的 token 用量表写入）
+5. 未实现：`UpdateCommandExecutorMetadata`（执行元数据并入 `result_json`，无独立更新接口）
+6. 配套：`AppendCommandOutput`/`GetCommandOutput`、`CreateCommand`、`UpdateCommandStatus`/`UpdateCommandAckSeq`、`GetRunningCommand`/`ListPendingCommandsByAgent`
 
-### 6.4 Store 扩展
+### 6.5 鉴权与策略控制（部分落地）
 
-在 [backend/manager/store/command.go](/home/ran/gocode/laelia/backend/manager/store/command.go) 中新增：
+已落地：
 
-1. `AppendCommandEvent`
-2. `GetCommandEvents`
-3. `UpdateCommandResultSummary`
-4. `UpdateCommandExecutorMetadata`
+1. 谁可以对哪个 agent 发起会话：IAM 会话策略 + agent capability 门禁（dispatcher）。
+2. 谁可以查看结构化事件/raw event：`laelia.conversations.reviewAll`（`backend/manager/api/v1/command.go` 的 `validateRawEventAccess`，用于 `WatchCommandEvents`）。
+3. ACP 配置合法性：provider/model 校验（§6.1）。
 
-要求：
-
-1. 事件写入幂等
-2. 查询严格按 `seq_no` 排序
-3. 支持 `after_seq_no` 增量读取
-
-### 6.5 鉴权与策略控制
-
-ACP 任务必须补足独立策略控制。最低要求：
-
-1. 谁可以对哪个 agent 发起 ACP 任务
-2. 谁可以发起代码修改类任务
-3. 谁可以查看 raw event
-4. 是否需要审批
-
-建议将这些规则加在 `SendCommand` 前，而不是把决定权交给 agent 本地拒绝。
+未落地：代码修改类任务的独立审批策略、审批流平台。
 
 ### 6.6 审计与配额
 
-应将以下维度纳入审计：
+已落地的资源限制（agent 侧模板 + 执行器强制）：
 
-1. `executor_kind`
-2. `profile`
-3. 是否使用 diff
-4. 工具调用摘要
-5. 最终摘要
+1. 单轮超时上限（`DefaultMaxTimeoutSeconds=1800`，ACP 启动握手另有 60s `StartupTimeout` 快速失败）
+2. 单轮事件数上限（`DefaultMaxEventCount=10000`）
+3. 单轮文本输出上限（`DefaultMaxOutputBytes=1MiB` + 4KB flush 阈值）
+4. raw event 批量聚合（256 条/事件）压缩归档量
 
-应新增以下配额：
+审计：ACP 配置变更类 RPC（`UpdateAgentACPConfig`、`RefreshAgentProviders` 等）带 `laelia.v1.audit` 注解入 `audit_log`；执行过程审计即事件流本身。未落地：单 agent ACP 任务速率限制。
 
-1. 单次任务最大事件数
-2. 单次任务最大文本输出
-3. 单次任务最大 raw event 大小
-4. 单次任务最大运行时长
-5. 单 agent ACP 任务速率限制
+### 6.7 取消语义（已变更：无宽限期两阶段）
 
-### 6.7 取消语义
-
-取消采用两阶段：
-
-1. manager 发 cancel
-2. agent 对 ACP 子进程先发 ACP cancel/interrupt
-3. 超过宽限期后强杀本地子进程
-
-原因：
-
-1. 避免直接 kill 导致无最终状态或资源泄漏
-2. 尽量争取 LLM agent 输出可解释的中断结果
+实际实现：manager 发 `CancelMessage` → agent 端 `runtime.Cancel()`：取消 turn context + 向 ACP 子进程发 `Cancel` 通知 + **立即** `SIGKILL` 整个进程组。原设计的"宽限期后再强杀"未实现（当前为一刀切回收）；最终状态仍由执行器兜底收口（exit code 124 超时 / 130 取消 / 1 失败），不会静默丢失。
 
 ---
 
-## 七、安全设计
+## 七、安全设计（已按实现更新）
 
 ### 7.1 高风险参数不上收 manager
 
-以下内容不得由 manager 直接控制：
+以下内容不得由 manager 直接控制（已实现）：
 
-1. ACP agent 可执行路径
-2. ACP CLI 参数
-3. 工具白名单
-4. 本地敏感环境变量
-5. 本地系统提示词模板全文（如需暴露，也应以 profile 名称形式暴露）
+1. ACP agent 可执行路径 —— 由 agent 侧 provider registry 派生（或 `"custom"` 逃生舱由管理员在配置面手填，不在执行面下发）
+2. ACP CLI 参数 —— 同上
+3. 工具白名单 —— 运行时能力由模板决定
+4. 本地敏感环境变量 —— 仅 `allow_env` 白名单 + `custom_env` 叠加，`LAELIA_*` 引导变量由 agent 侧最后写入不可覆盖
+5. 本地系统提示词模板全文 —— 由 machine 二进制内置 prompt bundle 携带（`prompt/communication.md` 等），manager 只下发 persona 等动态段
 
-### 7.2 ACP 子进程最小权限运行
+### 7.2 ACP 子进程最小权限运行（已实现）
 
-建议控制：
+1. 独立工作目录：`~/.laelia/<machineID>/<agentID>/`（LAELIA_HOME 可覆盖数据根）
+2. 最小环境变量继承 + 显式 env allowlist（`buildRuntimeEnv`）
+3. 超时上限（turn 1800s + 启动握手 60s）
+4. 输出字节上限（1MiB）
+5. 事件数上限（10000）
+6. 进程组隔离（`SetProcessGroup`/`KillGroup`，Linux 上父进程死亡自动回收子进程）
+7. 未引入 cgroup/ulimit 隔离（未来工作）
 
-1. 独立工作目录
-2. 最小环境变量继承
-3. 显式 env allowlist
-4. 超时上限
-5. 输出字节上限
-6. 事件数上限
-7. 需要时引入 cgroup/ulimit/rootless 隔离
+### 7.3 原始事件与敏感信息治理（已实现）
 
-### 7.3 原始事件与敏感信息治理
+raw ACP event 经批量聚合（`rawEventBatch`）归档，且：
 
-raw ACP event 归档虽然对排障有价值，但也可能包含：
+1. raw event 有单独权限（`laelia.conversations.reviewAll`，`WatchCommandEvents` 入口校验）
+2. 批量上限（256 条/事件）限制归档量
+3. 未实现可选脱敏
+4. UI 中 raw event 默认折叠（事件账本中低优先级展示）
 
-1. 大量上下文文本
-2. 文件内容片段
-3. 工具参数
-4. 模型中间结果
+### 7.4 失败收口（已实现）
 
-因此应至少具备：
+以下情况都会显式收口为事件/最终失败，而不是只留在 agent 日志中：
 
-1. raw event 单独权限
-2. 存储上限
-3. 可选脱敏
-4. UI 默认折叠
-
-### 7.4 失败收口
-
-以下情况都必须显式收口为系统事件和最终失败，而不是只留在 agent 日志中：
-
-1. profile 不存在
-2. 子进程启动失败
-3. ACP initialize 失败
-4. session 创建失败
-5. event 映射失败
-6. 取消超时后被强杀
-7. 恢复失败
+1. provider 未配置/子进程启动失败 → `CommandResult` 带 `ErrorMessage`（FAILED）
+2. ACP initialize/newSession 失败 → 同上（进程组回收后收口）
+3. 启动握手超时 → 独立 `StartupTimeout`（60s）快速失败，exit code 124
+4. 事件映射失败 → 降级为告警/摘要，不阻塞
+5. 取消/超时 → exit code 130/124 显式上报
+6. 恢复失败（resume 3 连败）→ `WARNING` 事件 + 冷启动
+7. 断连时在跑命令 → manager 侧显式标 FAILED（"agent disconnected during execution"）
 
 ---
 
-## 八、前端与交互设计
+## 八、前端与交互设计（已按实现更新）
 
 ### 8.1 列表页
 
-在 [frontend/src/pages/dashboard/command-list.tsx](/home/ran/gocode/laelia/frontend/src/pages/dashboard/command-list.tsx) 中：
+[frontend/src/pages/dashboard/command-list.tsx](/home/ran/gocode/laelia/frontend/src/pages/dashboard/command-list.tsx)：
 
-1. 将 “Send Command” 升级为 “Send Task”
-2. 增加执行类型切换：shell / ACP
-3. ACP 模式下展示自然语言任务输入
-4. 展示可选 profile 与受控超时
-5. 不展示底层二进制路径、任意工具参数等高风险字段
+1. 无 "Send Task" 下发表单——命令由会话消息驱动创建，不从列表页发起（原设计的执行类型切换/任务输入表单未实施）。
+2. 列表展示命令状态、时长、token 用量等。
 
 ### 8.2 详情页
 
-在 [frontend/src/pages/dashboard/command-detail.tsx](/home/ran/gocode/laelia/frontend/src/pages/dashboard/command-detail.tsx) 中：
+[frontend/src/pages/dashboard/command-detail.tsx](/home/ran/gocode/laelia/frontend/src/pages/dashboard/command-detail.tsx) 以结构化事件为中心实现（事件账本）：
 
-1. 保留现有 [frontend/src/components/command-terminal.tsx](/home/ran/gocode/laelia/frontend/src/components/command-terminal.tsx) 终端区域
-2. 新增事件时间线面板
-3. 新增 diff 视图
-4. 新增工具调用摘要区
-5. 新增最终结果卡片
-6. raw event 折叠展示
+1. 事件时间线面板：`CommandEventTimelineOverview` / `CommandEventLedger`（`frontend/src/components/command-events/`）
+2. 事件检查器/过滤：`CommandEventInspector` / `CommandEventToolbar`
+3. 工具调用摘要区（`pairToolCallEvents` 配对 STARTED/FINISHED）
+4. 最终结果卡片（FinalSummary markdown 渲染）+ `TokenUsageCard`
+5. raw event 折叠展示
+6. 6. 已移除/已变更：原设计引用的独立终端组件已删除，终端文本区并入事件账本的文本流视图（`mergeOutputRuns` 合并 STDOUT/STDERR/ASSISTANT）
 
 ### 8.3 数据层
 
-在 [frontend/src/stores/command.ts](/home/ran/gocode/laelia/frontend/src/stores/command.ts) 中新增：
+[frontend/src/stores/command.ts](/home/ran/gocode/laelia/frontend/src/stores/command.ts)：
 
-1. 事件订阅
-2. 事件缓存
-3. 基于 `seq_no` 的增量续播
-4. 文本输出与结构化事件分离缓存
+1. `watchCommand` / `watchCommandEvents` 订阅（断线自重连，`afterSeqNo` 从 store 重读实现增量续播）
+2. 文本输出与结构化事件分离缓存
+3. 排序基于 `seq_no`，不依赖浏览器收到事件的顺序
 
 ### 8.4 降级策略
 
-前端需要适配以下组合：
-
-1. 旧 shell 任务：只显示终端
-2. 新 ACP 任务：显示终端 + 事件
-3. manager 支持但 agent 不支持 ACP：隐藏 ACP 入口
-4. 某类事件缺失：局部降级，不影响主流程显示
+1. 事件缺失类型：局部降级为摘要文本，不影响主流程显示（`isVisibleEvent` 过滤）
+2. 旧数据（无结构化事件的命令）：只显示文本输出
+3. 无 reviewAll 权限：`WatchCommandEvents` 被拒（PERMISSION_DENIED），前端不展示事件面板入口
 
 ---
 
-## 九、四个实施阶段
+## 九、四个实施阶段（已全部完成）
 
-### Phase 1：契约与数据面
+### Phase 1：契约与数据面 ✅
 
-#### 子任务
+已落地：`command.proto` 的 `CommandEvent/CommandEventType/WatchCommandEvents/GetCommandContext`，`agent.proto` 的 `AgentCapability`，`command` 表扩展与 `command_event` 表（含迁移），`last_ack_seq` 统一位点。偏差见 §4（`executor_kind` 移除、oneof 载荷、`TOKEN_USAGE` 等）。
 
-1. 扩展 `command.proto`
-2. 扩展 `agent.proto`
-3. 新增 `CommandEvent` 消息和 watch 接口
-4. 设计 `command_event` 存储模型
-5. 定义结果摘要与统计字段
-6. 完成 Go / TS 代码生成与兼容性确认
+### Phase 2：Agent Runtime 与 ACP Bridge ✅
 
-#### 实施要点
+已落地：`executor.Runtime` 抽象、ACP 启动与桥接（`acp_executor.go`）、会话快照与恢复（`state.go`/`acp_session.go`）、文本投影（`drain_runner.go`）。偏差：shell 执行器移除（§5.2）、launcher 内联（§5.4）、本地 profile 改 server-owned 配置（§5.7）；落地后追加了 acp-v2（`thread_executor.go` + `backend/agent/acp2/`）与 pi 运行时。
 
-1. 所有 proto 字段只追加，不重排 tag。
-2. `command` 资源保持兼容，旧 agent 继续支持 shell。
-3. 结构化事件和文本输出职责必须分离。
-4. 统一使用事件 seq 做回放与恢复。
+### Phase 3：Manager Control Plane 与安全治理 ✅（部分）
 
-#### 交付物
+已落地：dispatcher 事件处理与广播（§6.2）、store 事件读写（§6.4）、`WatchCommandEvents` raw event 权限（§6.5）、能力门禁、配额上限（§6.6）。未落地：审批流、单 agent 速率限制、断连续播补发。
 
-1. proto 更新稿
-2. DB migration 草案
-3. event 类型表
-4. 兼容性说明
+### Phase 4：UI 集成、兼容发布与回归验证 ✅
 
-### Phase 2：Agent Runtime 与 ACP Bridge
-
-#### 子任务
-
-1. 抽象 `Executor`
-2. 收敛 `ShellExecutor`
-3. 新增 ACP launcher
-4. 新增 `ACPExecutor`
-5. 新增本地 profile 配置
-6. 新增本地快照与恢复逻辑
-7. 新增文本投影策略
-
-#### 实施要点
-
-1. 不重写 shell 执行语义。
-2. ACP 只通过本地 profile 启动。
-3. 子进程失败必须产出系统事件。
-4. 取消采用 ACP cancel + kill 兜底双阶段。
-5. 恢复失败必须显式收口。
-
-#### 交付物
-
-1. Executor 接口与运行时实现
-2. ACP 子进程桥接实现
-3. profile 配置样例
-4. 恢复策略说明
-
-### Phase 3：Manager Control Plane 与安全治理
-
-#### 子任务
-
-1. 扩展 `SendCommand` 校验与落库
-2. 扩展 agent 回报协议
-3. 扩展 dispatcher 的事件处理与广播
-4. 扩展 store 的事件查询与写入
-5. 补齐 IAM / 策略控制
-6. 增加配额、审计、取消治理
-7. 增加 capability gate / feature flag
-
-#### 实施要点
-
-1. manager 只控制权限，不控制底层进程参数。
-2. 事件落库和结果收口分离。
-3. 旧 agent 必须可混跑。
-4. raw event 必须有单独权限控制。
-
-#### 交付物
-
-1. manager API 改造
-2. dispatcher/store 改造
-3. IAM / 审计 / 配额策略清单
-4. 灰度上线策略
-
-### Phase 4：UI 集成、兼容发布与回归验证
-
-#### 子任务
-
-1. 升级任务下发表单
-2. 新增事件订阅与缓存
-3. 升级详情页时间线 / diff / summary 展示
-4. 做旧任务与缺失能力场景的降级展示
-5. 设计上线顺序与回滚方案
-6. 补端到端与回归测试
-
-#### 实施要点
-
-1. UI 优先复用现有 command 页面。
-2. shell 基线流程不得退化。
-3. 事件排序必须严格以 `seq_no` 为准。
-4. raw event 默认折叠，不应污染主阅读路径。
-
-#### 交付物
-
-1. 列表页和详情页增强
-2. 前端事件数据层
-3. 灰度发布方案
-4. 回归测试清单
+已落地：命令详情页事件账本（§8.2）、事件订阅数据层（§8.3）、降级策略（§8.4）。偏差：无 "Send Task" 表单（§8.1）。
 
 ---
 
-## 十、发布顺序建议
+## 十、发布顺序建议（历史记录）
 
-建议按以下顺序发布：
-
-1. **先发布 proto/store/manager 兼容层**：即使此时新 agent 尚未上线，也不应影响现有 shell 任务。
-2. **再发布支持 ACP 的新 agent**：先在受控测试 agent 上验证。
-3. **最后打开前端 ACP 入口和 feature flag**：仅对支持 ACP 的 agent 和授权用户开放。
-
-这样做的好处是：
-
-1. 回滚边界清晰
-2. 不会因为 agent 未同步升级导致全量功能损坏
-3. 可以逐层观察风险
+原建议的灰度顺序已按计划执行完毕（proto/store/manager 兼容层 → 新 agent → 前端入口）。当前已无灰度开关需要管理。
 
 ---
 
-## 十一、验证与测试策略
+## 十一、验证与测试策略（已按实现更新）
 
 ### 11.1 回归基线
 
-必须确认以下现有能力不退化：
+原"shell command 回归"项已失效（shell 链路移除）。当前回归基线：
 
-1. shell command 创建
-2. shell command 执行
-3. shell command 输出 watch
-4. shell command 取消
-5. shell command 详情页展示
+1. 会话命令创建（`BeginSession` → RUNNING command）
+2. 文本输出 watch（`WatchCommand`）与事件 watch（`WatchCommandEvents`）
+3. 命令取消（`CancelCommand`）与中途注入（`SteerCommand`）
+4. 详情页展示（事件账本）
 
 ### 11.2 ACP 功能测试
 
-需要覆盖：
-
-1. 正常执行
-2. 文本流式输出
-3. 工具调用轨迹
-4. diff 结果展示
-5. raw event 归档
-6. 最终摘要与 usage 记录
+1. 正常执行 / 文本流式输出 / 工具调用轨迹 / diff 结果展示 / raw event 归档 / 最终摘要与 token 用量记录
+2. 集成测试门（见 AGENTS.md Testing 一节）：
+   - `LAELIA_RUN_OPENCODE_ACP_TESTS=1` —— 本地 opencode 的 ACP v1 执行与会话恢复（`backend/agent/executor`）
+   - `LAELIA_RUN_CODEX_ACP_TESTS=1` + `CODEX_HOME=<home>` —— `TestThreadExecutorCodex` 驱动真实 codex app-server（ACP v2）
 
 ### 11.3 异常与恢复测试
 
-需要覆盖：
-
-1. 子进程启动失败
-2. ACP initialize 失败
-3. 超时
-4. 用户取消
-5. agent 与 manager 断连
-6. manager 重启
-7. agent 重连
-8. 事件去重与续播
+1. 子进程启动失败 / ACP initialize 失败 / 超时 / 用户取消
+2. agent 与 manager 断连 / manager 重启 / agent 重连
+3. 事件去重（`(command_id, seq_no)` 幂等）与续播（`after_seq_no`）
 
 ### 11.4 安全测试
 
-需要覆盖：
-
-1. manager 不能注入任意二进制路径
-2. manager 不能注入任意工具白名单
-3. manager 不能注入敏感 env
-4. raw event 权限隔离
-5. 超量输出与超量事件受限
+1. manager 不能注入任意二进制路径（provider registry 派生 + 配置面校验）
+2. manager 不能注入敏感 env（allow_env 白名单）
+3. raw event 权限隔离（`laelia.conversations.reviewAll`）
+4. 超量输出与超量事件受限（`executor.Limits`）
 
 ---
 
 ## 十二、非目标
 
-以下内容不在首版范围内：
+以下内容不在范围内（当前仍然成立，除第 4 项外均未实施）：
 
 1. 远程 ACP HTTP/WebSocket transport
 2. 一个 Laelia agent 同时跑多个 ACP 会话
 3. 将 Laelia manager 改造成通用 ACP server
-4. 重构全部 `command` 资源名为 `task` / `run`
-5. 在首版中实现复杂审批流编排平台
+4. 重构全部 `command` 资源名为 `task` / `run`（仍叫 command；注意：会话/任务语义已由独立的 task 资源承载，见 `docs/plan/channel-tasks-design.md`）
+5. 实现复杂审批流编排平台
 
 ---
 
@@ -829,24 +560,29 @@ raw ACP event 归档虽然对排障有价值，但也可能包含：
 1. **统一任务资源**
 2. **统一执行器运行时**
 3. **结构化事件驱动过程回报**
-4. **agent 本地能力控制 + manager 平台策略控制**
+4. **manager 平台策略控制 + agent 运行时能力控制**
 
-在这个前提下，ACP 能作为 Laelia agent 的内部执行协议稳定落地，并且不会破坏现有 shell 链路、manager 控制面和前端交互骨架。
+该方案已落地，并在此基础上继续演进：shell 链路被移除、命令创建改为消息驱动（drain 会话）、agent 守护进程重构为 machine 守护进程（每 agent 一条 AgentChannel）、新增 acp-v2 与 pi 运行时。后续演进方向（审批/策略面、速率限制、断连续播补发）仍沿本文档 §6 的缺口推进。
 
-从实施顺序上看，最关键的是先完成 **Phase 1 契约与数据面**，否则后续 agent runtime、manager store/dispatcher、UI 都会在错误抽象上反复返工。# Laelia Agent ACP 集成详细设计方案
+---
+
+# Laelia Agent ACP 集成详细设计方案
+
+> 状态：2026-09-06 已对照当前代码核对更新。主要变化：本方案已落地并继续演进——ACP 配置为 manager 集中管理（server-owned `AgentACPConfig` + provider registry），命令创建改为消息驱动 drain 会话，agent 守护进程重构为 machine 守护进程（每 agent 一条 AgentChannel），shell 执行器移除，新增 acp-v2（codex）与 pi 运行时。
 
 ## 设计目标
 
-Laelia 现有的 agent 执行链路是 manager 下发 shell command，agent 在本地执行并将文本输出与最终结果回传。现在需要在不推翻现有调度骨架的前提下，引入对 ACP 的支持，使 manager 能下发面向 LLM agent 的任务，Laelia agent 通过 ACP 调用本机 LLM agent 执行，并将执行过程、工具调用、diff、最终结果等信息可靠回报给 manager。
+Laelia 的执行链路（本设计稿撰写时）是 manager 下发命令、agent 在本地执行并回传文本输出与最终结果。目标是在不推翻现有调度骨架的前提下，引入对 ACP 的支持，使 agent 通过 ACP 调用本机 LLM agent 执行会话任务，并将执行过程、工具调用、diff、最终结果等信息可靠回报给 manager。
 
 本方案的目标是：
 
-1. 保留现有 manager -> Laelia agent 的控制链路与鉴权模型。
-2. 首版支持本机子进程 + stdio 模式的 ACP agent，不引入远程 ACP transport。
-3. 保持每个 Laelia agent 单任务串行，复用现有 dispatcher 语义。
-4. 让 shell 执行与 ACP 执行共存，旧路径不退化。
-5. 让 manager 侧能查看可靠、结构化、可审计的执行过程，而不只是纯文本终端。
-6. 将高风险运行参数固定在 agent 本地 profile，不允许 manager 直接控制底层二进制、敏感环境变量或工具白名单。
+1. 保留现有 manager ↔ machine/agent 的控制链路与鉴权模型。
+2. 仅支持本机子进程 + stdio 模式的 ACP agent，不引入远程 ACP transport。
+3. 保持每个 Laelia agent 单会话串行，复用现有 dispatcher 语义。
+4. 让 manager 侧能查看可靠、结构化、可审计的执行过程，而不只是纯文本终端。
+5. 将高风险运行参数收束在 manager 侧 server-owned `AgentACPConfig`（模板 + provider registry 派生启动命令），不允许 manager 直接控制底层二进制、敏感环境变量或工具白名单。
+
+（已移除/已变更：原目标的"shell 执行与 ACP 执行共存，旧路径不退化"——shell 执行器已整体移除，所有会话均由 LLM agent 运行时执行。）
 
 ## 非目标
 
@@ -858,41 +594,42 @@ Laelia 现有的 agent 执行链路是 manager 下发 shell command，agent 在�
 4. 不在首版中实现完整的审批流平台或通用任务编排系统。
 5. 不把模型的隐藏推理过程当作产品契约进行采集或展示；仅采集可展示的代理输出、工具调用、diff 和摘要事件。
 
-## 现状分析
+## 现状分析（已随实现更新）
 
 当前核心链路如下：
 
-1. manager 通过 `CommandService.SendCommand` 创建命令记录。
-2. `Dispatcher` 将待执行命令通过 `AgentCommandService.CommandChannel` 推送给 agent。
-3. agent 在 `command_stream` 中收到命令后，直接实例化 `BashExecutor` 执行。
-4. agent 将 stdout/stderr 以 `CommandProgress` 形式回传，将退出码和错误信息以 `CommandResult` 形式回传。
-5. manager 将输出写入 `command_output` 表，并通过 `WatchCommand` 向前端广播。
+1. 用户/agent 在会话中发消息；agent 客户端经 `AgentStreamService.AgentChannel`（bidi）发 `BeginSession` 询问工作。
+2. `Dispatcher.HandleBeginSession` 检查会话游标与到期 reminder，有工作则创建 RUNNING command 并返回 `command_id`。
+3. agent 客户端（`backend/agent/client/runner.go` + `drain_runner.go`）按 `command_id` 起执行器运行时：ACP v1（opencode/claude-code）、ACP v2 线程协议（codex）或 pi RPC 运行时（`backend/agent/pi/`）。
+4. agent 将文本以 `CommandProgress`、过程以 `CommandEvent`、退出信息以 `CommandResult` 回传。
+5. manager 将文本写入 `command_output`、事件写入 `command_event`，经 `WatchCommand`/`WatchCommandEvents` 向前端广播。
 
-这个模型对 shell command 足够，但对 ACP 存在以下不足：
+> 历史注：本设计稿撰写时的链路是 agent 在 `command_stream` 收到 `CommandRequest` 后直接实例化 `BashExecutor` 执行 shell——该路径与 `BashExecutor` 均已移除。
 
-1. 执行器与 shell 强耦合，当前 `command_stream` 直接依赖 `BashExecutor`。
-2. 输出模型只有 `STDOUT`、`STDERR`、`SYSTEM` 三类，不足以表达工具调用、diff、结构化结果。
-3. manager 侧没有 ACP 能力协商面，无法知道某个 agent 是否支持 ACP、支持哪些 profile。
-4. 当前命令模型以 shell command 为中心，缺少更通用的任务元数据。
-5. 当前恢复语义主要面向文本流，不足以支撑结构化事件的断线续播。
-6. 当前安全边界不足以直接托管外部 LLM agent 子进程。
+原设计稿识别的不足与落地状态：
+
+1. 执行器与 shell 强耦合 → 已解决（shell 移除，统一 `executor.Runtime`）。
+2. 输出模型只有 `STDOUT/STDERR/SYSTEM` → 已解决（+`ASSISTANT` 与结构化事件流）。
+3. manager 侧没有 ACP 能力协商面 → 已解决（`AgentCapability` + server-owned 配置 + provider 校验）。
+4. 命令模型缺少通用任务元数据 → 部分解决（`instruction/profile/allow_diff/final_summary/result` 已落地）。
+5. 恢复语义不足以支撑断线续播 → 部分解决（`AgentReady` 位点 + `LocalState`；断连命令标 FAILED，会话进度靠 agent 游标）。
+6. 安全边界不足 → 已解决（provider registry 派生命令、env 白名单、进程组隔离、资源上限）。
 
 ## 总体架构
 
 目标架构保持三层角色不变：
 
 1. manager 仍然是任务控制面、审计面和展示面。
-2. Laelia agent 仍然是受控执行宿主，但新增 ACP client runtime。
-3. 外部 LLM agent 作为本机 ACP 子进程，由 Laelia agent 受控拉起与管理。
+2. machine 守护进程是受控执行宿主：控制面跑 `MachineChannel`（agent 分配/配置热更新/provider 发现/自升级），数据面为每个 agent 开一条 `AgentChannel`。
+3. 外部 LLM agent 作为本机 ACP/pi 子进程，由 machine 守护进程受控拉起与管理。
 
 ```mermaid
 flowchart LR
     U[User / UI] --> M[Manager API]
     M --> D[Dispatcher + Store]
-    D --> S[AgentCommandService Stream]
-    S --> A[Laelia Agent]
-    A --> R[Execution Router]
-    R --> SH[ShellExecutor]
+    D --> S[AgentStreamService.AgentChannel per-agent]
+    S --> A[Machine 守护进程 agent runner]
+    A --> R[Runtime 分支: pi / thread v2 / ACP v1]
     R --> ACP[ACPExecutor]
     ACP --> P[Local ACP Agent Process]
     P --> ACP
@@ -904,501 +641,356 @@ flowchart LR
 
 关键原则如下：
 
-1. manager 与 Laelia agent 之间继续使用现有 command channel，不让 ACP 细节泄漏到外部控制协议之外。
-2. ACP 只存在于 Laelia agent 内部，作为一种执行器实现。
-3. manager 面向的是统一的 task/command 生命周期与结构化事件流，而不是面向某个具体 ACP SDK 的内部对象模型。
+1. manager 与 machine/agent 之间继续使用现有 command channel，不让 ACP 细节泄漏到外部控制协议之外。
+2. ACP 只存在于 machine 守护进程内部，作为一种执行器实现。
+3. manager 面向的是统一的 command 生命周期与结构化事件流，而不是面向某个具体 ACP SDK 的内部对象模型。
 
 ## 核心设计
 
-### 1. 任务模型与兼容策略
+### 1. 任务模型与兼容策略（已落地）
 
-首版不重命名现有 `Command` 资源，继续沿用 `agents/{agent}/commands/{command}` 这一资源模型，以控制改动范围。
+`Command` 资源名仍是 `agents/{agent}/commands/{command}`，未重命名。
 
-#### 1.1 兼容原则
+#### 1.1 兼容原则（已落地）
 
-1. 旧 shell 调用链路必须无需修改即可继续工作。
-2. 新 ACP 任务与旧 shell 命令共用同一套 command 列表、详情页、状态机和审计主线。
+1. 命令由会话消息驱动（`BeginSession` 流程）创建，`SendCommand` 已从 proto 移除。
+2. 所有命令共用同一套 command 列表、详情页、状态机和审计主线。
 3. 新字段采用追加式扩展，不重排现有 proto tag。
 
-#### 1.2 推荐字段演进
+#### 1.2 字段演进（已落地）
 
-MVP 建议继续复用现有 `command` 字段承载原始任务文本：
+实际落地的字段（[proto/v1/v1/command.proto](proto/v1/v1/command.proto)）：
 
-1. 当 `executor_kind = SHELL` 时，`command` 表示 shell command。
-2. 当 `executor_kind = ACP` 时，`command` 表示自然语言任务或简短任务描述。
+1. `instruction`（字段 16）：自然语言任务描述；drain 会话路径下留空（agent-first prompt 由 agent 客户端组装）。
+2. `profile`（字段 17）：已落地（`CommandRequest.profile` 同名）。
+3. `result`（字段 19，`google.protobuf.Struct`；DB 列 `result_json`）：最终结构化结果摘要。
+4. `final_summary`（字段 18）与 `allow_diff`（字段 20）、`conversation_id`（字段 22）。
+5. `executor_kind` 已 `reserved` 移除（shell 不存在，执行类型由 `LifecyclePayload.executor_kind` 表达）。
 
-同时新增以下字段：
+### 2. ACP 能力声明与 profile 协商（已落地，形式有变）
 
-1. `executor_kind`：执行类型，首版支持 `SHELL` 与 `ACP`。
-2. `profile_name`：引用 agent 本地允许的 ACP profile。
-3. `result_json`：最终结构化结果摘要，复用现有数据库列。
-4. 预留 `instruction` 或 `task_payload`：当后续需要 richer task schema 时再引入，不作为首版强制字段。
+能力声明落地为 `AgentCapability`（`proto/v1/v1/agent.proto`），实际字段：`supports_acp`、`max_timeout_seconds`、`supports_diff`、`supports_raw_events`、`supports_tool_traces`、`max_event_count`、`max_output_bytes`、`supports_autonomous_decision`、`supports_pi`。
 
-这样的好处是数据库迁移最小，前端列表与搜索逻辑也更容易复用。
+原设计的 `supported_profiles`/`default_profile` 未落地：profile 概念被 **server-owned `AgentACPConfig`**（manager 集中管理、经 `AgentAssignment.acp_config` 下发）+ **agent 侧 provider registry**（派生启动命令）取代。能力由 `BuildCapability`（`backend/agent/executor/acp_config.go`）从配置推导，连接时由 manager 回填（agent 上报不覆盖）。
 
-### 2. ACP 能力声明与 profile 协商
+#### 2.2 配置控制原则（已落地）
 
-ACP 是否可用、可用到什么程度，不应该继续依赖 `labels` 这种弱约束结构。建议在 `AgentInfo` 旁增加明确的能力摘要。
+manager 集中管理配置但**不控制以下高风险参数**：
 
-#### 2.1 Agent capability 建议项
+1. ACP agent 可执行路径（provider registry 派生；`"custom"` 逃生舱在配置面手填）
+2. 额外启动参数（同上）
+3. 工具白名单或黑名单（运行时能力由模板决定）
+4. 敏感环境变量（仅 `allow_env` 白名单 + `custom_env` 叠加）
+5. 模型供应商专有底层参数（pi 的 API 配置除外，经 `api_provider/global_provider` 管理并服务端解析 key）
 
-1. `supports_acp`：是否支持 ACP 执行器。
-2. `supported_profiles`：可被 manager 引用的 profile 名称集合。
-3. `max_timeout_seconds`：ACP 任务允许的最大超时。
-4. `supports_diff_events`：是否支持 diff 事件。
-5. `supports_raw_acp_events`：是否支持保存 raw ACP event。
-6. `supports_tool_trace`：是否支持工具调用结构化跟踪。
-7. `max_event_count`：单任务事件数上限。
-8. `max_output_bytes`：单任务文本投影上限。
+配置校验在 `UpdateAgentACPConfig`/`CreateAgent` 完成（`validateAgentACPConfig`）。
 
-#### 2.2 Profile 控制原则
+### 3. 结构化事件模型（已落地）
 
-profile 定义在 Laelia agent 本地，manager 只可引用 profile 名称，不可传递以下高风险参数：
+已落地 `CommandEvent` + `WatchCommandEvents`，将"展示给用户的文本"和"用于审计/回放/前端时间线的事件"分离。
 
-1. ACP agent 可执行路径。
-2. 额外启动参数。
-3. 工具白名单或黑名单。
-4. 敏感环境变量。
-5. 模型供应商专有底层参数。
+#### 3.1 事件对象（已落地，形式有变）
 
-profile 由 agent 启动时加载，并通过 capability 摘要对 manager 暴露最小必要信息。
+`CommandEvent` 字段：`command_id`、`seq_no`、`event_type`、`timestamp`、`summary`；原设计的 `payload_json` 字段改为 **oneof 强类型载荷**（`lifecycle/text_delta/tool_call_started/tool_call_finished/diff_emitted/warning/raw_acp/final_summary/context_compaction/context_usage/token_usage`）。DB 仍存 `payload_json` JSONB 列（由 `marshalEventPayload` 序列化）。
 
-### 3. 结构化事件模型
+#### 3.2 事件类型（已落地）
 
-ACP 集成后，执行过程不能继续只依赖 `CommandOutput.SYSTEM`。需要引入结构化事件流，将“展示给用户的文本”和“用于审计/回放/前端时间线的事件”分离。
+`LIFECYCLE / TEXT_DELTA / TOOL_CALL_STARTED / TOOL_CALL_FINISHED / DIFF_EMITTED / WARNING / RAW_ACP / FINAL_SUMMARY`（1-8 与设计一致），另落地 `CONTEXT_COMPACTION_STARTED/FINISHED / CONTEXT_USAGE_UPDATE / TOKEN_USAGE`（12-15）；原设计的 `PERMISSION_*`（9-11）实现后被移除（权限改为运行时自动授予）。
 
-#### 3.1 事件对象建议字段
+#### 3.3 文本投影策略（已落地）
 
-1. `command_id`
-2. `seq_no`
-3. `event_type`
-4. `timestamp`
-5. `summary`
-6. `payload_json`
+1. 助手文本经 `mergedText` 合并后作为 `TEXT_DELTA` 事件与 `CommandOutput`（`ASSISTANT`/`STDOUT`）输出。
+2. 工具调用只投影摘要，不投影全部参数与返回体（原始值在事件载荷里，UI 折叠）。
+3. diff 只投影简短说明，详细内容在 `DIFF_EMITTED` 载荷里。
+4. raw ACP event 不投影到终端，默认只用于审计与排障（raw event 有独立查看权限）。
 
-其中：
+### 4. 数据库存储与回放语义（已落地）
 
-1. `summary` 用于快速展示或日志摘要。
-2. `payload_json` 保存结构化原始负载，便于前端渲染与审计追踪。
+#### 4.1 command 主表（已落地）
 
-#### 3.2 首版事件类型建议
+实际落地列：`instruction`、`profile`、`allow_diff`、`timeout_seconds`、`final_summary`、`last_ack_seq`、`machine_id`（machine 重构冗余）、`conversation_id`；`result_json` 继续存最终结构化摘要；`command` 列保留原始任务文本。`executor_kind` 列未建。
 
-1. `LIFECYCLE`：开始、阶段切换、取消、完成。
-2. `TEXT_DELTA`：用户可读文本增量。
-3. `TOOL_CALL_STARTED`：工具调用开始。
-4. `TOOL_CALL_FINISHED`：工具调用结束。
-5. `DIFF_EMITTED`：产生代码差异或 patch。
-6. `WARNING`：告警与降级信息。
-7. `RAW_ACP`：原始 ACP event 归档。
-8. `FINAL_SUMMARY`：最终任务摘要与关键产物。
+#### 4.2 command_event 表（已落地，与设计一致）
 
-#### 3.3 文本投影策略
+表结构与索引同设计（唯一索引 `(command_id, seq_no)` + `(command_id, created_at)`），见 [backend/manager/migration/migration/LATEST.sql](backend/manager/migration/migration/LATEST.sql)。另有落地时新增的 `command_token_usage` 表（每命令一行 token 用量，幂等写入）。
 
-不是所有结构化事件都应该进入终端文本流。必须定义一层 projection 规则：
+#### 4.3 确认位点与恢复策略（已落地，语义有变）
 
-1. `TEXT_DELTA` 通常投影到终端。
-2. 工具调用只投影摘要，不投影全部参数与返回体。
-3. diff 只投影简短说明，详细内容放在结构化事件里。
-4. raw ACP event 不投影到终端，默认只用于审计与排障。
+`command.last_ack_seq` 统一解释为事件/输出确认位点 ✓（由 `HandleEvent`/`HandleResult` 更新）。
 
-这样可以避免 UI 终端被噪声淹没。
+恢复语义的实际实现（与原设计稿"续播"设想不同）：
 
-### 4. 数据库存储与回放语义
+1. agent 重连后 `AgentReady` 上报 `last_command_id / last_ack_seq / last_event_seq`。
+2. manager 对断连时仍在跑的 RUNNING 命令**显式标 FAILED**（"agent disconnected during execution"），不做事件续播补发。
+3. 会话级进度以 agent 的 durable per-channel cursor 为真相源，断连不丢工作（下轮 `BeginSession` 重新发现）。
+4. ACP 子进程级会话恢复由 `acp-session.json` + ACP `session/resume` 完成（跨轮次复用会话，与命令续播无关）。
 
-#### 4.1 command 主表演进
+## Agent Runtime 设计（已按实现更新）
 
-建议在现有 `command` 表最小化扩展：
+### 1. 执行器抽象（已落地）
 
-1. 新增 `executor_kind` 列，默认 `SHELL`。
-2. 新增 `profile_name` 列，默认空字符串。
-3. 继续复用 `result_json` 存最终结构化摘要。
-4. 保留 `command` 列作为原始任务文本。
+已落地为 `backend/agent/executor/runtime.go` 的 `Runtime` 接口（`Start/Cancel/OutputChannel/EventChannel/ResultChannel/Done`；原设计的 `Snapshot()` 未实现，恢复以 `LocalState` 实现）。`Event` 是内部统一事件对象，所有运行时产出同一类事件，由 `drain_runner` 统一上报。实现：`ACPExecutor`（ACP v1）、`ThreadExecutor`（ACP v2，`backend/agent/acp2/` 客户端）、`pi.Pi`（`backend/agent/pi/` RPC 运行时）；另落地 `SteerResolver`（仅 v2 线程执行器支持 mid-turn steering）。
 
-#### 4.2 command_event 新表
+### 2. ShellExecutor（已移除）
 
-新增 `command_event` 表，建议包含：
+已移除/已变更：原设计"把当时的 shell 执行器文件收敛为 `ShellExecutor`"的方案未实施——shell 执行器已整体删除，不存在 shell 命令执行路径。
 
-1. `id BIGSERIAL PRIMARY KEY`
-2. `command_id UUID NOT NULL`
-3. `seq_no INTEGER NOT NULL`
-4. `event_type SMALLINT NOT NULL`
-5. `summary TEXT NOT NULL DEFAULT ''`
-6. `payload_json JSONB NOT NULL DEFAULT '{}'`
-7. `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`
+### 3. ACPExecutor 设计（已落地）
 
-索引建议：
+`backend/agent/executor/acp_executor.go` 的 `ACPExecutor` 已落地，职责：
 
-1. 唯一索引 `(command_id, seq_no)`，保证幂等写入。
-2. 普通索引 `(command_id, created_at)`，便于时间线读取与排障。
-
-#### 4.3 确认位点与恢复策略
-
-首版建议将 `last_ack_seq` 统一解释为事件流确认位点，而不是拆成文本流确认和事件流确认两个维度。原因是：
-
-1. 文本是事件投影，不是主事实来源。
-2. 单一 seq 更易恢复与排障。
-3. watcher 和前端都可以基于 `after_seq_no` 增量续播。
-
-恢复原则：
-
-1. event 是真相源，文本可重建。
-2. manager 重连后按事件 seq 续播。
-3. command 最终状态以主表为准，事件用于过程重放。
-
-## Agent Runtime 设计
-
-### 1. 执行器抽象
-
-需要从当前 shell 强耦合模型中抽出统一执行器接口，建议包含：
-
-1. `Start(ctx)`
-2. `Cancel(reason)`
-3. `Events() <-chan Event`
-4. `Result() <-chan Result`
-5. `Done() <-chan struct{}`
-6. `Snapshot() *ExecutionSnapshot`
-
-其中 `Event` 是内部统一事件对象，shell 与 ACP 都产出同一类事件，再由 `command_stream` 负责统一上报。
-
-### 2. ShellExecutor 收敛
-
-现有 [backend/agent/executor/executor.go](backend/agent/executor/executor.go) 保留为 shell 基线实现，但需要做如下角色调整：
-
-1. 从 `BashExecutor` 语义转为 `ShellExecutor`。
-2. 输出不再只对应 `stdout/stderr`，而是转换为统一内部事件。
-3. 最终结果统一为执行器通用结果对象，供 manager 侧统一收口。
-
-### 3. ACPExecutor 设计
-
-ACPExecutor 是本次集成的核心新增执行器，实现职责包括：
-
-1. 根据 `profile_name` 解析本地受控 profile。
-2. 拉起本机 ACP agent 子进程。
+1. 读取 `ACPConfig`（模板 + provider registry 派生的启动命令）。
+2. 拉起本机 ACP agent 子进程（进程组隔离）。
 3. 使用 `acp-go-sdk` 建立 stdio 连接。
-4. 执行 `Initialize -> NewSession -> Prompt`。
-5. 将 ACP update 映射为内部事件。
-6. 处理取消、超时、异常退出和恢复。
+4. 执行 `Initialize` → `ResumeSession`（可复用时）/ `NewSession` → 应用所选 model（`applySelectedModel`）→ `Prompt`。
+5. 将 ACP update 映射为内部事件（经 provider 的 `ToolCallAdapter` 适配各 agent 的 wire shape）。
+6. 处理取消（立即 SIGKILL 进程组 + ACP Cancel 通知）、超时（turn 1800s + 启动握手 60s 快速失败）、异常退出和会话恢复。
 
-### 4. ACP 子进程拉起与连接生命周期
+acp-v2 的等价实现是 `thread_executor.go` 的 `ThreadExecutor`（`thread/start`/`turn/steer`/`model/list`，会话以 `thread_session.go` 长驻进程复用）。
 
-首版仅支持 stdio。ACPExecutor 的建议时序如下：
+### 4. ACP 子进程拉起与连接生命周期（已落地）
 
-1. 读取本地 profile。
-2. 构造最小权限环境变量集。
-3. 以独立工作目录拉起 ACP 子进程。
+仅支持 stdio。`ACPExecutor.run()` 的实际时序：
+
+1. 读取 `ACPConfig` 并解析工作目录/allowed roots。
+2. 构造最小权限环境变量集（`buildRuntimeEnv`）。
+3. 以独立工作目录拉起 ACP 子进程（进程组 + PDEATHSIG）。
 4. 通过 stdout/stdin 建立 ACP client connection。
-5. 发送 `Initialize`。
-6. 创建新 session。
-7. 发送 prompt 执行任务。
-8. 持续消费 update 并映射为内部事件。
-9. 收到完成或错误后收口结果。
-10. 如果被取消，先发 ACP cancel/interrupt，超时后再 kill 子进程。
+5. 发送 `Initialize`（带 `StartupTimeout` 上限）。
+6. 有持久化会话则 `ResumeSession` 复用，否则 `NewSession`。
+7. 应用所选 model（`SetSessionConfigOption`，仅当 agent 广告了 model config option）。
+8. 持久化 session id（`acp-session.json`）。
+9. 发送 prompt 执行本轮任务，持续消费 update 并映射为内部事件。
+10. 收到完成或错误后回收进程组并收口结果；被取消时取消 turn context + ACP Cancel + SIGKILL 进程组。
 
-### 5. ACP 配置模型
+### 5. ACP 配置模型（已落地，字段有扩展）
 
-配置由 manager 集中管理，agent 不再读取本地 YAML 文件，也不再提供 `--acp-config` / `--acp-config-server` 启动参数。agent 连接时 manager 在 `ConnectAgentResponse.acp_config` 中下发结构化配置，agent 用 `BuildACPConfig` 套用内置模板生成完整的 `ACPConfig`。
+配置由 manager 集中管理，machine 守护进程不读取本地 YAML 文件，也不提供 `--acp-config` / `--acp-config-server` 启动参数。配置经 `ConnectMachineResponse.assigned_agents`（`AgentAssignment.acp_config`）全量下发、MachineChannel 的 `AgentConfigUpdate`/`ReloadAgentAssignment` 热更新，machine 端用 `BuildACPConfig` 套用内置模板生成完整的 `ACPConfig`。
 
-用户只需配置三项（`AgentACPConfig`）：
+用户可配置项（`AgentACPConfig`，已超出设计稿的三项）：
 
-1. `executable` — 要执行的 LLM agent，如 `npx`
-2. `args` — 传给 executable 的参数，如 `["-y", "@agentclientprotocol/claude-agent-acp@latest"]`
-3. `allow_env` — 子进程允许继承的环境变量名白名单，创建时预置默认列表（PATH/HOME/LANG/TERM/XDG_*/代理变量），可在配置页增删
+1. `provider` — 选定的 provider id（`opencode`/`claude-code`/`codex`/`pi`/`builtin-pi`/`custom`），已知 provider 的 executable/args 由 registry 派生
+2. `model` — 选定的 model valueId（provider 探测的 `Options[].value`）
+3. `custom_env` — key-value 自定义 env，叠加并覆盖 `allow_env` 继承值
+4. `executable` / `args` — `"custom"` provider 的逃生舱
+5. `allow_env` — 子进程允许继承的环境变量名白名单，创建时预置默认列表（PATH/HOME/LANG/TERM/XDG_*/代理变量，`executor.DefaultAllowEnv`）
+6. `persona_prompt` — 管理员撰写的自我认知 prompt（冷启动 init prompt 注入）
+7. pi 专属：`api_provider`/`api_key`/`global_provider`/`global_provider_entry`/`api_base_url`/`context_window`/`max_tokens`；`"custom"` 专属：`protocol`（`acp-v1`/`acp-v2`）
 
-其余字段（max_timeout/max_event_count/max_output_bytes、read/write_text_files、supports_diff/raw_events/tool_traces、auto_approve_tool_kinds）均由模板默认值填充，用户无需干预。
+其余（max_timeout/max_event_count/max_output_bytes/flush 阈值/startup timeout、read/write_text_files、supports_diff/raw_events/tool_traces）均由模板默认值填充。
 
-`working_dir` 不再由用户配置：每个 agent 在 `~/.laelia/<agent_id>/` 下拥有独立的持久工作目录，agent 启动连接时创建该目录并作为 `working_dir`，使 agent 能持久地在自己的目录中工作。`agent_id` 取自 bootstrap token 中解析出的 resource UUID。本地命令状态文件也随之移至 `~/.laelia/<agent_id>/command-state.json`，实现多 agent 同主机隔离。
+`working_dir` 不由用户配置：每个 agent 在 `~/.laelia/<machineID>/<agentID>/`（数据根 `home.Dir()`，LAELIA_HOME 可覆盖）下拥有独立持久工作目录，machine 守护进程在 agent runner 启动时创建该目录。`agent_id` 是 agent 资源 id，`machineID` 为 machine 重构后新增的上层命名空间（一台机器承载多个 agent）。本地命令状态文件在 `<data root>/<machineID>/<agentID>/command-state.json`，多 agent 同主机隔离。
 
-未配置 executable 的 agent 处于 inert 状态：`BuildACPConfig` 返回 nil，`Capability()` 上报 `supports_acp=false`，无法运行会话，直至管理员通过 `UpdateAgentACPConfig` 设置 executable。
+未配置的 agent 处于 inert 状态：`BuildACPConfig` 返回 nil（executable 解析为空），`Capability()` 上报 `supports_acp=false`，无法运行会话，直至管理员通过 `UpdateAgentACPConfig`（或 `CreateAgent` 携带初始配置）设置 provider/executable。非 ACP 的 user-installed pi 同样被 `BuildACPConfig` 判为 nil（由 pi 执行器驱动，capability 走 `supports_pi`）。
 
-### 6. 会话快照与恢复
+### 6. 会话快照与恢复（已落地）
 
-现有 [backend/agent/executor/state.go](backend/agent/executor/state.go) 需要扩展，建议保存：
+实际实现分三层：
 
-1. `command_id`
-2. `executor_kind`
-3. `profile_name`
-4. `started_at`
-5. `last_event_seq`
-6. `acp_session_id`
-7. `resume_metadata`
-8. `terminal_projection_state`
+1. 命令状态：`backend/agent/executor/state.go` 的 `LocalState`（`command-state.json`）——`command_id/executor_kind/status/started_at/last_seq_sent/last_event_seq_sent/session_id/output_buffer`。
+2. ACP 会话：`backend/agent/executor/acp_session.go` 的 `acp-session.json`——`session_id` + 配置指纹 + 创建时间；指纹匹配则下一轮 `ResumeSession` 复用会话（init prompt 已在会话历史中，省 token），resume 失败冷启动，连续失败 3 次发 WARNING 事件。
+3. manager 连接恢复：`AgentReady` 上报 `last_command_id/last_ack_seq/last_event_seq`；manager 将断连时在跑的命令标 FAILED，不保证继续原地执行；会话级进度由 agent 的 channel cursor 兜底。
 
-恢复分两层：
+首版的取舍保持不变：优先保证"状态一致、事件不乱序、不重复上报"，而非强保证任意 ACP agent 的跨进程会话恢复。
 
-1. manager 连接恢复：能够继续向 manager 补发事件和最终状态。
-2. ACP 会话恢复：如果目标 ACP agent 支持 `session/load`，则尝试恢复 session；否则退化为 manager 侧恢复，但不保证继续原地执行。
+## Manager Control Plane 设计（已按实现更新）
 
-首版优先保证“状态一致、事件不乱序、不重复上报”，而不是强保证任意 ACP agent 的跨进程会话恢复。
+### 1. API 扩展（已变更：无 SendCommand）
 
-## Manager Control Plane 设计
+`CommandService` 现仅承担读取/控制：`ListCommands/GetCommand/CancelCommand/SteerCommand/WatchCommand/WatchCommandEvents/GetCommandContext`（[backend/manager/api/v1/command.go](backend/manager/api/v1/command.go)）。命令创建与校验改由 dispatcher 的 `HandleBeginSession` 承担：
 
-### 1. API 扩展
+1. 检查会话游标与到期 reminder，无工作回 `idle`。
+2. 校验 agent 未停止、具备运行时能力（`supports_acp || supports_pi`）。
+3. 创建 RUNNING command 并返回 `command_id` + 提示词上下文（agent/owner 显示名、team、prompt_version）。
 
-[backend/manager/api/v1/command.go](backend/manager/api/v1/command.go) 需要承担如下新职责：
+ACP 配置的合法性校验在配置面完成（`validateAgentACPConfig`：provider 须在所属 machine 已发现列表内、model 必填等），执行面不接收可执行路径/CLI args/敏感 env。
 
-1. 接收 `executor_kind`、`profile_name` 等扩展字段。
-2. 根据 agent capability 校验该 agent 是否支持 ACP。
-3. 根据策略检查该用户是否允许下发 ACP 任务。
-4. 校验超时、profile、diff 能力等约束。
-5. 以兼容方式落库，不破坏现有 shell 路径。
+### 2. Stream 协议扩展（已落地）
 
-### 2. Stream 协议扩展
+[proto/v1/v1/command.proto](proto/v1/v1/command.proto) 的 agent ↔ manager 流实际形态：
 
-[proto/v1/v1/command.proto](proto/v1/v1/command.proto) 的 agent <-> manager stream 需要扩展：
+1. 命令不再 push：agent 发 `BeginSession`，manager 回 `BeginSessionResponse{command_id, idle, agent_display_name, owner_display_name, team, prompt_version, prompt_release_notice}`。
+2. `AgentStreamMessage` 增加 `event`（`CommandEvent`）✓、`BeginSession`、`Ping`、`ProvidersDiscovered`、workspace 请求/响应、`PromptReleaseNoticeAck`。
+3. `AgentReady` 携带 `last_command_id / last_ack_seq / last_event_seq` ✓（无独立 resume_token）。
+4. manager → agent：`CancelMessage`、`SteerMessage`、`PromptReleaseNotice`、`NewMessagesAvailable`（best-effort 唤醒）、`Pong` 等。
 
-1. `CommandRequest` 中增加 `executor_kind` 和 `profile_name`。
-2. `AgentCommandMessage` 中增加 `event` 消息，用于承载结构化事件。
-3. `AgentReady` 中增加最近确认的事件位点，便于恢复。
+manager 不直接参与 ACP session 生命周期 ✓。
 
-manager -> agent 仍只做任务下发与取消，不直接参与 ACP session 生命周期。
+### 3. Dispatcher 扩展（已落地）
 
-### 3. Dispatcher 扩展
+[backend/manager/component/dispatcher/dispatcher.go](backend/manager/component/dispatcher/dispatcher.go) 与 `command_handler.go` 实际能力：
 
-[backend/manager/component/dispatcher/dispatcher.go](backend/manager/component/dispatcher/dispatcher.go) 需要新增：
+1. 结构化事件落库入口（`HandleEvent`）与广播入口（`broadcastEvent`/`SubscribeEvents`）✓。
+2. `HandleProgress` 兼容文本输出 ✓。
+3. `HandleResult` 只负责状态收口、时长、最终摘要、ack 更新与 watcher 关闭；不再 push 下一条命令（drain 循环自行决定下一会话）✓。
+4. 未落地：重连恢复时基于 `last_ack_seq` 的续播补发（改为断连命令标 FAILED + agent 游标兜底）。
 
-1. 结构化事件落库入口。
-2. 结构化事件广播入口。
-3. 重连恢复时基于 `last_ack_seq` 的继续发送逻辑。
-4. 兼容旧 agent 时的分支处理。
+### 4. Store 扩展（已落地）
 
-`HandleResult` 仍只负责状态收口、时长、最终摘要和 next dispatch，不承担过程事件写入。
+[backend/manager/store/command.go](backend/manager/store/command.go) 实际能力：`AppendCommandEvent`、`GetCommandEvents`（`after_seq` 增量 + 按 seq 排序）、`UpdateCommandResultSummary`、`RecordCommandTokenUsage`（token 用量独立表）、`AppendCommandOutput`/`GetCommandOutput`、`CreateCommand`、`UpdateCommandStatus`/`UpdateCommandAckSeq`。未实现原设计的 `UpdateCommandExecutorMetadata` 与独立的 `WatchCommandEvents` 数据读取支撑（`GetCommandEvents` + 内存 watcher 已覆盖）。
 
-### 4. Store 扩展
+### 5. Watch API 扩展（已落地）
 
-[backend/manager/store/command.go](backend/manager/store/command.go) 建议新增以下能力：
+`WatchCommand` 之外新增 `WatchCommandEvents`（均支持 `after_seq_no`）✓，另有 `GetCommandContext` 一次性返回 command + outputs + events。支撑页面刷新恢复、网络抖动续播与懒加载时间线。
 
-1. `AppendCommandEvent`
-2. `GetCommandEvents`
-3. `UpdateCommandResultSummary`
-4. `WatchCommandEvents` 对应的数据读取支撑
+## 安全设计（已按实现更新）
 
-文本输出查询接口继续保留，用于兼容旧终端视图。
+ACP 集成后，machine 守护进程实际成为受控的本地 agent runtime 宿主。安全策略已先于功能落地。
 
-### 5. Watch API 扩展
+### 1. 运行边界（已落地）
 
-除现有 `WatchCommand` 外，建议新增：
+1. ACP 子进程启动命令仅能来自 provider registry 派生或配置面的 `"custom"` 手填（`"custom"` 不在执行面下发）。
+2. 子进程运行目录独立（`~/.laelia/<machineID>/<agentID>/`）。
+3. 环境变量采用 allowlist 注入（`allow_env` → `custom_env` 叠加 → `LAELIA_*` 引导变量），不透传 manager 自定义任意 env。
+4. 敏感变量防护：workspace 文件预览按 secret/credential/token 模式拒绝（machine 端强制）。
 
-1. `WatchCommandEvents`
-2. 或 `GetCommandEvents` + 流式 watch 的组合接口
+### 2. 资源限制（已落地）
 
-接口必须支持 `after_seq_no`，便于：
+1. 超时上限（turn `DefaultMaxTimeoutSeconds=1800` + 启动握手 60s）。
+2. 文本输出上限（1MiB）。
+3. 结构化事件数量上限（10000）。
+4. raw event 批量聚合上限（256 条/事件）。
+5. 未引入 `ulimit`/cgroup（未来工作）。
 
-1. 页面刷新恢复。
-2. 网络抖动后续播。
-3. manager 或前端懒加载时间线。
+### 3. 鉴权与审计（部分落地）
 
-## 安全设计
+已回答的问题：
 
-ACP 集成后，Laelia agent 实际上成为一个受控的本地 agent runtime 宿主。安全策略必须先于功能落地。
+1. 谁可以对哪个 agent 发起会话：IAM 会话策略 + capability 门禁（`HandleBeginSession`）。
+2. 谁可以查看结构化事件/raw event：`laelia.conversations.reviewAll`（`WatchCommandEvents` 校验）。
+3. ACP 配置变更审计：`UpdateAgentACPConfig` 等 RPC 带 `laelia.v1.audit` 注解入 `audit_log`。
 
-### 1. 运行边界
+未落地：代码修改/diff 类任务的独立审批策略与审批流平台。
 
-1. ACP 子进程仅允许从本地 profile 中选择。
-2. 子进程运行目录需要独立，避免直接在任意路径执行。
-3. 环境变量采用 allowlist 注入，不透传 manager 自定义任意 env。
-4. 对敏感变量采用 denylist 二次防护。
+### 4. 隐私与展示边界（已落地）
 
-### 2. 资源限制
+执行过程展示不依赖模型私有推理。仅展示：
 
-建议至少加上以下限制：
-
-1. 超时上限。
-2. 文本输出上限。
-3. 结构化事件数量上限。
-4. 原始事件大小上限。
-5. 子进程资源限制，例如 `ulimit` 或后续接入 cgroup。
-
-### 3. 鉴权与审计
-
-manager 侧需要增加 ACP 专属策略面，至少回答三个问题：
-
-1. 谁可以对哪个 agent 发起 ACP 任务。
-2. 谁可以发起允许代码修改或 diff 输出的任务。
-3. 谁可以查看 raw ACP event。
-
-审计上至少应保留：
-
-1. executor_kind
-2. profile_name
-3. 任务摘要
-4. 工具调用摘要
-5. diff 摘要
-6. 最终结果摘要
-
-### 4. 隐私与展示边界
-
-执行过程展示不应依赖模型私有推理。首版只展示以下内容：
-
-1. 用户可读文本输出。
+1. 用户可读文本输出（`ASSISTANT`/`STDOUT` 投影）。
 2. 工具调用开始/结束与摘要。
 3. diff 和产物摘要。
 4. 最终结果。
 
 raw ACP event 默认不作为常规 UI 主视图内容，只作为审计和排障入口。
 
-## 前端设计
+## 前端设计（已按实现更新）
 
 ### 1. 列表页
 
-[frontend/src/pages/dashboard/command-list.tsx](frontend/src/pages/dashboard/command-list.tsx) 需要从“Send Command”升级到“Send Task”：
+[frontend/src/pages/dashboard/command-list.tsx](frontend/src/pages/dashboard/command-list.tsx)：
 
-1. 支持选择 `SHELL` 或 `ACP`。
-2. 当选择 `ACP` 时，展示自然语言任务输入和 profile 选择。
-3. 不展示底层可执行路径、任意工具配置等高风险参数。
+1. 无 "Send Command/Send Task" 下发表单——命令由会话消息驱动创建（原设计的 SHELL/ACP 切换与 profile 选择表单未实施）。
+2. 列表展示状态、时长、token 用量等。
 
 ### 2. 详情页
 
-[frontend/src/pages/dashboard/command-detail.tsx](frontend/src/pages/dashboard/command-detail.tsx) 建议拆成四个展示区：
+[frontend/src/pages/dashboard/command-detail.tsx](frontend/src/pages/dashboard/command-detail.tsx) 以事件账本为中心（`frontend/src/components/command-events/`）：
 
-1. 顶部任务摘要与状态区。
-2. 终端文本区，继续复用 [frontend/src/components/command-terminal.tsx](frontend/src/components/command-terminal.tsx)。
-3. 结构化事件时间线。
-4. diff 与最终产物区。
-
-raw ACP event 默认折叠，不占主视图。
+1. 顶部任务摘要与状态区（`CommandStatusBadge`）。
+2. 事件时间线总览 + 账本 + 检查器（`CommandEventTimelineOverview`/`CommandEventLedger`/`CommandEventInspector`）。
+3. 工具调用配对摘要（`pairToolCallEvents`）。
+4. 最终结果卡片（FinalSummary）+ `TokenUsageCard`。
+5. 已移除/已变更：原设计引用的独立终端组件已删除，终端文本并入事件账本（`mergeOutputRuns`）。
 
 ### 3. Store 层
 
-[frontend/src/stores/command.ts](frontend/src/stores/command.ts) 需要同时维护两类流：
+[frontend/src/stores/command.ts](frontend/src/stores/command.ts) 同时维护两类流：
 
-1. 文本输出流。
-2. 结构化事件流。
+1. 文本输出流（`watchCommand`）。
+2. 结构化事件流（`watchCommandEvents`）。
 
-排序必须基于 `seq_no`，不能依赖浏览器收到事件的顺序。
+两者均断线自重连、以 `afterSeqNo` 增量续播；排序基于 `seq_no`，不依赖浏览器收到事件的顺序。
 
 ### 4. 降级策略
 
-1. 旧 shell 任务仍只显示文本终端。
-2. 新 ACP 任务显示文本终端 + 事件时间线。
-3. 如果 manager 或 agent 不支持某些事件类型，前端应优雅降级为摘要文本，而不是报错。
+1. 无结构化事件的旧命令只显示文本输出。
+2. 缺失事件类型优雅降级为摘要文本（`isVisibleEvent`）。
+3. 无 reviewAll 权限时事件面板入口隐藏（RPC 返回 PERMISSION_DENIED）。
 
-## 实施阶段与子任务
+## 实施阶段与子任务（已全部完成）
 
-### Phase 1: 契约与数据面
+### Phase 1: 契约与数据面 ✅
 
-1. 扩展 command.proto 的任务与 stream 协议。
-2. 扩展 agent.proto 的 capability 声明。
-3. 设计并新增 CommandEvent 模型。
-4. 完成 command 主表和 command_event 表迁移方案。
-5. 确定 `last_ack_seq` 的统一语义。
-6. 完成 Go 和 TS 代码生成影响评估。
+已落地：command.proto 任务与 stream 协议、`AgentCapability`、`CommandEvent` 模型、command 主表与 command_event 表迁移、`last_ack_seq` 统一语义、Go/TS 代码生成。偏差见上文各节（`executor_kind` 移除、oneof 载荷、BeginSession 流程）。
 
-实施要点：本阶段所有工作都必须以“不破坏旧 shell agent”为前提。
+### Phase 2: Agent Runtime 与 ACP Bridge ✅
 
-### Phase 2: Agent Runtime 与 ACP Bridge
+已落地：统一执行器接口（`executor.Runtime`）、ACP 子进程启动与桥接（`acp_executor.go`，launcher 内联）、模板配置（server-owned `AgentACPConfig` 取代本地 profile）、事件投影/快照/恢复。偏差：shell 执行器移除（原"收敛 ShellExecutor"子任务作废）；落地后追加 acp-v2 与 pi 运行时。
 
-1. 抽象统一执行器接口。
-2. 把当前 shell 执行收敛为 `ShellExecutor`。
-3. 实现 ACP 子进程 launcher。
-4. 实现 ACP client bridge。
-5. 实现 profile 加载与校验。
-6. 实现事件投影、快照和恢复。
+### Phase 3: Manager Control Plane 与安全治理 ✅（部分）
 
-实施要点：本阶段完成后，agent 应能在不改 manager 调度模型的前提下同时执行 shell 和 ACP 两类任务。
+已落地：`BeginSession` 命令创建与校验、stream/dispatcher/store/watch 扩展、能力协商、幂等写入、raw event 权限、审计注解。未落地：审批流、限流。
 
-### Phase 3: Manager Control Plane 与安全治理
+### Phase 4: UI 集成、灰度发布与回归 ✅
 
-1. 扩展 SendCommand 与任务校验。
-2. 扩展 stream message 与 dispatcher。
-3. 扩展 store 和 watch 接口。
-4. 增加能力协商、恢复和幂等写入逻辑。
-5. 增加 ACP 专属 IAM、审计、限流与取消治理。
-6. 增加 capability gate 或 feature flag。
+已落地：事件数据层与时间线视图、diff/最终结果卡片、token 用量卡片、兼容渲染。偏差：无任务下发表单（会话驱动）；灰度开关已移除。
 
-实施要点：本阶段完成后，manager 应具备可靠、可审计、可回放的 ACP 任务控制面。
+## 测试与验收标准（已按实现更新）
 
-### Phase 4: UI 集成、灰度发布与回归
+### 1. 会话命令回归（原 shell 回归已失效——shell 链路移除）
 
-1. 升级任务下发表单。
-2. 增加结构化事件数据层与时间线视图。
-3. 增加 diff 和最终结果卡片。
-4. 做 shell/ACP 双路径兼容渲染。
-5. 规划发布顺序与回滚方案。
-6. 完成端到端和回归验证。
-
-实施要点：本阶段的验收标准不是“ACP 能跑起来”，而是“shell 不退化、ACP 可观察、可取消、可恢复、可审计”。
-
-## 测试与验收标准
-
-### 1. shell 回归
-
-1. 创建 shell command。
-2. 运行 shell command。
-3. 取消 shell command。
-4. watch shell 输出。
-
-以上流程必须保持现有行为不变。
+1. `BeginSession` → RUNNING command 创建。
+2. 文本输出 watch（`WatchCommand`）与事件 watch（`WatchCommandEvents`）。
+3. 取消（`CancelCommand`）与中途注入（`SteerCommand`）。
 
 ### 2. ACP 正常路径
 
-1. 下发 ACP 任务。
+1. 会话任务执行（ACP v1 / acp-v2 thread / pi 三条路径）。
 2. 观察结构化事件流。
 3. 观察文本投影。
 4. 查看工具调用摘要。
 5. 查看 diff。
-6. 查看最终结果摘要。
+6. 查看最终结果摘要与 token 用量。
 
 ### 3. 异常路径
 
 1. ACP 子进程启动失败。
-2. `Initialize` 失败。
+2. `Initialize` 失败（含启动握手超时快速失败）。
 3. prompt 执行超时。
-4. 取消请求成功和取消超时兜底 kill。
+4. 取消请求与 SIGKILL 兜底。
 5. manager 重启。
-6. agent 断线重连。
-7. 事件重复写入。
-8. 事件乱序到达。
+6. agent 断线重连（断连命令标 FAILED）。
+7. 事件重复写入（`(command_id, seq_no)` 幂等）。
+8. 事件乱序到达（按 `seq_no` 排序）。
 
 ### 4. 安全路径
 
-1. manager 无法指定未注册 profile。
-2. manager 无法注入任意二进制路径。
-3. manager 无法注入敏感 env。
-4. 未授权用户无法下发 ACP 任务。
-5. 未授权用户无法查看 raw event。
+1. manager 无法下发未在所属 machine 发现列表中的 provider（`validateAgentACPConfig`）。
+2. manager 无法注入任意二进制路径（registry 派生 / 配置面 `"custom"` 手填）。
+3. manager 无法注入敏感 env（allow_env 白名单）。
+4. 未授权用户无法操作他人 agent（owner/权限门禁）。
+5. 未授权用户无法查看结构化事件（`laelia.conversations.reviewAll`）。
 
-## 发布策略
+## 发布策略（历史记录）
 
-建议按以下顺序灰度：
+原灰度顺序（proto/store/manager 兼容层 → 支持 ACP 的新 agent → 前端入口）已执行完毕，当前无 feature flag 需要管理。回滚原则中"旧 shell 路径"相关两条已随 shell 移除失效；"ACP 新字段不影响旧 agent 连接与心跳"仍由 proto 追加式扩展保证。
 
-1. 先发布 proto/store/manager 兼容层，但默认关闭 ACP 入口。
-2. 再发布支持 ACP 的新 agent，并上报 capability。
-3. 仅对少量 agent 和授权用户打开 ACP feature flag。
-4. 验证稳定后，再逐步开放到更多 agent。
+## 建议的代码影响面（落地后的实际位置）
 
-回滚原则：
-
-1. 关闭 ACP feature flag 后，旧 shell 路径必须不受影响。
-2. 不强依赖新前端页面才能运行旧 shell 流程。
-3. 不允许 ACP 新字段影响旧 agent 的连接与心跳。
-
-## 建议的代码影响面
-
-重点改造文件如下：
+核心文件如下：
 
 1. `proto/v1/v1/command.proto`
 2. `proto/v1/v1/agent.proto`
-3. `backend/agent/client/command_stream.go`
-4. `backend/agent/executor/executor.go`
-5. `backend/agent/executor/state.go`
-6. `backend/agent/client/client.go`
-7. `backend/manager/api/v1/command.go`
-8. `backend/manager/api/v1/agent_command.go`
-9. `backend/manager/component/dispatcher/dispatcher.go`
+3. `proto/v1/v1/machine.proto`（machine 控制面：AgentAssignment/配置热更新/provider 发现/自升级）
+4. `backend/agent/client/command_stream.go`、`drain_runner.go`、`runner.go`
+5. `backend/agent/executor/runtime.go`、`acp_executor.go`、`acp_config.go`、`acp_session.go`、`state.go`、`thread_executor.go`
+6. `backend/agent/acp2/`（acp-v2 JSON-RPC 客户端）、`backend/agent/pi/`（pi RPC 运行时）
+7. `backend/agent/provider/`（provider registry）
+8. `backend/manager/api/v1/command.go`、`agent_command.go`、`machine_command.go`
+9. `backend/manager/component/dispatcher/dispatcher.go`、`command_handler.go`
 10. `backend/manager/store/command.go`
-11. `backend/manager/migration/latest.sql`
+11. `backend/manager/migration/migration/LATEST.sql`
 12. `frontend/src/stores/command.ts`
-13. `frontend/src/pages/dashboard/command-list.tsx`
-14. `frontend/src/pages/dashboard/command-detail.tsx`
+13. `frontend/src/pages/dashboard/command-detail.tsx`、`command-list.tsx`
+14. `frontend/src/components/command-events/`（事件账本组件）
 
 ## 结论
 
-本方案的核心不是“给现有 agent 再加一个执行器”这么简单，而是将 Laelia 现有的 command 执行体系扩展为一套兼容 shell、可承载 ACP 任务、具备结构化过程观测能力的统一执行框架。
+本方案的核心不是"给现有 agent 再加一个执行器"这么简单，而是将 Laelia 现有的 command 执行体系扩展为一套可承载 LLM agent 运行时、具备结构化过程观测能力的统一执行框架。
 
-如果按本设计实施，Laelia 将获得以下能力：
+该方案已落地，Laelia 获得的能力：
 
-1. 现有 shell 执行链路保持可用。
-2. ACP 任务可以被统一调度、回放、取消和审计。
-3. manager 侧可以看到比纯文本终端更完整的执行过程。
-4. 高风险运行参数被收束在 agent 本地 profile，安全边界更清晰。
-5. 后续如果需要接更多 ACP agent 或扩展审批与策略体系，也有清晰的演进路径。
+1. 会话任务可以被统一调度、回放、取消（含中途注入）和审计。
+2. manager 侧可以看到比纯文本终端更完整的执行过程（事件账本 + token 用量）。
+3. 高风险运行参数被收束在 manager 侧 server-owned 配置与 agent 侧 provider registry，安全边界清晰。
+4. 后续如果需要接更多 ACP provider（实现 `Provider`/`ThreadProvider` 接口注册即可）或扩展审批与策略体系，也有清晰的演进路径。

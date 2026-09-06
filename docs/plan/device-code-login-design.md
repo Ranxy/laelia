@@ -1,5 +1,7 @@
 # Device-Code Login & Machine Provisioning — Design
 
+> Status: verified and updated against the current code on 2026-09-06. Main changes: the design is fully implemented (backend DeviceService, CLI `setup`/state, `/login/device` + `/machines/new` pages, docker auto-setup); corrections cover the shipped deltas — `verification_uri` became the relative `verification_path`, a shared `DeviceLoginStatus` enum, `UpdateMachine` is title-only, the planned per-IP rate limiter was not built (the 2s poll minimum is), and new-machine approval additionally requires the `laelia.machines.create` IAM check.
+
 ## Goals
 
 Replace the bootstrap-token machine registration with an OAuth2-style **device
@@ -25,6 +27,14 @@ code flow**:
 No backward compatibility is required (project is pre-launch).
 
 ## Current flow (what we are replacing)
+
+> **Implemented & removed (2026-09-06)**: the bootstrap-token flow described
+> here is gone. `CreateMachine`/`RotateMachineToken` RPCs, the frontend
+> create-token dialog, `credential.Manager`, the `machine-token-<id>` files,
+> and the docker `LAELIA_TOKEN` mapping no longer exist; `ConnectMachine`
+> authenticates only via the machine access token minted by
+> `RefreshMachineToken` (`backend/manager/api/v1/machine_connection.go`). This
+> section is kept as historical context for the design.
 
 - `CreateMachine` (frontend) mints a single-use **bootstrap (registration)
   token**; the UI shows `laelia-machine run --manager <url> --token <token>`.
@@ -67,6 +77,13 @@ No backward compatibility is required (project is pre-launch).
 
 ## Backend design
 
+> **Implemented (2026-09-06)**: `proto/v1/v1/device.proto` exists with all four
+> RPCs below. Shipped deltas vs this sketch: a shared top-level enum
+> `DeviceLoginStatus` (`DEVICE_LOGIN_STATUS_*`) replaces the per-message
+> nested enums; `verification_uri` became `verification_path` (relative path —
+> the CLI composes the full URL from its `--manager` value);
+> `PollDeviceLoginResponse` carries `denial_reason` (see design deltas).
+
 ### New proto: `DeviceService` (`proto/v1/v1/device.proto`)
 
 ```proto
@@ -103,7 +120,8 @@ message StartDeviceLoginRequest {
 message StartDeviceLoginResponse {
   string device_code = 1;        // high-entropy secret, never displayed
   string user_code = 2;          // 8 chars, XXXX-XXXX, displayed on device + page
-  string verification_uri = 3;   // full URL: <external_url>/login/device?user_code=...
+  string verification_path = 3;  // RELATIVE: "/login/device?user_code=XXXX-XXXX";
+                                 // the CLI composes the full URL from --manager
   int32 expires_in = 4;          // 600
   int32 interval = 5;           // 5
 }
@@ -116,6 +134,7 @@ message PollDeviceLoginResponse {
   string machine_id = 2;        // on APPROVED
   string machine_title = 3;     // on APPROVED
   string refresh_token = 4;     // on APPROVED, single delivery
+  string denial_reason = 5;     // on DENIED (implemented per design deltas)
 }
 
 message GetDeviceLoginStatusRequest { string user_code = 1; }
@@ -129,30 +148,36 @@ message GetDeviceLoginStatusResponse {
   string arch = 5;
   bool reauth_existing = 6;     // true when the CLI supplied an existing machine_id
   string machine_title = 7;     // existing machine title when reauth_existing
+  string denial_reason = 8;     // shipped beyond the sketch: set on DENIED
+  string ip = 9;                // shipped beyond the sketch: device IP for verification
+  string machine_owner = 10;    // shipped beyond the sketch: owner handle on reauth
 }
 
 message ApproveDeviceLoginRequest { string user_code = 1; }
 message ApproveDeviceLoginResponse {}
 ```
 
-### Device session store (in-memory)
+### Device session store (in-memory) — implemented
 
 Consistent with the existing single-instance in-memory components (dispatcher,
-roomhub, `state.State`). A new `backend/manager/component/device` package:
+roomhub, `state.State`). Shipped as `backend/manager/component/device/device.go`:
 
 ```go
 type Session struct {
-    DeviceCode  string
-    UserCode    string
-    Status      Status            // PENDING / APPROVED / EXPIRED / DENIED
-    MachineID   string            // existing machine to re-auth, or ""
+    DeviceCode string
+    UserCode   string
+    Status     Status            // StatusPending / StatusApproved / StatusExpired / StatusDenied
+    MachineID  string            // existing machine to re-auth, or ""
     Hostname, OS, Arch, IP, Version string
     Fingerprint string
     CreatedAt   time.Time
-    ExpiresAt  time.Time          // CreatedAt + 10 min
-    ApprovedAt time.Time
-    ApprovedBy int                // user id
-    Result     *Result            // set on approval
+    ExpiresAt   time.Time        // CreatedAt + SessionTTL (10 min)
+    // LastPolledAt backs the server-side minimum poll interval.
+    LastPolledAt time.Time
+    ApprovedAt  time.Time
+    ApprovedBy  int              // user id
+    Result      *Result          // set on approval
+    DenialReason string          // set on Deny (policy failure)
 }
 type Result struct {
     MachineID    string
@@ -162,73 +187,93 @@ type Result struct {
 ```
 
 - Maps keyed by `device_code` and `user_code`; mutex-guarded; lazy expiry sweep
-  on access (plus a background ticker to purge expired sessions).
-- **Post-approval grace window** (e.g. 10 min): an APPROVED session keeps
-  returning `Result` on poll so a CLI that crashed between approval and saving
-  state can recover by re-polling; after the window it is purged.
+  on access (plus `StartSweeper`, a background ticker that purges expired
+  sessions and post-grace-window approvals).
+- **Post-approval grace window**: shipped as `GraceWindow = 10 * time.Minute`
+  (equal to `SessionTTL`): an APPROVED session keeps returning `Result` on poll
+  so a CLI that crashed between approval and saving state can recover by
+  re-polling; after the window it is purged.
 - Manager restart mid-flow loses pending sessions → CLI poll returns
   EXPIRED/not-found → user re-runs `setup`. Acceptable (short-lived flow,
   single-instance manager).
 
-### Approval handler (`ApproveDeviceLogin`)
+### Approval handler (`ApproveDeviceLogin`) — implemented
+
+Shipped in `backend/manager/api/v1/device.go`:
 
 1. Look up session by `user_code`; must be PENDING and unexpired, else
-   `InvalidArgument`/`FailedPrecondition`.
-2. Resolve the approving user from context.
+   `FailedPrecondition` (missing → `NotFound`).
+2. Resolve the approving user from context (`Unauthenticated` when absent).
 3. If `session.MachineID != ""` (re-auth of an existing machine):
    - Load machine; if it exists and is not deleted:
-     - **Policy**: allow only the machine's creator or a workspace admin to
-       approve re-auth (a different account must not silently take over a
-       machine). Otherwise `PermissionDenied`.
+     - **Policy (implemented)**: allow only the machine's creator or a
+       workspace admin (`isMachineAdmin`) to approve re-auth. Anyone else →
+       the session is marked **DENIED** with a reason carrying the owner's
+       handle and machine resource name, and the RPC returns
+       `PermissionDenied` with that same reason (per the 2026-08-13 decision).
      - Bump `token_version`, revoke all machine tokens, mint a **new refresh
-       token** (new family = machine resource id, fingerprint from the
-       session) — reuse/extend the existing `RotateMachineTokens` store
-       transaction (it currently mints a bootstrap token; change it to mint a
-       refresh token).
+       token** bound to the session fingerprint via
+       `auth.GenerateMachineTokenWithFamily` (the `RotateMachineTokens` store
+       transaction named here originally was removed together with the
+       `RotateMachineToken` RPC; approval mints the refresh token directly).
    - If the machine is missing/deleted → fall through to creation (the CLI
      will receive the new machine id and update its state).
-4. Else (new machine): create the machine row with `title = hostname`,
-   `info` from the session, `created_by = approving user`. Mint a refresh
-   token (family = machine resource id, fingerprint from session).
+4. Else (new machine) — **additional shipped gate**: `requireCanCreateNewMachine`
+   first checks the approving user against the `laelia.machines.create` IAM
+   permission (a workspace may disable user-created machines →
+   `PermissionDenied` "machine creation is disabled for ordinary users").
+   Then: create the machine row with `title = hostname`, `info` from the
+   session, `created_by = approving user`. Mint a refresh token (family =
+   machine resource id, fingerprint from session).
 5. Mark session APPROVED, store `Result`, audit.
 
-### Poll handler (`PollDeviceLogin`)
+### Poll handler (`PollDeviceLogin`) — implemented
 
-- PENDING → `PENDING` (enforce a minimum poll interval server-side, e.g. 2s).
-- APPROVED → return `Result` (idempotent within the grace window).
-- EXPIRED/DENIED → return the status.
+- PENDING → `PENDING`; the server-side minimum poll interval is
+  `deviceMinPollInterval = 2s` (`TouchPoll`) — polls that arrive too fast get
+  `ResourceExhausted`, not a silent pass.
+- APPROVED → return `Result` (idempotent within the 10-min grace window).
+- DENIED → return the status plus `denial_reason`.
 - Unknown device_code → `EXPIRED` (do not leak whether a code ever existed).
 
-### Start handler (`StartDeviceLogin`)
+### Start handler (`StartDeviceLogin`) — implemented with one gap
 
-- Rate limit per source IP (e.g. 5/min).
-- `device_code`: 32 random bytes, base64url. `user_code`: 8 chars from an
-  unambiguous alphabet (`ABCDEFGHJKLMNPQRSTUVWXYZ23456789`), formatted
-  `XXXX-XXXX`.
-- `verification_uri`: `<workspace external_url>/login/device?user_code=<code>`,
-  falling back to the request `Host` when `external_url` is unset.
+- `device_code`: 32 random bytes, base64url (`generateDeviceCode`).
+  `user_code`: 8 chars from the unambiguous alphabet
+  (`ABCDEFGHJKLMNPQRSTUVWXYZ23456789`), formatted `XXXX-XXXX`.
+- `verification_path`: shipped as the RELATIVE path
+  `/login/device?user_code=<code>`; the CLI composes the full URL from its
+  configured manager URL (no `external_url` fallback involved).
+- **Not implemented**: the planned per-source-IP rate limit on
+  `StartDeviceLogin`. The only throttling shipped is the 2s poll minimum above
+  (plus Connect-level auth handling); see the design-deltas note below.
 
-### MachineService changes
+### MachineService changes — implemented
 
-- **Remove** `CreateMachine` RPC and the bootstrap-token machinery
-  (`TokenTypeBootstrap` minting in `CreateMachine`/`RotateMachineToken`,
-  `registration_token` in `ConnectMachineRequest` /
-  `RotateMachineTokenResponse`, `authenticateMachineRegistrationToken`,
-  `ConsumeMachineToken` usage on the connect path).
+- **Removed** `CreateMachine` RPC and the bootstrap-token machinery on the
+  machine path (`registration_token` in `ConnectMachineRequest`,
+  `authenticateMachineRegistrationToken`, bootstrap-token minting/consumption
+  on the connect path). `TokenTypeBootstrap` survives only on the unused
+  **agent** path (`backend/manager/api/v1/agent_token.go`,
+  `agent_connection.go`), as planned.
 - `ConnectMachine` now authenticates **only** via the machine access token
   (minted by `RefreshMachineToken`); the first-connect token-minting branch is
-  removed. The refresh token is minted by the device approval instead.
-- **Remove** `RotateMachineToken` (its only output was a bootstrap token).
-  `RevokeMachineToken` remains: revoke all tokens + bump `token_version`; the
-  machine's next refresh fails permanently and the user recovers by re-running
-  `setup` (device re-auth of the existing machine).
-- **Add** `UpdateMachine(UpdateMachineRequest) → Machine` (title + labels) for
-  the frontend confirm/rename step. Authorized in the handler for the machine's
-  creator or `laelia.machines.edit` (same pattern as `DeleteMachine`).
-- **Add** `created_at` to `MachineSummary` (needed by the frontend waiting
-  page to detect "new" machines).
+  gone (`machine_connection.go`: "there is no bootstrap/registration path
+  anymore"). The refresh token is minted by the device approval instead.
+- **Removed** `RotateMachineToken`. `RevokeMachineToken` remains: revoke all
+  tokens + bump `token_version`; the machine's next refresh fails permanently
+  and the user recovers by re-running `setup` (device re-auth of the existing
+  machine).
+- **Added** `UpdateMachine(UpdateMachineRequest) → Machine` — shipped
+  **title-only** (no labels; `UpdateMachineRequest.title = 2`). Authorized for
+  the machine's creator or `laelia.machines.edit`.
+- **Added** `created_at` (field 10) **and `created_by` (field 6, populated)** on
+  `MachineSummary`; the waiting page filters on both.
+- Also shipped (not from this design): `ForceDisconnectMachine`,
+  `TransferMachineOwnership` (from the Q2 decision), and the
+  `provisioner` filter on `ListMachines` (provisioner plan).
 
-## CLI design (`backend/agent`)
+## CLI design (`backend/agent`) — implemented
 
 ### Local state file: `~/.laelia/machine.json`
 
@@ -242,59 +287,66 @@ type Result struct {
 }
 ```
 
-- Written atomically with `0600` (reuse `atomicfile.WriteFileAtomicSync`).
-- New `backend/agent/state` package: `Load()`, `Save()`, `Clear()`.
-- Replaces `credential.Manager` and the per-machine `machine-token-<id>`
-  files. The refresh token is the only credential; the bootstrap token is
-  gone.
+- Written atomically with `0600` (`atomicfile.WriteFileAtomicSync` —
+  `backend/agent/state/state.go`).
+- Shipped as `backend/agent/state` (`Load()`, `Save()`, `Clear()`); the path is
+  `home.Join("machine.json")`, i.e. `~/.laelia` by default with a `LAELIA_HOME`
+  override (`backend/agent/home`).
+- Replaced `credential.Manager` and the per-machine `machine-token-<id>` files
+  (both deleted). The refresh token is the only credential; the bootstrap
+  token is gone.
 - One machine per computer ⇒ a single state file. Running `setup` against a
   different manager URL than the state's re-flows (creates a new machine on
   the new manager; the old machine stays orphaned/offline on the old manager).
 
-### `setup` command (new)
+### `setup` command (new) — implemented (`backend/agent/cmd/setup.go`)
 
 ```
 laelia-machine --manager <url> setup
 ```
 
 1. **Already-running check**: probe the well-known daemon socket
-   `~/.laelia/daemon.sock` (see below). If live → print "laelia-machine is
-   already running" and exit 0.
-2. Load state. If state exists and `manager_url` matches:
+   `~/.laelia/daemon.sock` (`alreadyRunning()`). If live → print "laelia-machine
+   is already running on this computer" and exit 0.
+2. Load state. `--force` clears it first ("the old machine stays registered on
+   the manager"). A `manager_url` mismatch prints a warning and re-flows.
+3. State exists and `manager_url` matches:
    - `RefreshMachineToken(refresh_token, fingerprint)`:
      - success → print "Already logged in as machine <title> (<id>)" and
        proceed to run;
      - permanent failure (revoked/expired/deleted) → drop the dead refresh
        token but keep the machine id, then continue to the device flow so the
        approval re-authenticates the existing machine (no duplicate);
-     - transient failure (manager unreachable) → warn and proceed to run (the
-       run loop retries with backoff).
-3. No state (or cleared): device flow:
+     - transient failure (manager unreachable) → warn ("could not validate the
+       saved login (manager unreachable); starting anyway") and proceed to run
+       (the run loop retries with backoff).
+4. No state (or cleared): device flow:
    - `StartDeviceLogin(hostname, os, arch, ip, version, fingerprint,
      machine_id?)` — `machine_id` from the (cleared) state if present.
-   - Print the verification URL and the user code; optionally auto-open the
-     browser (`xdg-open`/`open`/`rundll32`, `--no-browser` to disable).
+   - Compose the full verification URL from `--manager` +
+     `VerificationPath`, print it; auto-open the browser unless
+     `--no-browser` (`--foreground` keeps it as PID 1 inside containers).
    - Poll `PollDeviceLogin` every `interval` seconds until APPROVED /
-     EXPIRED / DENIED (print a progress line with remaining time).
-   - On APPROVED: atomically save state, print
-     "Machine <hostname> registered as <machine_id>".
-   - On EXPIRED: "code expired, run setup again".
-4. Proceed to run (foreground) — see open question Q1.
+     EXPIRED / DENIED (progress line with remaining time).
+   - On APPROVED: atomically save state.
+   - On EXPIRED: report and exit.
+5. Proceed to run (foreground) — per the Q1 decision, `setup` is the single
+   entry command and runs the machine itself.
 
-### `run` command (changed)
+### `run` command (changed) — implemented (`backend/agent/cmd/run.go`)
 
-- `--token` flag removed. Loads state; missing state → error "not configured,
-  run `laelia-machine setup` first".
+- `--token` flag removed. Loads state; missing/incomplete state → error "not
+  configured, run `laelia-machine setup` first".
 - `manager_url` mismatch → error pointing at the configured manager.
 - Already-running check first (same as setup).
-- Connect via refresh token only (`connectViaRefresh`); the registration
-  paths (`connectViaRegistration`, `connectWithRegistrationToken`,
+- Connect via refresh token only (`client.New(managerURL, machineID,
+  refreshToken, …)`); the registration paths
+  (`connectViaRegistration`, `connectWithRegistrationToken`,
   `parseResourceIDFromBootstrapToken`) are deleted.
-- Permanent auth failure → error "credentials rejected; run `laelia-machine
-  setup` to re-authenticate" (the run loop already bails on permanent
-  failures).
+- Permanent auth failure → error pointing at re-running `setup` (the run loop
+  bails on permanent failures).
 - Refresh-token rolling renewal is saved back to `machine.json` (the client
-  gets a `saveRefreshToken` callback).
+  gets a `saveRefreshToken` callback — `backend/agent/client/client.go`).
 
 ### One-process-per-computer enforcement
 
@@ -307,80 +359,94 @@ laelia-machine --manager <url> setup
   running → print "already running" and exit 0. This is robust against stale
   PID files and works even when the state file is missing.
 
-## Frontend design
+## Frontend design — implemented
 
-### Approval page: `/login/device?user_code=XXXX-XXXX` (public)
+### Approval page: `/login/device?user_code=XXXX-XXXX` (public) — implemented
 
-- New route, **exempt from the auth guard** in both directions (logged-out
-  users must reach it; logged-in users must not be redirected away). Extend
-  `resolveAuthRedirect` with a public-path check.
-- Reads `user_code` from the query string; polls `GetDeviceLoginStatus` every
-  3s.
-- Renders:
-  - device hostname + OS/arch, the user code prominently (user verifies it
-    matches the code on their device screen), and the machine title when
-    `reauth_existing`;
-  - logged in → `[Approve]` button + "use another account" (logout → sign-in
-    with `redirect` back to this page);
-  - logged out → inline sign-in (reuse the sign-in form) or link to
-    `/auth/signin?redirect=/login/device?...`;
-  - APPROVED → "Approved! You can close this page.";
-  - EXPIRED → "This code has expired. Run the setup command again on the
-    device."
+- Route registered under `frontend/src/router/routes/auth.tsx`
+  (`frontend/src/pages/auth/device-login.tsx`); exempt from the auth guard in
+  both directions via the public-path check in
+  `frontend/src/router/auth-redirect.ts` (`isPublicPath("/login/device")`).
+- Reads `user_code` from the query string; polls `GetDeviceLoginStatus` with a
+  self-scheduling loop (base 3s, doubling per consecutive failure, capped at
+  15s, paused while the tab is hidden; unreachable-server and
+  close-blocking UX included).
+- `GetDeviceLoginStatusResponse` shipped with two fields beyond this sketch:
+  `ip` (device IP, shown for verification) and `machine_owner` (owner handle
+  shown when `reauth_existing`), plus `denial_reason`.
+- Renders device hostname + OS/arch + IP, the user code prominently, the
+  machine title and owner when `reauth_existing`; logged in → `[Approve]`;
+  logged out → sign-in link that returns here; APPROVED → "you can close this
+  page"; DENIED → shows the denial reason (or a hint); EXPIRED → re-run-setup
+  message.
 - Approve calls `ApproveDeviceLogin(user_code)`.
 
-### Create-machine waiting page: `/machines/new` (protected)
+### Create-machine waiting page: `/machines/new` (protected) — implemented, merged with the provisioner flow
 
-- The Machines page "create" button navigates here instead of opening the
-  name+token dialog.
-- Shows the command `laelia-machine --manager <url> setup` (from
-  `getManagerURL()`) with a copy button, and a short explanation.
-- Polls `ListMachines` every 5s (silent). A machine is "new" when
-  `created_at > page-open time` **and** `created_by == current user`
-  (requires the new `created_at` on `MachineSummary`).
+- Shipped as `frontend/src/pages/dashboard/machine-new.tsx`: the original
+  device-flow waiting page became the **"Self-hosted" tab**, and the
+  provisioner plan's machine creation page became the **"Provisioned" tab**
+  (`machine-new-provisioned.tsx`); without the provision permission only the
+  self-hosted content renders.
+- The self-hosted tab shows the install command (per-OS) and
+  `laelia-machine --manager <url> setup` (from `getManagerURL()` in
+  `frontend/src/lib/machine-token.ts`) with copy buttons.
+- Polls `ListMachines` every 5s (silent, `usePolling`). A machine is "new"
+  when `created_at > page-open time` **and** `created_by == current user`
+  (uses the shipped `MachineSummary.created_at`/`created_by`).
 - When a new machine appears: card with hostname/os/arch/ip + editable name
   input (prefilled with the hostname) + `[Confirm]` → `UpdateMachine` →
-  navigate to `/machines/<id>`. A "not mine / dismiss" action leaves the
-  machine as-is (it can be renamed later from its profile).
+  navigate to `/machines/<id>`. A "not mine / dismiss" action records the
+  machine name in a dismissed set (it can be renamed later from its profile).
 - Note: if the user approves with a *different* account, the machine's
   `created_by` is that account and this page will not show it (the machine
   still appears in the full list for users with permission).
 
-### Machine profile changes
+### Machine profile changes — implemented
 
-- The rotate-token dialog is replaced by a "revoke + re-authenticate" flow:
-  `RevokeMachineToken` then instruct "run `laelia-machine setup` on the
-  machine to re-authenticate". The registration-token display dialog is
-  removed.
+- The rotate-token dialog is replaced by the revoke flow
+  (`RevokeMachineToken` in `machine-profile.tsx`) that instructs "run
+  `laelia-machine setup` on the machine to re-authenticate". The
+  registration-token display dialog is removed.
 
-### i18n
+### i18n — implemented
 
-New strings in `en-US.json` / `zh-CN.json` for both pages and the profile
-change.
+New strings under `auth.device-login` / `machine.new` / `settings.provisioners`
+in `en-US.json` / `zh-CN.json`.
 
-## Docker machine image
+## Docker machine image — implemented
 
-- The entrypoint no longer maps `LAELIA_TOKEN`; it runs
-  `laelia-machine run --manager $LAELIA_MANAGER_URL` (plus `--allow-http` for
-  `http://`).
-- The state file must live on a mounted volume (`-v laelia-state:/root/.laelia`
-  or a `LAELIA_HOME`-style env override). Without state, `run` errors with
-  "run setup first".
-- Open question Q3: whether the entrypoint should auto-run `setup` when no
-  state exists (print the URL to the container logs, wait for approval, then
-  run) so a single `docker run -d` works.
+- `scripts/docker/machine-entrypoint.sh` maps env to flags and **always runs
+  `laelia-machine setup --no-browser --foreground`** (per the Q3 decision): no
+  state → device flow printing the approval URL to the container logs, waits
+  for approval, then keeps running; existing state → validates and runs.
+  `--allow-http` is added automatically for `http://` manager URLs; `--insecure`
+  and `--debug` map from `LAELIA_INSECURE`/`LAELIA_DEBUG`; `LAELIA_CODEX_HOME`
+  is exported as `CODEX_HOME`. No `LAELIA_TOKEN` exists anywhere.
+- The state file must live on a mounted volume (`LAELIA_HOME` overrides the
+  data root, default `~/.laelia`).
+- Provisioned pods use the separate runtime image
+  (`scripts/docker/Dockerfile.machine-runtime` +
+  `machine-runtime-entrypoint.sh`), whose `LAELIA_PROVISIONED=true` switches to
+  the fail-fast `setup --provisioned` headless mode (provisioner plan §8.4).
 
-## Security
+## Security — as shipped
 
 - `device_code` is a 32-byte random secret; `user_code` is 8 chars from an
-  unambiguous alphabet. Polling is rate-limited (min 2s interval server-side);
-  `StartDeviceLogin` is rate-limited per IP.
-- The approval page shows the hostname + user code so the user can verify the
+  unambiguous alphabet. Polling is throttled server-side (min 2s interval →
+  `ResourceExhausted`). **The planned per-IP rate limit on
+  `StartDeviceLogin`/`PollDeviceLogin`/`GetDeviceLoginStatus` was not built**
+  (no limiter exists for these RPCs); the anonymous surface is otherwise
+  limited to read-only session status.
+- The approval page shows the hostname + user code (plus the device IP and,
+  for re-auth, the machine title + owner handle) so the user can verify the
   code matches their device screen (standard device-flow phishing mitigation).
 - `ApproveDeviceLogin` requires a logged-in session; same CSRF posture as all
-  other cookie-authenticated Connect RPCs.
+  other cookie-authenticated Connect RPCs. New-machine approval additionally
+  requires the caller to pass the `laelia.machines.create` IAM check.
 - Re-auth of an existing machine is restricted to the creator or a workspace
-  admin (open question Q2).
+  admin; anyone else gets an explicit DENIED + `PermissionDenied` (Q2
+  decision, implemented).
 - The refresh token is only ever returned over TLS (CLI enforces https unless
   `--allow-http`); the state file is `0600` and written atomically.
 - The refresh token is bound to the device fingerprint (existing
@@ -399,30 +465,35 @@ change.
 | Second instance started | Well-known socket probe → "already running", exit 0. |
 | User approves with a different account (new machine) | That account owns the machine; the waiting page (other account) won't show it. |
 
-## Cleanup / removals
+## Cleanup / removals — all done
 
 - `CreateMachine` RPC + frontend store method + dialog.
 - Bootstrap token minting/consumption on the machine path
-  (`TokenTypeBootstrap` stays for the unused agent path).
+  (`TokenTypeBootstrap` stays for the agent path).
 - `RotateMachineToken` RPC + frontend method.
 - `credential.Manager`, `machine-token-<id>` files,
   `parseResourceIDFromBootstrapToken`, `connectViaRegistration`.
 - `--token` flag and the docker `LAELIA_TOKEN` mapping.
 
-## Implementation order
+## Implementation order — all shipped
 
 1. Proto: `device.proto`, `MachineService` changes; `buf format/lint/generate`.
-2. Backend: device session store, `DeviceService`, `UpdateMachine`,
-   `MachineSummary.created_at`, remove bootstrap paths.
-3. CLI: `state` package, `setup`, `run` changes, well-known daemon socket,
-   already-running check.
-4. Frontend: approval page, waiting page, guard, machines list/profile,
-   i18n.
-5. Docker entrypoint.
-6. Tests (backend unit + handler tests, CLI tests, frontend page tests),
-   `gofmt`, `golangci-lint`, `pnpm` checks, build.
+2. Backend: device session store (`component/device`), `DeviceService`
+   (`api/v1/device.go`), `UpdateMachine`, `TransferMachineOwnership`,
+   `MachineSummary.created_at`/`created_by`, bootstrap paths removed.
+3. CLI: `state` package, `setup` (incl. `--force`/`--provisioned`),
+   `run` changes, well-known daemon socket, already-running check.
+4. Frontend: approval page, waiting page (now the Self-hosted tab), guard,
+   machines list/profile, i18n.
+5. Docker entrypoint (auto-setup per Q3) + the separate provisioned runtime
+   image.
+6. Tests: frontend `frontend/src/pages/auth/device-login.test.tsx` +
+   `machine-new-provisioned.test.tsx`, CLI `backend/agent/state/state_test.go`
+   + `backend/agent/cmd/setup_provisioned_test.go`. **Gap**: no automated
+   backend tests for `DeviceService`/`component/device` (the handler and the
+   session store ship without unit tests).
 
-## Open questions
+## Open questions (all answered — see the Decisions section below)
 
 - **Q1 — `setup` semantics**: should `setup` also start the machine in the
   foreground after configuring/validating (making it the single entry command,
@@ -470,21 +541,28 @@ change.
   `LAELIA_TOKEN` is removed; the state file must live on a mounted volume
   (`-v laelia-state:/root/.laelia`).
 
-### Design deltas from the decisions
+### Design deltas from the decisions — implementation status (2026-09-06)
 
-- `PollDeviceLoginResponse` gains `denial_reason` (set on DENIED).
+- `PollDeviceLoginResponse` gains `denial_reason` (set on DENIED) — **done**.
 - `ApproveDeviceLogin` marks the session DENIED (with reason) on the
-  not-creator/not-admin policy failure instead of leaving it PENDING.
-- New proto RPCs: `UpdateMachine` (title/labels, creator-or-admin authorized)
-  and `TransferMachineOwnership` (creator-or-admin authorized, audited).
-- `MachineSummary.created_at` added; `created_by` populated (was declared but
-  never filled in ListMachines).
-- The rate limiter gets a dedicated per-IP "device" bucket (60/min, burst 30)
-  for `StartDeviceLogin` / `PollDeviceLogin` / `GetDeviceLoginStatus` so
-  5s-polling anonymous calls are not throttled by the tiny connect bucket.
+  not-creator/not-admin policy failure instead of leaving it PENDING —
+  **done**.
+- New proto RPCs: `UpdateMachine` (**shipped title-only**, creator-or-admin
+  authorized) and `TransferMachineOwnership` (creator-or-admin authorized,
+  audited) — **done**.
+- `MachineSummary.created_at` added; `created_by` populated — **done**.
+- The rate limiter's dedicated per-IP "device" bucket (60/min, burst 30) for
+  `StartDeviceLogin` / `PollDeviceLogin` / `GetDeviceLoginStatus` — **not
+  implemented**; the shipped throttling is only the 2s poll minimum
+  (`TouchPoll` → `ResourceExhausted`). Anonymous calls are not otherwise
+  rate-limited.
 - `setup` flow: already-running check → load state → state+URL match:
   refresh-token probe → success: "already logged in" → run; permanent
   failure: drop the dead refresh token, keep the machine id → device flow
   (re-auth of the existing machine); transient failure: warn → run (run loop
   retries with backoff). No state / `--force` / different URL: device flow →
-  poll → APPROVED: save state → run.
+  poll → APPROVED: save state → run — **done as specified**
+  (`backend/agent/cmd/setup.go`).
+- Shipped beyond these deltas: new-machine approval is additionally gated by
+  the `laelia.machines.create` IAM check (`requireCanCreateNewMachine`), and
+  the approval page receives the device `ip` + `machine_owner` fields.

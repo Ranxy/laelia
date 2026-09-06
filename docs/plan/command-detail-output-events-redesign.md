@@ -1,5 +1,7 @@
 # Command Detail "Output & Events" Redesign — Trajectory-Style Ledger
 
+> Status: verified and updated against the current code on 2026-09-06. Main changes: the P0 redesign has landed and evolved — the kind registry moved from `components/command-events/command-event-kind.ts` into `lib/command-events-model.ts`, the ledger gained virtualization and drag range-selection, and the run tab is a single-column ledger (the `CommandTimeline` component was deleted entirely).
+
 ## 1. Background & Goal
 
 We want to bring the visual/UX quality of deepseek-harness's **Trajectory** view
@@ -19,6 +21,11 @@ events that are currently missing or under-represented.
 ---
 
 ## 2. Current Implementation (as-is)
+
+> Historical note (2026-09-06): this section describes the **pre-redesign**
+> state that motivated the work. The redesign has since landed — the run tab is
+> now a single-column ledger and §9 records what actually shipped. Kept for
+> reference only.
 
 ### 2.1 Page structure
 
@@ -139,6 +146,10 @@ Source: `packages/client/ui-trajectory` in `/home/ran/project/deepseek-harness`.
 - deep hierarchy navigation (subtool nesting),
 - resizable split with persisted widths (nice-to-have, not required).
 
+> 2026-09-06 update: virtualization **was** added since — the ledger row list
+> renders through `@tanstack/react-virtual` (30px estimated rows, overscan 12)
+> inside `command-event-ledger.tsx`.
+
 ---
 
 ## 4. Proposed Design for "Output & Events"
@@ -170,6 +181,11 @@ view; the new ledger replaces the current right-side events panel. The two are
 kept in sync via the existing `selectedToolSeq` mechanism (click a tool card in
 the ledger → scroll the timeline to it, and vice versa).
 
+> 2026-09-06: as implemented (see §9 Revision), there is no separate left
+> timeline — outputs are merged into the ledger and selection is a single
+> unified `selectedKey` row-key space (`out-N` / `ev-N` / `tool-N`) shared by
+> ledger, overview timeline and inspector.
+
 ### 4.2 New components
 
 #### 4.2.1 `CommandEventLedger` (new)
@@ -195,6 +211,11 @@ the ledger → scroll the timeline to it, and vice versa).
   `… N events` summary row.
 - Empty state: reuse the existing "Waiting for structured events..." message.
 
+> 2026-09-06 as implemented: collapsible group rows were **not** built (the
+> toolbar has no fold-all either); phases are used for filtering/grouping
+> metadata. The ledger additionally gained virtualization and `rangeKeys`
+> range highlighting (see §9).
+
 #### 4.2.2 `CommandEventInspector` (new)
 
 `frontend/src/components/command-events/command-event-inspector.tsx`
@@ -213,6 +234,14 @@ the ledger → scroll the timeline to it, and vice versa).
 - Reuses existing `ChatToolCall`, `ChatDiff`, `ChatWarning`,
   `ContextUsageBar`, `TokenUsageCard` so chat and command detail stay
   consistent.
+
+> 2026-09-06 as implemented: the inspector mounts in the shared
+> `SidePanel` primitive (`components/ui/side-panel.tsx`) and reuses
+> `ChatDiff` (`components/chat-events/diff-view.tsx`), `ChatWarning`
+> (`components/chat-events/warning.tsx`), `ContextUsageBar` and
+> `TokenUsageCard`. `ChatToolCall` itself is not mounted here — tool calls
+> render through the inspector's own `payload`/`result` tabs (plus a
+> `timing` tab); `ChatToolCall` remains the chat-message-row renderer.
 
 #### 4.2.3 `CommandEventToolbar` (new)
 
@@ -234,6 +263,10 @@ the ledger → scroll the timeline to it, and vice versa).
     output = chunk timestamps, compaction = started→finished),
   - click a span to focus the ledger row,
   - no drag/zoom in v1 (can add later).
+
+> 2026-09-06: drag range selection **was** added — dragging on the overview
+> background emits `onRangeSelect(keys)` and the ledger highlights the selected
+> row range (`rangeKeys`); zoom is still not implemented.
 
 #### 4.2.5 Modify `command-detail.tsx`
 
@@ -294,10 +327,12 @@ the ledger → scroll the timeline to it, and vice versa).
 - `PERMISSION_REQUESTED` / `PERMISSION_TIMED_OUT` / `PERMISSION_DECIDED`
   (enum values 9–11) exist in the proto but have **no payloads** (reserved
   18–20) and are not emitted by the current runtime (permissions are
-  auto-granted). The frontend `commandEventTypeToI18nKey` also lacks keys for
-  them.
-  - **Recommendation**: keep them reserved; if permission flows are re-enabled
-    later, add payloads + i18n + kind tags. Do not render them now.
+  auto-granted).
+  - **2026-09-06 update**: the frontend now *does* have i18n keys
+    (`command.event-permission-requested/timed-out/decided`) and kind-tag
+    entries (Shield icon, `permission` phase) for them in the
+    `commandEventKind` registry (`lib/command-events-model.ts`), so they would
+    render if ever emitted. The recommendation stands: do not emit them now.
 
 ### 5.2 Missing events worth adding
 
@@ -358,6 +393,14 @@ the ledger → scroll the timeline to it, and vice versa).
    `commandEventKindIcon` in `frontend/src/lib/command-status.ts` (or a new
    `command-events.ts`).
 3. Add `formatEventDuration` (started→finished) helper.
+
+> 2026-09-06: as implemented, the kind registry lives in
+> `frontend/src/lib/command-events-model.ts` (`commandEventKind` /
+> `getCommandEventKind`, plus the output-stream registry
+> `outputStreamKind` / `getOutputStreamKind`); `command-status.ts` no longer
+> holds event i18n mapping. Tool-call pairing is `pairToolCallEvents` in
+> `frontend/src/lib/tool-call-events.ts`, and output-run merging /
+> `isVisibleEvent` are in `command-events-model.ts` too.
 
 ### Phase 2 — Ledger component
 
@@ -436,51 +479,77 @@ front-end-first (P0) with optional backend additions (P1/P2).
 ### Done (P0 — front-end redesign)
 
 - Added `frontend/src/components/command-events/`:
-  - `command-event-kind.ts` — kind-tag mapping (label/color/icon/phase) for all
-    current event types plus placeholders for future `STEER`/`RETRY` types.
   - `command-event-ledger.tsx` — dense table ledger with kind tags, phase
-    group headers, collapse, search/filter, selection rail, tool-pair merging.
-  - `command-event-inspector.tsx` — right-side details panel with per-type
-    tabs (Summary/Input/Output/Diff/Raw/Usage), reusing existing
-    `ChatToolCall`/`ChatDiff`/`ChatWarning`/`ContextUsageBar`/`TokenUsageCard`.
-  - `command-event-toolbar.tsx` — search, filter, collapse-all.
-  - `command-event-timeline-overview.tsx` — simplified Chrome-Network-style
-    overview (Output/Tools/System lanes).
+    grouping, search/filter, selection rail, tool-pair merging; rows render
+    through `@tanstack/react-virtual` (30px rows, overscan 12) and support
+    `rangeKeys` range highlighting.
+  - `command-event-inspector.tsx` — right-side details panel built on the
+    shared `SidePanel` primitive, with per-type tabs (Summary/Input/Output/
+    Payload/Result/Diff/Raw/Usage/Timing), reusing `ChatDiff`/
+    `ChatWarning`/`ContextUsageBar`/`TokenUsageCard`.
+  - `command-event-toolbar.tsx` — search + filter (All/Output/Tools/Diffs/
+    Warnings/Compaction/System). No test file for the toolbar itself.
+  - `command-event-timeline-overview.tsx` — Chrome-Network-style overview
+    (Output/Tools/System lanes) with drag range selection (`onRangeSelect`).
+- The kind registries that were originally created as
+  `components/command-events/command-event-kind.ts` were later moved into
+  `frontend/src/lib/command-events-model.ts`, which is now the single source
+  for `commandEventKind`/`getCommandEventKind` (event → label/icon/tag/phase),
+  `outputStreamKind`/`getOutputStreamKind` (stream → tag), `mergeOutputRuns`
+  (consecutive same-stream output chunks → runs sharing the `out-N` key
+  space), `isVisibleEvent`, and tool-call error classification. Tool pairing
+  stays in `frontend/src/lib/tool-call-events.ts` (`pairToolCallEvents`).
 - Rewrote `frontend/src/pages/dashboard/command-detail.tsx` to integrate the
-  new ledger + inspector + toolbar + overview into the **Output & Events** tab,
-  keeping the left terminal `CommandTimeline` and the existing selection sync.
-- Added i18n keys (en-US + zh-CN) and updated the i18n checker's
-  `DYNAMIC_PREFIXES` for `command.filter-*` / `command.phase-*`.
-- Added unit tests:
-  - `command-event-ledger.test.tsx` (6 tests)
-  - `command-event-inspector.test.tsx` (3 tests)
-  - updated `command-detail.test.tsx` for the new inspector flow.
-- `tsc --noEmit`, `npm run check`, and the full Vitest suite (483 tests) pass.
+  ledger + inspector + toolbar + overview into the **Output & Events** tab.
+- Added i18n keys (en-US + zh-CN; including `command.stream-stdout/stderr/
+  system/assistant` and `command.event-*`) and registered
+  `command.filter-*` / `command.phase-*` in the i18n checker's
+  `DYNAMIC_PREFIXES` (`frontend/scripts/check-react-i18n.mjs`).
+- Added unit tests: `command-event-ledger.test.tsx` (13 cases),
+  `command-event-inspector.test.tsx` (5 cases),
+  `command-event-timeline-overview.test.tsx`, and an updated
+  `command-detail.test.tsx`.
 
 ### Deferred (P1/P2 — backend event supplements)
 
-- **STEER event** (`CommandEventType_STEER = 16` + `SteerPayload`): the
-  frontend already has a placeholder kind tag; the backend change requires
-  editing `proto/v1/v1/command.proto`, regenerating Go/TS (needs the buf
-  toolchain / network), emitting in `backend/agent/pi/executor.go`, and
-  passing through `backend/manager/component/dispatcher/dispatcher.go`.
-- **RETRY_STARTED/FINISHED** and **AGENT_START/END**: same proto/regeneration
-  dependency; frontend placeholders are already in `command-event-kind.ts`.
+Still accurate on 2026-09-06: the `CommandEventType` enum in
+`proto/v1/v1/command.proto` still ends at `TOKEN_USAGE = 15`; `STEER`,
+`RETRY_*` and `AGENT_*` were never added.
 
-### Revision (2026-08-14, after review)
+- **STEER event** (`CommandEventType_STEER = 16` + `SteerPayload`): the
+  frontend has no dedicated tag yet (the old placeholder registry is gone);
+  the backend change requires editing `proto/v1/v1/command.proto`,
+  regenerating Go/TS (`cd proto && buf generate`), emitting in
+  `backend/agent/pi/executor.go`, and passing through
+  `backend/manager/component/dispatcher/dispatcher.go`.
+- **RETRY_STARTED/FINISHED** and **AGENT_START/END**: same proto/regeneration
+  dependency.
+
+### Revision (2026-08-14, after review; refreshed 2026-09-06)
 
 Per review feedback, the **Output & Events** tab was changed from a two-column
 layout (left terminal + right events panel) to a **single unified Trajectory-style
 ledger**:
 
 - The terminal output (`CommandOutput` stdout/stderr/system) is now **merged
-  into the ledger** as rows with stream kind tags (`OUTPUT` / `ERROR` / `SYSTEM`),
-  interleaved with structured event rows by timestamp.
-- The run tab is now a single column:
-  `Toolbar → TimelineOverview → ContextUsageBar → Ledger (+ Inspector on selection)`.
-- The separate `CommandTimeline` component is no longer used on the run tab;
-  the ledger itself is the output + events view.
+  into the ledger** as rows with stream kind tags, interleaved with structured
+  event rows by timestamp. Stream kinds are `STDOUT`/`STDERR`/`SYSTEM`/`ASSISTANT`
+  (`CommandOutput.StreamType`, ASSISTANT = 4 was added after the original
+  revision; i18n labels: OUTPUT / ERROR / SYSTEM / ASSISTANT). Consecutive
+  same-stream chunks merge into runs via `mergeOutputRuns` so the shared row
+  key space is `out-N` / `ev-N` / `tool-N` across ledger, overview and
+  inspector.
+- The run tab is a single column:
+  `Toolbar → TimelineOverview → Ledger (+ Inspector overlay on selection)`.
+- The separate `CommandTimeline` component was **deleted entirely** (no file
+  remains); the ledger itself is the output + events view.
+- `ContextUsageBar` and `TokenUsageCard` are **not** pinned above the ledger —
+  they render inside the inspector's Usage tab (and `TokenUsageCard` on the
+  summary tab).
 - The ledger table matches the reference structure: two columns
-  (`event` kind tag + `content`), compact rows, phase group headers, selection
-  rail, and a subtle right-aligned timestamp in the content cell.
-- Added `output` filter and stream kind tags; updated tests (485 total pass).
+  (`event` kind tag + `content`), compact rows, phase grouping (used for
+  filtering and grouping), selection rail, and a right-aligned timestamp in
+  the content cell.
+- Added `output` filter and stream kind tags; row rendering is virtualized
+  (`@tanstack/react-virtual`) and supports drag range selection from the
+  overview timeline (`rangeKeys`).

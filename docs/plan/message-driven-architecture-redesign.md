@@ -1,5 +1,7 @@
 # Laelia 架构重构：从 Command-Driven 到 Message-Driven
 
+> 状态：2026-09-06 已对照当前代码核对更新。主要变化：消息驱动骨架已落地并被进一步演进——`SendCommand`/`ExecutorKind`/inbox 已彻底删除，agent 改为 `BeginSession` 会话模型 + per-channel 游标发现（原方案的 `PullMessages`/`SubmitAction`/服务端 Held Draft 未实现，版本校验以 `PostMessage.base_version` 冲突检测在客户端落地），权限决策流已移除（自动授予）。下文按当前实现重写。
+
 ## 背景：Raft 博客《Is Having Agents in the Room Meant to Be Chaotic?》的核心论点
 
 Raft 团队在他们的博客中提出了 **AX（Agent Experience Design）** 的设计理念。关键论点如下：
@@ -54,7 +56,9 @@ Agent 应该是"房间里的人"，而不是"等待被调用的工具"。
 
 ## 当前架构问题诊断
 
-### 现状：Command-Driven 模型
+> 状态：本节为**重构前的历史诊断**，描述的是旧 Command-Driven 模型。其中的 `SendCommand`、`ExecutorKind`、`CommandSource`、agent_inbox/agent_working_state、权限二元模型等在当前代码中均已移除（实施结果见"实施结果"一节）；保留本节是为了记录重构动机。
+
+### 现状（重构前）：Command-Driven 模型
 
 ```
 User → SendCommand(instruction="帮我检查服务器")
@@ -93,96 +97,92 @@ User → SendCommand(instruction="帮我检查服务器")
 
 ---
 
-## 新架构：Message-Driven 模型
+## 新架构：Message-Driven 模型（当前实际实现）
 
-### 核心思想
+### 核心思想（已落地，形态有调整）
 
 ```
-User → SendMessage("帮我检查服务器")
-     → 创建 chat_message (唯一用户入口)
-     → room_version++
-     → 通知连接中的 Agent
-     → Agent 拉取消息
+User → SendMessage("帮我检查服务器")            （用户唯一发送入口）
+     → 创建 chat_message, conversation.version++（同事务）
+     → dispatcher.NotifyNewMessages 唤醒成员 Agent（NewMessagesAvailable）
+     → roomhub 唤醒前端长轮询
+     → Agent drain 循环 → BeginSession（Manager 校验游标/提醒/启用状态）
+     → 有待处理工作 → Manager 创建 RUNNING 会话 command（会话锚点）
+     → Agent 拉取未读（ListChannelUpdates → message check / message read）
      → Agent 自主判断：回复？执行工具？追问？沉默？
-     → 若需执行 → Agent 发起 SubmitAction（新的执行触发）
-     → Manager 校验版本 → 内部创建 command（不可见）
-     → Agent 本地执行 ACP
-     → 结果 → 创建 assistant chat_message → room_version++
+     → 回复 → PostMessage(base_version=N)
+         → 版本一致 → committed=true，消息创建，发送者游标前移
+         → 版本冲突 → committed=false + new_messages（Agent 客户端自行决议）
 ```
 
-**本质变化**：`message` 是主，`command` 退化为内部实现细节。`SubmitAction` 取代 `SendCommand` 成为执行触发点，但触发者从"用户"变为"Agent"。
+**本质变化**：`message` 是主，`command` 退化为"会话锚点"——`BeginSession` 时创建的 RUNNING command 只用于承载执行/事件/审计关联，不再承载指令内容（`instruction` 为空，prompt 由 agent 侧组装）。
 
-### SubmitAction 的角色澄清
+> 设计偏差记录：原方案中的 `SubmitAction` / `PullMessages` / `MessageSnapshot` / `ResolveHeldAction` / 服务端 `held_action` 表**均未实现**。版本校验改为轻量的 `PostMessage.base_version` 冲突检测（决议在客户端完成），消息拉取改为 `ListChannelUpdates` 发现 + 既有的 `ListConversationMessages(after_version)` 增量读取（见下文）。
 
-`SubmitAction` **就是**新的执行触发器，等价于旧架构中 `SendCommand` + inbox 派发的合并。区别在于：
+### 实际落地：BeginSession 会话模型（取代 SubmitAction）
 
-| 维度 | 旧 `SendCommand` | 新 `SubmitAction` |
-|------|------------------|-------------------|
-| 触发者 | 用户（API 调用方） | Agent（拉取消息后自主发起） |
-| 版本校验 | 无 | 携带 `base_version`，Manager 做 Held Draft 校验 |
-| 执行器选择 | 用户指定 `ExecutorKind` | 固定 ACP，对用户不可见 |
-| 上下文注入 | Manager 静态注入最近 6 条 | Agent 主动 `PullMessages` 拉取所需范围 |
+Agent 侧由 drain 循环驱动（`backend/agent/client/drain_runner.go`），Manager 侧入口在 `backend/manager/component/dispatcher/dispatcher.go` 的 `HandleBeginSession`：
 
-提交成功（`committed=true`）后，Manager 内部创建 `command` 记录并通过 bidi stream 下发 `CommandRequest` 给 Agent，后续执行流程（Progress/Event/Result）保持不变。
+| 维度 | 旧 `SendCommand` | 当前实现 |
+|------|------------------|----------|
+| 触发者 | 用户（API 调用方） | Agent 自主（drain 循环；唤醒只是加速器） |
+| 会话开启 | 无 | `BeginSession` → Manager 校验游标（`HasUpdates`）、到期提醒（`HasDueReminders`）、agent 启用状态与运行时能力 → 无工作回 `BeginSessionResponse{idle=true}`，有工作则创建 RUNNING command 并回 `BeginSessionResponse{command_id, agent_display_name, owner_display_name, team, prompt_version, ...}` |
+| 版本校验 | 无 | Agent 回复携带 `PostMessage.base_version`，Manager 比对 `conversation.version`（一致才提交） |
+| 执行器选择 | 用户指定 `ExecutorKind` | ACP（stdio `acp` + acp2 v2 thread 路径）或内置 pi 运行时，由 agent 能力（`supports_acp` / `supports_pi`）决定，对用户不可见 |
+| 上下文注入 | Manager 静态注入最近 6 条 | Agent 用 `message check` / `message read` 主动拉取；`GetCommandContext`（CLI `command context`）仅用于执行历史恢复/详情 |
 
-### 新数据流
+会话 command 与 conversation 的关联在 Agent 读取频道/提交 `AckProcessedVersion` 时补全；结果回写由 Agent 主动 `PostMessage`（带 `command_id` 关联），不再由 Manager 代发 assistant 消息。
+
+### 实际数据流
 
 ```
 ┌─ 1. 用户发送消息 ──────────────────────────────────────────┐
-│  SendMessage(conversation, "帮我检查服务器")                  │
-│  → chat_message 创建, conversation.version++                  │
-│  → push NewMessagesAvailable 通知给该房间的连接中 Agent        │
+│  SendMessage(conversation, content)                         │
+│  → store.CreateChatMessageBumpVersion: chat_message 创建,   │
+│    conversation.version++（同一事务）                        │
+│  → dispatcher.NotifyNewMessages 唤醒成员 Agent               │
+│  → roomhub.NotifyConversation 唤醒前端长轮询                 │
+│  → 线程订阅 / activity 生成（旁路，best-effort）             │
 └─────────────────────────────────────────────────────────────┘
                           ↓
-┌─ 2. Agent 拉取消息 ─────────────────────────────────────────┐
-│  Agent ← NewMessagesAvailable({conversation_id})              │
-│  Agent → PullMessages(conversation_id, after_version)         │
-│  Agent ← MessageSnapshot(messages)                            │
+┌─ 2. Agent 发现工作 ─────────────────────────────────────────┐
+│  Agent ← NewMessagesAvailable（best-effort 唤醒，非真相源）  │
+│  Agent → BeginSession                                        │
+│  Manager: agent_channel_cursor vs conversation.version、     │
+│  到期提醒、agent 启用/运行时能力                              │
+│    ✓ 有工作 → 创建 RUNNING command → BeginSessionResponse    │
+│    ✗ 无工作 → BeginSessionResponse{idle=true}（保持空闲）    │
 └─────────────────────────────────────────────────────────────┘
                           ↓
-┌─ 3. Agent 决定行动 + Held Draft 校验 ────────────────────────┐
-│  Agent → SubmitAction(conversation_id, reply_to_message_id,  │
-│                       base_version=N)                        │
-│                                                               │
-│  Manager 比较 base_version vs conversation.version:           │
-│    ✓ 一致 → ActionResponse(committed=true, action_id,         │
-│                            command_id)                        │
-│    ✗ 不一致 → ActionResponse(held=true, action_id,            │
-│                              new_messages=[...])              │
-│                                                               │
-│  若 held: Agent 有四种选择:                                    │
-│    ResolveHeldAction(REVISE) - 放弃原稿, 重新决策              │
-│    ResolveHeldAction(SEND_AS_IS) - 坚持原回复                  │
-│    ResolveHeldAction(DISCARD) - 沉默是有效行为                  │
-│    ResolveHeldAction(FORCE_SEND) - 我确定要发, 绕过版本检查    │
-│                                                               │
-│  committed=true 后:                                           │
-│    Manager 内部创建 command 记录                               │
-│    Manager → CommandRequest 下发到 Agent bidi stream          │
+┌─ 3. Agent 拉取消息并决策 ────────────────────────────────────┐
+│  Agent → ListChannelUpdates（游标后的频道/线程未读清单）      │
+│  Agent → message check / message read（按 after_version）    │
+│  Agent 自主判断：回复 / 执行工具 / 追问 / 沉默               │
 └─────────────────────────────────────────────────────────────┘
                           ↓
-┌─ 4. Agent 本地执行 ACP ─────────────────────────────────────┐
-│  Agent 启动 opencode ACP session                             │
-│  用已拉取的消息构建对话上下文                                   │
-│  opencode 决定工具调用、生成回复                                │
-│  → 通过 bidi stream 报告 CommandProgress/CommandEvent        │
-│  → 若有权限请求 → PERMISSION_REQUESTED event                  │
-│    → 用户 RespondPermission API → Manager bidi → Agent       │
+┌─ 4. Agent 本地执行 ─────────────────────────────────────────┐
+│  ACP（opencode/codex）或内置 pi 运行时，同一 drain turn       │
+│  → bidi stream 上报 CommandProgress / CommandEvent           │
+│  → 权限已自动授予（permission_decision 流已移除）            │
+│  → 用户可 CancelCommand（→ CancelMessage）中断，             │
+│    或 SteerCommand（→ SteerMessage）向在途 turn 注入消息     │
 └─────────────────────────────────────────────────────────────┘
                           ↓
-┌─ 5. Agent 报告结果 ─────────────────────────────────────────┐
-│  Agent → CommandResult(command_id, final_summary)            │
-│  Manager → 创建 assistant chat_message (link command_id)     │
-│  Manager → conversation.version++                             │
-│  Manager → 关闭 command 的 output/event watchers            │
-│  Agent → PullMessages (检查是否有新消息积压)                  │
+┌─ 5. Agent 回写结果 ─────────────────────────────────────────┐
+│  Agent → PostMessage(conversation, content, base_version,    │
+│                       command_id)                            │
+│  base_version == version → committed=true：消息创建，        │
+│                             发送者游标前移（UpsertCursor）    │
+│  base_version != version → committed=false：响应携带         │
+│    new_messages（≤50 条）+ conflict_description，            │
+│    由 Agent 决定改写重发 / 照发 / 放弃（沉默）                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### 架构对比
 
 ```
-                    旧架构 (Command-Driven)
+                    旧架构 (Command-Driven, 已移除)
 
   ┌──────────────────────────────────────────────────┐
   │                                                  │
@@ -199,7 +199,7 @@ User → SendMessage("帮我检查服务器")
   │                                                  │
   └──────────────────────────────────────────────────┘
 
-                    新架构 (Message-Driven)
+                新架构 (Message-Driven, 已落地)
 
   ┌──────────────────────────────────────────────────┐
   │                                                  │
@@ -208,21 +208,20 @@ User → SendMessage("帮我检查服务器")
   │                      message (主, 唯一)           │
   │                         │                        │
   │                         ↓                        │
-  │               Agent 拉取消息                      │
+  │        NewMessagesAvailable 唤醒 + 游标发现       │
   │                         │                        │
-  │                    Agent 判断                     │
-  │                  /    |     \                    │
-  │              回复   执行工具   沉默                │
-  │                │      │                          │
-  │                │  SubmitAction (held draft 校验)  │
-  │                │  → 内部创建 command               │
-  │                │  (实现细节, 不可见)              │
-  │                ↓      ↓                          │
-  │         assistant message  ←── 结果              │
+  │                    Agent drain turn              │
+  │              (BeginSession → command 锚点)       │
+  │                 /      |       \                 │
+  │             回复     执行工具    沉默              │
+  │               │        │                         │
+  │               │  CommandProgress/Event/Result    │
+  │               ↓                                  │
+  │        PostMessage(base_version)                 │
+  │          ├ 一致 → committed (消息+游标前移)       │
+  │          └ 冲突 → new_messages (自行决议)         │
   │                                                  │
-  │              + Held Draft 版本校验 (Phase 2)     │
-  │              + Action Explicitness               │
-  │              + Agent 自主决策                     │
+  │  沉默是有效行为；唤醒只是 hint，游标是真相源        │
   └──────────────────────────────────────────────────┘
 ```
 
@@ -230,26 +229,25 @@ User → SendMessage("帮我检查服务器")
 
 ## 非对话类触发路径
 
-删除 `SendCommand` 后，程序化触发（CI/CD、定时任务、webhook）通过 **系统消息** 进入对话：
+`SenderType` 枚举已实现（`SENDER_TYPE_USER=1 / SENDER_TYPE_AGENT=2 / SENDER_TYPE_SYSTEM=3`，见 `proto/v1/v1/command.proto`）；`chat_message.sender_type` 列 1=USER、2=AGENT、3=SYSTEM。
 
-- 在 `chat_message` 表中，`sender_type` 引入 `SYSTEM=3`（见下文 proto 枚举）
-- 系统消息与用户消息走同一流程：`SendMessage` 创建 → `room_version++` → 通知 Agent
-- 对于无明确对话上下文的程序化触发，Manager 可通过 `GetOrCreateSystemConversation(agent, principal)` 创建一个 `type=2`（系统）会话
-- Agent 拉取后可识别 `sender_type=SYSTEM`，按系统指令处理（例如执行服务器检查并直接回写 summary）
+- 系统消息由**内置后台功能**以系统机器人身份（`principal_id=1`）直接写入会话：提醒到期胶囊与错过补发（`backend/manager/store/reminder.go`）、任务状态胶囊（`backend/manager/api/v1/task.go`、`backend/manager/api/v1/reminder.go`）等。这些写入统一走 bump-version 管线，会唤醒成员 Agent。
+- 原方案中的 `GetOrCreateSystemConversation` **未实现**；当前也没有通用的 webhook/CI 注入 API——程序化触发依赖上述内置功能或未来的专用入口。
+- Agent 拉取后按 `sender_type=SYSTEM` 识别系统消息（chattools 输出行带 sender 类型），按引导语处理。
 
-这样"一切源于消息"不是口号：用户消息、系统消息、Agent 回复都是 `chat_message`，差异仅在 `sender_type`。
+这样"一切源于消息"成立：用户消息、系统消息、Agent 回复都是 `chat_message`，差异仅在 `sender_type`。
 
 ---
 
-## Proto 设计
+## Proto 设计（当前实际形态，`proto/v1/v1/command.proto`）
 
 ### 消息服务 (CommandService)
 
-保留现有的消息/频道/会话管理 RPC。`SendCommand` RPC 在 Phase 1 中**标记弃用**（保留实现但不再被前端调用），Phase 2 中删除。`SendMessage` 成为主要入口，新增 `room_version` 递增逻辑。
+`SendCommand` RPC、`SendCommandRequest`、`ExecutorKind`、`CommandSource` 枚举已**全部删除**（没有保留弃用窗口）。`SendMessage` 是用户唯一发送入口（handler 强制要求用户身份；agent 调用被拒，必须走 `PostMessage`）。保留的命令相关 RPC：`ListCommands` / `GetCommand` / `CancelCommand` / `SteerCommand` / `WatchCommand` / `WatchCommandEvents` / `GetCommandContext`。
 
-### Agent 流服务 (AgentStreamService)
+频道/会话管理 RPC 大幅扩展：threads、archive/mute、channel members、tasks、reminders、files、activities、presence、reactions、`SearchChatHistory` 等（完整清单见 `proto/v1/v1/command.proto` 的 `service CommandService`）。
 
-bidi stream 从命令通道演化为通用的 Agent 通信通道。
+### Agent 流服务 (AgentStreamService)（重命名已按方案落地）
 
 ```protobuf
 service AgentStreamService {
@@ -259,477 +257,231 @@ service AgentStreamService {
 message AgentStreamMessage {
   oneof message {
     AgentReady agent_ready = 1;
-    PullMessages pull_messages = 2;
-    SubmitAction submit_action = 3;
-    ResolveHeldAction resolve_held_action = 4;   // Phase 2
+    BeginSession begin_session = 2;
     CommandProgress progress = 5;
     CommandResult result = 6;
     CommandEvent event = 7;
     Ping ping = 8;
+    ProvidersDiscovered providers_discovered = 9;      // 响应 discover_providers
+    WorkspaceListResponse workspace_list_response = 10;
+    WorkspaceReadResponse workspace_read_response = 11;
+    PromptReleaseNoticeAck prompt_release_notice_ack = 12;
   }
 }
 
 message ManagerStreamMessage {
   oneof message {
-    MessageSnapshot message_snapshot = 1;
-    ActionResponse action_response = 2;
-    CommandRequest command_request = 3;        // SubmitAction 提交后内部下发
-    NewMessagesAvailable new_messages = 4;     // 新消息推送通知
+    NewMessagesAvailable new_messages = 4;             // best-effort 唤醒
+    BeginSessionResponse begin_session_response = 8;
     CancelMessage cancel = 5;
     Pong pong = 6;
-    PermissionDecision permission_decision = 7;
+    // 7 曾是 permission_decision；权限现已自动授予，该分支已删除
+    DiscoverProviders discover_providers = 9;          // 要求 daemon 重新探测 LLM provider
+    WorkspaceListRequest workspace_list_request = 10;
+    WorkspaceReadRequest workspace_read_request = 11;
+    SteerMessage steer = 12;                           // 向在途 turn 注入后续消息
+    PromptReleaseNotice prompt_release_notice = 13;    // 系统提示词变更推送
   }
 }
 ```
 
-### 新增消息类型
+### 关键消息类型（实际实现）
 
-```protobuf
-// 消息发送者类型（复用于 chat_message.sender_type 与 RoomMessage）
-enum SenderType {
-  SENDER_TYPE_UNSPECIFIED = 0;
-  USER = 1;
-  AGENT = 2;
-  SYSTEM = 3;   // 程序化触发（CI/CD、定时任务、webhook）
-}
+- **`SenderType`**：`SENDER_TYPE_UNSPECIFIED=0 / SENDER_TYPE_USER=1 / SENDER_TYPE_AGENT=2 / SENDER_TYPE_SYSTEM=3`（取代 `CommandSource`）。
+- **`AgentReady`**：`session_id`、`last_command_id`、`last_ack_seq`、`last_event_seq`、`agent_name`（声明本连接服务的 agent；重连语义见"崩溃恢复"）。
+- **`NewMessagesAvailable`**：`conversation_ids[]`、`versions[]`、`thread_root_message_id`（线程唤醒提示）。仅是唤醒信号；**真相源是 agent 的持久化 per-channel 游标**（`agent_channel_cursor` 表），掉线漏唤醒靠重连后 `ListChannelUpdates` 对比 `conversation.version` 与游标重新发现。
+- **`BeginSession` / `BeginSessionResponse`**：会话开启协商；响应携带 `command_id`、`idle`、`agent_display_name`、`owner_display_name`、`team`（TeamContext）、`prompt_version`（"<static_expected>.<dynamic_hash>" 提示词指纹）、`prompt_release_notice`。
+- **`PostMessageRequest` / `PostMessageResponse`**：agent 回复入口；`base_version` REQUIRED；冲突时响应 `committed=false` + `current_version` + `new_messages[]`（≤50 条，含 `is_own` 标记）+ `conflict_description`。
+- **`SendMessageRequest`**：用户发送；支持 `content`（可空，允许纯附件消息）、服务端解析的 `mentions`、`attachments`、`thread_root`、`as_task`。
 
-// Agent 拉取房间未读消息。
-// 采用单会话拉取（而非 map），因为 Agent 通常一次只关注一个会话。
-// 服务端通过 session 维护游标也可，但显式 after_version 让 Agent
-// 在重连/崩溃恢复时能自描述其进度。
-message PullMessages {
-  string conversation_id = 1;
-  int64 after_version = 2;   // 返回 room_version > after_version 的消息
-}
+原方案中的 `PullMessages` / `MessageSnapshot` / `SubmitAction` / `ActionResponse` / `ResolveHeldAction` / `ActionResolution` **从未加入 proto**——对应能力由 `ListChannelUpdates` + `ListConversationMessages(after_version)` + `PostMessage(base_version)` 承接。
 
-message MessageSnapshot {
-  repeated ChatMessage messages = 1;   // 复用现有 ChatMessage，新增 room_version 字段
-  int64 current_version = 2;            // 当前房间版本（供 Agent 记录为下次 base_version）
-}
+### ChatMessage 字段（实际编号）
 
-// ChatMessage 新增字段（不新建 RoomMessage，避免重复类型）:
-//   int64 room_version = 10;
-//   SenderType sender_type = 11;
-// 现有 sender_name/role/content/created_at/command_id 保持不变。
+`ChatMessage`（`proto/v1/v1/command.proto`）：`sender_type = 9`、`room_version = 10`、`mentions = 11`、`is_own = 12`、`attachments = 13`、`thread_root = 14`、`thread_reply_count = 15`、`task = 16`、`agent_id = 17`、`principal_id = 18`、`reactions = 19`。原方案设想的 `room_version=10 / sender_type=11` 编号中，`sender_type` 实际落在 9（中间插入了 mentions 等字段）。
 
-// Agent 提交行动（新的执行触发器）
-message SubmitAction {
-  string conversation_id = 1;
-  string reply_to_message_id = 2;  // 触发此行动的消息
-  int64 base_version = 3;          // Agent 决策时的房间版本
-  string instruction = 4;          // Agent 提取后的执行指令（可选，默认用 reply_to_message 内容）
-  string profile = 5;              // 执行 profile
-  map<string, string> env = 6;
-  string working_dir = 7;
-  int32 timeout_seconds = 8;
-  bool allow_diff = 9;
-}
-
-// Manager 对行动的校验结果（Held Draft 检查）
-message ActionResponse {
-  string action_id = 1;
-  bool committed = 2;               // true: 提交成功, command 已创建
-  string command_id = 3;            // committed=true 时返回新建 command 的 ID
-  int64 current_version = 4;        // 当前房间版本
-  repeated ChatMessage new_messages = 5;  // 若 held, 判定后到达的新消息
-}
-
-// Agent 决议暂存的草稿（Phase 2）
-message ResolveHeldAction {
-  string action_id = 1;
-  ActionResolution resolution = 2;
-}
-
-enum ActionResolution {
-  ACTION_RESOLUTION_UNSPECIFIED = 0;
-  REVISE = 1;       // 放弃原稿，重新决策
-  SEND_AS_IS = 2;   // 坚持原回复
-  DISCARD = 3;      // 沉默
-  FORCE_SEND = 4;   // 绕过检查强制提交
-}
-
-// Manager 推送新消息通知给连接中的 Agent
-message NewMessagesAvailable {
-  repeated string conversation_ids = 1;
-  repeated int64 versions = 2;       // 每个 conversation 的当前版本号
-}
-```
-
-### CommandRequest 字段简化
-
-`CommandRequest` 不再暴露 `executor_kind` 和 `source`，因为执行器固定为 ACP、来源固定为消息驱动。保留 Agent 执行所需的核心字段：
+### CommandRequest（实际字段）
 
 ```protobuf
 message CommandRequest {
   string command_id = 1;
-  string instruction = 2;          // 合并原 command + instruction（ACP 模式下 instruction 即指令）
+  string instruction = 2;
   string profile = 3;
   map<string, string> env = 4;
   string working_dir = 5;
   int32 timeout_seconds = 6;
   bool allow_diff = 7;
   string principal_id = 8;
-  string conversation_id = 9;      // 新增：Agent 回写 assistant message 时需要
-  string reply_to_message_id = 10;  // 新增：关联触发消息
+  string conversation_id = 9;
+  string reply_to_message_id = 10;
+  string agent_display_name = 11;
 }
 ```
 
-### 重命名对照
+`executor_kind` / `source` 字段已删除（枚举本身也已删除）。会话型 command 的 `instruction` 为空（指令由 agent 侧 prompt 组装）。
 
-| 旧名称 | 新名称 | 原因 |
+### 重命名对照（已全部落地）
+
+| 旧名称 | 新名称 | 状态 |
 |--------|--------|------|
-| `AgentCommandMessage` | `AgentStreamMessage` | 流不再只承载命令 |
-| `ManagerCommandMessage` | `ManagerStreamMessage` | 同上 |
-| `AgentCommandService` | `AgentStreamService` | 同上 |
-| `CommandChannel` | `AgentChannel` | 同上 |
+| `AgentCommandMessage` | `AgentStreamMessage` | 已落地（Go 侧构造函数名 `NewAgentCommandService` 保留，返回的服务类型为 `AgentStreamService`） |
+| `ManagerCommandMessage` | `ManagerStreamMessage` | 已落地 |
+| `AgentCommandService` | `AgentStreamService` | 已落地（`backend/manager/api/v1/agent_command.go`） |
+| `CommandChannel` | `AgentChannel` | 已落地 |
 
-### 删除/弃用的 Proto 元素
+### 已删除的 Proto 元素（全部直接删除，无弃用窗口）
 
-| 元素 | 处理 | 原因 |
-|------|------|------|
-| `ExecutorKind` enum | Phase 1 弃用，Phase 2 删除 | 不再需要区分执行器类型 |
-| `CommandSource` enum | Phase 1 弃用，Phase 2 删除 | 一切源于消息（含 SYSTEM sender_type） |
-| `SendCommand` RPC | Phase 1 弃用（保留兼容），Phase 2 删除 | `SendMessage` 成为唯一入口 |
-| `SendCommandRequest` | 随 `SendCommand` 删除 | 同上 |
-| `PullInbox` / `SelectInboxItem` / `DeferInboxItem` | Phase 1 删除 | inbox 模型被消息拉取取代 |
-| `InboxSnapshot` / `InboxItemSelected` / `InboxItem` | Phase 1 删除 | 同上 |
-
----
-
-## 数据库变更
-
-### Phase 1（建立消息驱动骨架）
-
-```sql
--- === 新增：房间版本控制 ===
-ALTER TABLE conversation ADD COLUMN version BIGINT NOT NULL DEFAULT 1;
-COMMENT ON COLUMN conversation.version IS '房间版本号，每次新增 chat_message 时 +1';
-
-ALTER TABLE chat_message ADD COLUMN room_version BIGINT NOT NULL DEFAULT 0;
-COMMENT ON COLUMN chat_message.room_version IS '该消息诞生时的 conversation.version';
-
--- === 新增：sender_type 枚举值 ===
--- 现有 chat_message 无 sender_type 列；conversation_member.member_type 已有。
--- 为支持系统消息，新增列而非复用 conversation_member：
-ALTER TABLE chat_message ADD COLUMN sender_type SMALLINT NOT NULL DEFAULT 1;
--- 1=USER, 2=AGENT, 3=SYSTEM
-COMMENT ON COLUMN chat_message.sender_type IS '1=USER, 2=AGENT, 3=SYSTEM';
-
--- 为历史数据回填 AGENT（role=2 且 sender_agent_id 非空的为 AGENT 发送）
-UPDATE chat_message SET sender_type = 2 WHERE role = 2 AND sender_agent_id IS NOT NULL;
-UPDATE chat_message SET sender_type = 3 WHERE role = 1 AND principal_id = 1;
--- 剩余 role=1 且 principal_id>1 的保持 sender_type=1 (USER)
-
-CREATE INDEX idx_chat_message_room_version ON chat_message(conversation_id, room_version);
-
--- === 删除：Phase 1 inbox 表 ===
-DROP TABLE IF EXISTS agent_inbox CASCADE;
-DROP TABLE IF EXISTS agent_working_state CASCADE;
-
--- === command 表：保留历史字段（不 DROP，避免丢失审计数据） ===
--- executor_kind 和 source_type 列保留不再写入，历史 command 仍可查询。
--- 新建 command 时 executor_kind 固定写 2 (ACP)、source_type 固定写 2 (CHAT)。
--- Phase 2 再考虑废弃。
-```
-
-### Phase 2（Held Draft 机制）
-
-```sql
--- state: 1=HELD, 2=RESOLVED, 3=EXPIRED
-CREATE TABLE held_action (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    agent_id INTEGER NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
-    conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
-    action_json JSONB NOT NULL,          -- 原始 SubmitAction proto
-    base_version BIGINT NOT NULL,        -- Agent 决策时的房间版本
-    current_version BIGINT NOT NULL,     -- 暂存时的房间版本
-    state SMALLINT NOT NULL DEFAULT 1,   -- 1=HELD, 2=RESOLVED, 3=EXPIRED
-    resolution SMALLINT,                 -- 1=REVISE, 2=SEND_AS_IS, 3=DISCARD, 4=FORCE_SEND
-    command_id UUID REFERENCES command(id) ON DELETE SET NULL,  -- resolved=FORCE_SEND/SEND_AS_IS 后创建
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    resolved_at TIMESTAMPTZ,
-    expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '10 minutes')
-);
-
-CREATE INDEX idx_held_action_agent_state ON held_action(agent_id, state);
-CREATE INDEX idx_held_action_conversation ON held_action(conversation_id, state);
-CREATE INDEX idx_held_action_expires ON held_action(state, expires_at) WHERE state = 1;
-
--- 后台定期清理过期 held_action (由 Dispatcher 扫描 expires_at)
-```
+| 元素 | 处理 |
+|------|------|
+| `ExecutorKind` enum | 已删除；仅在 Lifecycle 事件 payload 中保留字符串形式（`"ACP"` / `"THREAD"`） |
+| `CommandSource` enum | 已删除（由 `SenderType` 取代） |
+| `SendCommand` RPC / `SendCommandRequest` | 已删除 |
+| `PullInbox` / `SelectInboxItem` / `DeferInboxItem` | 已删除（inbox 模型移除） |
+| `InboxSnapshot` / `InboxItemSelected` / `InboxItem` | 已删除 |
+| `RespondPermission` / `permission_decision` | 已删除（权限自动授予） |
 
 ---
 
-## 崩溃恢复与 Held Draft 超时
+## 数据库变更（实际落地）
 
-### Agent 重连恢复
+### 已实现（消息驱动骨架 + 演进）
 
-当前 `AgentReady` 携带 `last_command_id` / `last_ack_seq` / `last_event_seq` 用于恢复 in-flight command。新架构保留此机制，并扩展：
+`backend/manager/migration/migration/LATEST.sql` 与增量迁移（`backend/manager/migration/migration/1.1/`）：
 
-1. **Agent 重连时**发送 `AgentReady`：
-   - 若有未完成的 `command_id` → 走现有 grace period 恢复流程
-   - 并检查该 agent 是否有 `held_action` 处于 `HELD` 状态：
-     - 存在 → 发送 `ActionResponse(held=true, ...)` 重新提示 Agent 决议
-     - 不存在 → 发送 `NewMessagesAvailable` 让 Agent 拉取最新消息
+- `conversation.version BIGINT NOT NULL DEFAULT 1`（房间版本号）。
+- `chat_message.room_version BIGINT NOT NULL DEFAULT 0` + `idx_chat_message_room_version (conversation_id, room_version)`。
+- `chat_message.sender_type SMALLINT NOT NULL DEFAULT 1`（1=USER, 2=AGENT, 3=SYSTEM）+ 历史数据回填（role=2 且 sender_agent_id 非空 → AGENT；principal_id=1 → SYSTEM）。
+- `DROP TABLE IF EXISTS agent_inbox / agent_working_state CASCADE`（inbox 模型移除）。
+- 新增游标表 `agent_channel_cursor` / `user_channel_cursor`（`processed_version`），作为 agent/前端"已处理到哪"的真相源——取代 inbox 的"下一条工作"派发。
+- 线程模型：`chat_message.thread_root_message_id`、`thread_participant`、`user_thread_participant` 等。
 
-2. **Held Action 超时**：
-   - `expires_at` 默认 10 分钟
-   - Dispatcher 后台 goroutine 每 1 分钟扫描 `state=HELD AND expires_at < now()`
-   - 超时 → `state=EXPIRED`，释放占用，记录审计
-   - 不自动 FORCE_SEND（避免发送过期内容）
+### 与原方案的偏差
 
-### Permission 模型与 Held Draft 的交互
-
-当一个 ACP command 处于 `PERMISSION_REQUESTED` 等待用户决策时：
-- 若期间该 conversation 有新消息到达，**不触发** Held Draft（command 已在执行中）
-- Permission 决策仍通过 `RespondPermission` API → bidi stream → Agent
-- 若用户取消 command（`CancelCommand`），Manager 取消 ACP session 并将任何未决议的 held_action 标记为 `DISCARD`
+- **`held_action` 表未创建**：LATEST.sql 中显式 `DROP TABLE IF EXISTS held_action CASCADE`（清理历史实验），Held Draft 的服务端实现被客户端 `PostMessage.base_version` 冲突检测取代（见"崩溃恢复"一节）。
+- **`command.executor_kind` / `command.source_type` 已删除**（原方案 Phase 1 "保留不删" → 实际在后续迁移中直接 DROP）。`command` 表现有列：`id / agent_id / machine_id / principal_id / command / instruction / profile / allow_diff / status / exit_code / duration_ms / created_at / started_at / completed_at / result_json / env / working_dir / timeout_seconds / error_message / final_summary / last_ack_seq / conversation_id`。
+- store 层提供 `IncrementConversationVersion` / `GetConversationVersion` / `GetMessagesAfterVersion`（`backend/manager/store/conversation_version.go`）；但消息写入主路径使用 `CreateChatMessageBumpVersion` / `CreateTaskMessageBumpVersion`（消息创建与 bump 同事务，见 `backend/manager/store/chat_message.go`、`backend/manager/store/task.go`）。
 
 ---
 
-## 前端执行进度可见性
+## 崩溃恢复（原"Held Draft 超时"一节随 held_action 方案废弃）
 
-### 问题
+### Agent 重连恢复（实际行为）
 
-删除 `SendCommand` 后，`command` 变成内部细节。但前端仍需展示 ACP 执行过程（工具调用、diff、文本输出等）。
+`AgentReady` 携带 `session_id` / `last_command_id` / `last_ack_seq` / `last_event_seq` / `agent_name`（处理逻辑在 `backend/manager/api/v1/agent_command.go` 的 `handleAgentReady`）：
 
-### 方案：对话级事件流
+1. 若 `last_command_id` 对应的 command 仍为 RUNNING（断线前在途）——**不恢复执行**，直接标记 FAILED（"agent disconnected during execution"）并清空会话当前 command；agent 的 drain 循环将开启全新会话。原方案的 grace period 恢复流程已不存在。
+2. 断线期间漏掉的消息不靠补推：Manager 发送 best-effort `NotifyWake`，agent 自 kick 后由下一次 `BeginSession` 通过持久化游标（`agent_channel_cursor`）重新发现全部未处理工作——游标是真相源，唤醒丢失只是多等一个周期。
+3. 执行历史（output/event）可通过 `GetCommandContext`（CLI `command context`）恢复阅读。
 
-保留 `WatchCommand` / `WatchCommandEvents` RPC（以 `command_id` 为准），但前端通过 `chat_message.command_id` 关联找到对应 command，再订阅其事件流。
+### PostMessage 版本冲突（取代 Held Draft）
 
-新增 **`WatchConversationEvents`** RPC（Phase 2 考虑），以 `conversation` 为维度聚合该会话内所有 command 的事件，前端无需逐个 command 订阅：
+原方案的 held_action 表 / 四决议 RPC / 超时扫描**未实现**。等价能力内联在 `PostMessage`（`backend/manager/api/v1/command_message.go`）：
 
-```protobuf
-rpc WatchConversationEvents(WatchConversationEventsRequest) returns (stream CommandEvent) {
-  option (google.api.http) = {get: "/v1/{conversation=conversations/*}:watchEvents"};
-}
+- `base_version == conversation.version` → `committed=true`，消息创建，发送者游标前移（`UpsertCursor`，单调 `GREATEST`，不会被显式 ack 回退——保证自己的回复不会被误认为新工作）。
+- `base_version != current` → `committed=false`，响应携带 `new_messages`（最多 50 条，含 `is_own` 标记）与 `conflict_description`；由 **agent 客户端**决定改写重发 / 照发 / 放弃（沉默）。没有服务端暂存、没有超时、没有 FORCE_SEND——REVISE/SEND_AS_IS/DISCARD 都在客户端完成，"FORCE_SEND"即无视冲突再次提交。
 
-message WatchConversationEventsRequest {
-  string conversation = 1;
-  int32 after_seq_no = 2;  // 可选，沿用现有语义
-}
-```
+### Permission 模型
 
-Phase 1 阶段前端继续用 `chat_message.command_id` → `WatchCommandEvents`，保证兼容。
+权限已**自动授予**：`PERMISSION_REQUESTED` 事件、`RespondPermission` API 与 `ManagerStreamMessage.permission_decision`（原字段 7）均已删除。高风险操作的把关改为引导语约束（owner DM 确认等，见 `backend/agent/executor/prompt/communication.md`）。用户中断/干预走 `CancelCommand`（→ `CancelMessage` 下发）与 `SteerCommand`（→ `SteerMessage` 在途注入）。
 
 ---
 
-## 后端代码变更
+## 前端执行进度可见性（当前实现）
+
+- `WatchCommand` / `WatchCommandEvents` RPC 保留；`frontend/src/stores/command.ts` 提供 `watchCommand` / `watchCommandEvents` / `getCommand` / `cancelCommand` / `steerCommand`。
+- 聊天视图渲染**已提交的消息**（token 级流式渲染管线已退役）；需要看执行过程时从消息行跳转 command-detail 页（`/members/agents/{agent}/commands/{command_id}`），该页（`frontend/src/pages/dashboard/command-detail.tsx`）用 `watchCommand` + `watchCommandEvents` 订阅输出与事件流；`frontend/src/components/chat-events/`（tool-call、diff、warning）与 `frontend/src/components/command-events/` 复用同一事件模型（`frontend/src/lib/command-events-model.ts`）。
+- **`WatchConversationEvents` 未实现**（仍以 command 为粒度订阅）。
+
+---
+
+## 后端代码变更（实际结果）
 
 ### 删除的文件
 
-| 文件 | 阶段 | 原因 |
-|------|------|------|
-| `backend/agent/executor/executor.go` | Phase 1 | BashExecutor 废弃，只保留 ACP（需先确认无生产 Agent 依赖 SHELL） |
-| `backend/manager/store/inbox.go` | Phase 1 | inbox 模型被消息拉取取代 |
+| 文件 | 说明 |
+|------|------|
+| `backend/agent/executor/executor.go` | BashExecutor 已删除（连同 SHELL 执行器）；现为 ACP executor（`backend/agent/executor/acp_executor.go`）+ thread executor（`backend/agent/executor/thread_executor.go`，acp2 v2 thread 路径） |
+| `backend/manager/store/inbox.go` | inbox 模型移除 |
 
-### 新建的文件
+### 新建的关键文件
 
-| 文件 | 阶段 | 职责 |
-|------|------|------|
-| `backend/manager/store/held_action.go` | Phase 2 | `held_action` 表的 CRUD + 超时扫描 |
-| `backend/manager/store/conversation_version.go` | Phase 1 | `IncrementConversationVersion`、`GetMessagesAfterVersion` |
+| 文件 | 职责 |
+|------|------|
+| `backend/manager/store/conversation_version.go` | `IncrementConversationVersion` / `GetConversationVersion` / `GetMessagesAfterVersion` |
+| `backend/manager/api/v1/message_create.go` | SendMessage/PostMessage 共享的消息创建管线（bump 版本 + 唤醒 + activity） |
+| `backend/manager/component/dispatcher/session_lifecycle.go`、`session_registry.go`、`command_bus.go` | agent 会话注册、BeginSession 生命周期、流管理 |
+| `backend/agent/client/drain_runner.go`、`message_router.go`、`stream_connector.go` | agent 侧 drain 循环、Manager 消息路由、连接管理 |
+| `backend/agent/acp2/` | acp2 v2 thread 传输层 |
 
-### 重度改写的文件
+（原方案的 `backend/manager/store/held_action.go` 未创建。）
 
-| 文件 | 阶段 | 变更说明 |
-|------|------|----------|
-| `backend/manager/component/dispatcher/dispatcher.go` | Phase 1+2 | Phase 1：删除 inbox 方法，新增 `HandlePullMessages`、`NotifyNewMessages`；`HandleResult` 改为创建 assistant message + 递增 conversation.version。Phase 2：新增 `HandleSubmitAction`（Held Draft 校验 + 内部创建 command + 下发 `CommandRequest`）、`HandleResolveHeldAction`、held_action 超时扫描 goroutine |
-| `backend/agent/client/command_stream.go` | Phase 1+2 | Phase 1：`PullMessages` 流程、`NewMessagesAvailable` 处理、删除 shell executor 分支。Phase 2：`SubmitAction` 流程、Held Draft 处理 |
-| `proto/v1/v1/command.proto` | Phase 1+2 | 按上文 Proto 设计部分分阶段改写 |
+### 重写/新增的核心文件
 
-### 中度改写的文件
-
-| 文件 | 阶段 | 变更说明 |
-|------|------|----------|
-| `backend/manager/api/v1/command.go` | Phase 1 | 删除/弃用 `SendCommand` handler；`SendMessage` handler 增加 `room_version` 递增 + `NewMessagesAvailable` 通知；`buildInboxSummary` 删除 shell 分支 |
-| `backend/manager/api/v1/agent_command.go` | Phase 1+2 | `CommandChannel` 改为 `AgentChannel`；处理 `PullMessages`/`SubmitAction`/`ResolveHeldAction` |
-| `backend/manager/store/command.go` | Phase 1 | `CommandMessage` 保留 `ExecutorKind`/`SourceType`/`ConversationID` 字段（历史兼容），`CreateCommand` 固定写入 `ExecutorKind=ACP`、`SourceType=CHAT` |
-| `backend/manager/store/chat_message.go` | Phase 1 | `ChatMessage` 新增 `RoomVersion`、`SenderType` 字段；`CreateChatMessage` 写入这些字段 |
-| `backend/manager/store/conversation.go` | Phase 1 | 新增 `IncrementVersion` 方法 |
-| `backend/manager/migration/latest.sql` | Phase 1+2 | 按上表分阶段新增表和列 |
-| `backend/manager/server/grpc_routes.go` | Phase 1 | 更新服务名绑定（`AgentStreamService`） |
-
-### 轻微改写的文件
-
-| 文件 | 阶段 | 变更说明 |
-|------|------|----------|
-| `backend/agent/executor/runtime.go` | Phase 1 | `Request` 结构体删除 `ExecutorKind`、`SourceType` 字段，新增 `ConversationID`、`ReplyToMessageID` |
-| `backend/agent/executor/acp_executor.go` | Phase 1 | 适配新的 Request 结构 |
+| 文件 | 变更 |
+|------|------|
+| `proto/v1/v1/command.proto` | 按上文 Proto 设计重写（SendCommand/枚举/inbox RPC 删除；BeginSession/PostMessage/SenderType/threads/reactions 等加入） |
+| `backend/manager/component/dispatcher/dispatcher.go` | `HandleBeginSession`（游标/提醒/启用/运行时能力校验 → 创建 RUNNING command）、`NotifyNewMessages` / `NotifyWake` / `NotifyThreadMention`、`HandleResult` 等 |
+| `backend/manager/api/v1/agent_command.go` | `AgentChannel` bidi：AgentReady（在途 command 标记 FAILED + wake）、BeginSession、Progress/Result/Event、Ping、workspace/providers、prompt notice ack |
+| `backend/manager/api/v1/command_message.go` | `PostMessage`（成员门禁、归档只读、base_version 冲突检测、mentions 服务端解析、发送者游标前移） |
+| `backend/manager/api/v1/channel_message.go` | `SendMessage`（用户专用；agent 调用被拒）+ `notifyConversationAgents` / 线程订阅唤醒 |
+| `backend/manager/api/v1/command.go` | `ListChannelUpdates` / `ListThreadUpdates` / `AckProcessedVersion`（AX Agent Inbox 发现与游标推进） |
+| `backend/manager/store/chat_message.go` | `RoomVersion` / `SenderType` 字段；`CreateChatMessageBumpVersion` |
+| `backend/manager/store/agent_channel_cursor.go` | 持久化 per-channel 游标（取代 agent_inbox 的"下一条工作"派发） |
+| `backend/agent/client/command_stream.go` | 连接循环 + 唤醒 + BeginSession 请求编排（配套 `drain_runner.go` / `message_router.go`） |
+| `backend/agent/executor/runtime.go` | `Request` 无 `ExecutorKind`/`SourceType`；携带 `ConversationID`、`AgentID`、`MachineID`、`TurnPrompt`、`ReanchorPrompt`、owner/team 注入字段等 |
+| `backend/manager/server/grpc_routes.go` | 注册 `AgentStreamService` |
 
 ---
 
-## 前端变更
+## 前端变更（当前状态）
 
-### Store 变更
-
-| 文件 | 阶段 | 变更 |
-|------|------|------|
-| `stores/chat.ts` | Phase 1 | `sendChatMessage()` 改为纯 `SendMessage`，不再调用 `SendCommand`；`streamChatCommand()` 适配：通过 `chat_message.command_id` 关联 `WatchCommandEvents` |
-| `stores/command.ts` | Phase 1 | 删除 `sendCommand()`；保留 `listCommands()`、`getCommand()`、`watchCommand()`、`watchCommandEvents()` 用于执行监控 |
-| `stores/types.ts` | Phase 1 | 删除 `sendCommand`、`executorKind` 等类型定义 |
-
-### 组件和页面变更
-
-| 文件 | 阶段 | 变更 |
-|------|------|------|
-| `pages/dashboard/command-list.tsx` | Phase 1 | 删除 `handleSend()` 中的 `SendCommand` 调用和 `ExecutorKind` 引用 |
-| `pages/dashboard/command-detail.tsx` | Phase 1 | 删除 `isACP` 条件分支（全部是 ACP） |
-| `lib/command-status.ts` | Phase 1 | 删除 `executorKindToI18nKey` 中的 SHELL 条目 |
-
-### 文案变更
-
-| 文件 | 阶段 | 删除内容 |
-|------|------|----------|
-| `locales/en-US.json` | Phase 1 | `"executor-shell": "Shell"` |
-| `locales/zh-CN.json` | Phase 1 | `"executor-shell": "Shell"` |
-
-### Proto 生成物变更
-
-```
-frontend/src/types/proto-es/v1/command_pb.d.ts
-frontend/src/types/proto-es/v1/command_pb.js
-```
-自动重新生成，随 proto 变更更新。
+- `frontend/src/stores/chat.ts`：`sendChatMessage()` 纯 `SendMessage`（乐观占位 + 服务端回显按 id 去重）；无任何 `SendCommand` 调用链。
+- `frontend/src/stores/command.ts`：无 `sendCommand`；保留 `cancelCommand`、`steerCommand`、`getCommand`、`watchCommand`、`watchCommandEvents`（执行监控/详情页用）。
+- `frontend/src` 中已无 `ExecutorKind` / `sendCommand` 引用（仅生成物 `src/types/proto-es/` 含枚举历史命名，无调用）；`frontend/src/lib/command-status.ts` 只含状态→i18n key/徽章 variant 映射；`frontend/src/locales/` 无 `executor-shell` 文案。
+- 执行详情：`frontend/src/pages/dashboard/command-detail.tsx` 通过 `watchCommand` + `watchCommandEvents` 订阅；`frontend/src/pages/dashboard/command-list.tsx` 的发送走 `sendChatMessage`（SendMessage）。
 
 ---
 
-## 实施步骤（分阶段）
+## 实施结果（截至 2026-09-06）
 
-### Phase 1：消息驱动骨架（不含 Held Draft）
+### Phase 1（消息驱动骨架）——已实现，且被进一步演进
 
-目标：`SendMessage` 成为唯一用户入口，inbox 模型替换为消息拉取，SHELL 执行器移除。
+- `SendMessage` 成为用户唯一发送入口；inbox 模型移除（表与 RPC 全删）；SHELL 执行器移除；`conversation.version` / `chat_message.room_version` / `sender_type` 落库；`NewMessagesAvailable` 唤醒。
+- **超出原方案**：线程（thread）模型、per-channel 游标（`agent_channel_cursor`）、`ListChannelUpdates` / `ListThreadUpdates` / `AckProcessedVersion`、`BeginSession` 会话模型、系统提示词版本与推送（`prompt_version` / `PromptReleaseNotice`）、workspace/provisioner 流、团队上下文注入（`TeamContext`）、`SteerCommand`、任务/提醒/反应等会话内功能。
 
-#### Step 1.1: Proto 改写（Phase 1 部分）
-- 新增 `PullMessages`、`MessageSnapshot`、`NewMessagesAvailable`、`SenderType` enum
-- `ChatMessage` 新增 `room_version`、`sender_type` 字段
-- `CommandRequest` 简化字段（删除 `executor_kind`、`source`，新增 `conversation_id`、`reply_to_message_id`）
-- 重命名 `AgentCommandService` → `AgentStreamService`、`*CommandMessage` → `*StreamMessage`、`CommandChannel` → `AgentChannel`
-- 删除 `PullInbox`/`SelectInboxItem`/`DeferInboxItem`/`InboxSnapshot`/`InboxItemSelected`/`InboxItem`
-- `SendCommand` RPC 标记 `deprecated`（proto option `deprecated = true`），不删除
-- `ExecutorKind`/`CommandSource` enum 保留但标记 deprecated
-- 运行 `buf format -w proto && buf lint proto && cd proto && buf generate`
+### Phase 2（Held Draft）——按简化形态实现
 
-#### Step 1.2: 数据库迁移（Phase 1 部分）
-- 新增 `conversation.version`、`chat_message.room_version`、`chat_message.sender_type` 列
-- 回填历史 `sender_type`
-- 新增 `idx_chat_message_room_version` 索引
-- 删除 `agent_inbox`、`agent_working_state` 表
-- `command.executor_kind`、`command.source_type` 列**保留**（历史兼容），新建 command 固定写 ACP/CHAT
+- 服务端 held_action 表 / `ResolveHeldAction` / 超时扫描**未实现**（LATEST.sql 显式 DROP）。
+- 等价物：`PostMessage.base_version` 冲突检测 + `new_messages` 回传，决议在 agent 客户端完成（见"崩溃恢复"一节）。
 
-#### Step 1.3: Store 层变更
-- 删除 `inbox.go`
-- 新建 `conversation_version.go`（`IncrementConversationVersion`、`GetMessagesAfterVersion`）
-- 更新 `chat_message.go`（新增 `RoomVersion`、`SenderType` 字段读写）
-- 更新 `command.go`（`CreateCommand` 固定 `ExecutorKind=ACP`、`SourceType=CHAT`）
-- 更新 `conversation.go`（新增 `IncrementVersion`）
+### Phase 3（清理废弃 API）——大部分完成
 
-#### Step 1.4: Dispatcher 改写（Phase 1）
-- 删除所有 inbox 方法（`HandlePullInbox`、`HandleSelectInboxItem`、`HandleDeferInboxItem`、`SendInboxSnapshot`、`NotifyInboxUpdated`）
-- 新增 `HandlePullMessages(agentID, conversationID, afterVersion)` → 返回 `MessageSnapshot`
-- 新增 `NotifyNewMessages(agentID, conversationID, version)` → 推送 `NewMessagesAvailable`
-- 修改 `HandleResult`：创建 assistant `chat_message`（带 `room_version`）+ `IncrementConversationVersion`
-- `RegisterAgent` 不再 upsert working_state（该表已删）
-
-#### Step 1.5: API Handler 更新
-- `command.go`：`SendMessage` handler 增加 `IncrementConversationVersion` + `NotifyNewMessages`；`SendCommand` 保留但内部委托给 `SendMessage` 流程（兼容期）
-- `agent_command.go`：`CommandChannel` → `AgentChannel`；处理 `PullMessages`
-- `grpc_routes.go`：更新服务名绑定
-
-#### Step 1.6: Agent Client 改写（Phase 1）
-- 删除 `buildRuntime` 中的 SHELL 分支
-- `handleInboxSnapshot` → `handleNewMessagesAvailable` + `pullMessages` 流程
-- `CommandRequest` 适配新字段
-- `runCommand` 中 LIFECYCLE event 不再写 `executor_kind`（或固定写 `"ACP"`）
-
-#### Step 1.7: Agent Executor 适配
-- `runtime.go` `Request` 删除 `ExecutorKind`、`SourceType`，新增 `ConversationID`、`ReplyToMessageID`
-- `acp_executor.go` 适配
-- 删除 `executor.go`（BashExecutor）
-
-#### Step 1.8: 前端适配
-- 删除前端 `SendCommand` 调用链
-- `sendChatMessage()` 改为纯 `SendMessage`
-- 执行进度通过 `chat_message.command_id` → `WatchCommandEvents`（保持兼容）
-- 删除 `ExecutorKind` 引用与 shell 文案
-
-#### Step 1.9: 构建验证
-- `go build -ldflags "-w -s" -p=16 -o ./build/laelia ./backend/manager/bin/server/main.go`
-- `golangci-lint run --allow-parallel-runners`
-- `go test ./backend/... -count=1`
-- `LAELIA_RUN_OPENCODE_ACP_TESTS=1 go test ./backend/agent/executor -count=1`（若 stdio/runtime 集成有变）
-- `pnpm --dir frontend type-check`
+- `SendCommand` / `SendCommandRequest` / `ExecutorKind` / `CommandSource` / inbox RPC 已删除（直接删除，未走弃用期）。
+- `command.executor_kind` / `command.source_type` 列已 DROP。
+- `WatchConversationEvents` **未实现**。
 
 ---
 
-### Phase 2：Held Draft 机制（多参与方场景）
-
-目标：引入版本校验与草稿决议，应对并发消息场景。
-
-#### Step 2.1: Proto 增量
-- 新增 `SubmitAction`、`ActionResponse`、`ResolveHeldAction`、`ActionResolution` enum
-- `AgentStreamMessage`/`ManagerStreamMessage` 新增对应 oneof 分支
-
-#### Step 2.2: 数据库迁移
-- 新建 `held_action` 表（含 `expires_at`、`command_id` 关联）
-
-#### Step 2.3: Store 层
-- 新建 `held_action.go`（CRUD + `ExpireHeldActions` 扫描）
-
-#### Step 2.4: Dispatcher 增量
-- 新增 `HandleSubmitAction`：
-  1. 比较 `base_version` 与 `conversation.version`
-  2. 一致 → 内部创建 command + 下发 `CommandRequest` → `ActionResponse(committed=true, command_id)`
-  3. 不一致 → 创建 `held_action` 记录 → `ActionResponse(held=true, new_messages)`
-- 新增 `HandleResolveHeldAction`：
-  - `REVISE` → 删除 held_action，Agent 重新 `PullMessages` + 重提 `SubmitAction`
-  - `SEND_AS_IS` → 直接创建 command + 下发
-  - `DISCARD` → 标记 `RESOLVED`，不发 command
-  - `FORCE_SEND` → 直接创建 command + 下发
-- 新增 held_action 超时 goroutine（每 1 分钟扫描 `state=HELD AND expires_at < now()` → `state=EXPIRED`）
-- `AgentReady` 重连流程扩展：检查并重新提示 held_action
-
-#### Step 2.5: Agent Client 增量
-- `PullMessages` 后发起 `SubmitAction`
-- 处理 `ActionResponse(held=true)` → 读 `new_messages` → 发 `ResolveHeldAction`
-- `AgentReady` 崩溃恢复时检查并决议遗留 held_action
-
-#### Step 2.6: 构建验证
-- 同 Phase 1 Step 1.9
-
----
-
-### Phase 3：清理废弃 API（可选，视兼容需求）
-
-- 删除 `SendCommand` RPC、`SendCommandRequest`
-- 删除 `ExecutorKind`、`CommandSource` enum
-- 删除 `command` 表的 `executor_kind`、`source_type` 列（确认无历史查询需求后）
-- 新增 `WatchConversationEvents` RPC（前端逐 command 订阅 → 会话级订阅）
-
----
-
-## 对 AX 四问的回应
-
-本次重构直接回应了 Raft 团队提出的 AX 四大问题：
+## 对 AX 四问的回应（按当前实现）
 
 | AX 问题 | 我们的回应 |
 |---------|-----------|
-| What does the agent see? | `MessageSnapshot`（复用 `ChatMessage` + `room_version`）提供结构化的房间状态，包含版本标记和发送者上下文 |
-| What state does it carry? | `PullMessages(conversation_id, after_version)` 让 Agent 携带上次看到的版本，只拉增量；重连时 `AgentReady` 自描述进度 |
-| What can it recover from? | Held Draft 四种决议路径（Revise/SendAsIs/Discard/ForceSend）+ `expires_at` 超时 + 崩溃重连重新提示覆盖全部恢复场景 |
-| What is it allowed to decide? | `SubmitAction` 的选项空间显式化；Agent 自主决定回复/执行/沉默/追问；`sender_type=SYSTEM` 让程序化触发也走同一决策路径 |
+| What does the agent see? | `ListChannelUpdates` 发现 + `message check` / `message read` 增量拉取（`after_version`）；`ChatMessage` 携带 `sender_type` / `room_version` / `mentions` / thread / reactions / task 上下文 |
+| What state does it carry? | 持久化 per-channel 游标（`agent_channel_cursor`）+ `AckProcessedVersion`；唤醒仅是 hint，游标是真相源 |
+| What can it recover from? | 断线重连：在途 command 标记 FAILED、游标重发现；回复冲突：`PostMessage` 返回 `new_messages` 供改写/照发/放弃；`GetCommandContext` 恢复执行历史 |
+| What is it allowed to decide? | 回复 / 执行工具 / 追问 / 沉默（"silence is valid" 引导语 + drain 会话最小间隔 `minSessionGap` 硬刹车）；`sender_type=SYSTEM` 让程序化消息走同一管线 |
 
 ---
 
-## 设计决策记录
+## 设计决策记录（最终态）
 
-| 决策 | 选择 | 理由 |
-|------|------|------|
-| 是否新建 `RoomMessage` 类型 | 否，复用 `ChatMessage` + 新增字段 | 避免双类型表示同一数据；`ChatMessage` 已有 `sender_name`/`role`/`content`/`created_at` |
-| `PullMessages` 用 map 还是单值 | 单值 `conversation_id + after_version` | Agent 通常一次关注一个会话；map 浪费带宽且游标应由 Agent 自维护 |
-| `command.executor_kind`/`source_type` 列 | Phase 1 保留不删，Phase 3 视情况删 | 保留历史审计数据；新建 command 固定写默认值 |
-| `SendCommand` RPC 处理 | Phase 1 deprecated 保留，Phase 3 删除 | 给前端/外部调用方迁移窗口 |
-| Held Draft 何时引入 | Phase 2，与骨架分离 | 1:1 场景并发概率低；Held Draft 主要服务多参与方频道 |
-| SHELL executor 删除时机 | Phase 1 确认无生产依赖后删除 | 若有 CI 依赖 SHELL，转为 SYSTEM sender_type 消息 |
-| `conversation.version` vs `room_version` 命名 | DB 列名 `version`，proto 字段名 `room_version` | DB 内部用简名，跨服务接口用语义明确名；文档统一用 `room_version` 描述概念 |
-| `held_action` 超时策略 | `expires_at` 默认 10 分钟，不自动 FORCE_SEND | 避免发送过期内容；让 Agent 重连后重新决策更安全 |
+| 决策 | 选择 | 理由/结果 |
+|------|------|-----------|
+| 是否新建 `RoomMessage` 类型 | 否，扩展 `ChatMessage` | 已按此落地（`sender_type=9`、`room_version=10`、…） |
+| 消息拉取机制 | `ListChannelUpdates` 发现 + `ListConversationMessages(after_version)` 增量，而非流上专用 `PullMessages` | 复用用户端同一读取管线；agent 与前端共享语义 |
+| `command.executor_kind`/`source_type` 列 | 已直接 DROP（未按 Phase 1 保留） | 历史审计价值有限，迁移更干净 |
+| `SendCommand` RPC 处理 | 已删除（未走 deprecated 保留期） | 前端调用链同期移除，无需兼容窗口 |
+| Held Draft 何时引入 | 未建 held_action 表；以 `PostMessage.base_version` 客户端决议实现 | 会话场景以 1:1/DM 为主，服务端暂存/超时收益低 |
+| SHELL executor 删除时机 | 已删除 | 仅保留 ACP（stdio + acp2 thread）与内置 pi 运行时 |
+| `conversation.version` vs `room_version` 命名 | DB 列名 `version`，proto 字段名 `room_version` | 已按此落地 |
+| 权限决策流 | 移除 `permission_decision`/`RespondPermission`，改为自动授予 + 引导语约束 | 降低在途 turn 的阻塞面 |

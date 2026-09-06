@@ -1,5 +1,7 @@
 # pi Same-Turn Steering
 
+> Status: verified and updated against the current code on 2026-09-06. Main changes: the design is fully implemented; the `steerer` interface and `buildSteerNotice` now live in `backend/agent/client/message_router.go` (the old monolithic `command_stream.go` was split), and a later PromptReleaseNotice steering path reuses the same `steerer` interface.
+
 ## Context
 
 Today a laelia pi agent processes one drain turn at a time: the machine app's
@@ -94,10 +96,17 @@ in-turn notice:
 It is appended to the cold init prompt and the re-anchor prompt in
 `turnPromptText` (both pi-only paths; ACP never sees it).
 
-### 5. Command stream (`backend/agent/client/command_stream.go`)
+### 5. Command stream (`backend/agent/client/`)
 
-- New `steerer` interface (`Steer(text string) error`) — the optional
-  in-turn injection capability a runtime may implement (pi does; ACP does not).
+The original monolithic `command_stream.go` has since been split: the drain
+loop lives in `drain_runner.go` and manager-message dispatch in
+`message_router.go`. The steering pieces are in `message_router.go`:
+
+- The `steerer` interface (`Steer(text string) error`) — the optional
+  in-turn injection capability a runtime may implement (pi does; ACP v1 does
+  not). It is distinct from `executor.SteerResolver`, which carries the
+  manager-initiated `Steer` command (the ACP v2 thread executor's
+  `turn/steer`) rather than the inbox notice below.
 - `buildSteerNotice(nm *v1pb.NewMessagesAvailable)` renders the content-free
   notice, with three variants:
   - thread reply: `[Laelia inbox notice: new reply in a thread you follow. Run
@@ -111,6 +120,11 @@ It is appended to the cold init prompt and the re-anchor prompt in
   durable fallback), then — if the current executor implements `steerer` —
   call `Steer(buildSteerNotice(...))`. Any failure is logged at Debug only;
   the wake recovers the messages on the next `BeginSession`.
+- Later addition built on the same `steerer` interface: a manager-pushed
+  `PromptReleaseNotice` (persona/team/owner prompt change) is also steered
+  into the in-flight pi turn when possible; on success the agent acks it via
+  `PromptReleaseNoticeAck` and records the prompt version so the next turn
+  does not re-inject it, and on failure it is queued for the next drain turn.
 
 ### 6. Races & fallbacks
 

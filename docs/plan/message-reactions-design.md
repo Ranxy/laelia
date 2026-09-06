@@ -1,5 +1,7 @@
 # 消息 emoji 反应（Message Reactions）设计
 
+> 状态：2026-09-06 已对照当前代码核对更新。主要变化：本设计已全量落地（表/迁移/proto/store/API/chattools/daemon/CLI/引导语/前端均在），本文按实现修正了 store/API 层的实际签名与文件位置、emoji 校验规则细节（新增零宽空格拒绝）、测试现状与实施清单勾稽。
+
 ## 1. 目标与定位
 
 human/agent 可对一条**可见消息**添加/移除一个 emoji 反应（如 `👍`、`✅`），作为一种**轻量反馈**：
@@ -82,15 +84,15 @@ CREATE INDEX IF NOT EXISTS idx_message_reaction_message ON message_reaction(mess
 
 ---
 
-## 5. proto 变更（`proto/v1/v1/command.proto`）
+## 5. proto 变更（`proto/v1/v1/command.proto`）— 已实现
 
 `buf generate` 重新生成 Go + TypeScript。
 
-### 5.1 Reaction 消息
+### 5.1 Reaction 消息（已实现，字段一致）
 
 ```proto
 // Reaction 是某条消息上针对一个 emoji 的聚合。count 为反应者总数；
-// reactors 为反应者显示名/handle；reacted 为调用者相对字段（是否已反应）。
+// reactors 为反应者显示名；reacted 为调用者相对字段（是否已反应）。
 message Reaction {
   string emoji = 1;
   int32 count = 2;
@@ -99,89 +101,65 @@ message Reaction {
 }
 ```
 
-### 5.2 ChatMessage 增加字段
+### 5.2 ChatMessage 增加字段（已实现，编号 19 正确落地）
 
-```proto
-message ChatMessage {
-  ...
-  // reactions 是该消息上当前的 emoji 反应聚合（按 emoji 分组、计数 + 反应者）。
-  // 由 ListConversationMessages / ListThreadMessages 填充。
-  repeated Reaction reactions = 19;
-}
-```
+`ChatMessage.reactions = 19`：按 emoji 分组的聚合，由 `ListConversationMessages` / `ListThreadMessages` 批量填充；无反应时为空列表。reaction 永不 bump `room_version`（proto 注释明确此旁路语义）。
 
-### 5.3 RPC（挂在 CommandService，user 与 agent 共用）
+### 5.3 RPC（挂在 CommandService，user 与 agent 共用；已实现）
 
-```proto
-message AddReactionRequest {
-  string message = 1 [REQUIRED];   // "conversations/{c}/messages/{m}"
-  string emoji = 2 [REQUIRED];
-}
-message AddReactionResponse {
-  string message = 1;
-  repeated Reaction reactions = 2;  // 更新后的聚合
-}
+`AddReactionRequest` / `AddReactionResponse` / `RemoveReactionRequest` / `RemoveReactionResponse` 与上文一致（实现中 REQUIRED 用 `[(google.api.field_behavior) = REQUIRED]` 表达）。handler 位于 `backend/manager/api/v1/command_reaction.go`。
 
-message RemoveReactionRequest {
-  string message = 1 [REQUIRED];
-  string emoji = 2 [REQUIRED];
-}
-message RemoveReactionResponse {
-  string message = 1;
-  repeated Reaction reactions = 2;  // 更新后的聚合
-}
-```
-
-> 不做 `ToggleReaction`：显式 add / remove 两个 RPC 与 CLI 的 `[--remove]` 一一对应，语义清晰、权限分支简单。
+> 不做 `ToggleReaction`：显式 add / remove 两个 RPC 与 CLI 的 `[--remove]` 一一对应。前端 store（`frontend/src/stores/chat.ts` 的 `toggleReaction`）按 `reacted` 字段自行决定调 add 还是 remove。
 
 ---
 
-## 6. 校验：`normalizeReactionEmoji`
+## 6. 校验：`NormalizeReactionEmoji`（已实现于 `backend/common/reaction.go`）
 
-放在共享包 `backend/common`，CLI 侧（chattools，本地快速失败）与 manager 侧（权威）共用同一实现。
+manager 侧（权威）与 CLI 侧（chattools，本地快速失败）共用同一实现。
 
-规则（按确认）：trim → 非空 → **不含任何空白字符**（空格/制表/换行/U+2000–200B 等 Unicode 空白全部拒绝，从而拒绝 `"thumbs up"` 这类文本）→ **≤16 rune**。
+规则（按确认）：trim → 非空 → **不含任何空白字符**（空格/制表/换行及 U+2000–U+200A 等 Unicode 空白全部拒绝，从而拒绝 `"thumbs up"` 这类文本；另显式拒绝 U+200B 零宽空格——它不属于 Unicode White_Space，需要单独拦截）→ **≤16 rune**（不是字节）。
 
 ```go
-func normalizeReactionEmoji(s string) (string, error) {
+func NormalizeReactionEmoji(s string) (string, error) {
     s = strings.TrimSpace(s)
     if s == "" {
         return "", errors.New("emoji is required")
     }
     for _, r := range s {
-        if unicode.IsSpace(r) {
-            return "", errors.New("emoji must not contain whitespace")
-        }
+        if unicode.IsSpace(r) { ... 拒绝 ... }
+        if r == '\u200b' { ... 拒绝（零宽空格） ... }
     }
-    if utf8.RuneCountInString(s) > 16 {
-        return "", errors.New("emoji too long (max 16 runes)")
+    if utf8.RuneCountInString(s) > maxReactionEmojiRunes /* 16 */ {
+        return "", errors.Errorf("emoji too long (max %d runes)", maxReactionEmojiRunes)
     }
     return s, nil
 }
 ```
 
 - **按 rune（非字节）**：`👍`=1 rune；`👍🏽`（肤色修饰，2 codepoint）= 2 runes，合法；family emoji（多 codepoint 拼接）仍在 16 rune 内。
-- **不做白名单**：任意单 emoji 都接受，只保证"是单个 emoji、不是文本"。
-- 校验失败 → manager 返回 `INVALID_ARGUMENT_FAILED`（见 §9）；CLI 在 chattools 层先本地校验以便 `--help`/错误更友好。
+- **不做白名单**：任意单 emoji 都接受，只保证"是单个 emoji、不是文本"。单个非空白单词（如 `okay`）**不会**被拒——设计确认只拦空白，文本由引导语约束。
+- 校验失败 → manager 返回 `INVALID_ARGUMENT`（CLI 侧映射为 `INVALID_ARGUMENT_FAILED`，见 §9）；CLI 在 chattools 层先本地校验以便 `--help`/错误更友好。
 
 ---
 
-## 7. 实时传播（关键技术点）
+## 7. 实时传播（已按推荐方案实现）
 
-**问题**：前端聊天流是"按 `after_version` 增量 + `roomhub` 长轮询"。reaction 不 bump 版本 → 消息长轮询增量恒为空 → 前端拿不到实时 reaction。
+**背景**：前端聊天流是"按 `after_version` 增量 + `wait_ms` 长轮询"（`ListConversationMessages`，服务端 `wait_ms` 上限 30000ms，由 `backend/manager/component/roomhub/roomhub.go` 的 pub/sub 唤醒）。reaction 不 bump 版本 → 消息增量恒为空 → 若不处理，前端拿不到实时 reaction。
 
-**推荐方案（最小改动、语义正确）**：
-- store 的 `AddReaction` / `RemoveReaction` 写完后调用 `roomNotifier.NotifyConversation(conversationID)`（复用现有 Hub，见 `backend/manager/component/roomhub/roomhub.go`）。
-- 前端聊天 watcher 在任意 wake（即使消息增量为空）时，对**当前渲染窗口内的消息**重新拉取 reactions。
-- 空增量对被意外唤醒的消息长轮询**无害**（客户端以同一 `after_version` 重新发起即可）。
+**实现（即原推荐方案）**：
+- store 的 `AddReaction` / `RemoveReaction` 写完后调用 `s.roomNotifier.NotifyConversation(conversationID)`（`backend/manager/store/message_reaction.go`，notifier 由 store 持有；`backend/manager/component/roomhub/roomhub.go` 的 `Hub.NotifyConversation` 非阻塞唤醒所有等待者）。
+- 前端聊天长轮询被唤醒后重新拉取当前页面——`ListConversationMessages` / `ListThreadMessages` 的 `fillReactions`（`backend/manager/api/v1/command_message.go`）每次都把最新聚合挂到消息上，reaction 随增量（可能为空）的重新拉取自然刷新；客户端以同一 `after_version` 重新发起即可。
+- 空增量对被意外唤醒的消息长轮询无害。
 
 **权衡**：reaction 风暴会带来少量多余的聊天长轮询往返（不破坏正确性）。当前单进程可接受。
 
-**未来 refinement（不在本期）**：给 `conversation` 加独立 `reactions_seq` 计数器 + `WatchReactions(conversation, after_seq)` 专用长轮询，与消息版本彻底隔离；多实例部署时换 Postgres LISTEN/NOTIFY 后端（与 roomhub 现有注释一致）。
+**未来 refinement（至今未实现）**：给 `conversation` 加独立 `reactions_seq` 计数器 + `WatchReactions(conversation, after_seq)` 专用长轮询，与消息版本彻底隔离；多实例部署时换 Postgres LISTEN/NOTIFY 后端（与 roomhub 现有注释一致）。
 
 ---
 
-## 8. agent 引导语（`communication.md`）
+## 8. agent 引导语（`backend/agent/executor/prompt/communication.md`）— 已实现
+
+Commands 表中的 `message react` 行、`message read` / `thread read` 输出的 `reactions:` 行、以及 `INVALID_ARGUMENT_FAILED` 中对非法 emoji 的说明，均与下文设计一致地存在于当前 communication.md。
 
 ### 8.1 Commands 表新增一行
 
@@ -208,9 +186,9 @@ func normalizeReactionEmoji(s string) (string, error) {
 
 ---
 
-## 9. 错误码
+## 9. 错误码（已实现，与 `chattools.wrapManagerError` 映射一致）
 
-沿用现有 `chattools.Error` 体系（CLI 渲染 `Error:` / `Code:` / `Next action:`）：
+沿用现有 `chattools.Error` 体系（CLI 渲染 `Error:` / `Code:` / `Next action:`；映射见 `backend/agent/chattools/chattools.go` 的 `wrapManagerError`）：
 
 | Code | 触发 |
 |------|------|
@@ -222,85 +200,63 @@ func normalizeReactionEmoji(s string) (string, error) {
 
 ---
 
-## 10. 后端 store / API 实现要点
+## 10. 后端 store / API 实现要点（已实现；签名与机制按实际代码修正）
 
-### 10.1 store（`backend/manager/store/message_reaction.go` 新建）
+### 10.1 store（`backend/manager/store/message_reaction.go`）
 
-- `AddReaction(ctx, messageID uuid.UUID, principalID, agentID *int, emoji string) ([]Reaction, error)`
-  - `INSERT INTO message_reaction ... ON CONFLICT DO NOTHING`（幂等），随后 `aggregateReactions(ctx, messageID)`。
-- `RemoveReaction(ctx, messageID uuid.UUID, principalID, agentID *int, emoji string) ([]Reaction, error)`
-  - `DELETE FROM message_reaction WHERE message_id=$1 AND emoji=$2 AND (principal_id IS NOT DISTINCT FROM $3 AND agent_id IS NOT DISTINCT FROM $4)`，再聚合。
-- `aggregateReactions(ctx, messageID) ([]Reaction, error)`：
+- `AddReaction(ctx, conversationID, messageID uuid.UUID, callerPrincipalID, callerAgentID *int, emoji string) ([]*v1pb.Reaction, error)`
+  - `INSERT INTO message_reaction ... ON CONFLICT DO NOTHING`（幂等，SQL 以常量 `addReactionSQL` 锁形测试），随后聚合返回。
+- `RemoveReaction(ctx, conversationID, messageID uuid.UUID, callerPrincipalID, callerAgentID *int, emoji string) (ReactionRemoveResult, error)`
+  - 一条 `reactionInspectSQL` 同时查出"调用者是否有此 emoji"（`callerHas`）与"是否有他人反应"（`othersHas`，actor 二元组 IS DISTINCT FROM 调用者）；仅当 `callerHas` 时执行 caller-scoped `DELETE`（`removeReactionSQL`）。返回 `ReactionRemoveResult{Removed, Others, Reactions}`，把"移除他人反应"的判定交给 API 层。
+- `queryReactions(ctx, messageIDs, callerPrincipalID, callerAgentID)`（批量聚合，供单条与批量共用）：
   ```sql
-  SELECT r.emoji, count(*),
-         COALESCE(array_agg(COALESCE(p.name, a.name) ORDER BY r.created_at) FILTER (WHERE r.principal_id IS NOT NULL OR r.agent_id IS NOT NULL), '{}'),
-         bool_or(<caller matches>)
+  SELECT r.message_id, r.emoji, count(*)::int,
+         COALESCE(array_agg(COALESCE(p.name, a.name) ORDER BY r.created_at), '{}'),
+         bool_or(COALESCE(r.principal_id = $2, false) OR COALESCE(r.agent_id = $3, false))
   FROM message_reaction r
   LEFT JOIN principal p ON p.id = r.principal_id
   LEFT JOIN agent a ON a.id = r.agent_id
-  WHERE r.message_id = $1
-  GROUP BY r.emoji ORDER BY r.emoji
+  WHERE r.message_id = ANY($1)
+  GROUP BY r.message_id, r.emoji
+  ORDER BY r.message_id, r.emoji
   ```
-  `reacted` 由调用者身份注入。
-- 写入后调用 `roomNotifier.NotifyConversation(convID)`（先解析 message → conversation）。
-- `ListReactionsForMessages(ctx, convID, messageIDs)`：`ListConversationMessages` / `ListThreadMessages` 读取时批量填充 `Reactions`（类似 `fillThreadReplyCounts` / `fillTaskInfo` 的 one-grouped-query 模式，避免 N+1）。
+  `reacted` 由调用者身份（principal 或 agent 二选一）经 `bool_or` 计算。
+- 写入后由 **store 自身**调用 `s.roomNotifier.NotifyConversation(convID)`（§7）。
+- `ListReactionsForMessages(ctx, messageIDs, callerPrincipalID, callerAgentID)`：返回 `map[messageID][]*Reaction`（无反应的消息映射为空切片）；被 `fillReactions` 用于批量填充，避免 N+1。
 
-### 10.2 API（`backend/manager/api/v1/command.go` 新增 handler）
+### 10.2 API（`backend/manager/api/v1/command_reaction.go`）
 
-`AddReaction` / `RemoveReaction` 共用一段授权逻辑（镜像 `PostMessage`）：
-
-1. 解析 `message` 名 → `parseMessageID`（conv + msg 两个 uuid）。
-2. `GetConversation`，不存在 → `NOT_FOUND`。
-3. **成员门禁**：
-   - agent 调用者：`IsConversationMember(ctx, convID, MemberTypeAgent, agent.ResourceID)`，非成员 → `PERMISSION_DENIED`；
-   - user 调用者：按现有 user 消息路径的会话策略校验可读。
-4. 确认 `message` 存在于该对话（且可被反应；thread reply 亦可）。
-5. `normalizeReactionEmoji`（server 权威）失败 → `INVALID_ARGUMENT`。
-6. 调用 store；`RemoveReaction` 前先判断：该 emoji 上**存在**他人反应且非本人 → `PERMISSION_DENIED`（见 §12 幂等/权限边界）。
-7. 返回更新后的 `reactions` 聚合。
-
-`ListConversationMessages` / `ListThreadMessages` 在填充 replies 后追加 `fillReactions`，把 `Reactions` 挂到每条消息。
+- `AddReaction` / `RemoveReaction` handler 共用 `requireReactionCaller(ctx, convID, msgID)`：
+  1. 解析 `message` 名 → `parseMessageName`（conv + msg 两个 uuid）。
+  2. `store.MessageExistsInConversation` 确认消息存在于该对话，否则 `NOT_FOUND`（thread reply 同样可反应）。
+  3. `common.NormalizeReactionEmoji`（server 权威）失败 → `INVALID_ARGUMENT`。
+  4. **agent 调用者**：`requireAgentMemberByConvID` 会话成员门禁，非成员 → `PERMISSION_DENIED`；**user 调用者**：仅需认证（未做会话成员/策略校验——与设计稿的"user 会话策略校验"不同，当前实现对 user 放行）。
+  5. `RemoveReaction`：调用 store 后，若 `!Removed && Others`（emoji 存在但属于他人）→ `PERMISSION_DENIED`；其余 no-op 情形成功返回当前聚合。
+- `fillReactions(ctx, msgs, v1msgs)`：`ListConversationMessages` / `ListThreadMessages`（`backend/manager/api/v1/command_message.go`）读取时批量填充 `Reactions`。
+- caller 身份解析（`reactionCallerFromContext`）：agent 调用者取 agent.ID，user 调用者取 user.ID。
 
 ---
 
-## 11. chattools / daemon / CLI
+## 11. chattools / daemon / CLI（已实现）
 
-### 11.1 chattools（`backend/agent/chattools/chattools_reaction.go` 新建）
+### 11.1 chattools（`backend/agent/chattools/chattools_reaction.go`）
 
-- `AddReaction(ctx, d, in{Message, Emoji}) (string, error)` / `RemoveReaction(...)`：
-  - 先 `normalizeReactionEmoji` 本地校验（快速失败）；
+- `AddReaction(ctx, d Deps, in ReactionInput) (string, error)` / `RemoveReaction(...)`（`ReactionInput{Message, Emoji}`）：
+  - 先 `common.NormalizeReactionEmoji` 本地校验（快速失败，`INVALID_ARGUMENT_FAILED`）；
   - `resolveMessageName(ctx, d, in.Message)` 得到 `conversations/<c>/messages/<m>`；
-  - 调 RPC，返回规范化文本。
-- `GetConversationMessages` / `GetThreadMessages` 的 `formatMessageLine` 增加可选 reactions 行（§8.2）。
+  - 调 RPC，返回 `formatReactionResult` 规范化文本（回显完整 handle，channel handle 带单引号；注意响应中的 `reactions` 聚合不打进文本）。
+- `formatReactionsLine(reactions)`：渲染 `  reactions: 👍 ×2 (alice, rei-agent-1), ✅ (bob)` 行（空时返回 ""）；`message read` / `thread read` 的消息行渲染处（`chattools.go`）追加该行。
 
-### 11.2 daemon（`backend/agent/daemon/server.go`）
+### 11.2 daemon（`backend/agent/daemon/`）
 
-- 新增 handler：`/reaction/add`、`/reaction/remove`，走 `s.run`（authorize → decode → chattools → write）。
-- `Request` 增加 `Emoji string`；reaction 的 message 用新增字段（如 `ReactionEmoji` + 复用 handle 传入），避免与 task RPC 的 `Message`（全名）语义混淆。
+- mux 注册在 `backend/agent/daemon/server.go`：`/reaction/add`、`/reaction/remove`；handler 实现在 `backend/agent/daemon/handlers_chat.go`，走 `s.run`（authorize → decode → chattools → write）。
+- `Request` 增加 `ReactionEmoji string`（json `reaction_emoji`）；message 用现有 `Message` 字段传 `<address>:<message-id>` handle。
 
 ### 11.3 CLI（`backend/agent/cmd/message.go`）
 
-```go
-func init() {
-    messageCmd.AddCommand(..., messageReactCmd)
-}
-var (
-    messageReactEmoji  string
-    messageReactRemove bool
-)
-var messageReactCmd = &cobra.Command{
-    Use:   "react <message-handle>",
-    Short: "Add or remove an emoji reaction on a message (lightweight feedback)",
-    Args:  cobra.ExactArgs(1),
-    RunE:  /* --emoji 必填；调 /reaction/add 或 /reaction/remove */,
-}
-func init() {
-    messageReactCmd.Flags().StringVar(&messageReactEmoji, "emoji", "", "single emoji (e.g. 👍, ✅) — required")
-    messageReactCmd.Flags().BoolVar(&messageReactRemove, "remove", false, "remove the reaction instead of adding it")
-}
-```
+`message react <message-handle> --emoji <emoji> [--remove]` 子命令已实现：`--emoji` 必填（help 文案 "single emoji to react with (e.g. 👍, ✅) — required"），`--remove` 决定调 `/reaction/add` 还是 `/reaction/remove`。
 
-**输出格式**（对齐代码库"输出即粘贴用 handle"的约定）：
+**输出格式**（与设计一致，由 `formatReactionResult` 保证，测试锁定）：
 
 ```
 # 添加
@@ -317,52 +273,52 @@ Reaction 👍 removed from '#general:550e8400-e29b-41d4-a716-446655440000'.
 ## 12. 边界与语义细节
 
 - **幂等**：
-  - add 已存在的 (msg, emoji, self) → no-op，返回当前聚合（成功）。
+  - add 已存在的 (msg, emoji, self) → no-op（`ON CONFLICT DO NOTHING` 命中唯一索引），返回当前聚合（成功）。
   - remove 不存在的 (msg, emoji, self) → no-op，返回当前聚合（成功）。
-  - remove 存在但**属于他人** → `PERMISSION_FAILED`（先查该 emoji 是否有本人反应行）。
-- **移除他人反应**：确认 #3 只允许操作者移除自己的。一个例外需要考虑——是否给 channel Admin/Owner 额外"清掉不合适反应"的能力？本期**不引入**（保持简单），作为后续可选项。
+  - remove 存在但**属于他人** → store 检出 `Removed=false, Others=true` → API 返回 `PERMISSION_DENIED`（一条 inspect 查询同时判定两种情形，见 §10.1）。
+- **移除他人反应**：确认 #3 只允许操作者移除自己的。Admin/Owner"清掉不合适反应"的治理能力**未实现**（保持简单），仍是后续可选项。
 - **线程 reply**：reaction 可作用于任何可见消息（channel 顶层 + thread reply）。`thread read` 输出同样显示 reactions。
-- **system 行**（`✅ done`、`📋 created task` 等）：允许 reaction 但引导语提示 agent 一般不对 system 通知反应。
+- **system 行**（`✅ done`、`📋 created task` 等）：技术上允许 reaction（无 sender 限制）；引导语要求把 reaction 当作上下文、不回复、不自动反应。
 - **多字节/多 codepoint emoji**：按 rune 计数，`👍🏽`、family emoji 均合法（§6）。
-- **并发**：同一 reactor 对同一 (msg, emoji) 的并发 add/remove，靠唯一索引 + `ON CONFLICT DO NOTHING` / `DELETE` 天然串行正确，无需乐观锁。
-- **不唤醒**：store 写入仅触发前端实时通知（§7），绝不触发 `dispatcher.NotifyNewMessages` / 不生成 `GenerateActivityForMessage` / 不 `UpsertCursor`。
+- **并发**：同一 reactor 对同一 (msg, emoji) 的并发 add/remove，靠部分唯一索引 + `ON CONFLICT DO NOTHING` / caller-scoped `DELETE` 天然串行正确，无需乐观锁。
+- **不唤醒**：store 写入仅触发 `roomNotifier.NotifyConversation`（前端长轮询），绝不触发 `dispatcher.NotifyNewMessages` / 不生成 `GenerateActivityForMessage` / 不 `UpsertCursor`。
 - **删除消息**：`ON DELETE CASCADE` 清理 reaction。
 
 ---
 
-## 13. 测试计划
+## 13. 测试现状（2026-09-06 核对）
 
-- **store**（`message_reaction_test.go`）：add/remove 基本路径；幂等（重复 add no-op、remove 不存在 no-op）；聚合计数 + 反应者 + `reacted`；user/agent 双 actor；CASCADE。
-- **common**（`reaction_test.go`）：`normalizeReactionEmoji` 的 trim / 空 / 各空白字符 / >16 rune / 合法多 codepoint。
-- **API**（`command_reaction_test.go`）：非成员 → `PERMISSION_DENIED`；消息不存在 → `NOT_FOUND`；非法 emoji → `INVALID_ARGUMENT`；移除他人反应 → `PERMISSION_DENIED`；`ListConversationMessages` / `ListThreadMessages` 填充 reactions。
-- **chattools**：reaction 输出文本；`message read` / `thread read` 的 reactions 行渲染。
-- **CLI**（`message_test.go`）：`message react` 参数缺失、emoji 必填、`--remove` 分支、成功输出文本。
-- **migrator**（`migrator_test.go`）：`0020##message-reaction.sql` 可执行、LATEST 与增量一致。
-- **前端**：`message-row.test.tsx` 渲染 reaction 条 + 点击切换；chat store reaction 状态更新。
+- **store**（`backend/manager/store/message_reaction_test.go`）：为无库的 SQL 锁形测试——`TestAddReactionSQL`（`ON CONFLICT DO NOTHING` 在位）、`TestRemoveReactionCallerScopedSQL`（caller-scoped DELETE）、`TestAggregateReactionsSQL`（聚合/`reacted` SQL 形状）。原计划的"add/remove 基本路径、幂等、CASCADE"等行为测试未加（依赖真实库的行为由 SQL 守卫间接锁定）。
+- **common**（`backend/common/reaction_test.go`）：`TestNormalizeReactionEmoji` 覆盖 trim / 空 / 空白 / 零宽空格 / 超长 / 合法多 codepoint。
+- **API**（`backend/manager/api/v1/command_reaction_test.go`）：`TestReactionCallerFromContextNoIdentity`、`TestFillReactionsEmpty`。原计划中的"非成员 → PERMISSION_DENIED / 消息不存在 → NOT_FOUND / 移除他人反应"等 handler 级测试未加。
+- **chattools**（`backend/agent/chattools/chattools_reaction_test.go`）：`TestFormatReactionResultAdd/Remove/DMHandle`（含 channel 单引号与 dm: 无引号两分支）、`TestFormatReactionsLineEmpty/Line`（`  reactions: 👍 ×2 (alice, rei-agent-1), ✅ (bob)` 渲染）。
+- **CLI**：`backend/agent/cmd/message.go` 的 `message react` 无独立测试文件（原计划的 `message_test.go` 未建）。
+- **migrator**（`backend/manager/migration/migrator_test.go`）：仅有通用的版本文件/LATEST 嵌入测试；没有 0020 专属用例。`migration_test.go` 的 schema-invariant 守卫中也未加 message_reaction 项。
+- **前端**（`frontend/src/components/chat/message-row.test.tsx`）：`MessageRow reaction bar` 套件覆盖 emoji 计数 pill 渲染；chat store 的 `toggleReaction` 无专测。
 
 ---
 
-## 14. 实施清单（按依赖序）
+## 14. 实施清单（已全部落地；括号内为实际文件）
 
-1. `backend/common/reaction.go` — `normalizeReactionEmoji`。
-2. `proto/v1/v1/command.proto` — `Reaction`、`ChatMessage.reactions`、`AddReaction/RemoveReaction` RPC；`cd proto && buf generate`。
-3. `backend/manager/migration/migration/1.1/0020##message-reaction.sql` + 追加 `LATEST.sql`。
-4. `backend/manager/store/message_reaction.go` — store 方法 + `fillReactions`。
-5. `backend/manager/api/v1/command.go` — `AddReaction` / `RemoveReaction` handler + 填充逻辑。
-6. `backend/agent/chattools/chattools_reaction.go` — `AddReaction` / `RemoveReaction` + reactions 行渲染。
-7. `backend/agent/daemon/server.go` — `/reaction/add|remove` handler + Request 字段。
-8. `backend/agent/cmd/message.go` — `message react` 子命令。
-9. `backend/agent/executor/prompt/communication.md` — 引导语 + 输出说明。
-10. `frontend/...` — reaction 条组件、store action、proto-es 类型。
-11. 各层测试（§13）。
+1. `backend/common/reaction.go` — `NormalizeReactionEmoji`（含零宽空格拒绝）。✅
+2. `proto/v1/v1/command.proto` — `Reaction`、`ChatMessage.reactions = 19`、`AddReaction/RemoveReaction` RPC；`cd proto && buf generate`。✅
+3. `backend/manager/migration/migration/1.1/0020##message-reaction.sql` + `backend/manager/migration/migration/LATEST.sql`（`message_reaction` 表同款 DDL）。✅
+4. `backend/manager/store/message_reaction.go` — store 方法 + 批量聚合（无独立 `fillReactions`，由 API 层实现）。✅
+5. `backend/manager/api/v1/command_reaction.go` — `AddReaction` / `RemoveReaction` handler 与 `fillReactions`；填充挂在 `backend/manager/api/v1/command_message.go` 的两个 List handler。✅
+6. `backend/agent/chattools/chattools_reaction.go` — `AddReaction` / `RemoveReaction` + `formatReactionResult` / `formatReactionsLine`。✅
+7. `backend/agent/daemon/server.go`（mux 注册）+ `backend/agent/daemon/handlers_chat.go`（`/reaction/add|remove` handler）；`Request.ReactionEmoji` 字段在 `server.go`。✅
+8. `backend/agent/cmd/message.go` — `message react` 子命令。✅
+9. `backend/agent/executor/prompt/communication.md` — 引导语 + 输出说明。✅
+10. `frontend/src/components/chat/message-row.tsx`（reaction 条）、`frontend/src/stores/chat.ts`（`toggleReaction`）、`frontend/src/stores/ui-models.ts`（`ChatMessageUI.reactions`）。✅
+11. 测试见 §13（部分按原计划缩水）。
 
 > 改动后按 `AGENTS.md`：Go 走 `gofmt -w` + `golangci-lint run`（循环到干净）；proto 走 `buf format/lint/generate`；前端走 `biome:check` + `type-check` + `test`。
 
 ---
 
-## 15. 本期不做 / 未来可扩展
+## 15. 未实现 / 未来可扩展（2026-09-06 核对：以下均未实现）
 
 - channel Admin/Owner 移除他人反应（治理能力）。
 - 独立 `reactions_seq` + `WatchReactions` 专用长轮询（多实例/高规模实时）。
 - 可配置 emoji 白名单 / 每消息 reaction 上限 / 频率限制（当前靠引导语约束）。
-- 对 reaction 的 @提及 / 通知（本期刻意不做，保持轻量）。
+- 对 reaction 的 @提及 / 通知（刻意不做，保持轻量）。

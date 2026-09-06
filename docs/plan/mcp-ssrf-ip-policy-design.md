@@ -1,11 +1,17 @@
 # MCP 目标 IP 策略（SSRF 防护）设计
 
+> 状态：2026-09-06 已对照当前代码核对更新。主要变化：本设计已全部实现——判定引擎
+> `component/mcp/ipolicy.go`、保存路径校验 `api/v1/mcp_ip_policy.go`、连接守卫
+> `component/mcp/client.go`（按服务器缓存的守卫 client + 请求层预检，覆盖 HTTP 代理
+> 与重定向）、设置读写并入统一 `GetSetting`/`UpdateSetting`、前端弹窗与策略卡片均已落地。
+
 ## 1. 背景与目标
 
 `allow_user_mcp_servers` 开启后，任意用户可以在自己的 Agent 上配置个人 MCP 服务
 （`scope=USER`，`owner_id != 0`）。MCP 网关运行在 manager 进程内
 （`component/mcp.Client`），直接对用户填写的 URL 发起 HTTP/SSE 请求
-（`client.go` 的 `httpClient.Do` / `sseClient.Do`），**当前没有任何 SSRF 防护**：
+（`backend/manager/component/mcp/client.go` 的 `httpClient.Do` / `sseClient.Do`），
+本设计实施前**没有任何 SSRF 防护**：
 用户把 URL 指向 `http://169.254.169.254/`（云元数据）或内网地址，manager 就会代其发起
 请求。个人 MCP 与管理员维护的全局 MCP 共用同一条连接通道，风险面一致。
 
@@ -68,7 +74,9 @@ flowchart LR
 - **连接路径**：`mcp.Client` 增加可注入的 IP 策略守卫，`DialContext` 内
   解析→校验→拨号被允许的 IP；TLS SNI 与 Host 头仍用原域名（Go `http.Transport`
   以请求 URL 为准，与拨号地址无关）。
-- **判定引擎**：独立纯函数包（`component/mcp/ipolicy` 或 `api/v1` 内），便于单测。
+- **判定引擎**：已落地为纯函数包 `backend/manager/component/mcp/ipolicy.go`（单测
+  `backend/manager/component/mcp/ipolicy_test.go`）；保存路径校验在
+  `backend/manager/api/v1/mcp_ip_policy.go`。
 
 ## 5. 数据模型
 
@@ -106,8 +114,8 @@ message McpIpPolicy {
 
 ### 5.2 v1 proto（`proto/v1/v1/setting.proto`）
 
-无需新增 RPC：`GetUserMcpConfig` / `UpdateUserMcpConfig` 直接透传扩展后的
-`laelia.store.UserMcpConfigSetting`。
+无需新增 RPC：统一资源式 `SettingValue.user_mcp_config`（`GetSetting` /
+`UpdateSetting`）直接透传扩展后的 `laelia.store.UserMcpConfigSetting`。
 
 ### 5.3 判定语义（唯一事实来源）
 
@@ -124,80 +132,96 @@ allow_cidrs 非空 && ip ∉ allow_cidrs   -> DENY
 
 ## 6. 后端实现
 
-### 6.1 IP 策略引擎（新增 `backend/manager/component/mcp/ipolicy.go`）
+### 6.1 IP 策略引擎（`backend/manager/component/mcp/ipolicy.go`，已实现）
 
 - `ParsePolicy(p *storepb.McpIpPolicy) (*CompiledPolicy, error)`：解析 CIDR 为
-  `[]netip.Prefix`，非法条目报错（含归一化：`netip.ParsePrefix` 规范化写法）。
-- `CompiledPolicy.Allowed(ip netip.Addr) bool`：实现 5.3 判定。
-- `CompiledPolicy.AppliesTo(ownerID int64) bool`：作用域判定。
-- 单列表上限（如 500 条）防滥用；`netip.Prefix.Masked()` 归一化去重。
-- IPv4-mapped IPv6（`::ffff:10.0.0.1`）先 `ip.Unmap()` 再匹配。
+  `[]netip.Prefix`（`netip.ParsePrefix` + `Masked()` 归一化去重），非法条目报错
+  （错误信息带具体条目）；allow/deny 合计超过 `maxIPPolicyCIDRs = 500` 条报错。
+- `CompiledPolicy.Allowed(addr netip.Addr) (*IPPolicyDenyReason, error)`：实现 5.3
+  判定，拒绝时返回 `IPPolicyDenyReason`（携带命中前缀或「不在白名单」标记，其
+  `Error()` 即面向用户的拒绝原因文案）；IPv4-mapped IPv6（`::ffff:10.0.0.1`）先
+  `addr.Unmap()` 再匹配。
+- `CompiledPolicy.HasAllowRestriction()`：白名单非空即视为有允许侧限制，用于解析
+  失败时的 fail-closed 判定。
+- `CompiledPolicy.AppliesTo(ownerID int64) bool`：作用域判定（`SCOPE_ALL` 恒生效，
+  其余仅 `ownerID != 0` 生效）。
 
-### 6.2 设置接口（`backend/manager/api/v1/setting_service.go`）
+### 6.2 设置接口（`backend/manager/api/v1/setting_service.go`，已实现）
 
-`UpdateUserMcpConfig`：
+设置读写走统一的资源式 `SettingService.GetSetting` / `UpdateSetting`（资源名
+`settings/user_mcp_config`；独立的 `GetUserMcpConfig`/`UpdateUserMcpConfig` RPC
+并未采用）：
 
-- 对 `in.McpIpPolicy` 做 `ParsePolicy` 校验，非法 CIDR 返回 `CodeInvalidArgument`
-  （错误信息带具体条目）。
-- `enabled=true` 且两张表都为空时允许保存（视为放行一切），但前端提示「策略已启用
-  但未配置任何网段」。
-- `GetUserMcpConfig` 原样返回（CIDR 非敏感）。
+- `UpdateSetting` 按 update_mask 路径（`value.user_mcp_config.allow_user_mcp_servers`
+  / `value.user_mcp_config.mcp_ip_policy`）把请求 payload 合并进存量配置
+  （`updateUserMcpConfig`），合并后对最终 `McpIpPolicy` 做 `ParsePolicy` 校验，
+  非法 CIDR 返回 `CodeInvalidArgument`（错误信息带具体条目）。
+- `enabled=true` 且两张表都为空时允许保存（视为放行一切），前端显示「策略已启用
+  但未配置任何网段」警示。
+- `GetSetting` 原样返回（CIDR 非敏感）。
 
-### 6.3 保存路径校验（`backend/manager/api/v1/mcp_server_service.go`）
+### 6.3 保存路径校验（`backend/manager/api/v1/mcp_ip_policy.go`，已实现）
 
-在 `buildMcpTransportForCreate` / `buildMcpTransportForUpdate` 之后、落库之前调用：
+`validateMcpServerTarget(ctx, settings, serverURL, isPersonal bool) error`，由
+`backend/manager/api/v1/mcp_server_service.go` 在 `buildMcpTransportForCreate` /
+`buildMcpTransportForUpdate` 之后、落库之前对 Create/Update 调用：
 
-```
-validateMcpServerTarget(ctx, s.store, serverURL, isPersonal bool) error
-```
-
-- 读取 `UserMcpConfigSetting`（建议 30s TTL 缓存，见 6.5）；`!enabled` 或策略作用域
+- 读取 `UserMcpConfigSetting`（store 层 30s TTL 缓存，见 6.5）；`!enabled` 或策略作用域
   不覆盖该服务器 → 直接放行。
 - host 为 IP 字面量 → 直接按该 IP 判定。
-- host 为域名 → `net.DefaultResolver.LookupNetIP(ctx, "ip", host)`（go1.18+，
-  仓库 go1.26）取全部地址；**任一地址违规即拒绝（fail-closed）**：
-  - 命中黑名单：`InvalidArgument: MCP target <host> resolves to <ip> which is denied by the workspace MCP IP policy (<deny prefix>)`
-  - 白名单非空且未命中：`... is not in the workspace MCP IP policy allow list`
+- host 为域名 → 经 `mcpTargetResolver` 接口（生产用 `net.DefaultResolver`，单测注入
+  fake）`LookupNetIP(ctx, "ip", host)` 取全部地址，解析带 `mcpTargetLookupTimeout = 5s`
+  超时；**任一地址违规即拒绝（fail-closed）**，错误形如：
+  - 命中黑名单：`InvalidArgument: MCP target <host> resolves to <ip> which is denied by MCP IP policy prefix <prefix>`
+  - 白名单非空且未命中：`... resolves to <ip> which is not in the MCP IP policy allow list`
 - 解析失败：
-  - 白名单非空 → 拒绝（无法验证，fail-closed）；
+  - 白名单非空 → 拒绝（`cannot resolve MCP target ... against the workspace MCP IP
+    policy allow list`，无法验证，fail-closed）；
   - 仅黑名单（白名单为空）→ 允许保存（连接时必然失败，错误更自然）。
 - 作用域：`isPersonal = (新服务器 scope==USER) || (存量服务器 OwnerID != 0)`。
 
 > 解析发生在 manager 网络上下文，与实际连接同源，结果有代表性。
 
-### 6.4 连接路径强制（`backend/manager/component/mcp/client.go` + `mcp_gateway_service.go`）
+### 6.4 连接路径强制（`backend/manager/component/mcp/client.go` + `mcp_gateway_service.go`，已实现）
 
-`mcp.Client` 增加字段与注入点：
+`mcp.Client` 注入点：
 
 ```go
 type IPPolicyFunc func(ctx context.Context, server *store.McpServerMessage, ip netip.Addr) (bool, error)
 func (c *Client) SetIPPolicy(fn IPPolicyFunc)
 ```
 
-- `McpGatewayService.NewMcpGatewayService` 注入闭包：读策略 → 编译（带小缓存）→
-  `CompiledPolicy.AppliesTo(server.OwnerID)` → `Allowed(ip)`。
-- `doHTTP` / SSE 打开连接时，若 `ipPolicy != nil`：**每次调用构建一个带守卫
-  Transport 的 `http.Client`**（保留 `Timeout: 25s`），守卫 `DialContext`：
-  1. `net.SplitHostPort(addr)` 取 host；
-  2. host 为 IP 字面量则直接判定；否则 `LookupNetIP` 解析；
-  3. 任一 IP 被拒 → 返回 `mcp target <host> resolves to <ip> ... blocked by MCP IP policy`；
-  4. 全部通过 → `net.Dialer{}.DialContext` 拨第一个被允许的 IP:port。
+- `McpGatewayService.NewMcpGatewayService` 注入闭包 `checkTargetIP`：读策略 → 编译
+  （`compiledIPPolicy`，30s 缓存）→ `CompiledPolicy.AppliesTo(server.OwnerID)` →
+  `Allowed(ip)`。
+- **按服务器缓存的守卫 client**（实现与原设计不同，非每次调用新建）：策略启用时
+  `httpClientFor` / `sseClientFor` 为每台服务器克隆一次 Transport（保留
+  `Timeout: 25s` 与 `Proxy` 字段）并安装守卫 `DialContext`，按
+  ResourceID+URL+OwnerID 缓存（上限 128），连接与 TLS 会话可跨 RPC 复用；策略未启用
+  时直接用共享 client。
+- **请求层预检**：每个请求发送前 `checkTarget` → `resolveTargetHosts` 解析目标 host
+  的全部地址并逐 IP 过策略，返回按解析序排列的批准地址列表；无批准地址即连接失败
+  （fail-closed）。批准结果缓存 `targetCacheTTL = 30s`，key 按 server+host 隔离，
+  两台服务器共享同一域名不会互串校验结果。
+- **守卫拨号**：`guardedDial` 对已验证目标直接拨批准的 IP:port（`dialAny` 按序逐个
+  尝试，保留多地址原生 fallback、被拒地址跳过）；缓存外的拨号地址——典型为配置的
+  HTTP 代理——按原样拨号，因为目标本身已在请求层校验。**代理场景因此也被覆盖**
+  （原设计只覆盖直连的边界已消除）。
 - TLS SNI / Host 头由 transport 依据请求 URL 的 host 设置，不受拨号 IP 影响，
   证书校验行为不变。
-- **重定向**：默认 `http.Client` 跟随重定向，所有跳转请求走同一守卫 Transport，
-  跨 host 跳转同样被检查。
-- **SSE endpoint**：`base.ResolveReference(endpoint)` 同源推导，天然受限；初始
-  GET 与 messages POST 均走守卫。
-- **代理环境**：`http.Transport.Clone()` 保留 `Proxy` 字段；若配置了 HTTP 代理，
-  拨号对象是代理而非目标（目标 IP 无法在本地观察），此时守卫仅覆盖直连场景，
-  保存路径校验仍然生效。文档中说明该边界。
-- 每次调用新建 Transport 的开销可接受（目录拉取/工具调用频率低），不引入连接池
-  复杂度。
+- **重定向**：`CheckRedirect` 对每个跳转目标复检策略（上限 10 跳），跨 host 跳转
+  不可绕过。
+- **SSE endpoint**：`base.ResolveReference(endpoint)` 同源推导；初始 GET 与
+  messages POST 前均 `checkTarget`（含解析出的 messages endpoint）。
+- 被拒地址记录 `slog.Warn("mcp target blocked by IP policy", server, host, ip)`。
 
-### 6.5 设置读取缓存
+### 6.5 设置读取缓存（已实现）
 
-`GetUserMcpConfigSetting` 增加 30s TTL 进程内缓存（`Upsert` 时失效），避免每次
-MCP 工具调用多一次 DB 读。安全影响：策略变更最多延迟 30s 生效，可接受。
+`backend/manager/store/user_mcp_setting.go` 的 `GetUserMcpConfigSetting` 带
+`userMcpConfigCacheTTL = 30s` 进程内缓存，`UpsertUserMcpConfigSetting` 写入后立即
+刷新缓存，避免每次 MCP 工具调用多一次 DB 读。网关侧另有一个 30s 的编译策略缓存
+（`mcp_gateway_service.go` 的 `ipPolicyCacheTTL`）。安全影响：策略变更最多延迟 30s
+生效，可接受。
 
 ## 7. 前端实现
 
@@ -227,15 +251,17 @@ MCP 工具调用多一次 DB 读。安全影响：策略变更最多延迟 30s �
   `169.254.0.0/16`、`172.16.0.0/12`、`192.168.0.0/16`、`198.18.0.0/15`、
   `224.0.0.0/4`、`240.0.0.0/4`、`::1/128`、`fc00::/7`、`fe80::/10`；
 - 保存按钮 → `updateUserMcpConfig`（携带 `allowUserMcpServers` 现值与完整
-  `mcpIpPolicy`）；客户端做基础 CIDR 正则校验，服务端为最终裁决，错误经
-  `describeError` 展示；
+  `mcpIpPolicy`）；客户端仅按行拆分（trim/去空行），CIDR 合法性由服务端最终裁决，
+  错误经 `showErrorToast` 展示；
 - 启用但两表皆空时显示警示文案。
 
-### 7.3 用户侧 MCP 表单（`settings-mcp-servers.tsx`）
+### 7.3 用户侧 MCP 表单（`settings-mcp-servers.tsx`，已实现）
 
-- 创建/编辑被策略拒绝时，服务端错误信息直接展示（现有 `describeError` 通道）；
-- 可选：表单 URL 输入框下方提示「工作区已启用 MCP 目标 IP 策略，域名将做解析
-  校验」（读取 `getUserMcpConfig` 的 `mcpIpPolicy.enabled`）。
+- 创建/编辑被策略拒绝时，服务端错误信息直接展示（`showErrorToast` 通道）；
+- 表单 URL 输入下方在策略启用时显示提示「工作区已启用 MCP 目标 IP 策略，域名将做
+  解析校验」（页面读取 `GetSetting("settings/user_mcp_config")` 的
+  `mcpIpPolicy.enabled`，以 `ipPolicyActive` 传入表单，键
+  `settings.mcp-servers.ip-policy-active-hint`）。
 
 ### 7.4 i18n
 
@@ -251,6 +277,16 @@ MCP 工具调用多一次 DB 读。安全影响：策略变更最多延迟 30s �
 | 连接守卫测试 | `httptest` 起 127.0.0.1 服务：黑名单含 `127.0.0.0/8` → `ListTools` 失败且错误含策略信息；白名单含之 → 成功；域名解析到被拒 IP → 失败 |
 | 设置接口测试 | 非法 CIDR → `InvalidArgument`；合法策略往返一致；零值 = 关闭；旧 JSON 行（无 `mcp_ip_policy`）读取后等价关闭 |
 | 前端 | `pnpm --dir frontend type-check`、`biome:check`、`test` |
+
+以上均已落地，对应测试：引擎单测
+`backend/manager/component/mcp/ipolicy_test.go`（黑名单优先、白名单空/非空、IPv6 与
+IPv4-mapped、非法 CIDR、去重与上限、作用域）；连接守卫
+`backend/manager/component/mcp/client_ip_policy_test.go`（loopback 拦截、白名单放行、
+域名解析到被拒 IP、SSE、代理地址不误拦、重定向复检、多地址 fallback、缓存行为）；
+保存路径 `backend/manager/api/v1/mcp_ip_policy_test.go`（黑名单拒、白名单未命中拒、
+多 A 记录 fail-closed、IP 字面量、解析失败±白名单、策略关闭放行、作用域覆盖）；
+设置接口见 `backend/manager/api/v1/setting_service_test.go` 与
+`backend/manager/api/v1/mcp_server_service_test.go`。
 
 ## 9. 兼容性与迁移
 
@@ -271,20 +307,24 @@ MCP 工具调用多一次 DB 读。安全影响：策略变更最多延迟 30s �
 - **多 A 记录**：任一地址违规即整体拒绝（避免连接落在违规地址上）。
 - **归一化**：IPv4-mapped IPv6 先 `Unmap()`；CIDR 统一 `Masked()` 规范形。
 - **重定向/SSE**：同守卫 Transport 覆盖，跨 host 跳转不可绕过。
-- **代理边界**：配置 HTTP 代理时连接守卫只覆盖直连；保存路径校验不受影响（见 6.4）。
-- **限流/审计**：解析带短超时（如 5s）；被拒事件 `slog.Warn` 记录 host/ip/策略命中
-  条目，后续可挂审计（audit 框架已存在，见 `recordMcpServerChange`）。
+- **代理边界**：配置 HTTP 代理时，请求层预检已在发送前校验目标地址（守卫拨号只对
+  已验证目标生效，代理地址按原样拨号），直连与代理场景均被覆盖（见 6.4）。
+- **限流/审计**：保存路径解析带 `mcpTargetLookupTimeout = 5s` 超时；连接路径被拒事件
+  `slog.Warn` 记录 host/ip（`client.go`），后续可挂审计（audit 框架已存在，见
+  `recordMcpServerChange`）。
 - **范围外**：MCP header 泄密（Authorization 头随请求发出）不在本次范围；LLM
   base URL、S3 endpoint、webhook 等其它用户可控出站地址可复用同一引擎，列为后续
   增强。
 
-## 11. 实施步骤
+## 11. 实施步骤（已全部完成）
 
-1. **P1 数据与引擎**：store proto 扩展 + `buf generate`；`ipolicy.go` 引擎 + 单测；
-   `setting_service.go` 校验。
-2. **P2 保存路径**：`mcp_server_service.go` 保存前域名解析校验（resolver 抽象为
-   接口便于注入）+ 单测。
-3. **P3 连接路径**：`mcp.Client` 守卫 `DialContext` + gateway 注入 + 单测/集成测试。
+1. **P1 数据与引擎**：store proto 扩展（`UserMcpConfigSetting.mcp_ip_policy`）+
+   `buf generate`；`component/mcp/ipolicy.go` 引擎 + 单测；`setting_service.go`
+   合并路径 + CIDR 校验。
+2. **P2 保存路径**：`api/v1/mcp_ip_policy.go` 保存前域名解析校验（resolver 抽象为
+   `mcpTargetResolver` 接口便于注入）+ 单测。
+3. **P3 连接路径**：`mcp.Client` 守卫拨号 + 请求层预检 + gateway 注入 +
+   单测/集成测试。
 4. **P4 前端**：二次确认弹窗 + 策略编辑卡片 + i18n；`settings-mcp-servers.tsx`
    提示文案。
 5. **P5 收尾**：按 AGENTS.md 跑 `gofmt`/`golangci-lint`/`go test`/前端

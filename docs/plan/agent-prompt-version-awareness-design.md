@@ -1,8 +1,6 @@
 # Agent 系统提示词版本感知与发布通知设计
 
-> 状态：已实现（阶段 1–3）
-> 范围：backend（manager + machine/agent）
-> 关联文件：见文末「改动文件清单」
+> 状态：2026-09-06 已对照当前代码核对更新。本文档与实现一致（阶段 1–3 已落地）：静态版本注入（`build-embedded-machines.sh` 的 `PROMPT_HASH` + manifest `prompt_bundle_version`）、复合 `buildPromptVersion`、proto `prompt_release_notice=13`/`prompt_release_notice_ack=12`、四个推送触发点（persona/owner/team/机器版本过旧）与文中列出的 5 个测试均逐一验证存在。第 9 节三项可选仍未实施：无服务端未确认巡检、pi `LaunchFingerprint` 仍只含 persona 不含 team/owner、前端未展示已确认版本。
 
 ---
 

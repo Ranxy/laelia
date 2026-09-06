@@ -1,186 +1,181 @@
 # Plan: Channel/Thread Roster Awareness + User Self-Description for Agents
 
-## Revision — single `members` tool (post-implementation)
+> Status: verified and updated against the current code on 2026-09-06. Main changes: the roster now surfaces a dedicated PUBLIC description (`Agent.description` field 24 / `User.description` field 16 — persona_prompt is intentionally never exposed), `ChannelMember` also carries `handle`/`avatar`/`preferred_language`, and content-mention parsing is handle-based (`@<handle>`) with a 3-pass resolver applied to both the agent `PostMessage` and user `SendMessage` paths.
+
+## Revision — single `members` tool (as implemented)
 
 After implementing the plan, the roster tool surface was collapsed from three
 tools to one. The original plan exposed `channel members` + `thread
 participants` + `agent detail` as separate tools, which forced an agent to call
 twice (roster, then `agent detail` per target) just to learn whom to @mention —
-extra reasoning steps that easily break. Since `persona_prompt` and user
-self-descriptions are short, they are now carried **inline, untruncated** in the
-roster itself. The implemented design:
+extra reasoning steps that easily break. Since descriptions are short, they are
+carried **inline, untruncated** in the roster itself. The implemented design:
 
 - One tool: `laelia-machine members <conversation> [--root <root-msg-id>]`. No
   `--root` → channel members; with `--root` → thread participants. Server-side
   `ListChannelMembers` and `ListThreadParticipants` RPCs remain (different data
   sources: membership table vs message senders); the single CLI command routes
-  to the right one internally.
+  to the right one internally (`daemon/server.go` exposes a single `/members`
+  route; `cmd/members.go` is the CLI).
 - `GetConversationAgentProfile` / `AgentProfile` were **removed entirely**
-  (proto, manager handler, chattool, daemon route, CLI, prompt). Each roster
-  entry's `description` now carries the agent's full `persona_prompt` inline.
-- `ChannelMember.description` is no longer truncated for display; the chattool
-  renders it as an indented block under each member line.
+  (proto, manager handler, chattool, daemon route, CLI, prompt). Instead of
+  exposing the private `persona_prompt`, agents received a dedicated **public**
+  description column (`agent.description`, migration
+  `migration/1.1/0023##agent-description.sql`, proto `Agent.description = 24`)
+  that the roster carries inline; the proto comment on `ChannelMember.description`
+  states persona_prompt is intentionally NOT exposed. Agent discovery beyond one
+  conversation is covered by the separate `laelia-machine agent list` tool
+  (`ListPeerAgents`, which also prints each peer's public description) and
+  `laelia-machine team get/show`.
+- `ChannelMember` now also carries `handle = 9` (the `@<handle>` mention token
+  for every member, user or agent), `avatar = 7`, and
+  `preferred_language = 8` alongside `description = 6`.
+- The chattool renders the description as an indented block under each member
+  line, untruncated (`chattools_channel.go` `formatMemberLine` — no
+  `truncateDescription` helper exists anymore).
 
 Parts 1/3/4/5 below describe the original three-tool design and are retained as
-the design rationale; the bullet above is the as-built surface.
+the design rationale; the bullets above (and the per-part notes) are the
+as-built surface.
 
 ## Context
 
-Today an autonomous agent in laelia has no way to see *who else is in a channel or thread*. The drain loop discovers unread messages and threads, but the agent cannot enumerate the members of a conversation, cannot read another agent's `persona_prompt`, and cannot perceive users well enough to proactively `@mention` the right person/agent for a task. Concretely:
+(A design-time snapshot; several gaps below have since been closed — see the
+per-part notes.)
 
-- No chattool wraps the existing `ListChannelMembers` RPC; no tool lists thread participants at all.
-- `ChannelMember` proto carries only `display_name` — no self-description (users have none at all; agents have `persona_prompt` but it is not surfaced here).
-- The agent `PostMessage` path never populates structured `Mentions` (`command.go:833` passes `nil`), so a thread `@agent` typed by an agent does not subscribe/wake anyone. The agent is told to `@mention` in the prompt but the manager does not parse it.
-- Users have no bio/description field and no self-service profile page.
+At design time an autonomous agent in laelia had no way to see *who else is in a channel or thread*. The drain loop discovers unread messages and threads, but the agent could not enumerate the members of a conversation, could not read another agent's description, and could not perceive users well enough to proactively `@mention` the right person/agent for a task. Concretely:
 
-Intended outcome: an agent can run `channel members` / `thread participants` to perceive the users and agents in scope (with short descriptions), run `agent detail` for a specific agent's full persona, and simply type `@someone` in its reply — the manager parses the `@` tokens, resolves them to conversation members, and routes thread subscription/wake. Users gain a self-description they can edit from a profile page.
+- No chattool wrapped the existing `ListChannelMembers` RPC; no tool listed thread participants at all. (Closed: the `members` tool.)
+- `ChannelMember` carried only `display_name` — no self-description. (Closed: `description` + `avatar` + `preferred_language`.)
+- The agent `PostMessage` path did not populate structured `Mentions`, so a thread `@agent` typed by an agent did not subscribe/wake anyone. (Closed: the manager parses `@<handle>` tokens in BOTH the agent `PostMessage` path (`api/v1/command_message.go`) and the user `SendMessage` path (`api/v1/channel_message.go`).)
+- Users had no bio/description field and no self-service profile page. (Closed: `principal.description` + `/settings/profile`.)
+
+Intended outcome (now real): an agent can run `laelia-machine members` to perceive the users and agents in scope (with descriptions, handles, roles, preferred languages), run `agent list` for peers beyond one conversation, and simply type `@<handle>` in its reply — the manager parses the `@` tokens, resolves them to members, and routes thread subscription/wake. Users gain a self-description they can edit from a profile page.
 
 ## Decisions (confirmed with user)
 
-1. **Thread participants**: derive from the distinct senders of the thread's messages (root + replies). No new participation table.
-2. **Persona exposure**: roster shows name/type/role + a *short* description; a separate `agent detail` tool fetches the full `persona_prompt` on demand.
-3. **@-mentions**: the agent only emits content-only `@someone`; the **manager** parses `@` tokens from content, resolves them to members, and populates structured `Mentions` (agent path only). No `--mention` CLI flag.
-4. **User self-description**: full stack — proto + store + RPC + frontend profile page + admin edit.
+1. **Thread participants**: derive from the distinct senders of the thread's messages (root + replies). No new participation table. (Implemented as `store.ListThreadSenders`.)
+2. **Persona exposure**: roster shows name/type/role + description inline, untruncated; a separate `agent detail` tool was dropped in favor of the public `Agent.description` column plus the `agent list` peer roster.
+3. **@-mentions**: the agent only emits content-only `@<handle>`; the **manager** parses `@handle` tokens from content, resolves them to members (handle first, then unambiguous display name, then the global directory), and populates structured `Mentions` — for both the agent `PostMessage` and user `SendMessage` paths. No `--mention` CLI flag; no quoted multi-word token form (the handle is the primary and unambiguous form).
+4. **User self-description**: full stack — proto + store + RPC + frontend profile page + admin edit. (Implemented.)
 
-## Part 1 — Proto & generated code
+## Part 1 — Proto & generated code (as built)
 
 File: `proto/v1/v1/command.proto`
 
-- Extend `ChannelMember` (L374-380) with `string description = 6;` — users: `User.description`; agents: `AgentACPConfig.persona_prompt`. The proto carries the full text; the chattool formatter truncates for display.
-- Add `GetConversationAgentProfile` RPC to `CommandService`:
-  ```
-  rpc GetConversationAgentProfile(GetConversationAgentProfileRequest) returns (AgentProfile) {}
-  message GetConversationAgentProfileRequest { string conversation = 1; string agent = 2; }  // agent = "agents/<id>"
-  message AgentProfile { string name = 1; string title = 2; string persona_prompt = 3; string status = 4; }
-  ```
-  Gated by conversation membership so an agent can only fetch co-members' profiles.
-- Add `ListThreadParticipants` RPC to `CommandService`:
+- `ChannelMember` gained `description = 6`, `avatar = 7`, `preferred_language = 8`, and `handle = 9` (plus the pre-existing `member_type/member_id/display_name/member_role/joined_at`). Users: `User.description`; agents: `Agent.description` (public intro — the proto comment explicitly says the agent's private `persona_prompt` is NOT exposed here).
+- `GetConversationAgentProfile` / `AgentProfile`: **not implemented — removed from the plan** (see the Revision section).
+- `ListThreadParticipants` RPC exists on `CommandService`:
   ```
   rpc ListThreadParticipants(ListThreadParticipantsRequest) returns (ListThreadParticipantsResponse) {}
   message ListThreadParticipantsRequest { string conversation = 1; string thread_root = 2; }
   message ListThreadParticipantsResponse { repeated ChannelMember members = 1; }
   ```
-  Reuses `ChannelMember` (role left 0 for threads).
+  Reuses `ChannelMember` (member_role left 0 for threads).
 
 File: `proto/v1/v1/user_service.proto`
 
-- Add `string description = 16;` to `User` (L205-243) — short self-description ("后端工程师, 专注于 agent 的构建"). `UpdateUser` already supports `update_mask`, so no new RPC is needed; just allow the field through the mask.
+- `string description = 16;` on `User` — self-description ("后端工程师, 专注于 agent 的构建"). `UpdateUser` supports it through `update_mask` path `"description"` (no new RPC).
 
-Regenerate: `cd proto && buf format -w proto && buf lint proto && buf generate`. This regenerates `backend/generated-go/v1/*` and `frontend/src/types/proto-es/v1/*`.
+Regenerated: `backend/generated-go/v1/*` and `frontend/src/types/proto-es/v1/*`.
 
-## Part 2 — Store layer
+## Part 2 — Store layer (as built)
 
-`backend/manager/migration/latest.sql` — add column to `principal`:
-```sql
-description TEXT NOT NULL DEFAULT ''
-```
-(One cumulative schema file; add near the `principal` columns around L18-31.)
+`backend/manager/migration/migration/LATEST.sql` — `description TEXT NOT NULL DEFAULT ''` lives inline in the base `CREATE TABLE principal` block (with a comment noting it is surfaced in channel/thread rosters). (`agent.description` came later via `migration/migration/1.1/0023##agent-description.sql`.)
 
 `backend/manager/store/principal.go`
-- Add `Description string` to `UserMessage` (L51-66) and to the `ListUsers`/`GetUserBy...` scan select-list and the principal row struct.
+- `UserMessage` carries `Description string`; the `ListUsers`/`GetUserBy...` scans and the principal row struct include it.
 
 `backend/manager/api/v1/user_service.go`
-- Populate `Description` in `convertToUser`; honor it in `UpdateUser` via `update_mask` (mirror the existing `title`/`phone` mask handling).
+- `Description` populated in the user conversion; honored in `CreateUser` and in `UpdateUser` via the `"description"` update-mask path.
 
-`backend/manager/store/conversation_member.go` — no change to `ListConversationMembers` (already returns members); description is resolved per-member in the handler.
+`backend/manager/store/conversation_member.go` — `ListConversationMembers` unchanged; the description is resolved per-member in the handler.
 
-`backend/manager/store/chat_message.go` — add a new query:
+`backend/manager/store/thread_participant.go` — the distinct-sender query is implemented as
 ```go
-func ListThreadParticipants(ctx, db, convID, threadRootID uuid.UUID) ([]ThreadParticipant, error)
+func (s *Store) ListThreadSenders(ctx context.Context, conversationID, rootID uuid.UUID) ([]ThreadSender, error)
 ```
-Select distinct senders from `chat_message` where `thread_root_message_id = $1` (and `conversation_id = $2`), returning `(sender_type, principal_id, agent_id)` tuples. Each distinct sender becomes one roster entry.
+(select distinct senders from `chat_message` where `id = root OR thread_root_message_id = root` in the conversation, excluding SYSTEM senders, returning `(sender_type, principal_id, handle, agent_id)` tuples ordered by first appearance; each distinct sender becomes one roster entry — the planned name `ListThreadParticipants` in `chat_message.go` was not used).
 
-## Part 3 — Manager handlers
+## Part 3 — Manager handlers (as built)
 
-`backend/manager/api/v1/channel.go` (`ListChannelMembers`, L295-318):
-- Extend the member build loop to populate `Description` alongside `DisplayName`. Add a sibling `resolveMemberDescription(ctx, store, memberType, memberID) string`:
-  - user (type 1): `store.GetPrincipal(memberID)` → `Description`.
-  - agent (type 2): `store.GetAgentByResourceID(memberID)` → `info.AcpConfig.PersonaPrompt`.
-  - Keep per-member resolution (channels are small); note batch as a future optimization.
+`backend/manager/api/v1/channel_members.go` (`ListChannelMembers`, `ListThreadParticipants`):
+- Member rows are built by the shared helper `buildChannelMember(ctx, store, memberType, memberID, role, joinedAt)` in `api/v1/channel_convert.go`, which resolves display name, public `Description`, `Avatar`, and `PreferredLanguage` via `resolveMemberProfile`:
+  - user (type 1): the principal's `Description`.
+  - agent (type 2): `store.GetAgentByResourceID(memberID)` → `agent.Description` (public intro).
+  - Per-member resolution (channels are small); batch resolution remains a future optimization.
+- `ListThreadParticipants` validates `thread_root` is a root in this conversation (`IsThreadRoot`), calls `store.ListThreadSenders`, and resolves each sender to a `ChannelMember` via the same `buildChannelMember` helper (role 0, no joinedAt).
 
-`backend/manager/api/v1/command.go`:
-- Implement `GetConversationAgentProfile`: parse conversation + agent resource id, `requireConversationMember`, `store.GetAgentByResourceID`, return title + `info.AcpConfig.PersonaPrompt` + status.
-- Implement `ListThreadParticipants`: `requireConversationMember`, validate `thread_root` is a root in this conversation (reuse `IsThreadRoot`), call `store.ListThreadParticipants`, resolve each sender to a `ChannelMember` (reuse the `resolveMemberDisplayName`/`resolveMemberDescription` helpers from channel.go — extract them to a shared file `api/v1/member_resolve.go`).
-
-`backend/manager/api/v1/mention.go` (new file) — content-mention parser:
+`backend/manager/api/v1/mention.go` — content-mention parser (as built; evolved from the original sketch):
 ```go
-func parseContentMentions(ctx, store, convID uuid.UUID, content string) []*v1pb.Mention
+func (s *CommandService) parseContentMentions(ctx, convID uuid.UUID, content string) []*v1pb.Mention
 ```
-- Tokenize `@<bareword>` and `@"quoted multi-word"` from content.
-- For each token, case-insensitively match against the conversation members' `display_name` (load members once via `store.ListConversationMembers`, build a name→member map). Exact match only; ambiguous/no-match → skip.
-- Build `Mention{Type:"user"|"agent", Id:<resource id>, Name:<display_name>}`. Exclude the posting agent itself (caller passes its agent id) to avoid self-subscribe.
-- Return the list; caller merges into the message + `subscribeAndNotifyThread`.
+- Tokenizes bare `@<handle>` runs (letters/digits/`_`/`-`/`.`) — e.g. `@ran-user-1`, `@rei-agent-1`. No quoted multi-word form.
+- Three-pass resolution: (1) exact case-insensitive match on the member's mention handle; (2) fallback to an unambiguous display-name match within the conversation; (3) global directory fallback (handle, then unambiguous display name) so an agent can mention a peer that is not a member of the current conversation — the global index is cached in the store and rebuilt on agent/user create/update/delete.
+- Ambiguous display names never resolve; unknown tokens are skipped. `Mention.Name` is the display text (or the handle when two members in one message share a display name); `Mention.Id` always carries the canonical handle.
+- The posting agent/sending user is NOT excluded here — routing already skips the poster, and keeping self-mentions lets the frontend render `@self` badges.
+- Callers merge the parsed mentions into the message and `subscribeAndNotifyThread`.
 
-`backend/manager/api/v1/command.go` (`PostMessage`, around L829):
-- After building the message content, call `parseContentMentions(ctx, s.store, convUUID, req.Msg.Content)` (passing `&agent.ID` to exclude self).
-- Pass the resolved mentions into `store.CreateChatMessageBumpVersion` (set the `Mentions` field, already supported — `chat_message.go:43`) and into `subscribeAndNotifyThread(ctx, convUUID, threadRoot.UUID, newVersion, mentions, &agent.ID)`. This makes a thread `@agent` typed by an agent actually subscribe/wake that agent, matching the user `SendMessage` path (`channel.go:459-514`).
-- User `SendMessage` path is left unchanged (frontend already provides structured mentions); optional future unification noted.
+Integration (as built — both paths, not just the agent one):
+- Agent `PostMessage`: `api/v1/command_message.go` calls `parseContentMentions` and merges into `store.CreateChatMessageBumpVersion` + `subscribeAndNotifyThread`, so a thread `@agent` typed by an agent actually subscribes/wakes that agent.
+- User `SendMessage`: `api/v1/channel_message.go` also calls `parseContentMentions` and merges with the frontend-provided structured mentions (the original plan left the user path unchanged; this unification happened later).
 
-## Part 4 — chattools (new tools + tidying)
+## Part 4 — chattools (as built)
 
-`backend/agent/chattools/chattools_channel.go` (new file, mirrors `chattools_task.go`):
+`backend/agent/chattools/chattools_channel.go`:
 
-- `ListChannelMembers(ctx, d, ListChannelMembersInput{Conversation}) (string, error)` — calls `d.Client.ListChannelMembers`, formats with `formatMemberLine` (truncated description).
-- `ListThreadParticipants(ctx, d, ListThreadParticipantsInput{Conversation, ThreadRoot}) (string, error)` — calls `d.Client.ListThreadParticipants`.
-- `GetAgentProfile(ctx, d, GetAgentProfileInput{Conversation, Agent}) (string, error)` — calls `d.Client.GetConversationAgentProfile`, prints full title + persona_prompt + status.
-- Local helpers (kept in this file, following the per-domain mapper convention noted in exploration):
-  - `memberTypeString(int32) string` (1→`user`, 2→`agent`), `memberRoleString(int32) string` (1→`owner`, 2→`member`).
-  - `formatMemberLine(*v1pb.ChannelMember) string` → `[user] Alice (owner) — 后端工程师, 专注 agent 构建`.
-  - `truncateDescription(s string, n int) string` (n≈140, `…` suffix).
-- Reuse `normalizeConversationName` and `normalizeThreadRoot` from `chattools.go`. Reuse `wrapManagerError` for error mapping.
+- `ListMembers(ctx, d, ListMembersInput{Conversation, Root}) (string, error)` — the single roster tool. Without `Root`, calls `d.Client.ListChannelMembers`; with `Root` (a bare thread-root id), calls `d.Client.ListThreadParticipants`. Formatted by `formatRoster` (header with count, one `formatMemberLine` per member, addressing footer).
+- `formatMemberLine(*v1pb.ChannelMember)` renders `- [user|agent] <display_name> @<handle> (owner|member) (language: xx-XX)` followed by the member's full public description as an indented block. The `@<handle>` token is shown for ALL members and is the exact text to copy into a reply. The description is emitted **untruncated** (no `truncateDescription` helper).
+- Local helpers kept in this file: `memberTypeString(int32)` (1→`user`, 2→`agent`), `memberRoleString(int32)` (1→`owner`, 2→`member`, 3→`admin`), `preferredLanguageString(v1pb.PreferredLanguage)`.
+- Reuses the shared conversation-address resolution and `wrapManagerError` error mapping.
 
-Tidying (opportunistic, in `chattools_reminder.go`):
-- Collapse `parseFireAt` + `mustParseRFC3339` (L300-319) into a single function returning `(time.Time, error)` to remove the "Unreachable" silent-fallback landmine identified in exploration. No behavior change for valid input.
+Tidying (done): the reminder chattool's date parsing collapsed into a single `parseFireAtTime(s string) (time.Time, error)` in `chattools_reminder.go` — the "Unreachable" silent-fallback pair (`parseFireAt` + `mustParseRFC3339`) from the exploration no longer exists.
 
-## Part 5 — Wiring (daemon + CLI + prompt)
+## Part 5 — Wiring (daemon + CLI + prompt, as built)
 
 `backend/agent/daemon/server.go`:
-- Add three handlers (`handleChannelMembers`, `handleThreadParticipants`, `handleAgentProfile`) following `handleFileList` (L680-687). Build `Input` from the shared `Request` (add `Agent`/`Thread` fields to `Request` if not present — check existing fields first). Wrap with `s.run(...)`.
-- Register routes in `Server.Start()` (near L151-175): `/channel/members`, `/thread/participants`, `/agent/profile`.
+- A single `/members` route (`s.handleMembers`) registered alongside the other command routes; the shared `Request` envelope carries `Conversation`/`Root`. The planned `/channel/members`, `/thread/participants`, `/agent/profile` routes were collapsed into this one (and `/agent/profile` never existed — replaced by `/agent/list`).
 
 `backend/agent/cmd/`:
-- New `channel.go` with `laelia-machine channel members --conversation <c>` (model on `file.go`).
-- Extend thread command (or new `thread.go`) with `laelia-machine thread participants --conversation <c> --root <r>`.
-- New `agent.go` with `laelia-machine agent detail --conversation <c> --agent <a>` (or accept a display-name and resolve via members list — simpler to require the agent resource id as returned by `channel members`).
-- All read `LAELIA_*` env via existing `loadIdentity` and call `cmd.call("/<path>", Request{...})`.
+- `members.go` — `laelia-machine members <address> [--root <root>]` ("List the users and agents in a channel (or thread with --root) with their full descriptions").
+- No `channel members` subcommand (channel.go owns list/join/leave/add-member/remove-member); no `thread participants` subcommand (`members --root` covers it); no `agent detail` — instead `agent.go`'s `laelia-machine agent list` (`ListPeerAgents`) and `team.go`'s `team get` / `team show`.
+- All read `LAELIA_*` env via the shared identity loader and call the daemon over the same HTTP mux.
 
 `backend/agent/executor/prompt/communication.md`:
-- Document the three new commands (usage, output format, examples) in the same style as the existing CLI reference.
+- Documents `laelia-machine members <address> [--root <root-msg-id>]` in the command table (roster semantics, the `(language: xx-XX)` tag, the indented public-description block) plus the `@<handle>` mention guidance and the `agent list` peer roster.
 
-`backend/agent/executor/prompt.go` (`AgentFirstPromptBody`, L51-89):
-- Add a line in the decision step: before `@mention`ing someone for a task, run `channel members` (or `thread participants`) to see who is present and their descriptions; use `agent detail` for a specific agent's full persona. Keep the existing 9-step structure; this is an inline hint, not a new mandatory step.
+`backend/agent/executor/prompt.go` (`AgentFirstPromptBody`):
+- The decision-step hint is present: before `@mention`ing someone for a task, run `laelia-machine members <address>` (or `members <address> --root <thread_root>`) to see who is present, their preferred language, and their public descriptions; `agent list` for peers beyond the channel. The prompt body has since been restructured into the batch-driven 0–8 step flow (step 0 due reminders, step 1 batch); the roster hint lives in the decision step.
 
-## Part 6 — Frontend
+## Part 6 — Frontend (as built)
 
-Proto-es regen (from Part 1) gives `User.description` types.
+Proto-es regen (Part 1) provides `User.description` types.
 
-`frontend/src/stores/types.ts` (L98-102) — extend `updateUser` fields type: add `description?: string`.
+`frontend/src/stores/types.ts` / `frontend/src/stores/user.ts` — `createUser`/`updateUser` pass `description` through.
 
-`frontend/src/stores/user.ts` (L57-80) — pass `description` through in `createUser`/`updateUser`.
-
-New page `frontend/src/pages/dashboard/settings-profile.tsx` — `SettingsProfilePage`, Style A (copy `settings-storage.tsx` layout): a form seeded from `useAppStore(s => s.currentUser)`, with a `Textarea` (from `@/components/ui/textarea`, model on `agent-profile.tsx:544-554`) for `description` plus the existing editable fields (title/email/phone). Save via `updateUser(currentUser.name, {...}, maskPaths)` with a diff-driven mask (mirror `user-list.tsx:163-201`); toast via `toastManager`.
+`frontend/src/pages/dashboard/settings-profile.tsx` — `SettingsProfilePage`: a form seeded from `useAppStore(s => s.currentUser)`, including the `description` `Textarea` plus the existing editable fields (title/email/phone); saves via `updateUser` with a diff-driven `description` mask path; toast feedback.
 
 Routing:
-- `frontend/src/router/handles.ts` — add `SETTINGS_ROUTE_PROFILE`.
-- `frontend/src/router/routes/dashboard.tsx` (L132-153) — add `path: "profile"` child under `/settings`. Update the `/settings` `<Navigate>` default if desired (keep `storage` default).
-- `frontend/src/components/user-menu.tsx` — add a "Profile" link to the new route.
+- `frontend/src/router/handles.ts` — `SETTINGS_ROUTE_PROFILE` ("settings.profile").
+- `frontend/src/router/routes/dashboard.tsx` — `path: "profile"` child under `/settings` (the `/settings` default still redirects to storage).
+- `frontend/src/components/user-menu.tsx` — "Profile" link navigating to `/settings/profile`.
 
 Admin edit (`frontend/src/pages/dashboard/user-list.tsx`):
-- Add `editDescription` state, a description `FieldRow` + `Textarea` in the edit Sheet (mirror the title block L522-529), seed in `openEdit` (L154), push `"description"` into `maskPaths` in `handleSaveEdit` (L163-201) when changed.
+- `editDescription` state, a description `Textarea` in the edit Sheet, seeded in `openEdit`; `"description"` is pushed into `maskPaths` in the save handler when changed.
 
-i18n — add `settings.profile.*` / `user.field-description` keys to both `frontend/src/locales/en-US.json` and `zh-CN.json` (user-field keys ~L93-99).
+i18n — `settings.profile.*` and user-field description keys exist in both `frontend/src/locales/en-US.json` and `zh-CN.json`.
 
-Optional human-facing enhancement: render `description` as `sublabel` in `frontend/src/components/chat/member-picker.tsx` (L42-52) and in `mention-detail-sheet.tsx` so users see each other's bios. Small, low-risk.
+Human-facing enhancement (implemented): `member-picker.tsx` prefers `description` as the `sublabel` for both users and agents; `mention-detail-sheet.tsx` renders the bio as well.
 
 ## Verification
 
 Backend:
 - `gofmt -w` modified files; `golangci-lint run --allow-parallel-runners` until clean.
-- Unit tests: extend `backend/agent/chattools/chattools_test.go` with cases for `memberTypeString`/`memberRoleString`/`formatMemberLine`/`truncateDescription`. Add a manager test for `parseContentMentions` (matches `@"Alice"`, bare `@Bob`, skips unknown, excludes self, handles multi-word `@"UI UX"`).
+- Unit tests: `backend/agent/chattools/chattools_test.go` covers the roster helpers (`memberTypeString`/`memberRoleString`); `backend/manager/api/v1/mention_test.go` covers the mention parser (`TestTokenizeMentions`, `TestBuildDisplayNameIndexWithResolver`, `TestResolveMentionTokenFallback`, `TestBuildGlobalMentionIndex`, `TestBuildMentionsWithDisplayNames` — handle tokens, unambiguous display-name fallback, global-directory fallback, ambiguity skip).
 - `go build -ldflags "-w -s" -p=16 -o ./build/laelia ./backend/manager/bin/server/main.go`.
-- If ACP stdio integration touched: `LAELIA_RUN_OPENCODE_ACP_TESTS=1 go test ./backend/agent/executor -count=1` (expect known pre-existing failures per memory; skip `TestACPSessionUpdate`).
+- If ACP stdio integration is touched: `LAELIA_RUN_OPENCODE_ACP_TESTS=1 go test ./backend/agent/executor -count=1`.
 
-End-to-end (manual): start manager `--port 8181 --debug`; in a channel with ≥1 user (description set) and ≥2 agents (persona_prompt set), trigger an agent drain and have the agent run `laelia-machine channel members` — verify roster shows both types with descriptions. Have the agent `thread send --root <r> @<other-agent>`; verify the `@`-mentioned agent is subscribed (thread_participant row) and woken on next drain, and that the posted message's `mentions` field is populated. Frontend: open `/settings/profile`, set a description, reload, confirm it persists and appears in the admin edit Sheet and member picker.
+End-to-end (manual): start manager `--port 8181 --debug`; in a channel with ≥1 user (description set) and ≥2 agents (public description set), trigger an agent drain and have the agent run `laelia-machine members '<address>'` — verify the roster shows both types with handles, roles, languages, and descriptions. Have the agent `thread send --root <r> "@<other-agent-handle>"`; verify the `@`-mentioned agent is subscribed (thread_participant row) and woken on next drain, and that the posted message's `mentions` field is populated. Frontend: open `/settings/profile`, set a description, reload, confirm it persists and appears in the admin edit Sheet and the member picker.
 
 Frontend:
 - `pnpm --dir frontend biome:check`; `pnpm --dir frontend lint --fix`; `pnpm --dir frontend type-check`; `pnpm --dir frontend test`.

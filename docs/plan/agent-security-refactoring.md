@@ -1,13 +1,23 @@
 # Laelia Agent-Manager 通信安全重构方案
 
+> 状态：2026-09-06 已对照当前代码核对更新。主要变化：方案核心已落地（三层 token、轮换/吊销、会话表、nonce、TLS 自签、审计采样），但连接主体已演进为 machine-token 体系（设备码登录 + machine.json），bootstrap token 改为单次使用，分层限流与 setting 化安全配置未实现。
+
+## 现状概述（2026-09-06）
+
+本方案写于重构之前，现已基本落地并发生了一次重要架构演进：
+
+- **machine-token 体系**：机器端守护进程 `laelia-machine` 不再用 `--token` bootstrap，而是通过**设备码登录**（`laelia-machine setup` → StartDeviceLogin/PollDeviceLogin）取得 refresh token，持久化在 `~/.laelia/machine.json`（0600）。一台机器托管多个 agent，所有 agent 复用机器的 access token，通过 `AgentChannel`（in-stream `AgentReady.agent_name`）或机器调用时的 `X-Laelia-Agent` 头声明 agent 身份（见 `backend/manager/api/auth/auth.go` 的 `resolveDeclaredAgent`）。
+- **agent-token 连接 API 保留**：`ConnectAgent` / `RefreshAgentToken` / `AgentHeartbeat` / `AgentDisconnect` 及 token 轮换/吊销/会话管理 RPC 均已在 manager 侧实现（`backend/manager/api/v1/agent_token.go`、`agent_connection.go`），但 `backend/agent` 中没有任何调用方 —— daemon 走 machine 通道。agent-token 体系作为独立 agent 直连 manager 的机制保留。
+- **machine 侧对偶实现**：`machine_session` / `machine_token` 表与 `RefreshMachineToken` / `ConnectMachine` / `MachineHeartbeat` / `MachineDisconnect` / `RevokeMachineToken` 与 agent 侧一一对应，但 refresh token 语义不同（多用途滚动续期，见 §七）。
+
 ## 设计前提
 
 | 约束 | 说明 |
 |------|------|
 | 无需迁移/兼容 | 项目未上线，可直接破坏性变更 |
-| 单实例部署 | 暂不考虑多实例，缓存用进程内方案 |
-| 仅改 Agent Token | 用户侧认证保持现有机制不变，两套共存 |
-| Token 持久化 | Agent 优先用文件中的 refresh token，fallback 到 `--token` |
+| 单实例部署 | 暂不考虑多实例，缓存用进程内方案（nonce 重放缓存、TokenExpireCache 均为进程内，多实例需共享，代码中有 TODO 注释） |
+| ~~仅改 Agent Token~~ | **已变更**：实际演进为 machine-token 为主、agent-token 为辅的双体系；用户侧认证机制不变 |
+| ~~Token 持久化：~/.laelia/agent-token~~ | **已变更**：机器凭证持久化在 `~/.laelia/machine.json`（`backend/agent/state/state.go`，0600 原子写）；agent-token 路径的客户端持久化未实现（无调用方） |
 
 ---
 
@@ -18,34 +28,44 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Bootstrap Token                                            │
-│  来源: CreateAgent API 返回                                  │
-│  有效期: 7天（可配置）                                        │
-│  用途: 首次连接 或 refresh token 失效后 fallback              │
-│  特性: 可重用，直到管理员吊销或轮换                             │
-│  存储: 仅通过 --token 参数传入，不持久化                        │
+│  来源: CreateAgent / RotateAgentToken API 返回               │
+│  有效期: 7天 (bootstrapTokenDuration)                        │
+│  用途: ConnectAgent 请求体传入（首次连接）                     │
+│  特性: 【已变更】单次使用 —— ConnectAgent 成功后即标记        │
+│        CONSUMED（防止泄露的 bootstrap token 重放踢掉合法      │
+│        agent），见 agent_connection.go                        │
+│  存储: 不持久化；DB 中按 SHA-256 hash 存一份用于校验           │
 ├─────────────────────────────────────────────────────────────┤
 │  Access Token                                               │
-│  来源: ConnectAgent / RefreshAgentToken 返回                 │
-│  有效期: 15分钟（可配置）                                     │
-│  用途: Heartbeat 及后续所有 agent API 调用                    │
-│  特性: 短期，心跳时可透明续期                                  │
+│  来源: ConnectAgent / RefreshAgentToken / 心跳续期 返回       │
+│  有效期: 15分钟 (accessTokenDuration)                        │
+│  用途: 后续所有 agent API 调用 (Bearer)                       │
+│  特性: 短期，心跳时剩余 < 1/3（即 <5min）时透明续期            │
 │  存储: 仅内存                                                │
 ├─────────────────────────────────────────────────────────────┤
 │  Refresh Token                                              │
-│  来源: ConnectAgent / RefreshAgentToken 返回                 │
-│  有效期: 24小时（可配置）                                     │
-│  用途: access token 过期后换取新 access + refresh              │
-│  特性: 单次使用轮换，重试窗口30秒                              │
-│  存储: 内存 + 文件持久化 (~/.laelia/agent-token, 0600权限)     │
+│  来源: ConnectAgent（仅 bootstrap 路径）/ RefreshAgentToken   │
+│  有效期: 24小时 (refreshTokenDuration)                       │
+│  用途: access token 过期后换取新 access + refresh             │
+│  特性: 单次使用轮换；重放 CONSUMED/REVOKED → 吊销整个 family  │
+│  存储: manager 侧按 SHA-256 hash 存 agent_token 表；          │
+│        【已变更】agent 端文件持久化 (~/.laelia/agent-token)    │
+│        未实现 —— 当前 daemon 不走 agent-token 路径             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
+JWT claims（`backend/manager/api/auth/auth.go`）：`token_type`（BOOTSTRAP/ACCESS/REFRESH）、`session_id`、`token_family`、`token_version`，audience 为 `ll.agent.access.<mode>`（machine/provisioner/user 各有独立 audience，拦截器按 audience 分支解析）。
+
 ### 1.2 连接生命周期
+
+> 已实现（manager 侧 `agent_connection.go`）。注意两点与原设计的差异：
+> ① ConnectAgent 仅在 bootstrap 路径上签发 access+refresh；用 access token 重连时不再重复签发（避免 hash 碰撞与 refresh 表无限增长）。
+> ② 当前 daemon 实际走 §七 的 machine 通道，下面是 agent-token 路径的设计/实现流程。
 
 ```
 Agent 启动 (--token <bootstrap_token>)
-    │
-    ├─ 尝试从 ~/.laelia/agent-token 加载 refresh_token ──┐
+    │                                      （以下为 agent-token 路径设计流程；
+    ├─ 尝试从 ~/.laelia/agent-token 加载 refresh_token ──┐   客户端文件持久化未实现）
     │                                                     │
     ├─ 有 refresh_token?                                  │
     │   ├─ YES → RefreshAgentToken(refresh_token)         │
@@ -77,45 +97,41 @@ Agent 启动 (--token <bootstrap_token>)
             → 退出                                         │
 ```
 
-### 1.3 Refresh Token 重试窗口
+### 1.3 Refresh Token 重用检测
 
-解决网络重试导致的假阳性吊销问题：
+> **已变更**：最终实现没有采用"幂等重放窗口"，而是更保守的"重放即盗窃"策略（`token_refresh.go` 的 `validateRefreshToken` + `agent_token.go` 的 `refreshReuseAction`，与 machine 侧共用）：
 
 ```go
-// Refresh token 状态机
-const (
-    RefreshActive   = "ACTIVE"     // 可用
-    RefreshConsumed = "CONSUMED"   // 已使用，保留明文30秒（重试窗口）
-    RefreshRevoked  = "REVOKED"    // 已吊销
-)
-
-// 刷新逻辑：
-// 1. 收到 RefreshAgentToken(R1)
-// 2. 检查 R1 状态：
-//    - ACTIVE → 正常处理，生成新的 access+refresh，标记 R1 为 CONSUMED，
-//              启动30秒定时器后标记为 REVOKED
-//    - CONSUMED → 返回上一次的响应（幂等），不生成新 token
-//    - REVOKED → 拒绝，这可能是窃取重用，吊销整个 token family
-// 3. 如果同一 family 中出现已被 REVOKED 的 refresh token → 吊销该 agent 所有 token
+// Refresh token 状态机（storepb.AgentTokenState）
+//   ACTIVE   → 正常轮换：标记旧 token 为 CONSUMED（记录 consumed_at），
+//              30 秒后定时器将其置为 REVOKED（scheduleTokenRevoke）
+//   CONSUMED → 重用！吊销整个 token family，返回 PermissionDenied
+//   REVOKED  → 重用！同上
+//
+// 另有两条防线：
+//   - fingerprint 绑定：请求携带的 fingerprint 与存储的不一致 → 拒绝
+//   - token_version 绑定：JWT 中的版本 ≠ agent 当前 TokenVersion → 吊销 family 并拒绝
 ```
+
+即 30 秒窗口只是 CONSUMED→REVOKED 的延迟状态转移；窗口内的二次使用同样触发 family 吊销，不做幂等补偿。刷新成功时新 refresh token 与旧 token 同 family（`{resourceID}:v{version}`，RotateAgentToken 时 bump 版本并换新 family）。
 
 ### 1.4 并发会话策略
 
-```
-同一 Agent 同时只允许一个活跃 session:
-  1. 新 ConnectAgent 到达 → 查找该 agent 是否有活跃 session
-  2. 如果有 → 标记旧 session 为 KICKED，旧连接下次心跳时收到 KICKED 错误
-  3. 新 session 建立，记录 connected_at、source_ip 等
-  4. 旧连接收到 KICKED → Agent 退出或重连
-
-  配置项: agent.max_concurrent_sessions = 1 (默认)
-```
+> 已实现，但形式比原设计更简单：无 `agent.max_concurrent_sessions` 配置项，新连接直接 `TerminateAllAgentSessions(agent.ID, "replaced")` 终结该 agent 全部旧会话（machine 侧对偶为 `TerminateAllMachineSessions`）。旧会话下次心跳携带 session_id 时收到 `CodePermissionDenied`（"session has been replaced by a new connection"）。
 
 ---
 
 ## 二、Proto 协议重新设计
 
-### 2.1 完整 agent.proto
+> **已实现并扩展**：现行协议见 `proto/v1/v1/agent.proto`（与 `proto/store/store/agent.proto`）。下列代码块是设计快照，与现行 proto 的主要差异：
+> - 管理端 RPC 远多于设计：新增 `UpdateAgent`、`TransferAgentOwnership`、`StopAgent`/`StartAgent`/`RestartAgent`、`UpdateAgentACPConfig`、`UpdateAgentMcpConfig`、`RefreshAgentProviders`/`RefreshAgentModels`、`ListAgentWorkspace`/`ReadAgentWorkspaceFile`、`ListPiModels`、头像三 RPC 等。权限不是"仅管理员"一刀切：大部分 RPC 无 permission 注解、由 handler 按"owner 或 `laelia.agents.edit`"判定（`canEditAgent`）；`ListAgents`/`GetAgent` 要求 `laelia.agents.get`，`ListAgentSessions` 要求 `laelia.agents.listSessions`（见 `backend/common/permission/permission_gen.go`）。
+> - `CreateAgent` 是 machine-scoped：handler 用 `laelia.machines.createAgent` 对机器的 IAM policy 判定，agent 创建时必须绑定 machine（`agent.machine`）。
+> - `ConnectAgentResponse` 额外返回 `acp_config`（服务端解析后的 ACP 配置）；`AgentHeartbeatResponse` 额外返回 `command_stream_required` + `pending_command_hint`（bidi 命令流不可用时的兜底命令提示）。
+> - `AgentStatus.ConnectionState` 增加 `STOPPED = 5`（StopAgent 停用态），共 6 个状态。
+> - `AgentSession.state` 直接复用 `AgentStatus.ConnectionState`。
+> - agent-token 连接 RPC（ConnectAgent 等）的调用方已由 §七 的 machine 客户端取代，proto 保留。
+
+### 2.1 完整 agent.proto（设计快照）
 
 ```protobuf
 syntax = "proto3";
@@ -492,16 +508,18 @@ message AgentMetrics {
 
 ### 3.1 迁移脚本
 
+> **已实现**：以下为 `backend/manager/migration/migration/LATEST.sql` 中的实际表结构（增量迁移在各 `{MAJOR.MINOR}/` 目录）。machine 侧另有对偶的 `machine_session` / `machine_token` 表（含 `idx_machine_token_hash` 唯一索引）。
+
 ```sql
 -- agent_session 表: 追踪活跃会话
 CREATE TABLE agent_session (
     id bigserial PRIMARY KEY,
     session_id text NOT NULL UNIQUE,
     agent_id int NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
-    token_family text NOT NULL,              -- token family 标识 (for rotation detection)
-    state text NOT NULL DEFAULT 'ACTIVE',    -- ACTIVE, TERMINATED, KICKED
-    source_ip text NOT NULL,
-    fingerprint text NOT NULL,                -- hostname:os:arch
+    token_family text NOT NULL,
+    state text NOT NULL DEFAULT 'ACTIVE',    -- ACTIVE / KICKED / TERMINATED...
+    source_ip text NOT NULL DEFAULT '',
+    fingerprint text NOT NULL DEFAULT '',
     agent_version text NOT NULL DEFAULT '',
     connected_at timestamptz NOT NULL DEFAULT now(),
     disconnected_at timestamptz,
@@ -514,60 +532,55 @@ CREATE INDEX idx_agent_session_agent ON agent_session(agent_id, state);
 CREATE INDEX idx_agent_session_session ON agent_session(session_id);
 CREATE INDEX idx_agent_session_active ON agent_session(state, last_heartbeat_at);
 
--- agent_refresh_token 表: 跟踪 refresh token 状态 (用于 reuse detection)
-CREATE TABLE agent_refresh_token (
+-- agent_token 表: 跟踪 token 状态 (reuse detection)
+CREATE TABLE agent_token (
     id bigserial PRIMARY KEY,
     agent_id int NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
     token_hash text NOT NULL,               -- SHA-256(bootstrap_token 或 refresh_token)
-    token_type text NOT NULL DEFAULT 'BOOTSTRAP',  -- BOOTSTRAP / REFRESH
-    token_family text NOT NULL,             -- family 标识 (同一 bootstrap 衍生的 token 属同一家族)
+    token_type text NOT NULL DEFAULT 'BOOTSTRAP',  -- BOOTSTRAP / ACCESS / REFRESH
+    token_family text NOT NULL,
     state text NOT NULL DEFAULT 'ACTIVE',   -- ACTIVE, CONSUMED, REVOKED
-    fingerprint text,                        -- 首次使用时的连接指纹
-    source_ip text,
+    fingerprint text NOT NULL DEFAULT '',
+    source_ip text NOT NULL DEFAULT '',
     issued_at timestamptz NOT NULL DEFAULT now(),
     expires_at timestamptz NOT NULL,
     consumed_at timestamptz,
     revoked_at timestamptz,
     last_used_at timestamptz,
-    created_by text                          -- 哪个用户创建的
+    created_by text NOT NULL DEFAULT ''
 );
 
-CREATE INDEX idx_agent_refresh_token_hash ON agent_refresh_token(token_hash);
-CREATE INDEX idx_agent_refresh_token_family ON agent_refresh_token(token_family, state);
-CREATE INDEX idx_agent_refresh_token_agent ON agent_refresh_token(agent_id, token_type, state);
+CREATE INDEX idx_agent_token_hash ON agent_token(token_hash);  -- 迁移后追加 UNIQUE 约束
+CREATE INDEX idx_agent_token_family ON agent_token(token_family, state);
+CREATE INDEX idx_agent_token_agent ON agent_token(agent_id, token_type, state);
 
 -- 扩展 agent 表
 ALTER TABLE agent ADD COLUMN last_token_rotated_at timestamptz;
 -- token_version 字段已存在，无需新增
 ```
 
+注意：`idx_agent_token_hash` 在后续增量迁移中升级为 **UNIQUE** 索引 —— 这正是"ConnectAgent 仅在 bootstrap 路径签发 token"的原因（同秒重复签发同一 token 会撞唯一约束，见 `agent_connection.go` 注释）。
+
 ### 3.2 Agent Auth 拦截器变更
 
-现有 `auth.go` 中的 `getUserOrAgentConnect` 需要扩展：
+> **已实现**：`backend/manager/api/auth/auth.go`。claims 结构与设计一致并已落地：
 
 ```go
-// 新增: token 类型识别
-//
-// JWT claims 中增加 token_type 字段:
-//   BOOTSTRAP: 仅用于 ConnectAgent 和 RefreshAgentToken
-//   ACCESS:    用于 Heartbeat 等常规 API
-//   REFRESH:   仅用于 RefreshAgentToken
-
 type agentClaimsMessage struct {
     Name         string `json:"name"`
     TokenVersion int    `json:"token_version"`
-    TokenType    string `json:"token_type"`    // 新增: "BOOTSTRAP" / "ACCESS"
-    SessionID    string `json:"session_id"`    // 新增: ACCESS token 绑定的会话
-    TokenFamily  string `json:"token_family"`  // 新增: token family 标识
+    TokenType    string `json:"token_type"`    // "BOOTSTRAP" / "ACCESS" / "REFRESH"
+    SessionID    string `json:"session_id,omitempty"`
+    TokenFamily  string `json:"token_family,omitempty"`
     jwt.RegisteredClaims
 }
-
-// 拦截器逻辑:
-// 1. ConnectAgent → 接受 BOOTSTRAP 类型
-// 2. Heartbeat + DisconnectAgent → 仅接受 ACCESS 类型
-// 3. RefreshAgentToken → 接受 BOOTSTRAP 和 REFRESH 类型
-// 4. 其他 (ListAgents, CreateAgent 等) → 仅接受 IAM (用户 token)
 ```
+
+实际实现要点（与原设计的差异）：
+- 拦截器先 `peekTokenAudience` 读未签名 payload 的 `aud` 选分支（user / agent / machine / provisioner 四种 audience：`ll.user.access.<mode>` 等），再做完整签名校验并复查 audience，避免四次解析。
+- **token_type 的强制不在拦截器里统一做**：拦截器只认 audience + 签名 + token_version；`ACCESS` 类型约束在 machine 侧于 `authenticateMachineByClaims` 中强制（非 ACCESS 拒绝）。agent 侧的 bootstrap token 不走 Authorization 头 —— ConnectAgent handler 从请求体取出后自行校验（`authenticateBootstrapToken`：JWT 签名 + `TokenType==BOOTSTRAP` + 版本匹配 + DB hash 匹配 + ACTIVE + 未过期）；REFRESH 只被 `RefreshAgentToken`/`RefreshMachineToken` 的请求体接受（`ParseAgentToken`/`ParseMachineToken`）。
+- CUSTOM auth_method 的 RPC（ConnectAgent / RefreshAgentToken 等）在无凭证时放行到 handler（`IsAuthenticationAllowed`），由 handler 完成认证。
+- 拦截器链（`backend/manager/server/grpc_routes.go`）：DebugInterceptor → IPValidator → APIAuthInterceptor → IAMInterceptor → AuditInterceptor。
 
 ---
 
@@ -575,387 +588,153 @@ type agentClaimsMessage struct {
 
 ### 4.1 ConnectAgent 流程
 
+> **已实现**（`agent_connection.go`），实际流程：
+
 ```
-1. 提取 bootstrap_token (从请求体) 或 access_token (从 Authorization header)
-2. 验证 token:
-   a. 如果是 bootstrap_token:
-      - 查数据库 agent_refresh_token 表, 验证 hash 匹配且 state=ACTIVE
-      - 验证 bootstrap_token 未过期 (expires_at > now)
-      - 验证 agent 存在、未删除、token_version 匹配
-   b. 如果是 access_token:
-      - 标准 JWT 验证 (同现有逻辑)
-3. 计算/验证 fingerprint:
-   - fingerprint = SHA256(hostname + os + arch)
-   - 存入 session 和 token 记录
-4. 检查并发会话:
-   - 查找该 agent 是否有 ACTIVE session
-   - 如果有 → 标记旧 session.state = KICKED, 原因 "replaced"
-5. 创建新 session (INSERT agent_session)
-6. 生成 token:
-   - access_token: 15min, type=ACCESS, 包含 session_id
-   - refresh_token: 24h, type=REFRESH, 新 token_family (或沿用的)
-7. 存储 refresh_token 到 agent_refresh_token 表
-8. 标记 bootstrap_token 为 CONSUMED (如果使用的是 bootstrap)
-9. 更新 agent.status = ONLINE
-10. 返回 ConnectAgentResponse
+1. 优先从 Authorization header 提取 access token（拦截器已解析出 agent）；
+   若无（或解析不到 agent）→ 从请求体取 bootstrap_token，走 authenticateBootstrapToken:
+   - JWT 验签（HS256, kid=v1）+ TokenType==BOOTSTRAP
+   - agent 存在、未删除、token_version 匹配
+   - SHA-256 hash 在 agent_token 表中存在、state=ACTIVE、未过期
+2. 计算 token_family（bootstrap claims 的 token_family，缺省为 resourceID）
+3. 生成 session_id（32 位随机 hex）+ 用 NonceManager 生成首个 nonce
+4. 更新 agent.status = ONLINE（含 ConnectedAt/ActiveSessionId），写入 ACP 配置
+5. TerminateAllAgentSessions(agent.ID, "replaced") —— 旧会话全部 KICKED
+6. IP 校验：ValidateAgentIP(reportedIP, sourceIP, IPValidationWarn) —— 当前固定 WARN
+7. INSERT agent_session（source_ip / fingerprint / token_family / ACTIVE）
+8. 仅 bootstrap 路径：
+   - 签发 access_token（15min, type=ACCESS, 绑定 session_id）
+   - 签发 refresh_token（24h, type=REFRESH），SHA-256 入 agent_token 表（同 family）
+   - bootstrap token 标记 CONSUMED（单次使用，防重放）
+9. 解析 ACP 配置（global_provider 引用解析为 api_provider/api_key/model）后返回
+   ConnectAgentResponse（含 next_nonce、initial_status、acp_config）
 ```
 
 ### 4.2 AgentHeartbeat 流程
 
+> **已实现**（`agent_connection.go`），实际流程：
+
 ```
-1. 从 Authorization header 提取 access_token
-2. 验证 JWT (access_token, type=ACCESS)
-3. 验证 session_id:
-   - 查 agent_session 表, session 必须是 ACTIVE 状态
-   - 如果 session.state = KICKED → 返回 CodePermissionDenied, 要求重连
-   - 如果 session 不存在 → 返回 CodeUnauthenticated
-4. 验证 previous_nonce:
-   - 从 session.metadata 中取出上次签发的 nonce
-   - 计算 HMAC-SHA256(nonce_string, server_key) 与客户端发送的比对
-   - 验证通过 → 生成新 nonce, 存入 session.metadata
-   - 验证失败 → 容忍一次 (可能是网络重传), 记录告警, 发出新 nonce
-   - 连续失败 2 次 → 拒绝请求
-5. (可选上限采样审计: 每100次心跳记录1次, 或仅在异常时记录)
-6. 更新 agent_session.last_heartbeat_at = now()
-7. 检查 access_token 是否剩余 < 5min:
-   - 是 → 生成新 access_token, 放入 response
-   - 否 → response.access_token 为空
-8. 更新 agent.status.last_heartbeat_at (内存缓存, 批量写DB)
-9. 返回 AgentHeartbeatResponse (next_nonce, 可选 access_token)
+1. 从 Authorization header 提取 access_token（拦截器验证 JWT）
+2. 验证 session_id（可选字段，传入即校验）:
+   - 查 agent_session 表；不存在 → CodeUnauthenticated
+   - session.state = KICKED → CodePermissionDenied（要求重连）
+   - session.AgentID 不匹配 → CodePermissionDenied
+3. 验证 previous_nonce（见 4.4）:
+   - VerifyNonce 失败且 previous_nonce 非空 → 直接拒绝 CodeUnauthenticated
+   - previous_nonce 为空 → 跳过校验（容忍空值）
+   【已变更】原设计的"容忍一次/保留2个 nonce"未实现 —— 无宽限期
+4. TouchAgentSession 更新 session.last_heartbeat_at（请求路径即时）
+5. HeartbeatBuffer.Record(...) —— 内存缓冲，10s 批量刷写（见 4.5）
+6. 生成新 nonce 放入 response.next_nonce
+7. access token 剩余 < 1/3（15min 的 1/3 = 5min）→ 生成新 access_token 放入 response
+8. 若 dispatcher 中 agent 无活跃连接，查询下一条 pending 命令放入
+   response.command_stream_required / pending_command_hint（命令流兜底通道）
+9. 返回 AgentHeartbeatResponse（next_heartbeat_at = now+30s）
 ```
 
 ### 4.3 RefreshAgentToken 流程
 
+> **已实现**（`agent_token.go` + 共享的 `token_refresh.go`），实际流程：
+
 ```
 1. 从请求体提取 refresh_token
-2. 计算 SHA-256(refresh_token), 查 agent_refresh_token 表:
+2. JWT 验签（ParseAgentToken，不强制 token_type/version —— 由流程绑定）
+3. 计算 SHA-256(refresh_token), 查 agent_token 表:
    a. 找到, state=ACTIVE:
       - 验证未过期
-      - 验证 fingerprint 匹配 (如果请求中有)
+      - 验证 fingerprint（双方都非空时必须一致，否则视为窃取 → CodePermissionDenied）
+      - 验证 principal 存在且未删除；JWT 的 token_version 必须 == agent.TokenVersion
+        （不匹配 → 吊销该 family，CodeUnauthenticated）
       - 生成新 access_token (15min) + 新 refresh_token (24h, 同 family)
-      - 标记旧 refresh_token 为 CONSUMED, 设置 consumed_at
-      - 启动30秒定时器: CONSUMED → REVOKED
+      - 标记旧 refresh_token 为 CONSUMED（记录 consumed_at）
+      - 启动 30 秒定时器: CONSUMED → REVOKED（scheduleTokenRevoke）
       - 存储新 refresh_token 到数据库
-      - 更新 session.last_heartbeat_at
       - 返回新 token 对
-   b. 找到, state=CONSUMED (在30秒重试窗口内):
-      - 幂等返回: 重新生成一对 access+refresh, 但使用相同的 family
-      - 不触发 family 吊销
-      - 标记旧 token 为 REVOKED (立即)
-      - 返回新 token 对
-   c. 找到, state=REVOKED:
-      - 安全事件: refresh token reuse detected!
-      - 吊销该 token_family 下所有 token
-      - 吊销 agent 的所有 session
-      - bump agent.token_version
-      - 返回 CodeUnauthenticated, 要求重新 bootstrap
-   d. 找不到:
+   b. 找到, state=CONSUMED 或 REVOKED:
+      - 【已变更】无幂等重放窗口 —— 一律视为重用攻击:
+        吊销该 token_family 全部 token，返回 CodePermissionDenied
+        ("refresh token reuse detected, token family revoked")
+   c. 找不到:
       - 返回 CodeUnauthenticated
 ```
 
+注意：b 分支不再 bump agent.token_version、不吊销 session —— family 吊销 + 版本绑定已覆盖。该验证逻辑与 machine 侧共用（`validateRefreshToken` 注入各自查询单元）。
+
 ### 4.4 Nonce 重放防护
 
-```go
-type NonceManager struct {
-    secrets map[string][]byte  // agent_id → HMAC key
-    mu      sync.RWMutex
-}
+> **已实现**：`backend/manager/component/state/nonce.go`（不是设计稿中的 `api/auth/nonce.go`）。实际实现：
 
+```go
+// NonceManager（进程内，per-agent 对称密钥）
 // 生成 nonce:
 // 1. 生成 24 字节随机数
-// 2. 拼接: agent_id + session_id + random + timestamp
-// 3. HMAC-SHA256 签名
-// 4. 输出: base64url(random_bytes) + "." + hex(hmac_signature)
-// 5. 存入 session metadata
-
+// 2. 拼接: agentResourceID + sessionID + base64url(random) + timestamp（秒）
+// 3. HMAC-SHA256 签名（密钥为 per-agent 32 字节随机密钥，getOrCreateKey 惰性创建）
+// 4. 输出: base64url(random) + "." + timestamp + "." + hex(hmac)
+//    【已变更】时间戳显式嵌在 nonce 中（非设计稿的 random+sig 两段式）
+//
 // 验证 nonce:
-// 1. 拆分 nonce → random_bytes + hmac
-// 2. 重新计算 HMAC-SHA256(agent_id + session_id + random_bytes + expected_timestamp, key)
-// 3. 比对签名
-// 4. 比对 timestamp 在 [server_time - 35s, server_time + 5s] 范围内
-//    (容忍时钟偏差 ±5s)
+// 1. 拆分三段，解析时间戳
+// 2. 时间戳必须在 [now-35s, now+5s] 窗口内
+// 3. 重新计算 HMAC 并恒时比对
+// 4. recordAndCheckReplay: 一次性使用 —— 已验证过的 nonce 在 45s TTL 内
+//    再次出现即为重放，拒绝（进程内 map，惰性清扫；多实例需共享，代码有 TODO(T14)）
 ```
 
-**容错设计**: 如果 Agent 未收到上次心跳的响应（网络超时），nonce 不匹配：
+**容错设计【已变更】**: 原设计的"保留最近2个 nonce / 容忍一次不匹配"未实现。实际行为（`AgentHeartbeat`）：
 
 ```
-服务端保留 session 中最近2个 nonce (当前 + 上一个)
 Agent 发送 previous_nonce 时:
-  - 匹配当前 nonce → 正常
-  - 匹配上一个 nonce → 容忍，发出新 nonce，记录告警
-  - 都不匹配 → 拒绝，返回 CodeUnauthenticated
+  - 为空 → 跳过校验（容忍）
+  - 非空且校验失败 → 直接返回 CodeUnauthenticated，无宽限
 ```
 
 ### 4.5 心跳写入优化
 
-当前每个心跳直接写数据库。1000个 Agent × 120 beats/hour = 120k writes/hour。
+> **已实现**：`backend/manager/component/state/heartbeat.go` 的 `HeartbeatBuffer`，随 `state.NewWithStore` 创建。实际实现与设计稿的差异：缓冲的是 `AgentHeartbeatUpdate{AgentID, LastHeartbeatAt, SessionID}`（无 Metrics），默认 10 秒刷写（`Start`/`Stop` 管理生命周期，退出前 final flush，单飞防重复启动），刷写调用 `store.TouchAgentHeartbeats` 做**多行批量 UPDATE**（agent_session touch + agent.status 的 jsonb_set），单次刷写带 10s 超时防挂死。`GetLatest(agentID)` 也在（供读路径合并最新心跳）。
 
-**优化方案**: 内存缓存 + 批量刷写
-
-```go
-type HeartbeatBuffer struct {
-    mu      sync.Mutex
-    updates map[int]*AgentHeartbeatUpdate  // agent_id → 最新状态
-    store   *store.Store
-    interval time.Duration  // 刷写间隔，默认 10秒
-}
-
-type AgentHeartbeatUpdate struct {
-    AgentID         int
-    LastHeartbeatAt int64
-    SessionID       string
-    Metrics         *AgentMetrics
-}
-
-func (b *HeartbeatBuffer) Record(update *AgentHeartbeatUpdate) {
-    b.mu.Lock()
-    b.updates[update.AgentID] = update  // 只保留最新值
-    b.mu.Unlock()
-}
-
-func (b *HeartbeatBuffer) FlushLoop(ctx context.Context) {
-    ticker := time.NewTicker(b.interval)
-    defer ticker.Stop()
-    for {
-        select {
-        case <-ctx.Done():
-            b.flush() // 退出前刷写
-            return
-        case <-ticker.C:
-            b.flush()
-        }
-    }
-}
-
-func (b *HeartbeatBuffer) flush() {
-    b.mu.Lock()
-    snapshot := b.updates
-    b.updates = make(map[int]*AgentHeartbeatUpdate)
-    b.mu.Unlock()
-
-    if len(snapshot) == 0 {
-        return
-    }
-
-    // 批量 UPDATE
-    b.store.BatchUpdateAgentStatus(ctx, snapshot)
-}
-```
-
-同时，读取 agent 状态时优先读内存缓存：
-
-```go
-// GetAgent 仍然从 DB 读 (或缓存)，但 LastHeartbeatAt 从 HeartbeatBuffer 读
-func (s *AgentService) GetAgent(...) {
-    agent := s.store.GetAgent(...)
-    if latest := s.heartbeatBuffer.GetLatest(agent.ID); latest != nil {
-        agent.Status.LastHeartbeatAt = latest.LastHeartbeatAt
-    }
-    return agent
-}
-```
+另注意：该优化只用于 **AgentHeartbeat** 路径；`MachineHeartbeat` 仍逐次 `UpdateMachine` 直接写 DB（machine 数量远小于 agent）。
 
 ### 4.6 时钟偏移处理
 
 ```go
-// 在 Hello RPC 中，已返回 server 时间:
-// HelloResponse { current_time: int64 }
+// Hello RPC 已实现（AgentService.Hello，allow_without_credential）:
+// HelloResponse { current_time: int64; server_version: string }
 // Agent 启动时调用 Hello 获取服务器时间，计算偏移:
 //
 //   clockOffset = serverTime - localTime
 //
-// JWT 库（golang-jwt/jwt/v5）已内置 leeway 支持：
+// 【未实现】JWT 库 leeway（WithLeeway）未使用 —— 代码库中无调用；
+// 时钟容错实际由 nonce 的 [-35s, +5s] 窗口承担。
 parser := jwt.NewParser(jwt.WithLeeway(30*time.Second))
 ```
 
 ### 4.7 IP 校验
 
-```go
-type IPValidationPolicy int
-
-const (
-    IPValidationOff    IPValidationPolicy = 0  // 不校验
-    IPValidationWarn   IPValidationPolicy = 1  // 仅告警
-    IPValidationStrict IPValidationPolicy = 2  // 不匹配则拒绝
-)
-
-func extractSourceIP(r *http.Request, trustProxy bool) string {
-    if trustProxy {
-        if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-            ips := strings.Split(xff, ",")
-            return strings.TrimSpace(ips[0])
-        }
-        if xri := r.Header.Get("X-Real-IP"); xri != "" {
-            return strings.TrimSpace(xri)
-        }
-    }
-    host, _, _ := net.SplitHostPort(r.RemoteAddr)
-    return host
-}
-
-func validateAgentIP(reportedIP, sourceIP string, policy IPValidationPolicy) error {
-    if policy == IPValidationOff || reportedIP == "" || sourceIP == "" {
-        return nil
-    }
-    if reportedIP != sourceIP {
-        switch policy {
-        case IPValidationWarn:
-            slog.Warn("agent IP mismatch", "reported", reportedIP, "source", sourceIP)
-            return nil
-        case IPValidationStrict:
-            return connect.NewError(connect.CodePermissionDenied,
-                fmt.Errorf("agent-reported IP %s doesn't match source IP %s", reportedIP, sourceIP))
-        }
-    }
-    return nil
-}
-```
+> **已实现**：`backend/manager/api/auth/iplist.go`。`IPValidationPolicy`（Off/Warn/Strict）三种策略与设计一致。与原设计的差异：
+> - `extractSourceIP(header, remoteAddr, trustProxy)`：trustProxy 时取 X-Forwarded-For 最左项或 X-Real-IP，否则用 TCP peer 地址（去端口）—— 客户端伪造头在 trustProxy=false 时被完全忽略。
+> - `ValidateAgentIP` 的空 sourceIP 处理是 fail-closed 的：Strict 下拒绝，Warn 下仅告警。
+> - **策略当前为硬编码 `IPValidationWarn`**（`grpc_routes.go` 的 IPValidator 拦截器 + `ConnectAgent`/`ConnectMachine` 里的连接时校验），未接入 setting 表，无 STRICT 运行态。
+> - IPValidator 拦截器只负责把 sourceIP 注入 context；实际的不匹配校验发生在 Connect 时（比对 agent 上报的 info.ip）。
 
 ### 4.8 TLS 方案
 
-```go
-// 服务端 TLS 初始化
-func initTLS(cfg *config.TLSConfig) (*tls.Config, error) {
-    if cfg.Domain != "" {
-        // 公有云: 自动 ACME (Let's Encrypt)
-        return initAutoCert(cfg.Domain, cfg.Email, cfg.CertDir)
-    }
+> **部分实现**：`backend/manager/api/auth/tls.go`。自签名 CA + 服务器证书路径已落地（`InitTLS`：加载 `certs/server.pem`/`server.key`，否则自动生成自签名 CA + 服务器证书并落盘，TLS 1.3，日志打印 CA 指纹）。与原设计的差异：
 
-    certDir := filepath.Join(cfg.DataDir, "certs")
-
-    // 尝试加载已有证书
-    cert, err := tls.LoadX509KeyPair(
-        filepath.Join(certDir, "server.pem"),
-        filepath.Join(certDir, "server.key"),
-    )
-    if err == nil {
-        return &tls.Config{
-            MinVersion:   tls.VersionTLS13,
-            Certificates: []tls.Certificate{cert},
-        }, nil
-    }
-
-    // 首次运行: 自动生成自签名 CA + Server 证书
-    slog.Info("No TLS certificate found, generating self-signed CA and server certificate...")
-    ca, serverCert, err := generateSelfSignedCert(certDir, cfg.Hosts)
-    if err != nil {
-        return nil, err
-    }
-    slog.Info("CA fingerprint", "sha256", ca.fingerprint)
-    slog.Info("Save this fingerprint for agent verification (or use --insecure)")
-
-    return &tls.Config{
-        MinVersion:   tls.VersionTLS13,
-        Certificates: []tls.Certificate{serverCert},
-    }, nil
-}
-```
-
-Agent 端 TOFU:
-
-```go
-type ManagerVerifier struct {
-    knownHostsPath string
-    insecure       bool
-}
-
-func (v *ManagerVerifier) Verify(host string, rawCerts [][]byte) error {
-    if v.insecure {
-        return nil // 开发模式跳过验证
-    }
-
-    fp := sha256Hex(rawCerts[0])
-    saved, err := loadKnownHost(v.knownHostsPath, host)
-
-    if err != nil || saved == "" {
-        // 首次连接：打印指纹，等待确认
-        fmt.Printf("The authenticity of manager %s can't be established.\n", host)
-        fmt.Printf("CA fingerprint: SHA256:%s\n", fp)
-        fmt.Printf("Continue connecting? (yes/no): ")
-        if !askConfirmation() {
-            return fmt.Errorf("connection rejected by user")
-        }
-        saveKnownHost(v.knownHostsPath, host, fp)
-        return nil
-    }
-
-    if saved != fp {
-        return fmt.Errorf("MANAGER FINGERPRINT CHANGED!\n"+
-            "Expected: SHA256:%s\nGot: SHA256:%s\n"+
-            "This may indicate a MITM attack.", saved, fp)
-    }
-    return nil
-}
-```
+- **ACME/Let's Encrypt 自动证书未实现**：`initAutoCert` 直接返回 "not yet implemented" 错误，`Domain` 模式不可用（用手动证书或自签模式）。
+- **TOFU 交互确认未实现**：`ManagerVerifier.Verify` 存在但**没有任何调用方**（未接入机器端 TLS 客户端），且行为是"首次连接直接报错并提示 --insecure 或保存指纹"，不做交互式 yes/no 确认；`SaveKnownHost` 亦无调用方。
+- 机器端实际做法：`https://` 时 `tls.Config{MinVersion: TLS 1.3, InsecureSkipVerify: --insecure}`（`backend/agent/client/client.go`）；`http://` 需要 `--allow-http` 显式放行（h2c）。
+- 供给 pod 场景：`LAELIA_FINGERPRINT` 环境变量可覆盖 fingerprint（provisioner 播种，见 `client.ComputeFingerprint`）。
 
 ---
 
 ## 五、限流设计
 
-### 5.1 分层限流
-
-```go
-type RateLimiterConfig struct {
-    // 全局
-    GlobalRate  float64 // 10000/min
-    GlobalBurst int     // 5000
-
-    // Per IP (连接相关)
-    ConnectRate float64 // 10/min per IP
-    ConnectBurst int    // 5
-    LoginRate   float64 // 5/min per IP
-    LoginBurst  int     // 3
-
-    // Per Agent (心跳)
-    HeartbeatRate float64 // 120/min per agent
-    HeartbeatBurst int    // 10
-
-    // Per User (管理 API)
-    APIRate  float64 // 1000/min per user
-    APIBurst int     // 100
-}
-```
-
-实现基于 `golang.org/x/time/rate`:
-
-```go
-type APIRateLimiter struct {
-    global        *rate.Limiter
-    ipLimiters    *lru.Cache[string, *rate.Limiter]
-    agentLimiters *lru.Cache[string, *rate.Limiter]
-    userLimiters  *lru.Cache[string, *rate.Limiter]
-    cfg           RateLimiterConfig
-    mu            sync.Mutex
-}
-
-// 限流中间件 (ConnectRPC interceptor)
-func (rl *APIRateLimiter) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
-    return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-        // 1. 全局限流
-        if !rl.global.Allow() {
-            return nil, connect.NewError(connect.CodeResourceExhausted,
-                errors.New("rate limit exceeded"))
-        }
-
-        // 2. 根据 RPC 类型选择限流策略
-        switch {
-        case isConnectRPC(req.Spec().Procedure):
-            if !rl.getIPLimiter(sourceIP).Allow() {
-                return nil, connect.NewError(connect.CodeResourceExhausted,
-                    errors.New("connect rate limit exceeded"))
-            }
-        case isHeartbeatRPC(req.Spec().Procedure):
-            if !rl.getAgentLimiter(agentID).Allow() {
-                return nil, connect.NewError(connect.CodeResourceExhausted,
-                    errors.New("heartbeat rate limit exceeded"))
-            }
-        // ...
-        }
-
-        return next(ctx, req)
-    }
-}
-```
+> **未实现（已变更）**：原设计的分层限流（全局/IP/Agent/User 的 `RateLimiterConfig` + LRU limiter 中间件）没有落地，代码库中不存在 `api/auth/ratelimit.go`，拦截器链中也没有限流器。当前只有 `backend/manager/api/v1/auth_service.go` 里的**针对性限流**：
+> - 验证邮件重发：全局 30 次/60 秒（`resendGlobalRate`/`resendGlobalBurst`）+ 每地址 1 次/分钟（LRU 10000 个 `rate.Limiter`）。
+>
+> 拦截器顺序上有一条相关注释：限流器（若将来加入）必须在 auth 之后运行，否则按匿名 IP 桶分类会误伤已认证调用（见 `grpc_routes.go`）。
 
 ---
 
@@ -963,259 +742,117 @@ func (rl *APIRateLimiter) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 
 ### 6.1 Echo HTTP 安全头中间件
 
-```go
-func SecurityHeaders() echo.MiddlewareFunc {
-    return func(next echo.HandlerFunc) echo.HandlerFunc {
-        return func(c echo.Context) error {
-            h := c.Response().Header()
-            h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-            h.Set("X-Content-Type-Options", "nosniff")
-            h.Set("X-Frame-Options", "DENY")
-            h.Set("Content-Security-Policy", "default-src 'self'")
-            h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-            return next(c)
-        }
-    }
-}
-```
+> **已实现**：`backend/manager/server/echo_routes.go` 的 `securityHeadersMiddleware`。实际发送的头：`Strict-Transport-Security`（max-age=31536000; includeSubDomains）、`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`X-XSS-Protection: 1; mode=block`、`Referrer-Policy: strict-origin-when-cross-origin`。**Content-Security-Policy 未设置**（原设计中有）。
 
 ### 6.2 审计拦截器（仅记录关键事件）
 
-```go
-// 心跳采样: 仅记录异常 (状态变化、认证失败、nonce 失败等)
-// 其他 RPC: 全量审计
-func AuditInterceptor(stores *store.Store) connect.UnaryFunc {
-    return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-        resp, err := next(ctx, req)
-
-        authCtx := common.GetAuthContextFromContext(ctx)
-        if !authCtx.Audit {
-            return resp, err
-        }
-
-        procedure := req.Spec().Procedure
-
-        // 心跳采样: 仅在异常时记录
-        if isHeartbeatRPC(procedure) && err == nil {
-            if !shouldSampleHeartbeat(ctx) {
-                return resp, err
-            }
-        }
-
-        auditLog := &AuditLog{
-            Method:    procedure,
-            ActorType: getActorType(ctx),
-            ActorID:   getActorID(ctx),
-            SourceIP:  getSourceIP(ctx),
-            Status:    statusFromError(err),
-            Error:     errorFromError(err),
-            Timestamp: time.Now(),
-        }
-
-        go stores.CreateAuditLog(context.Background(), auditLog)
-        return resp, err
-    }
-}
-
-func shouldSampleHeartbeat(ctx context.Context) bool {
-    // 每100次心跳记录1次, 或者异常时总是记录
-    return rand.Intn(100) == 0
-}
-```
+> **已实现**：`backend/manager/api/v1/audit_interceptor.go`（配套 `audit_buffer.go`）。与原设计的差异：
+> - 审计写经由 `AuditBuffer`（2 秒窗口批量入库），不是每条 `go stores.CreateAuditLog`。
+> - 心跳采样：仅 `/laelia.v1.AgentService/AgentHeartbeat` 成功时按 1/100 采样（`heartbeatSamplingRate = 100`），失败必记录；MachineHeartbeat 不在 proto 审计注解内，不产生审计。
+> - 其他 RPC 按 proto 的 `laelia.v1.audit` 注解决定是否记录（成功与失败都记）。
+> - 记录字段：method、actor_type（user/agent）、actor_id、source_ip、status、error，以及 handler 通过 `SetServiceData` 附加的 resource/payload（如 IAM policy 变更详情）。
 
 ---
 
 ## 七、Agent 客户端重构
 
-### 7.1 状态机
+> **已变更（架构演进）**：本节原设计的"AgentClient + CredentialManager + ~/.laelia/agent-token"没有实现 —— `backend/agent/client/` 中是 **`MachineClient`**（机器端客户端），一台机器一个进程托管多个 agent。原设计的 `backend/agent/credential/` 目录不存在，凭证持久化由 `backend/agent/state/state.go` 承担（`~/.laelia/machine.json`，0600 原子写，存 manager_url / machine_id / refresh_token / hostname）。
 
-```go
-type AgentState int
+### 7.1 当前机器端认证模型（machine-token）
 
-const (
-    StateDisconnected    AgentState = iota
-    StateConnecting
-    StateConnected
-    StateDisconnecting
-)
+```
+laelia-machine setup（首次）:
+  1. StartDeviceLogin → 打印审批 URL + user code，浏览器内登录用户批准
+  2. PollDeviceLogin 轮询 → APPROVED 后取得 machine_id + refresh_token
+  3. 持久化到 ~/.laelia/machine.json
+  （--provisioned 供给 pod 模式：凭证由 provisioner 播种，死凭证直接 fail fast，
+    绝不启动交互式登录；recovery = 删除并重新供给）
 
-type AgentClient struct {
-    managerURL     *url.URL
-    bootstrapToken string         // --token 参数传入
-    credentialMgr  *CredentialManager
-    connState      AgentState
-    sessionID     string
-    serverNonce   string
-    backoff        *ExponentialBackoff
-    httpClient     *http.Client // 支持 TLS
-    metricsCollector *MetricsCollector
-}
-
-func (c *AgentClient) Run(ctx context.Context) error {
-    for {
-        switch c.connState {
-        case StateDisconnected:
-            if err := c.connect(ctx); err != nil {
-                slog.Error("connect failed", "error", err)
-                c.backoff.Wait(ctx)
-                continue
-            }
-            c.connState = StateConnected
-            c.backoff.Reset()
-
-        case StateConnected:
-            select {
-            case <-ctx.Done():
-                c.connState = StateDisconnecting
-            case <-c.heartbeatTicker.C:
-                if err := c.heartbeat(ctx); err != nil {
-                    slog.Error("heartbeat failed", "error", err)
-                    c.connState = StateDisconnected
-                }
-            }
-
-        case StateDisconnecting:
-            c.sendDisconnect(ctx, "agent shutdown")
-            c.credentialMgr.DeleteRefreshToken()
-            return nil
-        }
-    }
-}
-
-func (c *AgentClient) connect(ctx context.Context) error {
-    // 优先级: 文件中的 refresh_token > --token (bootstrap)
-    token, tokenType := c.credentialMgr.GetBestToken()
-
-    switch tokenType {
-    case "refresh":
-        resp, err := c.refreshToken(ctx, token)
-        if err != nil {
-            token = c.bootstrapToken
-            tokenType = "bootstrap"
-        } else {
-            c.credentialMgr.SaveRefreshToken(resp.RefreshToken)
-            c.accessToken = resp.AccessToken
-            // 还需要 ConnectAgent 获取 session
-        }
-    }
-
-    if tokenType == "bootstrap" {
-        resp, err := c.connectAgent(ctx, token, c.collectInfo())
-        if err != nil {
-            return err
-        }
-        c.accessToken = resp.AccessToken
-        c.credentialMgr.SaveRefreshToken(resp.RefreshToken)
-        c.sessionID = resp.SessionId
-        c.serverNonce = resp.NextNonce
-    }
-
-    c.backoff.Reset()
-    return nil
-}
+laelia-machine run（主循环，backend/agent/client/client.go）:
+  1. Connect: 无 access token → RefreshMachineToken(refresh_token, fingerprint)
+     - access token = 本次会话 bearer 凭证
+     - refresh token 为【多用途】滚动续期：仅当距过期 < 10 天
+       (machineRefreshRotateWindow) 时签发替换 token 并持久化；
+       常规重连复用同一 token，不消费 —— 丢失响应可安全重试
+       （与 agent-token 的单次轮换语义不同！）
+  2. ConnectMachine(access token) → session_id + 分配的 agent 花名册
+     （TerminateAllMachineSessions("replaced") 保证单活跃会话）
+  3. MachineChannel 控制流（bidi）+ 每 agent 一条 AgentChannel drain 流，
+     均复用机器 access token；agent 身份由流内 AgentReady.agent_name 声明，
+     机器侧主动调用 RPC 时用 X-Laelia-Agent 头声明
+  4. 心跳循环: MachineHeartbeat 每 30s（session_id 必填，KICKED/TERMINATED
+     → PermissionDenied 强制重连）；access token 剩余 < 1/3 时响应内续期
+  5. 失败重试: 指数退避 2s → 1min (defaultRetryBaseWait/MaxWait)；
+     永久性认证失败（Unauthenticated/PermissionDenied）→ 退出并提示重新 setup
+  6. 优雅退出: MachineDisconnect(session_id, "shutdown")；
+     保留持久化 refresh token（重启后凭它重连；彻底退役用 RevokeMachineToken）
 ```
 
-### 7.2 凭证管理器
+要点对照原设计：
+- 心跳 nonce 机制保留（MachineHeartbeatRequest.previous_nonce / NextNonce），机器端在心跳时更新 `serverNonce`。
+- 心跳超时 10s/次（heartbeatTimeout），控制流死亡也会触发整机重连。
+- agent 级 liveness 不再由 agent 心跳推导：agent 在线 = 其 AgentChannel 存活 或 所挂机器已连接（`agentReachable`）。
+- 机器指纹 `ComputeFingerprint = SHA256(hostname:os:arch)` 前 16 hex；`LAELIA_FINGERPRINT` 可覆盖（供给 pod）。
 
-```go
-type CredentialManager struct {
-    tokenFilePath string  // ~/.laelia/agent-token
-    refreshToken  string  // 内存中的 refresh token
-}
+### 7.2 状态机
 
-func (cm *CredentialManager) GetBestToken() (string, string) {
-    // 1. 尝试从文件加载 refresh token
-    if cm.refreshToken == "" {
-        cm.refreshToken = cm.loadFromFile()
-    }
-    if cm.refreshToken != "" {
-        return cm.refreshToken, "refresh"
-    }
-    // 2. fallback 到 bootstrap token (--token 参数)
-    return "", "bootstrap"
-}
-
-func (cm *CredentialManager) SaveRefreshToken(token string) {
-    cm.refreshToken = token
-    cm.writeToFile(token)
-}
-
-func (cm *CredentialManager) DeleteRefreshToken() {
-    cm.refreshToken = ""
-    os.Remove(cm.tokenFilePath)
-}
-
-func (cm *CredentialManager) writeToFile(token string) {
-    dir := filepath.Dir(cm.tokenFilePath)
-    os.MkdirAll(dir, 0700)
-    os.WriteFile(cm.tokenFilePath, []byte(token), 0600)
-}
-
-func (cm *CredentialManager) loadFromFile() string {
-    data, err := os.ReadFile(cm.tokenFilePath)
-    if err != nil {
-        return ""
-    }
-    return strings.TrimSpace(string(data))
-}
-```
+`MachineClient` 的 `ConnState`（Disconnected/Connecting/Connected/Disconnecting）与原设计一致，但主循环为"connect → 心跳/控制流 → 失败退避重连"结构（`Run`），不是原设计稿中的四态 switch 状态机；凭证管理收敛为 `refreshToken` 字段 + `saveRefreshToken` 回调（run.go 注入持久化）。
 
 ---
 
 ## 八、配置化安全策略
 
-所有安全相关阈值从 `setting` 表或配置文件读取：
+> **未实现（已变更）**：setting 表中没有新增任何 `agent.*` / `security.*` 安全配置项（LATEST.sql 的 setting 种子中无此类 key），运营时动态调整安全阈值的能力不存在。当前所有阈值都是 Go 常量：
 
-```sql
--- 新增配置项 (存入 setting 表, key-value)
-INSERT INTO setting (name, value) VALUES
-('agent.heartbeat_interval_seconds', '30'),
-('agent.offline_threshold_seconds', '60'),
-('agent.access_token_duration', '15m'),
-('agent.refresh_token_duration', '24h'),
-('agent.bootstrap_token_duration', '168h'),  -- 7天
-('agent.max_concurrent_sessions', '1'),
-('agent.ip_validation_policy', 'WARN'),  -- OFF, WARN, STRICT
-('agent.heartbeat_rate_limit_per_minute', '120'),
-('agent.connect_rate_limit_per_minute', '10'),
-('security.global_rate_limit_per_minute', '10000'),
-('security.login_rate_limit_per_minute', '5');
-```
-
-运营时可通过管理 API 动态调整，无需重启服务。
+| 阈值 | 值 | 位置 |
+|------|-----|------|
+| accessTokenDuration | 15 min | `backend/manager/api/v1/agent.go` |
+| refreshTokenDuration | 24 h | 同上 |
+| bootstrapTokenDuration | 7 天 | 同上 |
+| refreshTokenReuseWindow | 30 s | 同上 |
+| machineRefreshTokenDuration | 90 天 | `backend/manager/api/v1/machine.go` |
+| machineRefreshRotateWindow | 10 天 | 同上 |
+| 心跳间隔 / NextHeartbeatAt | 30 s | `agent_connection.go` / `client.go`（机器端 `defaultHeartbeatInterval`） |
+| HeartbeatBuffer 刷写 | 10 s | `component/state/heartbeat.go` |
+| IP 校验策略 | 硬编码 WARN | `grpc_routes.go` / `agent_connection.go` |
+| 审计心跳采样 | 1/100 | `audit_interceptor.go` |
 
 ---
 
-## 九、文件变更清单
+## 九、涉及文件现状
 
-| 文件 | 变更类型 | 说明 |
-|------|----------|------|
-| `proto/v1/v1/agent.proto` | **重写** | 新增 RPC、消息、reserved token 字段 |
-| `proto/v1/v1/annotation.proto` | 修改 | 无变更（已支持所需注解） |
-| `proto/store/store/agent.proto` | 修改 | AgentStatus 新增 ConnectionState(KICKED)、active_session_id |
-| `backend/manager/migration/latest.sql` | **新增迁移表** | agent_session 表、agent_refresh_token 表、agent 表扩展字段、setting 新增项 |
-| `backend/manager/api/v1/agent.go` | **重写** | 所有 RPC 实现 |
-| `backend/manager/api/auth/auth.go` | **大幅修改** | agent JWT claims 扩展、token 类型验证、HMAC key 管理 |
-| `backend/manager/api/auth/nonce.go` | **新增** | Nonce 签发/验证 |
-| `backend/manager/api/auth/ratelimit.go` | **新增** | 限流中间件 |
-| `backend/manager/api/auth/tls.go` | **新增** | TLS 初始化、自签名 CA 生成 |
-| `backend/manager/api/auth/iplist.go` | **新增** | IP 校验 |
-| `backend/manager/store/agent.go` | 修改 | 新增 session/token CRUD、BatchUpdateAgentStatus |
-| `backend/manager/store/agent_session.go` | **新增** | Session 存储 |
-| `backend/manager/store/agent_token.go` | **新增** | Refresh Token 存储 |
-| `backend/manager/store/setting.go` | 修改 | 新增安全配置项读取 |
-| `backend/manager/server/grpc_routes.go` | 修改 | 注册新 RPC、新拦截器（限流、审计） |
-| `backend/manager/server/echo_routes.go` | 修改 | 安全头中间件 |
-| `backend/manager/server/server.go` | 修改 | TLS 配置 |
-| `backend/manager/component/state/state.go` | 修改 | 扩展 TokenExpireCache、新增 NonceCache、HeartbeatBuffer |
-| `backend/agent/client/client.go` | **重写** | 新增 Connect/Heartbeat/Disconnect/Refresh 方法、TLS |
-| `backend/agent/cmd/run.go` | **重写** | 状态机、凭证管理、重连逻辑 |
-| `backend/agent/credential/credential.go` | **新增** | 凭证文件管理 |
-| `backend/common/context.go` | 修改 | 新增 SessionContextKey |
+> 原清单是设计稿的变更计划；下表按当前代码核对（✓ 存在，✗ 不存在/未实现）：
+
+| 文件 | 现状 | 说明 |
+|------|------|------|
+| `proto/v1/v1/agent.proto` | ✓ 已实现并大幅扩展 | RPC 远多于设计稿（见 §二） |
+| `proto/store/store/agent.proto` | ✓ | AgentTokenType/AgentTokenState 枚举 + AgentInfo JSONB 形状 |
+| `backend/manager/migration/migration/LATEST.sql` | ✓ | agent_session / agent_token（原稿表名 agent_refresh_token 未采用）、machine_session / machine_token；setting 安全项未加 |
+| `backend/manager/api/v1/agent.go` | ✓ | AgentService 主体 + 时长常量 |
+| `backend/manager/api/v1/agent_token.go` | ✓ | Rotate/Revoke/Refresh/Hello |
+| `backend/manager/api/v1/agent_connection.go` | ✓ | Connect/Heartbeat/Disconnect/ForceDisconnect/ListSessions |
+| `backend/manager/api/v1/token_refresh.go` | ✓ | agent/machine 共用的 refresh 验证 |
+| `backend/manager/api/v1/machine_token.go` / `machine_connection.go` | ✓ | machine 对偶实现 |
+| `backend/manager/api/auth/auth.go` | ✓ | JWT 签发/解析、四类 audience 分支、claims |
+| `backend/manager/api/auth/tls.go` | ✓ | InitTLS + 自签 CA；ACME 未实现；ManagerVerifier 无调用方 |
+| `backend/manager/api/auth/iplist.go` | ✓ | IPValidationPolicy + ValidateAgentIP |
+| `backend/manager/api/auth/nonce.go` | ✗ | nonce 在 `component/state/nonce.go` |
+| `backend/manager/api/auth/ratelimit.go` | ✗ 未实现 | 限流未做（仅 auth_service.go 针对性限流） |
+| `backend/manager/store/agent_session.go` / `agent_token.go` | ✓ | 会话/token CRUD、TerminateAll/Revoke family |
+| `backend/manager/server/grpc_routes.go` | ✓ | 拦截器链：Debug→IPValidator→Auth→IAM→Audit |
+| `backend/manager/server/echo_routes.go` | ✓ | securityHeadersMiddleware |
+| `backend/manager/component/state/` | ✓ | state.go (TokenExpireCache LRU 128) + nonce.go + heartbeat.go |
+| `backend/agent/client/client.go` | ✓ | MachineClient（refresh/Connect/Heartbeat/Disconnect/退避/TLS） |
+| `backend/agent/cmd/run.go` / `setup.go` | ✓ | run 主循环 + 设备码登录/供给模式 |
+| `backend/agent/state/state.go` | ✓ | machine.json 持久化（原稿的 credential/ 目录不存在） |
+| `backend/common/permission/` | ✓ | `laelia.agents.create/get/edit/listSessions` 等（permission.json 单一来源生成） |
+| `backend/common/context.go` | ✓ | SourceIPContextKey / AuthContextKey / AgentContextKey 等 |
 
 ---
 
 ## 十、实施顺序
+
+> **历史计划，已执行完毕**（含偏离）：第 1-4 周的 P0/P1 主体均已落地；其中"限流中间件"未实施（见 §五），"Agent TOFU" 缩水为自签 CA + `--insecure`（见 §4.8），其余按 §七 的 machine-token 演进形态实现。下表保留为原始排期记录。
 
 ```
 第1周: 基础安全 (P0)
@@ -1247,20 +884,22 @@ INSERT INTO setting (name, value) VALUES
 
 ## 十一、安全改进对照表
 
-| 安全问题 | 改进前 | 改进后 |
+> 按当前代码核对后的实际状态：
+
+| 安全问题 | 改进前 | 改进后（实际） |
 |----------|--------|--------|
-| 传输加密 | 纯 HTTP 明文 | TLS 1.3 (自签名 CA / ACME / TOFU) |
-| Agent Token 有效期 | 365天 | Bootstrap 7天, Access 15分钟, Refresh 24小时 |
-| Token 吊销 | 128 条目 LRU, 重启丢失 | 数据库持久化 + token_version + token family 吊销 |
-| Token 轮换 | 无 | RotateAgentToken API + refresh token rotation |
-| 重放攻击 | 心跳空 body, 无防护 | Nonce 链 + HMAC 签名 |
-| 限流 | 无 | 分层限流 (全局/IP/Agent/User) |
-| IP 校验 | 无 | 可配置 (OFF/WARN/STRICT) |
-| 并发会话 | 无检测 | 单会话策略 + KICKED 机制 |
-| 优雅断开 | 无 | AgentDisconnect + ForceDisconnectAgent |
-| 审计日志 | 拦截器被注释 | 启用 + 心跳采样 |
-| 密钥轮换 | 单一 kid="v1" | 支持 key rotation (多 kid) |
-| 安全头 | 无 | HSTS/X-Frame-Options/CSP 等 |
-| Agent 重连 | 无重试 | 指数退避 + 凭证 fallback |
-| 会话追踪 | 无 | agent_session 表 |
-| Token 泄露窗口 | 365天 | 15分钟 |
+| 传输加密 | 纯 HTTP 明文 | TLS 1.3 自签名 CA（✓）；ACME 自动证书（✗ 未实现）；TOFU 指纹校验（✗ 未接线，--insecure 跳过） |
+| Agent/Machine Token 有效期 | 365天 | Bootstrap 7天（单次使用）, Access 15分钟, Agent Refresh 24小时, Machine Refresh 90天滚动续期 |
+| Token 吊销 | 128 条目 LRU, 重启丢失 | 数据库持久化 + token_version + token family 吊销（LRU TokenExpireCache 仍在，仅作过期加速） |
+| Token 轮换 | 无 | RotateAgentToken / RevokeAgentToken API + refresh rotation（agent 单次 / machine 滚动） |
+| 重放攻击 | 心跳空 body, 无防护 | Nonce 链 + HMAC 签名 + 服务端一次性重放缓存（[-35s,+5s] 窗口） |
+| 限流 | 无 | 仅针对性限流（验证邮件重发）；分层限流 ✗ 未实现 |
+| IP 校验 | 无 | 已实现 OFF/WARN/STRICT，当前固定 WARN（不可配置） |
+| 并发会话 | 无检测 | 单活跃会话（新连接终结旧会话 "replaced"）+ KICKED 机制 |
+| 优雅断开 | 无 | AgentDisconnect / MachineDisconnect + ForceDisconnect(Agent|Machine) |
+| 审计日志 | 拦截器被注释 | 已启用 + AgentHeartbeat 1/100 采样 + AuditBuffer 批量入库 |
+| 密钥轮换 | 单一 kid="v1" | 仍为单一 kid="v1"，多 kid rotation ✗ 未实现 |
+| 安全头 | 无 | HSTS/X-Frame-Options/nosniff/X-XSS-Protection/Referrer-Policy（CSP ✗） |
+| Agent/机器重连 | 无重试 | 指数退避 2s→1min；永久认证失败退出提示重新 setup（machine）/ 重新 bootstrap（agent） |
+| 会话追踪 | 无 | agent_session / machine_session 表 |
+| Token 泄露窗口 | 365天 | 15分钟（access token） |

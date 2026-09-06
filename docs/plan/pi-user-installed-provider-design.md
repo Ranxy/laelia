@@ -1,5 +1,7 @@
 # 支持用户本机安装的 pi（host-detected provider）
 
+> 状态：2026-09-06 已对照当前代码核对更新。主要变化：本设计已全部实现（`provider.PiProvider`、proto `compatible`/`incompatibility_reason` 字段、own/self/global 三种模式、前端 `isPiProvider` helper）；文中补充了实际落点文件、探测超时与版本常量等实现细节。
+
 ## Context
 
 目前 pi 只有一种形态：`builtin-pi`。它由 laelia 内置/embed，始终可选，且强制使用 laelia 管理的
@@ -52,24 +54,26 @@ Manager:
 
 ### 1.1 新增 `PiProvider`
 
-- `ID()` = `"pi"`
-- `DisplayName()` = `"Pi (user-installed)"` 或 `"Pi"`
+（已实现：`backend/agent/provider/pi.go`。）
+
+- `ID()` = `"pi"`（常量 `provider.PiProviderID`）
+- `DisplayName()` = `"Pi (user-installed)"`
 - `Detect(ctx)`：
   - `exec.LookPath("pi")`；
   - 找不到返回 `(nil, false, nil)`；
   - 找到后执行 `pi --version` 获取版本；
-  - 与 `minSupportedPiVersion`（建议先用当前 builtin pi 版本，例如 `0.82.1`）比较；
-  - 返回 `Detected{ProviderID, DisplayName, Version, ExecutablePath, Compatible, IncompatibilityReason}`。
+  - 与常量 `MinSupportedPiVersion = "0.82.1"`（`backend/agent/provider/pi.go`，与 builtin pi 的固定版本一致）比较；
+  - 返回 `Detected{ProviderID, DisplayName, Version, ExecutablePath, Compatible, IncompatibilityReason}`；版本无法确定（空输出）同样视为不兼容。
 - `ProbeModels(ctx, _)`：
-  - 执行 `pi --list-models`，超时（复用 registry 的 `probeTimeout`）；
-  - 解析输出为 `[]ModelOption`；
-  - 失败不阻塞发现，返回空列表。
-- `BuildCommand` / `ToolCallAdapter`：仅为满足 `Provider` 接口；因实现了 `NonACPRuntime`，不会被 ACP executor 使用。
-- 实现 `NonACPRuntime` 接口（新增的可选标记接口），`BuildACPConfig` 对这类 provider 直接返回 nil。
+  - 执行 `pi --list-models`，超时 30s（`context.WithTimeout`）；
+  - 解析输出为 `[]ModelOption`：跳过 `#` 注释行与表头行（`provider` 开头），多列行转为 `provider/model` 形式的 id，单 token 行原样保留；
+  - 失败不阻塞发现，`Discover` 会将其上报为空模型列表。
+- `BuildCommand` / `ToolCallAdapter`：仅为满足 `Provider` 接口；因实现了 `IsNonACPRuntime()`（`NonACPRuntime` 标记接口），不会被 ACP executor 使用。
+- 实现 `NonACPRuntime` 接口（`backend/agent/provider/provider.go` 的可选标记接口，方法 `IsNonACPRuntime() bool`），`BuildACPConfig` 对这类 provider 直接返回 nil。
 
 ### 1.2 Registry
 
-`provider.Default()` 增加：
+`provider.Default()` 增加（已实现，`backend/agent/provider/registry.go`）：
 
 ```go
 return New(
@@ -84,6 +88,8 @@ return New(
 
 ## 2. 数据模型 / proto
 
+（已实现：`proto/v1/v1/agent.proto` 的 `AgentProviderInfo` 携带 `bool compatible = 8` 与 `string incompatibility_reason = 9`，store 侧同步。）
+
 需要让前端知道“版本不兼容”：
 
 `proto/v1/v1/agent.proto` + `proto/store/store/agent.proto` 的 `AgentProviderInfo` 增加：
@@ -96,7 +102,7 @@ string incompatibility_reason = 9; // 不兼容原因（如 "requires >= 0.82.1"
 同步：
 
 - `provider.Discovered` / `provider.Detected` 增加 `Compatible bool` 与 `IncompatibilityReason string`；
-- `discoveredToProto` 透传；
+- v1/store 转换函数 `convertToV1Providers` / `convertToStoreProviders`（`backend/manager/api/v1/agent_convert.go`）透传；
 - `buf format` / `buf lint` / `buf generate`；
 - 前端 generated types 自动更新。
 
@@ -105,6 +111,8 @@ string incompatibility_reason = 9; // 不兼容原因（如 "requires >= 0.82.1"
 ## 3. Runner 与 pi runtime
 
 ### 3.1 pi 包
+
+（已实现：常量与 `IsPiProvider` 在 `backend/agent/pi/protocol.go`，`BuildPiConfig`/`BuildPiCapability`/`launchArgs`/`buildPiEnv`/`LaunchFingerprint` 在 `backend/agent/pi/config.go`。）
 
 - 在 `backend/agent/pi` 增加：
   - `const UserPiProvider = "pi"`；
@@ -123,6 +131,8 @@ string incompatibility_reason = 9; // 不兼容原因（如 "requires >= 0.82.1"
 
 ### 3.2 Runner（backend/agent/client/runner.go）
 
+（已实现。用户安装 pi 的 Detect 探测有 5s 超时 `userPiDetectTimeout`，防止宿主机上的 `pi` 卡住配置下发。）
+
 - `applyAssignment` 分支条件从 `provider == pi.BuiltinPiProvider` 改为 `pi.IsPiProvider(provider)`。
 - `buildPiConfig`：
   - `builtin-pi`：继续 `pi.ResolveBinary()`；
@@ -137,9 +147,11 @@ string incompatibility_reason = 9; // 不兼容原因（如 "requires >= 0.82.1"
 
 ### 4.1 `knownProviderID`
 
-接受 `"pi"`（加入后天然通过），`"builtin-pi"` 仍特殊保留。
+（已实现：`backend/manager/api/v1/agent_config.go`。）接受 `"pi"`（注册表 `provider.Default().Lookup` 天然通过），`"builtin-pi"` 与 `"custom"` 保留为字面量特例。
 
 ### 4.2 `validateAgentACPConfig`
+
+（已实现：同文件 `agent_config.go`。）
 
 - 当 `pi.IsPiProvider(cfg.Provider)` 时：
   - 若 `cfg.Provider == "pi"`：
@@ -154,22 +166,24 @@ string incompatibility_reason = 9; // 不兼容原因（如 "requires >= 0.82.1"
 
 ### 4.3 capability
 
-`buildCapabilityForACPConfig` 对 `pi.IsPiProvider` 返回 `pi.BuildPiCapability`。
+（已实现：`backend/manager/api/v1/agent_convert.go`。）`buildCapabilityForACPConfig` 对 `pi.IsPiProvider` 返回 `pi.BuildPiCapability`。
 
 ### 4.4 API key 与 global provider
 
-- `UpdateAgentACPConfig` 中：
-  - inline api_key 的权限 gating 从 `provider == builtin-pi` 扩大到 `pi.IsPiProvider`；
+（已实现，落点如下。）
+
+- `UpdateAgentACPConfig`（`backend/manager/api/v1/agent_config.go`）中：
+  - inline api_key 的权限 gating 从 `provider == builtin-pi` 扩大到 `pi.IsPiProvider`（`canUseInlineAPIKey`）；
   - 对用户安装 pi 的“自身 model”模式（api_provider/global 都为空）不强制 key。
-- `GetAgent` 中 api_key 脱敏条件扩展到两种 pi。
-- `resolveAcpConfigForDaemon` 对两种 pi 都做 global provider 解析。
-- `RefreshAgentModels` / `RefreshMachineModels` 对 `"pi"` 与 `"builtin-pi"` 一样拒绝“on-host ACP model probing”。
+- `GetAgent`（`agent.go`）中 api_key 脱敏条件扩展到两种 pi（无编辑权限时置空，有编辑权限时返回掩码预览）。
+- `resolveAcpConfigForDaemon`（`agent_api_provider.go`）按 `pi.IsPiProvider` 对两种 pi 都做 global provider 解析。
+- `RefreshAgentModels`（`agent_config.go`）/ `RefreshMachineModels`（`machine_workspace.go`）对 `pi.IsPiProvider` 拒绝“on-host ACP model probing”。
 
 ## 5. 前端
 
 ### 5.1 通用 helper
 
-在 `frontend/src/components/profile-common.tsx` 增加：
+（已实现：`frontend/src/components/profile-common.tsx`。）
 
 ```ts
 export function isPiProvider(id: string) {
@@ -177,12 +191,14 @@ export function isPiProvider(id: string) {
 }
 ```
 
-### 5.2 agent-profile.tsx / machine-profile.tsx
+### 5.2 agent-profile / machine-profile 的 pi 配置区
+
+（已实现。配置 UI 后来抽成了共享组件：`frontend/src/components/agent/acp-config-editor.tsx`（agent-profile 与 `machine-add-agent-sheet.tsx` 共用），草稿状态在 `frontend/src/hooks/use-acp-config-draft.ts`。）
 
 - Provider 下拉：
   - `builtin-pi` 仍固定显示；
   - `pi` 从 `availableProviders` 自动出现；
-  - 如果 `provider.compatible === false`，该项 `disabled`，并显示 `incompatibility_reason`。
+  - 如果 `provider.compatible === false`，该项 `disabled`，并显示 `incompatibility_reason`（`machine-profile-cards.tsx` 的 provider 列表同样追加“版本不兼容”标注）。
 - `isPiProvider` 改用 helper。
 - 用户安装 pi 的配置区增加三种模式：
   - `own`：使用 pi 自身 model/auth，model 下拉来自 `selectedProviderInfo.models`（来自 `pi --list-models`）；
@@ -193,26 +209,26 @@ export function isPiProvider(id: string) {
   - global / self 沿用现有逻辑。
 - 通用 ACP model 区域（`selectedProviderInfo` 相关）只对非 pi 的 provider 渲染，避免用户安装 pi 时出现两套 model 选择器。
 
-### 5.2 machine-profile 的 provider 列表
+### 5.3 machine-profile 的 provider 列表
 
 - 显示 pi 时若 `compatible=false`，追加“版本不兼容”标注。
 
 ## 6. 测试
 
-- provider：
-  - `PiProvider.Detect`：PATH 有 pi / 无 pi / 版本过低 / 版本满足最低。
-  - `PiProvider.ProbeModels`：`pi --list-models` 输出解析。
-  - `Registry.Discover` 包含 pi 且不兼容时仍上报但 `Compatible=false`。
-- pi/config：
-  - `BuildPiConfig` 对 `"pi"` 的 own/self/global 三种模式；
-  - `launchArgs` 在 own 模式不传 `--provider`。
-- manager：
-  - validation 对用户 pi 的 available + compatible 校验；
-  - global provider resolve 覆盖 `"pi"`。
-- frontend：
-  - 类型 / 单测更新，确认 pi 与 builtin-pi 并列、不兼容项 disabled。
+（已实现，测试落点如下。）
+
+- provider（`backend/agent/provider/pi_test.go`）：
+  - `PiProvider.Detect`：PATH 有 pi / 无 pi / 版本过低 / 版本满足最低（`TestPiProviderDetectAbsent` / `TestPiProviderDetectCompatible` / `TestPiProviderDetectIncompatible` / `TestPiVersionAtLeast`）。
+  - `PiProvider.ProbeModels`：`pi --list-models` 输出解析（`TestPiProviderProbeModels` / `TestPiProviderProbeModelsTable`）。
+- pi/config（`backend/agent/pi/pi_test.go`）：
+  - `BuildPiConfig` 对 `"pi"` 的 own/managed 两种模式（`TestBuildPiConfig_UserPiOwnMode` / `TestBuildPiConfig_UserPiManagedMode`）；
+  - `launchArgs` 在 own 模式不传 `--provider`（`TestLaunchArgs`）。
+- manager：validation 对用户 pi 的 available + compatible 校验；global provider resolve 覆盖 `"pi"`（`api_provider_service_test.go` 等）。
+- frontend：类型 / 单测更新，确认 pi 与 builtin-pi 并列、不兼容项 disabled。
 
 ## 7. 实施顺序
+
+（已全部完成。）
 
 1. Proto 增加 `compatible` / `incompatibility_reason` 并重新生成。
 2. provider 包新增 `PiProvider`、`NonACPRuntime`、`Detected/Discovered` 字段。
@@ -223,5 +239,7 @@ export function isPiProvider(id: string) {
 
 ## Open Items / 待实现时确认
 
-- 最低版本号建议直接使用当前 builtin pi 的固定版本（例如 `0.82.1`），并在 `PiProvider` 中作为常量。
-- `pi --list-models` 的实际输出格式需要在实现时用真实用户安装 pi 验证（可能为纯 model id 列表，也可能需要额外 flag 保证非交互/无登录也能输出）。
+（两项均已落定：）
+
+- 最低版本号为常量 `provider.MinSupportedPiVersion = "0.82.1"`，与 builtin pi 固定版本一致。
+- `pi --list-models` 的输出格式已用真实用户安装 pi 验证：可能为表头 + 数据行的表格（解析时跳过表头，取 `provider/model` 两列拼接为 id），也可能为每行一个 model id（原样保留）。

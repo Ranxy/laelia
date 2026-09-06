@@ -1,5 +1,11 @@
 # MCP 服务管理：设计与实现
 
+> 状态：2026-09-06 已对照当前代码核对更新。主要变化：系统设置读写并入统一的
+> `GetSetting`/`UpdateSetting`（`settings/user_mcp_config`），daemon 本地 MCP 代理与
+> 线格式移至 `backend/agent/daemon/handlers_mcp.go`，Agent MCP 勾选改为独立的
+> `AgentMcpPage` 标签页（`agent-mcp.tsx`），网关目录新增 `catalog_version` 与
+> `structured_content` 字段。
+
 ## 1. 背景与目标
 
 管理员在 workspace 级配置中维护可用的 MCP 服务列表，并限制哪些用户/用户组可以使用
@@ -51,8 +57,9 @@ flowchart LR
   socket 的 `/mcp/tools` `/mcp/call`，由 `laelia-machine mcp-proxy`（stdio）转发；对 pi
   在 `127.0.0.1` 起带 per-agent token 的 TCP HTTP 代理。机器上不出现服务 URL/header 密钥。
 - 鉴权复用现有模式：daemon 调用 manager 时带机器 access token + `X-Laelia-Agent`
-  header，manager 据此解析调用者 Agent，见
-  `backend/agent/daemon/server.go:1`。
+  header（`backend/agent/daemon/clients.go` 注入），manager 在
+  `backend/manager/api/auth/auth.go`（`DeclaredAgentHeader`）解析并校验归属，
+  handler 内经 `GetAgentFromContext` 取调用者 Agent。
 
 ## 4. 数据模型
 
@@ -96,18 +103,23 @@ enum SettingName { ... LLM_AGENT_CONFIG = 12; USER_MCP_CONFIG = 13; }
 
 message UserMcpConfigSetting {
   bool allow_user_mcp_servers = 1;    // 默认 true（缺省行）
+  McpIpPolicy mcp_ip_policy = 2;      // MCP 目标 IP 策略，见 mcp-ssrf-ip-policy-design.md
 }
 ```
 
-`SettingService` 新增 `GetUserMcpConfig`（handler-gated，任意登录用户可读）与
-`UpdateUserMcpConfig`（admin，`laelia.settings.update`）。
+读写走统一的资源式 `SettingService`（`backend/manager/api/v1/setting_service.go`）：
+`GetSetting("settings/user_mcp_config")` handler-gated，任意登录用户可读；
+`UpdateSetting`（admin，`laelia.settings.update`）按 update_mask 路径
+`value.user_mcp_config.allow_user_mcp_servers` / `value.user_mcp_config.mcp_ip_policy`
+合并写入（`updateUserMcpConfig`）。（独立命名的 `GetUserMcpConfig`/`UpdateUserMcpConfig`
+RPC 未采用。）
 
-### 4.3 存储（迁移 `0013##mcp-servers.sql` + `0014##user-mcp-servers.sql`）
+### 4.3 存储（迁移 `migration/migration/1.1/0013##mcp-servers.sql` + `0014##user-mcp-servers.sql`）
 
 ```sql
 CREATE TABLE mcp_server (
   id BIGSERIAL PRIMARY KEY,
-  resource_id TEXT NOT NULL UNIQUE,
+  resource_id TEXT NOT NULL,             -- 唯一性由 idx_mcp_server_resource_id 保证
   title TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
   transport_type TEXT NOT NULL,          -- 'http' | 'sse'
@@ -170,8 +182,10 @@ CREATE TABLE agent_mcp (
 ## 6. Manager 网关
 
 `McpGatewayService`（unary，注册进
-`backend/manager/server/grpc_routes.go`），
-鉴权走现有 IAM/CUSTOM 链 + `X-Laelia-Agent` 解析。
+`backend/manager/server/grpc_routes.go`）。
+鉴权：daemon 携机器 access token + `X-Laelia-Agent` 声明，auth 拦截器
+（`backend/manager/api/auth/auth.go`）解析并校验归属后把 Agent 注入 ctx，handler 经
+`GetAgentFromContext` 取调用者 Agent。
 
 ```proto
 service McpGatewayService {
@@ -193,6 +207,10 @@ message McpTool {
 }
 ```
 
+- `GetMcpCatalogResponse` 带 `catalog_version`（目录契约版本，当前恒为 1）；
+  `CallMcpToolResponse` 带 `is_error` 与 `structured_content`（MCP
+  `structuredContent` 透传）。
+
 ### 6.1 GetMcpCatalog
 
 1. 由 `X-Laelia-Agent` 解析 Agent，加载 `agent_mcp` 选择。
@@ -200,13 +218,15 @@ message McpTool {
    开启），失败/开关关闭的服务跳过。
 3. 用 MCP client 拉取工具列表（进程内缓存 5 分钟，key=server id+config version），
    生成目录。
-4. 每个工具生成 `runtime_name`：`r<sha256(server_id)[:8]>_<tool_name>`，保证多服务
-   同名工具不碰撞；同时带 `server_name/server_description` 供 agent 展示服务归属。
+4. 每个工具生成 `runtime_name`：`r<sha256(server_id)[:8]>_<tool_name>`（tool_name 中
+   `[A-Za-z0-9_-]` 之外的字符替换为 `_`，总长上限 48），保证多服务同名工具不碰撞；
+   同时带 `server_name/server_description` 供 agent 展示服务归属。
 
 ### 6.2 CallMcpTool
 
 1. 重新解析 Agent，校验服务已分配且当前权限有效。
-2. 校验 `expected_config_version / expected_assignment_version`，不一致返回
+2. 校验 `expected_config_version / expected_assignment_version`（仅当传入值非 0 时
+   校验，0 表示跳过该项校验），不一致返回
    `mcp_stale_catalog`（fail closed）。
 3. 校验 `tool_name` 属于该服务当前工具列表（allowlist）。
 4. 调真实 MCP 服务，把结果规范化为 text/image content block。
@@ -217,30 +237,36 @@ message McpTool {
 `backend/manager/component/mcp/` 手写最小 JSON-RPC over HTTP/SSE 客户端：
 
 - streamable HTTP：POST 到配置 URL，`initialize` → `notifications/initialized` →
-  `tools/list` → `tools/call`，支持 `Mcp-Session-Id`。
+  `tools/list` → `tools/call`，支持 `Mcp-Session-Id`，`tools/list` 按 `nextCursor`
+  翻页取全量。
 - SSE：GET `/sse` 等 endpoint 事件，POST `/messages?session_id=...`，响应可直接在
   POST body 或事件流中返回。
-- 统一 25s 超时、512KB 响应上限。
+- 超时：HTTP client 25s；SSE client 无总超时（由调用方 context 限制，网关按 25s
+  包裹）；响应体上限 512KB。目标连接受 IP 黑白名单策略约束
+  （见 [mcp-ssrf-ip-policy-design.md](mcp-ssrf-ip-policy-design.md)）。
 
 ## 7. 机器侧注入
 
 ### 7.1 daemon 本地代理
 
-`backend/agent/daemon/server.go:219`：
+`backend/agent/daemon/handlers_mcp.go`（unix socket 路由注册在
+`backend/agent/daemon/server.go`）：
 
 - **pi 路径**：`McpProxyURLForAgent` 在 `127.0.0.1:<随机端口>` 起 TCP HTTP 代理，URL
-  形如 `http://127.0.0.1:<port>/mcp/<per-agent token>`；`GET /mcp/{token}/tools`、
+  形如 `http://127.0.0.1:<port>/mcp/<per-agent token>`（token 为 32 字节随机数，
+  agent→token 映射在 daemon 生命周期内稳定）；`GET /mcp/{token}/tools`、
   `POST /mcp/{token}/call`。
 - **ACP 路径**：unix socket 上的 `GET /mcp/tools`、`POST /mcp/call`，请求体带 agent
   资源名；由 `laelia-machine mcp-proxy` 转发。
 
 ### 7.2 ACP runtime
 
-- `backend/agent/client/runner.go:329`
+- `backend/agent/client/runner.go` 的
   `buildMcpServers` 每 turn 通过 daemon 拉目录，非空时注入一个 stdio MCP server：
   `laelia-machine mcp-proxy`，env 带 `LAELIA_DAEMON_SOCKET` / `LAELIA_SESSION_TOKEN` /
-  `LAELIA_AGENT` / PATH。
-- `mcp-proxy` 是 MCP stdio server：`tools/list` 把目录转成 MCP 工具列表（description
+  `LAELIA_AGENT` / PATH（父进程有 `LAELIA_HOME` 时透传）。
+- `mcp-proxy`（`backend/agent/cmd/mcp_proxy.go`）是 MCP stdio server：`tools/list`
+  把目录转成 MCP 工具列表（description
   带服务名/描述），`tools/call` 转发 unix socket → manager 网关。
 - ACP 每 turn 是新子进程，目录天然按启动时刷新。
 
@@ -256,21 +282,24 @@ pi 核心不内置 MCP；laelia 在 Agent 工作目录生成扩展
 2. 每个工具注册为 pi 原生工具，label/description/promptSnippet 带
    `服务名 - 服务描述`，让 agent 能看到服务归属。
 3. 工具 `execute` POST `/call`，带 `mcpServerId/toolName/arguments/
-   expectedConfigVersion/expectedAssignmentVersion`，daemon 转发网关。
-4. 扩展在 pi 会话启动时写入（
-   `backend/agent/pi/session.go:158`），
+   expectedConfigVersion/expectedAssignmentVersion`，daemon 转发网关；目录拉取与
+   调用均带 25s 客户端超时（`AbortSignal.timeout`）。
+4. 扩展在 pi 会话启动时写入（`backend/agent/pi/session.go` 的
+   `writeManagedMcpExtension`，模板在 `backend/agent/pi/mcp_extension.go`），
    选择变化后下次启动生效。
 
 ### 7.4 线格式约定（重要）
 
 daemon 是机器侧唯一出口，统一输出 **MCP wire JSON**（
-`backend/agent/daemon/server.go:322`）：
+`backend/agent/daemon/handlers_mcp.go` 的 `writeMcpCatalogJSON` /
+`writeMcpCallResultJSON`）：
 
 - 目录：`configVersion/assignmentVersion` 用**数字**（不能用 protojson 的字符串
   int64），否则 pi 扩展回传版本号时 daemon 解码失败返回 400。
 - 调用结果：content block 显式带 `type`，如
   `{"type":"text","text":"..."}` / `{"type":"image","data":...,"mimeType":...}`，
-  而不是 protojson 的 `{"text":{"text":"..."}}` 嵌套。
+  而不是 protojson 的 `{"text":{"text":"..."}}` 嵌套；结果额外携带 `isError` 与
+  `structuredContent`（MCP `structuredContent` 透传）。
 - 这两个格式问题曾分别导致「工具调用 HTTP 400」和「工具结果为空」，已修复并加了
   回归断言。
 
@@ -291,9 +320,11 @@ daemon 是机器侧唯一出口，统一输出 **MCP wire JSON**（
 
 ### 9.1 开关
 
-- 位置：设置 → Agents / LLM（`settings-agents.tsx`），Switch 调
-  `UpdateUserMcpConfig`；默认开启。
-- 读取：个人 MCP 设置页与 Agent 配置页调 `GetUserMcpConfig`（任意登录用户可读）。
+- 位置：设置 → Agents / LLM（`settings-agents.tsx`），Switch 经 store action
+  `updateUserMcpConfig`（`frontend/src/stores/setting.ts`）调 `UpdateSetting`
+  （update_mask `value.user_mcp_config.allow_user_mcp_servers`）；默认开启。
+- 读取：个人 MCP 设置页与 Agent 配置页经 store action `fetchUserMcpConfig` 调
+  `GetSetting("settings/user_mcp_config")`（任意登录用户可读）。
 
 ### 9.2 行为
 
@@ -322,10 +353,12 @@ daemon 是机器侧唯一出口，统一输出 **MCP wire JSON**（
 
 ### 10.2 Agent 配置
 
-`frontend/src/pages/dashboard/agent-profile.tsx`
-的 MCP 区块按「工作区 MCP 服务 / 我的 MCP 服务」分组勾选；数据来自
-`ListMcpServers` + `ListMyMcpServers` 的合并（store 层，开关关闭时自动跳过个人服务），
-保存仍是一次 `UpdateAgentMcpConfig`。
+MCP 勾选是 Agent 详情页的独立标签页
+`frontend/src/pages/dashboard/agent-mcp.tsx`（`AgentMcpPage`，路由注册于
+`frontend/src/router/routes/dashboard.tsx`），按「工作区 MCP 服务 / 我的 MCP 服务」
+（scope 过滤）分组勾选；数据来自
+`ListMcpServers` + `ListMyMcpServers` 的合并（`frontend/src/stores/mcp.ts`，开关关闭时
+自动跳过个人服务），保存仍是一次 `UpdateAgentMcpConfig`。
 
 ## 11. 实现状态与验证
 

@@ -1,5 +1,7 @@
 # Provisioner — Managed Machine Provisioning — Design
 
+> Status: verified and updated against the current code on 2026-09-06. Main changes: the design is fully implemented (manager services + stream replay, k8s operator, bootstrap script, frontend, Helm charts); §6.2/§11 rewritten for the shipped fail-fast-when-offline behavior, §6.5 rewritten for the dual-scope (workspace + per-provisioner) IAM model, §7/§8 updated for the `Backend.Shutdown` hook, `retain_data` plumbing, and the Helm charts.
+
 ## 0. Decision record (confirmed with product owner)
 
 | # | Question | Decision |
@@ -12,6 +14,18 @@
 | 6 | Upgrade policy | **Manual** via the existing `UpgradeMachine` flow, plus an optional per-provisioner `auto_upgrade` (default off) that auto-triggers upgrades for its machines. |
 | 7 | Who may provision | **New permission `laelia.provisioners.provision`**, granted via role binding (default: nobody but workspace admins; admins bind a role for members). |
 | 8 | arm64 clusters | **MVP is amd64-only**: the provisioner pins `kubernetes.io/arch=amd64`. `linux-arm64` embedding is a follow-up. |
+
+### Implementation status (2026-09-06)
+
+All phases of §13 are implemented and verifiable in the tree:
+
+- **Manager services**: `backend/manager/api/v1/provisioner.go` (CRUD + one-time token + `ProvisionMachine` + job state machine), `provisioner_stream.go` (channel + reconnect replay), `provisioner_auto_upgrade.go` (5-min ticker), wired in `backend/manager/server/grpc_routes.go`.
+- **Store + migration**: `backend/manager/store/provisioner.go`, `provisioner` table + `machine.provisioner_id`/`machine.provisioning` in `backend/manager/migration/migration/LATEST.sql`.
+- **Auth**: fourth audience branch `ProvisionerAccessTokenAudienceFmt` in `backend/manager/api/auth/auth.go`.
+- **Provisioner binary**: `backend/provisioner/` (client loop, `Backend` registry, kubernetes operator with `LaeliaMachine` CRD, docker stub, mock backend).
+- **Machine-side**: `LAELIA_FINGERPRINT` override (`backend/agent/client/client.go`), `setup --provisioned` (`backend/agent/cmd/setup.go`), runtime image (`scripts/docker/Dockerfile.machine-runtime` + `machine-runtime-entrypoint.sh`).
+- **Frontend**: machine-new "Provisioned" tab, Settings → Provisioners (+ per-provisioner IAM access + post-delete cleanup pages), machine profile provisioning card.
+- **Deploy**: manifests `backend/provisioner/backend/kubernetes/deploy/`, Helm charts `charts/provisioner/` and `charts/manager/`, `docs/deploy.md` §3b + §8 (k8s ≥ 1.27 pinned).
 
 ## 1. Goals
 
@@ -68,9 +82,9 @@ out to the manager and creates machine workloads on demand, fully automated:
   plus install scripts (`backend/manager/server/machine_download.go`). Embedded
   targets today: `linux-x64`, `windows-x64`, `darwin-arm64`.
 - **Auth interceptor** (`backend/manager/api/auth/auth.go`) branches on the JWT
-  audience (`user` / `agent` / `machine`), verifies the signature once, loads the
-  row, and checks `token_version`. Adding a fourth principal kind (provisioner)
-  follows the same pattern.
+  audience (`user` / `agent` / `machine` / `provisioner` — the fourth kind is
+  the provisioner branch, `ProvisionerAccessTokenAudienceFmt`), verifies the
+  signature once, loads the row, and checks `token_version`.
 - **Permissions** are a generated catalog (`backend/common/permission`);
   workspaceAdmin holds everything, workspaceMember holds a baseline list
   (`backend/manager/store/predefined_roles.go`).
@@ -163,6 +177,12 @@ A provisioner is a first-class manager resource, `provisioners/{provisioner}`
    token: llprov_xxx…        # provisioner token
    backend: kubernetes
    namespace: laelia-machines
+   # Optional keys (backend/config.Config): manager_url_override (in-cluster
+   # manager URL for egress-restricted clusters), retain_data (PVC retention),
+   # auto_upgrade (manager-driven upgrades for this provisioner's machines),
+   # resources / storage (workload sizing passthrough), extra_env (e.g.
+   # LAELIA_INSECURE). The token can alternatively come from the
+   # LAELIA_PROVISIONER_TOKEN env var (what the deploy manifest / Helm chart use).
    ```
 4. The provisioner connects with `Authorization: Bearer <token>`; the auth
    interceptor resolves the provisioner row and injects it into the context
@@ -228,9 +248,10 @@ message ManagerProvisionerStreamMessage {
 ```
 
 - On connect the provisioner sends `ProvisionerReady{version, backend,
-  capabilities, config_digest, auto_upgrade}`; the manager registers the session
+  capabilities, config_digest, auto_upgrade, retain_data}`; the manager registers the session
   in a small provisioner dispatcher (parallel to the machine dispatcher) and
-  stamps `provisioner.status` (connected, last_seen, version).
+  stamps `provisioner.status` (connected, last_seen, version, auto_upgrade,
+  retain_data, config_digest).
 - **Job replay on (re)connect**: the manager pushes every machine row in a
   non-terminal provisioning phase (PENDING/PROVISIONING) or with pending
   deprovision, exactly like `ConnectMachineResponse.assigned_agents` resyncs the
@@ -245,9 +266,15 @@ message ManagerProvisionerStreamMessage {
 - Ping/pong every 30s; a dead stream marks the provisioner offline in status
   (machines keep running — they never depend on the provisioner after boot).
 
+Implemented in `backend/manager/api/v1/provisioner_stream.go` +
+`backend/manager/component/dispatcher` (`RegisterProvisioner`,
+`SendProvisionMachineJob`, `SendDeprovisionMachineJob`,
+`SendProvisionerDisconnectNotice`, …) and `backend/provisioner/client/client.go`
+on the binary side (exponential backoff, no durable job state locally).
+
 ## 5. Manager: data model
 
-### 5.1 Migration (new)
+### 5.1 Migration (new) — implemented
 
 ```sql
 -- Provisioner registry (management-plane principal, parallel to machine)
@@ -281,9 +308,12 @@ CREATE INDEX IF NOT EXISTS idx_machine_provisioner ON machine(provisioner_id) WH
 -- writes enum values as numbers — a string-predicate index would never match.)
 ```
 
-`store/provisioner.go` + `store/machine.go` extensions follow the existing
-store patterns (`CreateProvisioner`, `GetProvisionerByResourceID`,
-`ListProvisioners`, `UpdateProvisionerStatus`, `UpdateMachineProvisioning`, …).
+This block is in `backend/manager/migration/migration/LATEST.sql` verbatim
+(plus comments); `store/provisioner.go` + `store/machine.go` implement
+`CreateProvisioner`, `GetProvisionerByResourceID`, `ListProvisioners`,
+`UpdateProvisioner`, `UpdateProvisionerStatus`, `CountMachinesByProvisioner`,
+`UpdateMachineProvisioning`, and `ListReplayableProvisioningMachines`
+(deprovision replay scans soft-deleted rows too).
 
 ### 5.2 Store proto (`proto/store/store/provisioner.proto`)
 
@@ -298,6 +328,7 @@ message ProvisionerStatus {
   string backend = 4;          // "kubernetes" | ...
   bool auto_upgrade = 5;       // config flag echoed from ProvisionerReady
   string config_digest = 6;    // hash of the provisioner's config, for drift hints
+  bool retain_data = 7;        // config flag echoed back as keep_data on teardown jobs
 }
 
 enum ProvisioningPhase {
@@ -326,10 +357,13 @@ with `google.protobuf.Timestamp` fields, living in `v1/machine.proto` (next to
 `Machine`, which carries them as fields 18/19) — `v1/provisioner.proto` imports
 `v1/machine.proto` for `ProvisionMachine`'s `Machine` return, so the API-level
 provisioning types must live in machine.proto to avoid an import cycle.
+Implemented exactly this way: see `proto/store/store/provisioner.proto` and
+`proto/v1/v1/machine.proto` (`Machine.provisioning` = 18,
+`Machine.provisioner` = 19, plus a `provisioning` mirror on `MachineSummary`).
 
 ## 6. Manager: API surface
 
-### 6.1 `provisioner.proto` (new, `laelia.v1`)
+### 6.1 `provisioner.proto` (new, `laelia.v1`) — implemented as `proto/v1/v1/provisioner.proto`
 
 ```protobuf
 service ProvisionerService {
@@ -378,13 +412,13 @@ Key messages:
 message Provisioner {
   option (google.api.resource) = { type: "laelia/Provisioner" pattern: "provisioners/{provisioner}" };
   string name = 1;                 // provisioners/{uuid}
-  string title = 3;
-  string backend = 4;              // "kubernetes" | "docker" | ...
-  string description = 5;
-  ProvisionerStatus status = 6;   // connected/last_seen/version/auto_upgrade
-  int32 machine_count = 7;         // live machines bound to it
-  google.protobuf.Timestamp created_at = 8;
-  string created_by = 9;
+  string title = 2;
+  string backend = 3;              // "kubernetes" | "docker" | ...
+  string description = 4;
+  ProvisionerStatus status = 5;   // connected/last_seen/version/auto_upgrade/retain_data
+  int32 machine_count = 6;         // live machines bound to it
+  google.protobuf.Timestamp created_at = 7;
+  string created_by = 8;
 }
 
 message CreateProvisionerRequest {
@@ -411,9 +445,15 @@ message ProvisionMachineRequest {
 The handler reuses the same store path as `approveNewMachine`
 (`backend/manager/api/v1/device.go`), minus the device session:
 
-1. Validate: provisioner exists, not deleted, backend known; workspace
-   `ProvisioningSetting.runtime_image` non-empty (clear error pointing at
-   Settings otherwise); `owner` is caller or caller is workspaceAdmin.
+1. Validate: provisioner exists, not deleted, backend implemented
+   (`knownProvisionerBackends` — `kubernetes` only today), and the provisioner
+   is **connected** (an offline provisioner would park the job with no worker;
+   the handler fails fast with `FailedPrecondition` instead of enqueueing);
+   workspace `ProvisioningSetting.runtime_image` non-empty (clear error
+   pointing at Settings otherwise); the workspace external URL is configured
+   (it becomes the job's `manager_url`); the manager embeds machine binaries
+   and holds the configured `binary_target` (`machinebuild` guards); `owner`
+   is caller or caller is a workspace admin.
 2. Choose the **fingerprint**: `F = sha256("provisioner:" + provisioner.resourceID
    + ":" + machineUUID)[:16]` — opaque, stable across pod restarts/reschedules,
    and independent of node architecture. The pod learns `F` via env, never
@@ -427,8 +467,10 @@ The handler reuses the same store path as `approveNewMachine`
    TokenTypeRefresh, fingerprint=F)`, hash stored in `machine_token` — identical
      to the device-flow mint, so revocation/rotation/re-auth semantics are shared.
 4. `machine.provisioning = {phase: PENDING, pending_at: now}` and push
-   `ProvisionMachineJob` on the provisioner's live stream (if connected; if not,
-   the job sits at PENDING and is replayed on the provisioner's next connect).
+   `ProvisionMachineJob` on the provisioner's live stream. Because step 1
+   already required a connected provisioner, a push failure is the only way a
+   job stays parked at PENDING — the machine row is kept (no rollback) and the
+   job is replayed on the provisioner's next connect.
 5. Return the `Machine` (with `provisioning` status).
 
 The machine resource gains one output-only field:
@@ -477,14 +519,17 @@ row for the UI; retry is delete + re-create in the MVP.
 ### 6.4 `DeleteMachine` integration
 
 `backend/manager/api/v1/machine.go` `DeleteMachine`: when `provisioner_id` is
-set, after the existing soft-delete it also sets
-`provisioning.phase = DEPROVISIONING` and pushes a `DeprovisionMachineJob`
-(`keep_data` = the provisioner's configured retention, default false → PVC
-deleted with the StatefulSet). The row deletion is **not** blocked on teardown:
-the machine disappears from the UI immediately; workload cleanup happens async
-and is replayed if the provisioner was offline. If the provisioner is gone
-forever (deleted last), the workload is orphaned in the cluster — visible to the
-cluster admin, documented in the UI warning (§10.3).
+set, it first records `provisioning.phase = DEPROVISIONING` (before the
+soft-delete, so the reconnect replay still finds the row), then soft-deletes,
+then pushes a `DeprovisionMachineJob` best-effort (`keep_data` = the
+provisioner's configured retention, `provisioner.status.retain_data`, default
+false → PVC deleted with the StatefulSet). The row deletion is **not** blocked
+on teardown: the machine disappears from the UI immediately; workload cleanup
+happens async and is replayed if the provisioner was offline. (Known deviation:
+the reconnect replay of a deprovision job currently sends `keep_data=false`
+unconditionally — `provisioner_stream.go` `replayProvisionJobs`.) If the
+provisioner is gone forever (deleted last), the workload is orphaned in the
+cluster — visible to the cluster admin, documented in the UI warning (§10.3).
 
 `ForceDisconnectMachine` / `RevokeMachineToken` need **no changes**: a
 provisioned machine reacts like any machine (connection dies; the pod's
@@ -502,11 +547,25 @@ permanent-auth-failure path is §8.4).
 | `laelia.provisioners.provision` | call `ProvisionMachine` |
 
 `workspaceAdmin` picks all of them up automatically via `allPermissionSet`.
-Members get **nothing** by default. To make self-service one click for
-enterprises, add a predefined role **machineProvisioner** =
-`{provisioners.get, provisioners.provision}` (shown on the Roles page, bound to
-users/groups through the existing IAM policy machinery). The
-`workspaceMember` baseline is unchanged.
+The workspaceMember baseline now includes `laelia.provisioners.get` (so a
+member can resolve provisioner names), but **nothing else** — members cannot
+provision by default. Three grants create provisioning rights
+(`backend/manager/api/v1/provisioner.go` `canProvisionOnProvisioner`):
+
+- workspace-scope: `workspaceAdmin` (via `allPermissionSet`) or a user bound to
+  the predefined role **machineProvisioner** = `{provisioners.get,
+  provisioners.provision}` (shown on the Roles page, `workspaceAdmin` binds it
+  through the existing IAM policy machinery); or
+- provisioner-scope: a principal bound to the marker role
+  **provisionerMachineCreator** in the *provisioner's own IAM policy*
+  (resolved by `component/iam.provisionerRolePermissions`; like
+  `machineAgentCreator` it never appears on the management Roles page). This
+  is how an admin delegates "create machines on this one provisioner" without
+  any workspace-wide rights.
+
+Provisioner visibility follows the same rule: `ListProvisioners` filters to
+provisioners the caller may provision on, and `GetProvisioner` returns
+`NotFound` for invisible ones (existence is not leaked).
 
 **Workspace setting** — new `ProvisioningSetting` message in
 `proto/store/store/setting.proto`, wired into the `SettingValue` oneof in
@@ -532,48 +591,59 @@ Admin-managed through the existing `GetSetting`/`UpdateSetting`
 ### 6.6 Optional auto-upgrade
 
 `ProvisionerReady.auto_upgrade` (from the provisioner config, default off) is
-persisted in `provisioner.status`. A small manager loop (ticker, e.g. 5 min):
+persisted in `provisioner.status`. A small manager loop
+(`provisioner_auto_upgrade.go`; first scan 2 min after boot, then a 5-min
+ticker, connected provisioners only):
 
 for each machine with `provisioner_id` set whose provisioner has
 `auto_upgrade=true`, that is ONLINE, whose reported version ≠
 `machinebuild.LatestVersion()` and which has no in-flight `upgrade_status` →
-push the same `UpgradeRequest` the manual `UpgradeMachine` RPC sends. The
-existing progress reporting and crash-safety (supervisor swap + exec in place)
-apply unchanged. Manual upgrade stays available regardless.
+push the same `UpgradeRequest` the manual `UpgradeMachine` RPC sends (target
+fixed to the embedded `linux-x64` build). The existing progress reporting and
+crash-safety (supervisor swap + exec in place) apply unchanged. Manual upgrade
+stays available regardless.
 
 ## 7. Provisioner binary
 
-New top-level package `backend/provisioner`:
+Implemented as the top-level package `backend/provisioner`:
 
 ```
 backend/provisioner/
   bin/provisioner/main.go     # entry: flags --manager --token --backend --config
-  cmd/                        # flag parsing, config load (yaml)
+  cmd/                        # flag parsing, config load (yaml), config digest
+  version/                    # binary version
   client/                     # manager client: ProvisionerChannel loop, job ack/queue,
                               #   status reporting, reconnect/backoff (mirrors agent/client)
   backend/                    # Backend abstraction
-    backend.go                # interface + registry + ErrUnsupportedBackend
+    backend.go                # interface + Factory registry + ErrUnsupportedBackend
+    mock/                     # in-memory Backend for tests
     kubernetes/               # the operator (only implemented backend)
       api/v1/                 # CRD types (LaeliaMachine) + generated deepcopy
-      internal/controller/    # reconciler
+      internal/controller/    # reconciler + builders
       backend.go              # Backend impl: jobs → CRs; CR status → events
+      deploy/                 # CRD + RBAC + Deployment manifests
     docker/                   # registry stub returning ErrUnsupportedBackend
 ```
 
 ### 7.1 `Backend` interface — the extension point for other virtualization stacks
+
+Implemented in `backend/provisioner/backend/backend.go` (below matches the
+code, plus two post-design additions: `MachineSpec.BootstrapScript` and the
+`Shutdown` method):
 
 ```go
 // MachineSpec is the backend-neutral description of one machine workload,
 // derived from a ProvisionMachineJob. The manager and the client layer never
 // learn backend specifics beyond the status events.
 type MachineSpec struct {
-    MachineID    string            // manager resource id (stable workload identity)
-    Title        string
-    ManagerURL   string
-    Fingerprint  string
-    RuntimeImage string
-    BinaryTarget string
-    Labels       map[string]string
+    MachineID       string            // manager resource id (stable workload identity)
+    Title           string
+    ManagerURL      string
+    Fingerprint     string
+    RuntimeImage    string
+    BinaryTarget    string
+    BootstrapScript string            // manager-rendered init-container script (§8.3)
+    Labels          map[string]string
 }
 
 // Event is a workload status change reported back to the manager.
@@ -599,14 +669,22 @@ type Backend interface {
     // Deprovision removes the workload; keepData preserves machine data
     // volumes when the backend supports retention.
     Deprovision(ctx context.Context, machineID string, keepData bool) error
+    // Shutdown runs when the manager permanently deletes this provisioner
+    // (not on a token rotate): e.g. the kubernetes operator scales its own
+    // Deployment to 0 so the process stops crash-looping on a dead credential.
+    Shutdown(ctx context.Context) error
 }
 ```
 
-The client layer is the only translator: stream frames → `Backend.Provision` /
-`Deprovision`; `Backend` events → `ProvisionJobProgress` frames. Adding docker
-later means implementing one interface + a deployment/docker-compose runtime
-template; **no manager change** (a new backend type string flows through the
-provisioner row, job, and UI select).
+Backends register through a `Factory` registry (`backend.Register(name,
+factory)`; `backend.New(name, cfg)` builds one from the backend-neutral
+`Config{Namespace, RetainData, Resources, Storage, ExtraEnv}`). A `mock`
+backend exists for hermetic tests. The client layer is the only translator:
+stream frames → `Backend.Provision` / `Deprovision`; `Backend` events →
+`ProvisionJobProgress` frames. Adding docker later means implementing one
+interface + a deployment/docker-compose runtime template; **no manager
+change** (a new backend type string flows through the provisioner row, job,
+and UI select).
 
 ### 7.2 Client loop (mirrors the machine app's `Run`)
 
@@ -645,6 +723,7 @@ spec:
   bootstrapSecret: laelia-machine-<uuid-prefix>   # Secret holding machine.json
   resources: { requests: {cpu: "1", memory: 2Gi}, limits: {memory: 4Gi} }   # from provisioner config
   storage: { size: 10Gi, storageClass: "" }       # from provisioner config
+  retainData: false                               # from provisioner config (PVC retention)
   extraEnv: [ …passthrough from provisioner config… ]
 status:
   phase: Ready            # Pending | Creating | Ready | Failed | Deleting
@@ -673,10 +752,10 @@ For each `LaeliaMachine` CR (all children carry `ownerReferences` to the CR):
    - **init container** (runtime image, mounts PVC at `/data`): runs the
      manager-generated bootstrap script (§8.3): download + verify the machine
      binary into `/data/bin/laelia-machine` (skipped when the file already
-     exists — restarts stay fast; forced re-download when
-     `spec.forceRedownload` is briefly set), then seed
-     `/data/laelia/machine.json` from the mounted bootstrap Secret **only if
-     absent** (first boot). The Secret is mounted read-only at
+     exists — restarts stay fast; forced re-download by setting
+     `LAELIA_FORCE_REDOWNLOAD=true` via the provisioner's `extra_env`), then
+     seed `/data/laelia/machine.json` from the mounted bootstrap Secret **only
+     if absent** (first boot). The Secret is mounted read-only at
      `/bootstrap`; the PVC copy is authoritative afterwards (rolling refresh
      renewals persist there).
    - **main container** (runtime image): runs the image's
@@ -701,30 +780,26 @@ For each `LaeliaMachine` CR (all children carry `ownerReferences` to the CR):
 
 ### 8.3 Init-container bootstrap script
 
-Generated by the manager from a new template
-(`backend/manager/component/provision/provision_bootstrap.sh.tmpl`, rendered by
-the `provision` component so the API layer can use it without an import cycle)
-and carried inside the job — the runtime image only needs POSIX `sh`, `curl`,
-`gzip`, `sha256sum` (the *image contract*, documented on the Settings page next
-to the runtime-image field). The renderer verifies the download against the
-embedded manifest's gz + raw checksums; it deliberately avoids the `<<<`
-heredoc (a bashism) so any POSIX `sh` can run it:
+Generated by the manager from
+`backend/manager/component/provision/provision_bootstrap.sh.tmpl` (rendered by
+`RenderBootstrapScript` in the `provision` component, so the API layer uses it
+without an import cycle) and carried inside the job — the runtime image only
+needs POSIX `sh`, `curl`, `gzip`, `sha256sum` (the *image contract*, documented
+on the Settings page next to the runtime-image field). The shipped template:
 
-```sh
-#!/bin/sh
-set -eu
-BIN=/data/bin/laelia-machine
-if [ ! -x "$BIN" ] || [ "${LAELIA_FORCE_REDOWNLOAD:-}" = "true" ]; then
-  curl -fsS "$MANAGER_URL/machine/manifest.json" -o /tmp/manifest.json
-  # verify manifest target sha256 + version, then:
-  curl -fsS "$MANAGER_URL/machine/bin/linux-x64" -o /tmp/machine.gz
-  sha256sum -c <<< "<gz-sha256>  /tmp/machine.gz"
-  gunzip -c /tmp/machine.gz > "$BIN.new" && chmod 0755 "$BIN.new" && mv "$BIN.new" "$BIN"
-fi
-if [ ! -f /data/laelia/machine.json ] && [ -f /bootstrap/machine.json ]; then
-  mkdir -p /data/laelia && cp /bootstrap/machine.json /data/laelia/machine.json
-fi
-```
+- prefers `LAELIA_MANAGER_URL` (set by the provisioner, which may override the
+  manager's public URL with an in-cluster service URL) and falls back to the
+  manager-rendered URL;
+- downloads `manifest.json` + the target's `.gz` from `/machine/…`, verifies
+  the archive sha256, gunzips, verifies the decompressed sha256, then installs
+  to `/data/bin/laelia-machine` (skip + `LAELIA_FORCE_REDOWNLOAD=true`
+  override, exactly as designed);
+- seeds `/data/laelia/machine.json` from the read-only `/bootstrap` mount on
+  first boot only, and fails loudly when neither the state file nor the secret
+  is present;
+- deliberately avoids the `<<<` heredoc (a bashism) — checksums are verified
+  with `printf '%s  %s\n' … | sha256sum -c -` — and checks `curl`/`gunzip`/
+  `sha256sum` availability before starting.
 
 `machine.json` content is composed by the provisioner from the job — exactly
 `state.State`: `{"manager_url", "machine_id", "refresh_token", "hostname":
@@ -768,18 +843,29 @@ binary on the PVC, and `machine.json` rotations are PVC writes.
 
 ## 10. Frontend
 
-1. **`/machines/new`** — add a "Provisioned" tab (visible when the caller holds
-   `laelia.provisioners.provision`; the existing device-flow content becomes
-   the "Self-hosted" tab): provisioner picker (radio cards: title, backend,
-   connected badge), title field, [Create] → `ProvisionMachine` → navigate to
-   the machine profile. The profile polls until `status.state == ONLINE`
-   (and shows the provisioning phase chip meanwhile).
+1. **`/machines/new`** — a "Provisioned" tab next to the classic
+   "Self-hosted" tab (`frontend/src/pages/dashboard/machine-new.tsx`,
+   `machine-new-provisioned.tsx`). The tab is visible when the caller may
+   provision: `laelia.provisioners.provision` permission **or** a non-empty
+   provisioner roster (`ListProvisioners` already filters to provisioners the
+   caller may provision on, which covers provisioner-scope
+   `provisionerMachineCreator` bindings that carry no workspace permission).
+   Provisioner picker (radio cards: title, backend, connected badge), title
+   field, [Create] → `ProvisionMachine` → navigate to the machine profile.
+   The profile polls until `status.state == ONLINE` (and shows the
+   provisioning phase chip meanwhile).
 2. **Settings → Provisioners** (admin): table of provisioners (title, backend,
    connected/last-seen, version, auto_upgrade, machine count) + *Add
    provisioner* dialog ending in the **copy-once token dialog**; Rotate /
-   Delete actions (Delete shows the "N machines still bound" refusal inline).
-   Plus the runtime-image field (Settings → General, next to the other
-   workspace settings, with the image-contract help text).
+   Delete actions (Delete shows the "N machines still bound" refusal inline
+   and lands on a full-page post-delete cleanup guide,
+   `settings-provisioner-cleanup.tsx`, with the manual kubectl teardown steps).
+   Two extra pages ship beyond the original design:
+   `settings-provisioner-access.tsx` (per-provisioner IAM policy: who may
+   provision on this provisioner, via the `provisionerMachineCreator` role)
+   and the cleanup page above. Plus the runtime-image field (Settings →
+   General, next to the other workspace settings, with the image-contract
+   help text).
 3. **Machine profile** (provisioned machines): a "Provisioning" card —
    provisioner title, backend, `workload_name`, phase timeline, last error if
    any — and the delete confirmation explicitly says the machine data volume is
@@ -789,7 +875,7 @@ binary on the PVC, and `machine.json` rotations are PVC writes.
 
 | Scenario | Behavior |
 |---|---|
-| Provisioner offline when user clicks create | Job sits at `PENDING`; UI shows "waiting for provisioner"; replayed on next connect. |
+| Provisioner offline when user clicks create | `ProvisionMachine` fails fast with `FailedPrecondition` ("connect it before provisioning a machine") — no job is enqueued with no worker to run it. Jobs can still park at `PENDING` when the post-create push loses a race; those are replayed on the next connect. |
 | Manager restarts mid-provision | Job state is in the DB row; provisioner reconnects → replay (idempotent upsert). |
 | Provisioner dies mid-provision | Workload may exist without the machine connecting; machine shows `PROVISIONED` but OFFLINE; pod keeps retrying via StatefulSet. |
 | Job replayed while pod already exists | `Backend.Provision` is an upsert of CR/Secret/StatefulSet — no-op if in sync. |
@@ -807,7 +893,12 @@ binary on the PVC, and `machine.json` rotations are PVC writes.
 - **Provisioner token**: long-lived, version-revocable, admin-minted. It grants
   *exactly* the provisioner plane (stream + its RPCs) — it cannot call user
   RPCs (different audience; interceptor rejects). Rotation invalidates at next
-  request and kills the live stream.
+  request and kills the live stream. On rotation/deletion the manager sends a
+  `ProvisionerDisconnectNotice` (`deleted=true` when permanently deleted); the
+  provisioner's `Backend.Shutdown` then scales its own Deployment to 0 so the
+  process stops crash-looping with a dead credential (the Deployment/CRD/RBAC/
+  namespace remain for the user to clean up manually — the UI shows the kubectl
+  steps, `settings-provisioner-cleanup.tsx`).
 - **Machine refresh token transits the provisioner** (decision #2). The
   provisioner is deployed by the same enterprise that operates the cluster and
   already holds cluster-admin-equivalent power over machine pods (it could read
@@ -830,11 +921,13 @@ binary on the PVC, and `machine.json` rotations are PVC writes.
 
 ## 13. Implementation plan
 
-The work below is grouped into six execution phases with dependency boundaries,
+The work below was grouped into six execution phases with dependency boundaries,
 exit criteria, and milestone demos in
 [provisioner-implementation-plan.md](./provisioner-implementation-plan.md).
+**All phases are implemented** (see the status note under §0); the map from
+phase to code:
 
-1. **Proto + store + auth** — `provisioner.proto`, stream messages,
+1. **Proto + store + auth** — `proto/v1/v1/provisioner.proto`, stream messages,
    `ProvisioningStatus`/`ProvisionerStatus` store protos, migration (§5.1),
    interceptor audience branch + context key, permission catalog + predefined
    `machineProvisioner` role, `ProvisioningSetting`.
@@ -848,14 +941,17 @@ exit criteria, and milestone demos in
    `Backend` interface + registry, docker stub, config.
 5. **k8s backend** — CRD types (kubebuilder/controller-runtime), reconciler
    (Secret/svc/STS/render pod), status events, deploy manifests (CRD + RBAC +
-   Deployment), envtest coverage.
+   Deployment), operator/controller tests.
 6. **Frontend** — machine-new provision tab, machine profile provisioning card,
    Settings → Provisioners (+ runtime image field), permission-gated visibility.
-7. **Docs** — `docs/deploy.md`: provisioner install, runtime image contract,
-   k8s version requirement (≥ 1.27 for PVC auto-delete), RBAC matrix.
+7. **Docs** — `docs/deploy.md` §3b + §8: provisioner install (manifests and the
+   `charts/provisioner` Helm chart), runtime image contract, k8s version
+   requirement (≥ 1.27 for PVC auto-delete), RBAC.
 
-Testing: unit tests for the job state machine + token mint paths (mirroring
-`device.go` tests); operator envtest; e2e on kind via
+Testing: hermetic unit tests for the job state machine, bootstrap renderer, and
+backend builders; the env-gated control-plane integration suite
+(`LAELIA_RUN_PROVISIONER_TESTS=1` + `LAELIA_TEST_PG_URL`,
+`backend/manager/api/v1/provisioner_integration_test.go`); e2e on kind via
 `scripts/test-server.sh` + a locally built provisioner (verify: create →
 provision → machine ONLINE → upgrade → delete → PVC gone).
 

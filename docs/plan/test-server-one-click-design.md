@@ -1,5 +1,7 @@
 # 一键启动测试服务脚本设计方案
 
+> 状态：2026-09-06 已对照当前代码核对更新。主要变化：`run` 启动完成后立即返回、实例常驻后台（不再监听信号等待）；构建产物按 git worktree 隔离且 stamp 含源码指纹；PG 密码持久化到 `workdir/pgpassword` 跨重启复用；PID 记录在 `.meta.json`；`cleanup`/`LAELIA_TEST_PG_BIN` 等预留项仍未实现。
+
 > 目标：提供一个自动化脚本，编译前端 + 用 `-tags embed_frontend` 编译后端，初始化数据库并写入预设测试数据，然后启动一个可被浏览器访问、可分享给其他用户/Agent 的测试服务。脚本以 `workdir` 为工作目录，所有运行时状态（数据库、日志、PID）都放在该目录内，测试结束后删除该目录即可完全清理，且多个实例可同时运行互不干扰。
 
 ---
@@ -8,8 +10,8 @@
 
 | 事实 | 代码依据 |
 | --- | --- |
-| 后端是 Go 单体，入口 `backend/manager/bin/server/main.go`，用 cobra 解析 `--port`（默认 8181）、`--debug` 等 | `cmd/root.go` |
-| 后端**必须**连接 PostgreSQL，通过环境变量 `LAELIA_PG_URL` 传入连接串；缺失则启动失败 | `cmd/profile.go`、`store/db_connection.go` |
+| 后端是 Go 单体，入口 `backend/manager/bin/server/main.go`，用 cobra 解析 `--port`（默认 8181）、`--debug` 等 | `backend/manager/bin/server/cmd/root.go` |
+| 后端**必须**连接 PostgreSQL，通过环境变量 `LAELIA_PG_URL` 传入连接串；缺失则启动失败 | `backend/manager/bin/server/cmd/profile.go`、`backend/manager/store/db_connection.go` |
 | 后端启动时**自动执行 schema 迁移**（嵌入式 SQL 迁移），无需手动建表 | `server/server.go` 中 `migration.MigrateSchema` |
 | 前端是 React/Vite，构建产物在 `frontend/dist`；用 `-tags embed_frontend` 编译时把 `backend/manager/server/dist` 内嵌进二进制 | `server/server_frontend_embed.go`、`scripts/build_laelia.sh` |
 | 内嵌模式下前端 API 走**同源**（`VITE_API_BASE_URL` 生产为空 → 同源），所以一个端口同时服务页面和 API | `frontend/src/connect/index.ts` |
@@ -25,8 +27,8 @@
 
 两个组件：
 
-1. **构建脚本** `scripts/build_test_server.sh` —— 只构建 manager（前端内嵌），产物放入**共享缓存目录**（默认 `~/.cache/laelia-test/`），带构建锁，支持并发安全。
-2. **启动器** `scripts/test-server.sh`（薄壳）+ **Go 启动器** `tools/testserver/`（核心逻辑）—— 在指定 `workdir` 内启动嵌入式 PostgreSQL、拉起 laelia 服务、等待就绪、写入种子数据、打印访问 URL，并负责优雅停机。
+1. **构建脚本** `scripts/build_test_server.sh` —— 只构建 manager（前端内嵌），产物放入共享缓存目录下**按 git worktree 隔离**的子目录（默认 `~/.cache/laelia-test/worktrees/<worktree-id>/`），带构建锁，支持并发安全。
+2. **启动器** `scripts/test-server.sh`（薄壳）+ **Go 启动器** `tools/testserver/`（核心逻辑）—— 在指定 `workdir` 内启动嵌入式 PostgreSQL、拉起 laelia 服务、等待就绪、写入种子数据、打印访问 URL 后**立即返回**（实例常驻后台）；`stop`/`status` 子命令（及生成的 `stop.sh`）负责停机与查询。
 
 关键设计决策：
 
@@ -43,20 +45,18 @@
 ```
 <workdir>/
 ├── pgdata/            # 嵌入式 PostgreSQL 数据目录（自包含，删除即清）
+├── runtime/           # embedded-postgres 的 initdb 临时目录（必须位于 pgdata 之外，见 §12）
 ├── logs/
 │   ├── server.log     # laelia 服务日志
-│   ├── postgres.log   # PostgreSQL 日志
-│   └── launcher.log   # 启动器自身日志
-├── run/
-│   ├── server.pid     # laelia 进程 PID
-│   ├── postgres.pid   # PG 进程 PID
-│   └── port           # 实际使用的 HTTP 端口（供脚本/Agent 读取）
+│   └── postgres.log   # PostgreSQL 日志
+├── run/               # 预留目录（当前实现未写入文件）
+├── pgpassword         # 持久化的 PG 密码（0600；数据目录复用时必须用同一密码）
 ├── info.txt           # 访问 URL、账号密码、停止方法（人类可读）
 ├── stop.sh            # 一键停止脚本（调用启动器 stop）
-└── .meta.json         # 启动器元数据（端口、PG URL、PID、创建时间等）
+└── .meta.json         # 启动器元数据（端口、PG URL/密码、serverPid、账号、状态等）
 ```
 
-删除 `workdir` 前建议先执行 `stop.sh`（或启动器在收到信号时自动清理）；即使直接 `rm -rf`，残留的孤儿进程也可通过 `run/*.pid` 定位清理（见 §9 兜底）。
+laelia 服务与 PG 的 PID 统一记录在 `.meta.json`（`serverPid` 字段；PG 侧由 `pg_ctl` 按数据目录管理）。删除 `workdir` 前建议先执行 `stop.sh`；即使直接 `rm -rf`，也可在目录被删前用 `testserver stop --workdir <dir>` 按 `.meta.json` 中的 PID 清理（见 §9 兜底）。
 
 ---
 
@@ -64,44 +64,13 @@
 
 只构建 manager（前端内嵌），产物进按 worktree 隔离的缓存（`$CACHE_DIR/worktrees/<worktree-id>/`），保证每个 git worktree 都由自己的最新代码构建。
 
-```bash
-#!/usr/bin/env bash
-# 用法: scripts/build_test_server.sh [--force]
-set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
-. ./scripts/build_init.sh
+实际实现要点（`scripts/build_test_server.sh`，与最初草稿的差异已合并）：
 
-CACHE_DIR="${LAELIA_TEST_CACHE:-$HOME/.cache/laelia-test}"
-BIN="$CACHE_DIR/laelia"
-STAMP="$CACHE_DIR/build.stamp"
-mkdir -p "$CACHE_DIR"
-
-# 构建锁：并发构建时只有一个真正构建，其余等待后复用
-exec 9>"$CACHE_DIR/.build.lock"
-flock 9
-
-# 若产物已存在且未 --force，且 stamp 与当前 git HEAD 一致，则跳过
-if [[ -f "$BIN" && -f "$STAMP" && "$(cat "$STAMP")" == "$GIT_COMMIT" && "${1:-}" != "--force" ]]; then
-  echo "laelia 已构建 ($GIT_COMMIT)，跳过。"
-  exit 0
-fi
-
-echo "构建前端..."
-rm -rf backend/manager/server/dist
-pnpm --dir frontend i --frozen-lockfile
-pnpm --dir frontend build
-cp -r frontend/dist backend/manager/server/dist
-
-echo "构建 manager (embed_frontend)..."
-CGO_ENABLED=0 go build -tags embed_frontend -ldflags "-w -s" -p=16 -o "$BIN" ./backend/manager/bin/server/main.go
-
-echo "$GIT_COMMIT" > "$STAMP"
-echo "构建完成: $BIN"
-```
-
-要点：
-- **构建锁（flock）** 保证多人/多 Agent 同时触发构建时只有一个真正构建，其余等待后复用，避免写 `backend/manager/server/dist` 和缓存目录的竞态。
-- **stamp 校验**：产物与当前 git HEAD 一致则跳过构建，加速重复启动。
+- **参数**：`--force`（强制重建）、`--release`/`--dev`（release 构建加 `release` tag，dev/release 产物不共用缓存条目）、`--quiet`（构建输出重定向到 worktree 缓存的 `build.log`）。
+- **缓存布局**：二进制与 stamp 在 `$CACHE_DIR/worktrees/<worktree-id>/laelia|build.stamp`；`worktree_id` 由 repo 根绝对路径哈希得出（`scripts/build_init.sh`，Go 启动器用同一算法对齐）。
+- **构建锁（flock）**：`exec 9>"$CACHE_DIR/.build.lock"; flock 9`，多人/多 Agent 同时触发时只有一个真正构建，其余等待后复用。
+- **stamp 校验**：`BUILD_STAMP = <git commit>|<version>|<release>|<worktree_fingerprint>|build-info-v3`。`worktree_fingerprint` 覆盖 HEAD、已暂存/未暂存 diff 与未跟踪文件，因此**含未提交改动的当前 worktree 代码一定会触发重建**；一致则跳过。
+- **构建步骤**：`rm -rf backend/manager/server/dist` → `pnpm --dir frontend i --frozen-lockfile` → `pnpm --dir frontend build` → `cp -r frontend/dist backend/manager/server/dist` → `CGO_ENABLED=0 go build -tags embed_frontend [-tags release] -ldflags "-w -s -X .../version.Version=... -X .../version.GitCommit=... -X .../version.BuildTime=..." -p=16 -o "$BIN" ./backend/manager/bin/server/main.go`。
 - 缓存目录可用 `LAELIA_TEST_CACHE` 覆盖（例如 CI 或共享机器上放到公共位置）。
 
 ---
@@ -113,61 +82,66 @@ echo "构建完成: $BIN"
 ### 5.1 命令行接口
 
 ```
-testserver run --workdir <dir> [--port <n>] [--pg-port <n>] [--host 127.0.0.1]
-               [--no-seed] [--build] [--keep] [--admin-email ...] [--admin-password ...]
+testserver run  --workdir <dir> [--repo <dir>] [--port <n>] [--pg-port <n>] [--host 127.0.0.1]
+                [--no-seed] [--build] [--keep] [--cache <dir>] [--binary <path>]
+                [--admin-email ...] [--admin-password ...]
 testserver stop --workdir <dir>
 testserver status --workdir <dir>
 ```
 
 - `--workdir`（必填）：工作目录，绝对路径。
+- `--repo`：repo 根（`run` 需要它定位 `scripts/build_test_server.sh`；薄壳脚本总是传入）。
 - `--port`：HTTP 端口，默认随机（20000–40000 区间内选空闲）。
-- `--pg-port`：PG 端口，默认随机。
-- `--host`：绑定地址，默认 `127.0.0.1`（安全）；分享给局域网其他用户/Agent 时用 `--host 0.0.0.0`。
+- `--pg-port`：PG 端口，默认随机（41000–50000 区间内选空闲）。
+- `--host`：默认 `127.0.0.1`，仅影响 `status` 等处的展示 URL；laelia 服务本身绑定 `:port`（所有网卡，见 §12）。
 - `--no-seed`：跳过种子数据。
-- `--build`：启动前强制重新构建（否则用缓存产物）。
-- `--keep`：退出时不自动清理（保留 PG 数据便于排查）。
-- `--admin-email/--admin-password`：覆盖预设管理员账号。
+- `--build`：启动前强制重新构建（转发 `--force` 给构建脚本，跳过 stamp）。
+- `--keep`：仅为兼容保留；`run` 现在总是让实例常驻后台，该参数无效果。
+- `--cache`：共享缓存目录（默认 `LAELIA_TEST_CACHE` 或 `~/.cache/laelia-test`）。
+- `--binary`：直接指定 laelia 二进制路径（默认用按 worktree 隔离的缓存产物）。
+- `--admin-email/--admin-password`：覆盖预设管理员账号（alice/bob 固定不变）。
 
 ### 5.2 启动流程（`run`）
 
-1. **解析并创建 workdir**：`mkdir -p` 各子目录，写 `.meta.json`。
-2. **确保二进制**：若 `--build` 或缓存无产物，调用 `scripts/build_test_server.sh`。
-3. **选端口**：随机选 HTTP 端口和 PG 端口，用 `net.Listen` 探测空闲，冲突则重选。
+1. **解析并创建 workdir**：`mkdir -p` `logs/`、`run/` 子目录。
+2. **确保二进制**：默认按 worktree 缓存路径取产物，**每次都调用 `scripts/build_test_server.sh --quiet`**（stamp 一致时秒级跳过，源码有变化——含未提交改动——则重建）；显式 `--binary` 时仅在缺失或 `--build` 时构建，`--build` 转发 `--force`。
+3. **选端口**：HTTP 端口在 20000–40000、PG 端口在 41000–50000 内随机选空闲端口（`net.Listen` 探测，冲突重选）。
 4. **启动嵌入式 PostgreSQL**：
-   - 用 `embedded-postgres` 在 `workdir/pgdata` 初始化并启动，监听 `127.0.0.1:<pg-port>`。
-   - 首次运行会下载 PG 二进制（约 50MB）到 `~/.cache/laelia-test/pg`，之后复用；可用 `LAELIA_TEST_PG_BIN` 指向本地 PG 二进制以离线/加速。
-   - 创建数据库 `laelia` 和用户 `laelia`（密码随机，写入 `.meta.json`）。
+   - 用 `embedded-postgres`（v1.34，PG 16）在 `workdir/pgdata` 初始化并启动，监听 `127.0.0.1:<pg-port>`；`runtimePath=workdir/runtime` 必须在 `pgdata` 之外（见 §12）。
+   - 首次运行会下载 PG 二进制（约 50MB）到共享缓存 `<cache>/pg`，之后复用；`LAELIA_TEST_PG_BIN` 指向本地 PG 二进制的离线加速目前**未实现**。
+   - 创建数据库 `laelia` 和用户 `laelia`；密码随机生成后**持久化到 `workdir/pgpassword`（0600）并在重启时复用**——数据目录跨重启复用，密码变了会认证失败。启动超时 120s。
 5. **启动 laelia 服务**：
    ```
    LAELIA_PG_URL=postgresql://laelia:<pw>@127.0.0.1:<pg-port>/laelia \
-     <cache>/laelia --port <http-port> --debug \
+     <worktree-cache>/laelia --port <http-port> --debug \
      >> <workdir>/logs/server.log 2>&1 &
    ```
-   记录 PID 到 `run/server.pid`。
-6. **等待就绪**：轮询 `http://127.0.0.1:<http-port>/healthz`，超时（默认 60s）则报错并清理。服务启动时自动完成 schema 迁移。
-7. **写入种子数据**（除非 `--no-seed`，见 §6）。
-8. **写 `info.txt` 和 `stop.sh`**，打印访问 URL 与账号。
-9. **进入等待**：监听 SIGINT/SIGTERM，收到后执行优雅停机（停 laelia → 停 PG → 写日志）。`--keep` 时跳过停机。
+   进程 `Setsid` 脱离启动器会话（启动器退出后服务继续运行），PID 记录到 `.meta.json` 的 `serverPid`。
+6. **等待就绪**：轮询 `http://127.0.0.1:<http-port>/healthz`，超时 90s 则杀掉进程并报错。服务启动时自动完成 schema 迁移。
+7. **写入种子数据**（除非 `--no-seed`，见 §6；幂等，已存在的用户跳过）。
+8. **写 `.meta.json`、`info.txt` 和 `stop.sh`**，打印访问 URL 与账号。
+9. **立即返回**：`run` 完成上述步骤后退出，laelia 与 PG 常驻后台。设计稿中的"监听 SIGINT/SIGTERM 进入等待"已移除；停机统一走 `stop` 子命令 / `stop.sh`。
 
-### 5.3 停机流程（`stop` / 信号）
+### 5.3 停机流程（`stop` / `stop.sh`）
 
-1. 读 `.meta.json` 拿到 PID 与 PG 端口。
-2. 向 laelia 进程发 SIGTERM（服务自身有优雅停机逻辑，见 `server.go` 的 `Shutdown`）。
-3. 等待进程退出（超时则 SIGKILL）。
-4. 停掉嵌入式 PG（`embedded-postgres` 的 `Stop`）。
-5. 更新 `.meta.json` 状态为 `stopped`。
+1. 读 `.meta.json` 拿到 `serverPid` 与 PG 配置（端口/密码/缓存目录）。
+2. 向 laelia 进程发 SIGTERM 并等待最多 15s（超时 SIGKILL）；服务自身有优雅停机逻辑（`server.go` 的 `Shutdown`，由 `bin/server/cmd/root.go` 的信号处理触发）。
+3. 用 `<cache>/pg/binaries/bin/pg_ctl stop -D <workdir>/pgdata -m fast` 停 PG（不用 embedded-postgres 的 `Stop()`，原因见 §12），随后轮询端口关闭（最多 15s）。
+4. 更新 `.meta.json` 状态为 `stopped`。
+
+`status` 子命令读取 `.meta.json` 打印状态、HTTP/PG 端口与 `serverPid` 存活情况（`kill -0` 探测）。
 
 ---
 
 ## 6. 种子数据（`--seed`）
 
-种子逻辑放在 Go 启动器内，**复用 store 包**，与 API 走完全相同的代码路径，保证一致性：
+种子逻辑放在 Go 启动器内（`tools/testserver/seed.go`），**复用 store 包**（`store.New(ctx, pgURL, false)` 打开存储），与 API 走完全相同的代码路径，保证一致性；实现为**幂等**——已存在的用户直接跳过，不重置密码：
 
 1. 连接 `postgresql://laelia:<pw>@127.0.0.1:<pg-port>/laelia`（迁移已由服务启动完成）。
 2. 用 `store.CreateUser` 创建预设用户（bcrypt 密码哈希 + `EmailVerifiedAt` 置为当前时间，避免登录被"未验证邮箱"拦截）：
-   - 管理员：`admin@laelia.test` / `admin1234`
-   - 普通用户：`alice@laelia.test` / `alice1234`、`bob@laelia.test` / `bob1234`
-   - 密码可用 `--admin-password` 等覆盖；账号密码写入 `info.txt`。
+   - 管理员：`admin@laelia.test` / `admin1234`（可用 `--admin-email/--admin-password` 覆盖）
+   - 普通用户：`alice@laelia.test` / `alice1234`、`bob@laelia.test` / `bob1234`（固定）
+   - 账号密码写入 `info.txt` 与 `.meta.json`。
 3. 用 `store.PatchWorkspaceIamPolicy` 把管理员绑定为 `workspaceAdmin`（`common.FormatRole(common.WorkspaceAdmin)`，member 用 `common.FormatUserHandle(handle)`）。
 4. （可选，后续迭代）创建测试 Agent / 会话 / 群组等更丰富的演示数据。
 
@@ -190,29 +164,29 @@ testserver status --workdir <dir>
 ## 8. 分享访问 URL
 
 - 本地浏览器：`http://127.0.0.1:<port>`。
-- 局域网其他用户/Agent：`--host 0.0.0.0` 后打印 `http://<本机局域网IP>:<port>`（脚本用 `hostname -I` 探测）。
-- 跨公网分享（可选扩展）：支持 `--tunnel` 调用 ngrok/cloudflared 生成公网 URL，写入 `info.txt`。v1 不做，留接口。
+- 局域网其他用户/Agent：服务绑定所有网卡，启动器用 Go `net.InterfaceAddrs()` 取第一个非回环 IPv4 打印 `http://<本机局域网IP>:<port>`（不依赖 `hostname -I`）。
+- 跨公网分享（可选扩展）：`--tunnel` 调用 ngrok/cloudflared 生成公网 URL —— **未实现**。
 
-`info.txt` 内容示例：
+`info.txt` 内容示例（实际输出字段为英文，见 `tools/testserver/run.go` 的 `writeInfo`）：
 
 ```
-Laelia 测试服务已启动
-  页面:   http://127.0.0.1:38123
-  局域网: http://192.168.1.20:38123
-  管理员: admin@laelia.test / admin1234
-  用户:   alice@laelia.test / alice1234
-          bob@laelia.test / bob1234
-停止:    bash <workdir>/stop.sh
-删除:    rm -rf <workdir>   (建议先 stop)
+Laelia test server
+  page:    http://127.0.0.1:38123
+  lan:     http://192.168.1.20:38123
+  admin:   admin@laelia.test / admin1234
+  user:    alice@laelia.test / alice1234
+  user:    bob@laelia.test / bob1234
+  stop:    bash <workdir>/stop.sh
+  delete:  rm -rf <workdir>   (run stop first)
 ```
 
 ---
 
 ## 9. 失败处理与兜底
 
-- **启动失败**：任一环节失败即回滚——停掉已启动的 PG/服务，删除 workdir 内已创建内容（除非 `--keep`），返回非零退出码并打印日志路径。
-- **孤儿进程兜底**：即使 `rm -rf` 前未 stop，`run/*.pid` 记录了 PID；提供 `testserver stop --workdir <dir>` 在目录被删前也能按 PID 清理。另提供 `testserver cleanup --stale` 扫描 `~/.cache/laelia-test/instances` 清理超时未用的实例（可选）。
-- **PG 二进制下载失败**：支持 `LAELIA_TEST_PG_BIN` 指向本地 PG 二进制，或回退到共享 PG 后端（见 §11 备选）。
+- **启动失败**：任一环节失败即回滚——停掉已启动的 PG/服务并返回非零退出码，指出 worktree 缓存里的 `build.log`（构建失败）或 `logs/server.log`（服务失败）。
+- **孤儿进程兜底**：即使 `rm -rf` 前未 stop，`.meta.json` 的 `serverPid` 记录了服务 PID；`testserver stop --workdir <dir>` 在目录被删前也能按 PID 清理。`testserver cleanup --stale`（扫描缓存清理超时实例）**未实现**。
+- **PG 二进制下载失败**：`LAELIA_TEST_PG_BIN` 指向本地 PG 二进制的离线加速**未实现**；共享 PG 后端（见 §11 备选）也未实现。
 
 ---
 
@@ -247,15 +221,18 @@ Laelia 测试服务已启动
 
 本方案已实现并通过本地端到端验证：
 
-- **构建脚本** `scripts/build_test_server.sh`：只构建 manager（前端内嵌），产物进共享缓存，flock 串行化 + git stamp 跳过重复构建。
-- **Go 启动器** `tools/testserver/`（独立 module + replace）：实现 `run/stop/status`、嵌入式 PG、服务拉起、就绪轮询、种子写入、优雅停机。
-- **薄壳脚本** `scripts/test-server.sh`：转发参数并传入 `--repo`。
+- **构建脚本** `scripts/build_test_server.sh`：只构建 manager（前端内嵌），产物进**按 git worktree 隔离**的共享缓存，flock 串行化 + 含源码指纹的 stamp（未提交改动也触发重建）跳过重复构建；支持 `--release/--dev/--quiet`，quiet 模式把构建日志写到 worktree 缓存的 `build.log`。
+- **Go 启动器** `tools/testserver/`（独立 module + replace）：实现 `run/stop/status`、嵌入式 PG（v1.34，PG 16）、服务拉起、就绪轮询、幂等种子写入；`run` 启动完成后立即返回，实例常驻后台。
+- **薄壳脚本** `scripts/test-server.sh`：把启动器二进制也构建进按 worktree 隔离的缓存（stamp 含 `tools/testserver` 目录指纹），`run` 时转发参数并传入 `--repo`。
 - **使用文档** `docs/test-server.md`。
 
 实现中的关键修正（相对 §5 设计）：
 
 1. **runtimePath 必须在 dataPath 之外**：embedded-postgres 的 `Start()` 会 `os.RemoveAll(dataPath)`，若 runtimePath 在 dataPath 内会被一并删除导致 initdb 失败。实际 `runtimePath=workdir/runtime`、`dataPath=workdir/pgdata`。
-2. **stop 用 pg_ctl 直接停 PG**：embedded-postgres 的 `Stop()` 要求是启动它的同一实例；跨进程 stop 时新建实例会返回 `ErrServerNotStarted` 而不做任何事。实际用 `<cache>/pg/binaries/bin/pg_ctl stop -D <dataPath>`。
+2. **stop 用 pg_ctl 直接停 PG**：embedded-postgres 的 `Stop()` 要求是启动它的同一实例；跨进程 stop 时新建实例会返回 `ErrServerNotStarted` 而不做任何事。实际用 `<cache>/pg/binaries/bin/pg_ctl stop -D <dataPath> -m fast`。
 3. **服务监听所有网卡**：laelia 服务 `--port` 绑定 `:port`（所有接口），`--host` 仅影响展示；启动器始终打印 localhost 与局域网两个 URL。
+4. **`run` 后台常驻、立即返回**：设计稿的"启动器前台监听 SIGINT/SIGTERM"改为 `Setsid` 脱离 + 立即返回；`--keep` 仅为兼容保留。停机统一走 `stop` 子命令 / 生成的 `stop.sh`（SIGTERM 服务 → `pg_ctl stop` PG → 端口关闭轮询 → `.meta.json` 置 `stopped`）。
+5. **PG 密码持久化**：密码写入 `workdir/pgpassword`（0600）并在重启时复用——数据目录跨重启复用，随机新密码会认证失败；检测到旧版本遗留的无密码 pgdata 时自动清掉重建。
+6. **构建产物按 worktree 隔离**：二进制/stamp 路径含 `worktrees/<worktree-id>/`（repo 根绝对路径哈希），多 worktree/多 Agent 并发使用互不覆盖。
 
 验证结果：一键启动 → 浏览器访问（healthz OK、前端正常）→ 种子用户（admin/alice/bob + workspaceAdmin 绑定）→ 并发两实例互不干扰（独立端口/数据）→ stop 后服务与 PG 均停止 → 删除 workdir 无残留进程。
