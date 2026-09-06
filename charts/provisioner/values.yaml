@@ -1,0 +1,63 @@
+# laelia-provisioner chart values.
+#
+# Install into the namespace the operator should manage:
+#   helm install laelia-provisioner ./charts/provisioner -n laelia-machines \
+#     --set token=llprov_... --set managerUrl=https://laelia.example.com
+#
+# The LaeliaMachine CRD ships in crds/ and is applied by Helm before the
+# templates; it is NOT removed on `helm uninstall` (see docs/deploy.md).
+replicaCount: 1
+
+image:
+  repository: laelia/provisioner
+  tag: local
+  pullPolicy: IfNotPresent
+
+# One-time token from manager Settings → Provisioners. Injected into the pod
+# as LAELIA_PROVISIONER_TOKEN via a Secret; the config file carries no token.
+token: ""
+
+# Manager the provisioner connects to. Required. Must be reachable from the
+# operator pod and from the machine pods it creates (set managerUrlOverride
+# for egress-restricted clusters).
+managerUrl: ""
+
+# Namespace machine workloads land in. Defaults to the release namespace; keep
+# it inside the RBAC that this chart creates (role/rolebinding deploy to the
+# release namespace). Leave empty to use the release namespace.
+namespace: ""
+
+# Optional: replace the manager URL machine pods connect to with an in-cluster
+# service URL.
+managerUrlOverride: ""
+
+# Preserve machine data PVCs on delete (StatefulSet Retain).
+retainData: false
+
+# Let the manager auto-upgrade this provisioner's machines.
+autoUpgrade: false
+
+# Machine data PVC sizing.
+storage:
+  size: ""
+  storageClass: ""
+
+# Operator pod sizing (the provisioner controller itself).
+operatorResources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+# Machine pod sizing (k8s quantities).
+resources:
+  requests: {}
+  limits: {}
+
+# Extra env passthrough to machine containers, e.g.
+#   extraEnv:
+#     LAELIA_INSECURE: "true"
+extraEnv: {}
+
+serviceAccount:
+  # Optional custom ServiceAccount name; defaults to the chart fullname.
+  name: ""

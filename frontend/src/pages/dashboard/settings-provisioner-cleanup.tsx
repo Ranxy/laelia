@@ -55,6 +55,15 @@ export function SettingsProvisionerCleanupPage() {
           description={t("settings.provisioner-cleanup.scaled-note")}
         />
 
+        <HelmNote
+          title={t("settings.provisioner-cleanup.helm-title")}
+          description={t("settings.provisioner-cleanup.helm-description")}
+          commands={[
+            t("settings.provisioner-cleanup.helm-command-1"),
+            t("settings.provisioner-cleanup.helm-command-2"),
+          ]}
+        />
+
         <CleanupStep
           step={1}
           title={t("settings.provisioner-cleanup.step-1-title")}
@@ -110,6 +119,35 @@ function CleanupStep({
       <div className="flex items-center gap-3">
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
           {step}
+        </span>
+        <h3 className="text-sm font-semibold text-main">{title}</h3>
+      </div>
+      <p className="mt-2 text-sm text-control-light">{description}</p>
+      <div className="mt-3 flex flex-col gap-2">
+        {commands.map((command) => (
+          <CopyCommand key={command} command={command} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// HelmNote is the alternative cleanup path for the Helm chart: uninstall the
+// release, then delete the CRD by hand (Helm does not remove crds/ objects).
+function HelmNote({
+  title,
+  description,
+  commands,
+}: {
+  title: string;
+  description: string;
+  commands: string[];
+}) {
+  return (
+    <div className="rounded-lg border border-control-border bg-background p-5 shadow-xs">
+      <div className="flex items-center gap-3">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded bg-accent text-xs font-semibold text-accent-foreground">
+          <Terminal className="size-3.5" />
         </span>
         <h3 className="text-sm font-semibold text-main">{title}</h3>
       </div>

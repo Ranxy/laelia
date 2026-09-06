@@ -1,0 +1,69 @@
+# Namespace-scoped RBAC for the laelia provisioner (design §12): the minimum
+# set to drive LaeliaMachine workloads inside one namespace. The CRD itself is
+# cluster-scoped and applied from crds/ by Helm; the operator's Role only sees
+# the namespaced CR *instances*.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "provisioner.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "provisioner.labels" . | nindent 4 }}
+rules:
+  # LaeliaMachine CRs, their status, and the finalizer the reconciler manages.
+  - apiGroups: ["laelia.sh"]
+    resources: ["laeliamachines"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["laelia.sh"]
+    resources: ["laeliamachines/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["laelia.sh"]
+    resources: ["laeliamachines/finalizers"]
+    verbs: ["update"]
+  # The bootstrap secret (machine.json + bootstrap script) is written by the
+  # provisioner and read by the pod's init container.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Workload objects owned by the CRs.
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # The operator's own Deployment/ReplicaSet, read and scaled to 0 when the
+  # manager deletes the provisioner (Shutdown), so it stops crash-looping.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get"]
+  # Pods are read for status; PVCs are deleted by the retention policy.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "delete"]
+  # Kubernetes events recorded by the reconciler (kubectl describe).
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "provisioner.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "provisioner.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "provisioner.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "provisioner.fullname" . }}
+  apiGroup: rbac.authorization.k8s.io

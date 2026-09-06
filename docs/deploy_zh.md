@@ -163,6 +163,28 @@ Manager 环境变量：
 - Manager 默认不保留本地状态；数据库是唯一数据源，因此应备份数据库而不是容器。如果启用了内置 TLS（见下文），请用 volume 持久化其证书目录。
 - Manager 每次启动都会应用待执行的迁移；升级前请备份数据库。
 
+### 3b. 使用 Helm 部署 Manager（Kubernetes）
+
+仓库提供可选的 Helm chart（`charts/manager`）将 Manager 部署进集群。chart 不内置数据库——请自行提供可达的 PostgreSQL 连接串：
+
+```bash
+cd /path/to/repo
+helm install laelia-manager charts/manager \
+  --namespace <ns> --create-namespace \
+  --set pg.url='postgresql://laelia:<password>@<db-host>:5432/laelia'
+```
+
+chart 会创建 Deployment、Service 以及承载 `LAELIA_PG_URL` 的 Secret。Manager 默认在 8181 端口提供纯 HTTP 服务；TLS 请自行配置 ingress/反向代理（见 §5），仅当位于可信代理之后时才启用 `--trust-proxy`：
+
+```bash
+helm upgrade laelia-manager charts/manager --namespace <ns> \
+  --set 'extraEnv[0].name=LAELIA_ALLOWED_ORIGINS' \
+  --set 'extraEnv[0].value=https://laelia.example.com' \
+  --set trustProxy=true
+```
+
+与 Docker 镜像一致，首个注册用户成为工作区管理员。该 chart 是可选方案：上述 Docker/二进制部署方式仍是受支持的非集群安装方式。
+
 ## 4. 启动 machine 宿主机
 
 Machine 通过 OAuth2 风格的 **设备码流程** 与 Manager 进行认证——没有注册令牌。在 Manager UI 中，进入 Machines 并点击 *创建 Machine*。页面会显示两条需要在宿主机上执行的命令：
@@ -363,6 +385,74 @@ kubectl apply -f deployment.yaml                 # namespace/secret/config/deplo
 ```bash
 KUBECONFIG=/path/to/kubeconfig ./build/laelia-provisioner run \
   --config /etc/laelia-provisioner/provisioner.yaml
+```
+
+#### 使用 Helm 安装 provisioner（推荐）
+
+提供 Helm chart（`charts/provisioner`）封装上面的清单：其 `crds/` 目录携带 CRD，Helm 会在渲染 chart 模板之前应用 CRD。RBAC、ConfigMap（由 `values.yaml` 渲染）、Secret 与 Deployment 全部部署到 release namespace——chart 不创建 namespace，请用 `-n` 指定（可配合 `--create-namespace`）：
+
+```bash
+cd /path/to/repo
+helm install laelia-provisioner charts/provisioner \
+  --namespace laelia-machines --create-namespace \
+  --set token=llprov_... \
+  --set managerUrl=https://laelia.example.com
+```
+
+常用 values（详见 `charts/provisioner/values.yaml`）：
+
+| Value | 用途 |
+| --- | --- |
+| `token` | Settings → Provisioners 中的一次性 token（必填；以 `LAELIA_PROVISIONER_TOKEN` 注入）。 |
+| `managerUrl` | provisioner 连接的 Manager 地址。 |
+| `namespace` | 机器工作负载落地的 namespace；缺省为 release namespace。 |
+| `managerUrlOverride` | 供机器 pod 连接的集群内 Manager 服务地址（集群出口受限时）。 |
+| `retainData`/`autoUpgrade`/`storage`/`resources`/`extraEnv` | 透传的 provisioner 配置项。 |
+
+这些 values 会渲染进 ConfigMap 中的 `provisioner.yaml`（`managerUrl`→`manager_url`、`namespace`→`namespace`、`managerUrlOverride`→`manager_url_override`、`retainData`→`retain_data`、`autoUpgrade`→`auto_upgrade`、`storage.*`→`storage.*`、`resources.*`→`resources.*`、`extraEnv`→`extra_env`；`backend` 固定为 `kubernetes`）。token **不会**写入配置文件——运行时通过 `LAELIA_PROVISIONER_TOKEN` Secret 读取。未设置的可选 value（如空的 `managerUrlOverride`）不会出现在生成的 YAML 中，对应原来 `deployment.yaml` 里被注释掉的可选 knobs。
+
+可通过命令行 `--set` 设置，或（推荐）对两个必填字段之外的配置使用独立的 values 文件：
+
+```bash
+# --set 形式
+helm install laelia-provisioner charts/provisioner -n laelia-machines \
+  --set token=llprov_... \
+  --set managerUrl=https://laelia.example.com \
+  --set managerUrlOverride=http://laelia-manager.laelia-machines.svc:8181 \
+  --set retainData=true \
+  --set 'storage.size=20Gi' \
+  --set 'extraEnv.LAELIA_INSECURE=true'
+
+# values 文件形式（推荐）：字段名与之上的 value 名一一对应
+helm install laelia-provisioner charts/provisioner -n laelia-machines \
+  -f my-provisioner-values.yaml
+```
+
+```yaml
+# my-provisioner-values.yaml
+token: llprov_...
+managerUrl: https://laelia.example.com
+namespace: laelia-machines          # 缺省为 release namespace
+managerUrlOverride: http://laelia-manager.laelia-machines.svc:8181
+retainData: true
+autoUpgrade: false
+storage:
+  size: 20Gi
+  storageClass: ""
+resources:
+  requests: { cpu: "1", memory: "2Gi" }
+  limits: { memory: "4Gi" }
+extraEnv:
+  LAELIA_INSECURE: "true"
+```
+
+这些 value 仅在安装/升级时读取。修改后请运行 `helm upgrade laelia-provisioner charts/provisioner -n laelia-machines -f my-provisioner-values.yaml`（若 ConfigMap 值已变而 pod 未被重新调度，可加 `--recreate-pods`）让 Deployment 拿到新的 ConfigMap。
+
+`helm uninstall` 会删除 namespaced 资源，但由于 CRD 位于 `crds/`，它**不会**删除集群级的 CRD，需手动清理：
+
+```bash
+helm uninstall laelia-provisioner --namespace laelia-machines
+kubectl delete crd laeliamachines.laelia.sh   # Helm 不管理 CRD 生命周期
 ```
 
 ### 8.3 provisioner 配置参考

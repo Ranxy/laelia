@@ -1,0 +1,6 @@
+apiVersion: v2
+name: laelia-manager
+description: Laelia manager — web UI and API (embeds the frontend and machine binaries). PostgreSQL is required and must be supplied by the user.
+type: application
+version: 0.1.0
+appVersion: "local"

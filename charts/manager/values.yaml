@@ -1,0 +1,44 @@
+# laelia-manager chart values.
+#
+# The manager needs a reachable PostgreSQL instance. Provide its connection
+# URL in `pg.url` (or mount your own Secret via `pg.existingSecret`); there is
+# no bundled database.
+replicaCount: 1
+
+image:
+  repository: laelia/manager
+  tag: local
+  pullPolicy: IfNotPresent
+
+pg:
+  # Required unless `existingSecret` is set. postgresql://user:pass@host:5432/db
+  url: ""
+  # Optional: name of an existing Secret whose `LAELIA_PG_URL` key holds the
+  # connection URL. When set, `pg.url` is ignored.
+  existingSecret: ""
+
+# trust-proxy flag: enable only when a trusted reverse proxy (ingress/gateway)
+# overwrites X-Forwarded-For / X-Real-IP. See docs/deploy.md §1d.
+trustProxy: false
+
+# Extra environment variables, e.g.:
+#   - name: LAELIA_ALLOWED_ORIGINS
+#     value: https://laelia.example.com
+#   - name: LAELIA_COOKIE_SAMESITE
+#     value: lax
+extraEnv: []
+
+service:
+  type: ClusterIP
+  port: 8181
+
+resources: {}
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # limits:
+  #   memory: 512Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

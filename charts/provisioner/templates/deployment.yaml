@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "provisioner.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "provisioner.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "provisioner.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "provisioner.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "provisioner.serviceAccountName" . }}
+      containers:
+        - name: provisioner
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["run", "--config", "/etc/laelia-provisioner/provisioner.yaml"]
+          env:
+            # The manager client token, injected from a Secret; the config
+            # file intentionally carries no token (LAELIA_PROVISIONER_TOKEN
+            # applies when the file and flags leave it empty).
+            - name: LAELIA_PROVISIONER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "provisioner.fullname" . }}-token
+                  key: token
+            # The operator's own pod name, so it can locate and scale its
+            # Deployment to 0 when the manager deletes the provisioner.
+            - name: LAELIA_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          resources:
+            {{- toYaml .Values.operatorResources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/laelia-provisioner
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "provisioner.fullname" . }}-config

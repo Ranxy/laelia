@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "provisioner.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "provisioner.labels" . | nindent 4 }}
+data:
+  provisioner.yaml: |
+    manager_url: {{ required "managerUrl is required" .Values.managerUrl | quote }}
+    backend: kubernetes
+    namespace: {{ .Values.namespace | default .Release.Namespace }}
+    {{- with .Values.managerUrlOverride }}
+    manager_url_override: {{ . | quote }}
+    {{- end }}
+    {{- if .Values.retainData }}
+    retain_data: true
+    {{- end }}
+    {{- if .Values.autoUpgrade }}
+    auto_upgrade: true
+    {{- end }}
+    {{- with .Values.storage }}
+    {{- if or .size .storageClass }}
+    storage:
+      {{- if .size }}
+      size: {{ .size | quote }}
+      {{- end }}
+      {{- if .storageClass }}
+      storage_class: {{ .storageClass | quote }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+    {{- with .Values.resources }}
+    {{- if or .requests .limits }}
+    resources:
+      {{- with .requests }}
+      requests: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .limits }}
+      limits: {{ toYaml . | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+    {{- with .Values.extraEnv }}
+    extra_env:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}

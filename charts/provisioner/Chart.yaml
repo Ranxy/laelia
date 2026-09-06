@@ -1,0 +1,6 @@
+apiVersion: v2
+name: laelia-provisioner
+description: laelia provisioner operator — turns manager provisioning jobs into LaeliaMachine CRs, Services, and StatefulSets in a namespace.
+type: application
+version: 0.1.0
+appVersion: "local"

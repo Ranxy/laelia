@@ -209,6 +209,34 @@ Notes:
 - The manager applies pending migrations on every startup; make a database
   backup before upgrading.
 
+### 3b. Deploy the manager with Helm (Kubernetes)
+
+An optional Helm chart (`charts/manager`) deploys the manager into a cluster.
+It ships no database — provide a reachable PostgreSQL URL:
+
+```bash
+cd /path/to/repo
+helm install laelia-manager charts/manager \
+  --namespace <ns> --create-namespace \
+  --set pg.url='postgresql://laelia:<password>@<db-host>:5432/laelia'
+```
+
+The chart creates a Deployment, Service, and a Secret carrying
+`LAELIA_PG_URL`. The manager serves plain HTTP on 8181; wire up your own
+ingress/reverse proxy for TLS (see §5), enabling `--trust-proxy` only behind
+a trusted one:
+
+```bash
+helm upgrade laelia-manager charts/manager --namespace <ns> \
+  --set 'extraEnv[0].name=LAELIA_ALLOWED_ORIGINS' \
+  --set 'extraEnv[0].value=https://laelia.example.com' \
+  --set trustProxy=true
+```
+
+As with the Docker image, the first user to sign up becomes the workspace
+admin. The chart is optional: the Docker/binary flows above remain the
+supported non-cluster installs.
+
 ## 4. Start machine hosts
 
 Machines authenticate with the manager through an OAuth2-style **device code
@@ -498,6 +526,92 @@ Deployment:
 ```bash
 KUBECONFIG=/path/to/kubeconfig ./build/laelia-provisioner run \
   --config /etc/laelia-provisioner/provisioner.yaml
+```
+
+#### Install the provisioner with Helm (recommended)
+
+A Helm chart (`charts/provisioner`) wraps the manifests above: its `crds/`
+directory carries the CRD, which Helm applies before the chart's templates.
+The RBAC, ConfigMap (rendered from `values.yaml`), Secret, and Deployment all
+deploy into the release namespace — no namespace is created by the chart, so
+pass one with `-n` (it should already exist or use `--create-namespace`):
+
+```bash
+cd /path/to/repo
+helm install laelia-provisioner charts/provisioner \
+  --namespace laelia-machines --create-namespace \
+  --set token=llprov_... \
+  --set managerUrl=https://laelia.example.com
+```
+
+Key values (see `charts/provisioner/values.yaml`):
+
+| Value | Purpose |
+| --- | --- |
+| `token` | One-time token from Settings → Provisioners (required; injected as `LAELIA_PROVISIONER_TOKEN`). |
+| `managerUrl` | Manager the provisioner connects to. |
+| `namespace` | Where machine workloads land; defaults to the release namespace. |
+| `managerUrlOverride` | In-cluster manager service URL for machine pods (egress-restricted clusters). |
+| `retainData`/`autoUpgrade`/`storage`/`resources`/`extraEnv` | Passthrough provisioner config knobs. |
+
+These values map to the `provisioner.yaml` rendered into the ConfigMap
+(`managerUrl`→`manager_url`, `namespace`→`namespace`, `managerUrlOverride`
+→`manager_url_override`, `retainData`→`retain_data`, `autoUpgrade`
+→`auto_upgrade`, `storage.*`→`storage.*`, `resources.*`→`resources.*`,
+`extraEnv`→`extra_env`, `backend` is fixed to `kubernetes`). The token is
+*not* written to the config file — it is read at runtime from the
+`LAELIA_PROVISIONER_TOKEN` Secret. Unset optional values (e.g. an empty
+`managerUrlOverride`) are omitted from the rendered YAML, matching the
+commented-out optional knobs of `deployment.yaml`.
+
+Set them on the command line with `--set`, or prefer a dedicated values file
+for anything beyond the two required fields:
+
+```bash
+# --set form
+helm install laelia-provisioner charts/provisioner -n laelia-machines \
+  --set token=llprov_... \
+  --set managerUrl=https://laelia.example.com \
+  --set managerUrlOverride=http://laelia-manager.laelia-machines.svc:8181 \
+  --set retainData=true \
+  --set 'storage.size=20Gi' \
+  --set 'extraEnv.LAELIA_INSECURE=true'
+
+# values-file form (recommended): values mirror the field names above
+helm install laelia-provisioner charts/provisioner -n laelia-machines \
+  -f my-provisioner-values.yaml
+```
+
+```yaml
+# my-provisioner-values.yaml
+token: llprov_...
+managerUrl: https://laelia.example.com
+namespace: laelia-machines          # defaults to the release namespace
+managerUrlOverride: http://laelia-manager.laelia-machines.svc:8181
+retainData: true
+autoUpgrade: false
+storage:
+  size: 20Gi
+  storageClass: ""
+resources:
+  requests: { cpu: "1", memory: "2Gi" }
+  limits: { memory: "4Gi" }
+extraEnv:
+  LAELIA_INSECURE: "true"
+```
+
+These values are read at install/upgrade time only. After changing them, run
+`helm upgrade laelia-provisioner charts/provisioner -n laelia-machines -f
+my-provisioner-values.yaml` (add `--recreate-pods` if the ConfigMap value
+changed but the pod didn't need rescheduling) so the Deployment picks up the
+new ConfigMap.
+
+`helm uninstall` removes the namespaced resources but — because the CRD ships
+in `crds/` — **not** the cluster-scoped CRD; delete it manually:
+
+```bash
+helm uninstall laelia-provisioner --namespace laelia-machines
+kubectl delete crd laeliamachines.laelia.sh   # Helm does not manage CRDs
 ```
 
 ### 8.3 Provisioner config reference

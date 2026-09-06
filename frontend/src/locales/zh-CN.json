@@ -1274,6 +1274,10 @@
     "provisioner-cleanup": {
       "back": "返回 Provisioners",
       "description": "{{title}} 已被删除,但它在你的 Kubernetes 集群中运行的 operator 并不会被自动移除。请按以下步骤手动清理。",
+      "helm-command-1": "helm uninstall <release-name> --namespace <release-namespace>",
+      "helm-command-2": "kubectl delete crd laeliamachines.laelia.sh",
+      "helm-description": "如果 operator 是通过 charts/provisioner Helm chart 安装的,请先卸载 release,再手动删除 CRD——Helm 不会删除位于 chart crds/ 目录中的 CRD。请将 <release-name> 和 <release-namespace> 替换为安装时使用的 release 名称与 namespace。",
+      "helm-title": "通过 Helm 安装?",
       "note": "部署清单位于仓库的 backend/provisioner/backend/kubernetes/deploy/ 目录。如果你是从其他路径应用的清单,请改用那些路径。",
       "scaled-note": "删除 provisioner 时,operator 已将自己的 Deployment 缩容到 0,因此不再反复崩溃重启。但 Deployment、CRD、RBAC 和 namespace 仍然存在,需要手动删除。",
       "step-1-command": "kubectl delete -f deploy/deployment.yaml",

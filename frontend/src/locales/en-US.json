@@ -1274,6 +1274,10 @@
     "provisioner-cleanup": {
       "back": "Back to provisioners",
       "description": "{{title}} was deleted, but the operator it ran in your Kubernetes cluster is not removed automatically. Follow these steps to remove it.",
+      "helm-command-1": "helm uninstall <release-name> --namespace <release-namespace>",
+      "helm-command-2": "kubectl delete crd laeliamachines.laelia.sh",
+      "helm-description": "If the operator was installed with the charts/provisioner Helm chart, uninstall the release and delete the CRD by hand — Helm does not remove CRDs shipped in the chart's crds/ directory. Replace <release-name> and <release-namespace> with the release name and namespace you used at install time.",
+      "helm-title": "Installed via Helm?",
       "note": "The deploy files live in the repository at backend/provisioner/backend/kubernetes/deploy/. If you applied the manifests from a different path, use those paths instead.",
       "scaled-note": "The operator scaled its own Deployment to 0 when the provisioner was deleted, so it is no longer crash-looping. The Deployment, CRD, RBAC, and namespace still exist and must be removed manually.",
       "step-1-command": "kubectl delete -f deploy/deployment.yaml",
