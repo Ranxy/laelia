@@ -26,6 +26,7 @@ All phases of §13 are implemented and verifiable in the tree:
 - **Machine-side**: `LAELIA_FINGERPRINT` override (`backend/agent/client/client.go`), `setup --provisioned` (`backend/agent/cmd/setup.go`), runtime image (`scripts/docker/Dockerfile.machine-runtime` + `machine-runtime-entrypoint.sh`).
 - **Frontend**: machine-new "Provisioned" tab, Settings → Provisioners (+ per-provisioner IAM access + post-delete cleanup pages), machine profile provisioning card.
 - **Deploy**: manifests `backend/provisioner/backend/kubernetes/deploy/`, Helm charts `charts/provisioner/` and `charts/manager/`, `docs/deploy.md` §3b + §8 (k8s ≥ 1.27 pinned).
+- **Not carried out**: the planned kind e2e runner script was never committed (`scripts/` has none; the manual checklist lives in `docs/deploy.md` §8), and the k8s envtest suite (`backend/provisioner/backend/kubernetes/internal/controller/suite_test.go`) is asset-gated (`KUBEBUILDER_ASSETS`) and runs in no CI workflow — exercise it locally. (The former phased implementation plan was consolidated into this status block once all six phases landed.)
 
 ## 1. Goals
 
@@ -921,11 +922,10 @@ binary on the PVC, and `machine.json` rotations are PVC writes.
 
 ## 13. Implementation plan
 
-The work below was grouped into six execution phases with dependency boundaries,
-exit criteria, and milestone demos in
-[provisioner-implementation-plan.md](./provisioner-implementation-plan.md).
-**All phases are implemented** (see the status note under §0); the map from
-phase to code:
+The work was originally grouped into six execution phases with dependency
+boundaries, exit criteria, and milestone demos (that separate plan document was
+retired once all phases landed). **All phases are implemented** (see the status
+note under §0); the map from phase to code:
 
 1. **Proto + store + auth** — `proto/v1/v1/provisioner.proto`, stream messages,
    `ProvisioningStatus`/`ProvisionerStatus` store protos, migration (§5.1),
