@@ -5,6 +5,52 @@ This file provides additional guidance to AI coding assistants working under `./
 - Follow the repository-wide guidance in `../AGENTS.md`.
 - Treat this file as frontend-specific additions, not a replacement for the root instructions.
 
+## Stack
+
+- React 19 + TypeScript + Vite; Biome is the only linter/formatter (2-space indent, double quotes, 80-col), no ESLint.
+- Tailwind CSS v4, CSS-first config in `src/assets/css/tailwind.css` — no JS config file. Design tokens are semantic CSS custom properties; see the color-token rules below.
+- UI: Base UI (`@base-ui/react`) primitives wrapped shadcn-style in `src/components/ui/`; icons from `lucide-react`; markdown rendering via `streamdown`.
+- API: ConnectRPC (`@connectrpc/connect-web`) over protobuf types generated into `src/types/proto-es/` (only `laelia.v1`); transports and auth interceptors in `src/connect/`.
+- State: Zustand slices under `src/stores/` (one domain per file, mutations via slice actions — see Store Write Surface); server reads use TanStack Query, with `src/hooks/use-resource-query.ts` as the shared read primitive for directory/CRUD pages.
+- Routing: React Router v7 (`src/router/`). i18n: react-i18next (`src/locales/`). PWA: `vite-plugin-pwa` with service worker source in `sw/sw.ts`.
+
+## Source Ownership
+
+| Location | Owns |
+| --- | --- |
+| `src/app/` | Bootstrap, root providers, root layout |
+| `src/router/` | Route definitions, guards, route handles, and routing helpers |
+| `src/pages/` | Route modules (`auth/`, `dashboard/`) with page-only components, hooks, and tests colocated |
+| `src/components/ui/` | Base UI/shadcn-style shared primitives |
+| `src/components/` | Product components genuinely reused across pages (`chat/`, `agent/`, `settings/`, `workspace/`, `activity/`, `preview/`, `shared/`, …) |
+| `src/stores/` | Zustand state slices, one domain per file |
+| `src/connect/` | ConnectRPC clients, transports, auth interceptors |
+| `src/hooks/` and `src/lib/` | Cross-page hooks and framework-neutral helpers |
+| `src/locales/` | i18n message catalogs (see i18n below) |
+| `src/types/proto-es/` | Generated protobuf output (buf) — do not edit manually |
+| `sw/` | PWA service worker source |
+
+Placement rules:
+
+- Keep page-only code beside its page under `src/pages/`; colocate tests as `*.test.ts(x)`.
+- Promote code into `src/components/`, `src/hooks/`, or `src/lib/` only after it has multiple independent consumers.
+- Shared code and components must not import from `src/pages/` — move the shared implementation to its actual owner instead.
+- Prefer direct owner imports over growing broad barrel modules.
+
+## i18n
+
+- All user-facing display text is defined in `src/locales/en-US.json` and `src/locales/zh-CN.json` via react-i18next. Do not hardcode display strings in source code.
+- `en-US` is the default locale bundled synchronously; the other locales load on demand (`src/lib/i18n.ts`). Adding a new locale means adding the catalog and registering it in `src/lib/i18n.ts`.
+- Every locale file must have the exact same key set, and keys are kept sorted: run `pnpm --dir frontend sort:i18n` after editing locale files.
+- Placeholders use double braces (`{{name}}`); a stray single-brace `{name}` renders literally and the checker flags it.
+- `scripts/check-react-i18n.mjs` (part of `pnpm --dir frontend check`) reports missing keys, unused keys, and placeholder problems. Keys it cannot trace statically — template-literal keys like `` t(`activity.filter-${f}`) `` or `t(labelKey)` indirections — must be listed in its `DYNAMIC_PREFIXES` with a pointer to the caller.
+
+## Testing
+
+- Vitest with jsdom + Testing Library; global setup in `src/test/setup.ts`.
+- Tests colocate with source as `*.test.ts` / `*.test.tsx` — colocated tests are the norm for `src/components/ui/` primitives and store slices alike.
+- Run `pnpm --dir frontend test` (or `test:watch` / `test:coverage`).
+
 ## shadcn Skill
 
 When working on React UI, invoke the `shadcn` skill before writing or modifying components. The skill provides component selection guidance, critical rules, and best practices. Always check the skill when unsure which component to use.
