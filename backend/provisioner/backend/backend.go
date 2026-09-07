@@ -39,6 +39,11 @@ type MachineSpec struct {
 	// needs nothing laelia-specific.
 	BootstrapScript string
 	Labels          map[string]string
+	// Params are the user-provided machine-parameter overrides (catalog
+	// keyed), validated manager-side at ProvisionMachine time. Backends merge
+	// them over their own config defaults, applying only the keys they know
+	// and ignoring the rest (replayed keys may outlive a schema change).
+	Params map[string]string
 }
 
 // Event is a workload status change reported back to the manager as a
@@ -66,15 +71,24 @@ type Storage struct {
 	StorageClassName string `yaml:"storage_class,omitempty"`
 }
 
+// ParamBounds are the inclusive min/max bounds of one user-customizable
+// machine parameter (k8s quantities); an empty side is unbounded. Declared by
+// the provisioner's config and reported with the parameter schema.
+type ParamBounds struct {
+	Min string
+	Max string
+}
+
 // Config is the backend-neutral slice of the provisioner configuration,
 // handed to every backend factory. Backend-specific validation (e.g. a
 // required namespace) belongs to the backend implementation.
 type Config struct {
-	Namespace  string
-	RetainData bool
-	Resources  Resources
-	Storage    Storage
-	ExtraEnv   map[string]string
+	Namespace   string
+	RetainData  bool
+	Resources   Resources
+	Storage     Storage
+	ExtraEnv    map[string]string
+	ParamBounds map[string]ParamBounds
 }
 
 // Backend provisions machine workloads in one virtualization stack. All
@@ -82,6 +96,12 @@ type Config struct {
 type Backend interface {
 	// Name matches the provisioner row's backend field.
 	Name() string
+	// MachineParams declares the machine parameters this backend supports:
+	// manager-catalog keys with defaults from the provisioner config and
+	// bounds from its ParamBounds. The manager filters the report against its
+	// catalog and persists it in the provisioner status, so backends may
+	// report keys the manager does not know (they are dropped there).
+	MachineParams() []*storepb.MachineParamSpec
 	// Start launches the backend's controllers/watchers and emits Events on ch
 	// until ctx is done.
 	Start(ctx context.Context, ch chan<- Event) error

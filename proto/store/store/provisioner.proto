@@ -27,6 +27,41 @@ message ProvisionerStatus {
   // keep_data on DeprovisionMachineJob so teardown honors the retention the
   // provisioner was configured with (design §6.4).
   bool retain_data = 7;
+  // MachineParams is the machine-parameter schema reported in the last
+  // ProvisionerReady frame: the manager-catalog keys this provisioner
+  // instance accepts, with per-instance defaults and bounds. Validated and
+  // filtered manager-side (unknown catalog keys are dropped, never persisted).
+  repeated MachineParamSpec machine_params = 8;
+}
+
+// MachineParamType is the value type of one catalog parameter. The type is
+// manager-catalog knowledge (resolved by key); it is mirrored on the v1 spec
+// for UI rendering.
+enum MachineParamType {
+  MACHINE_PARAM_TYPE_UNSPECIFIED = 0;
+  // QUANTITY is a k8s-style quantity string ("500m", "2Gi").
+  MACHINE_PARAM_TYPE_QUANTITY = 1;
+  // MACHINE_PARAM_TYPE_STRING is a DNS-1123-label-safe string (e.g. a
+  // storage class name).
+  MACHINE_PARAM_TYPE_STRING = 2;
+}
+
+// MachineParamSpec is one provisioner-declared machine parameter, mirroring
+// one manager-catalog key with per-instance constraints. Persisted in
+// provisioner.status (jsonb — no SQL migration).
+message MachineParamSpec {
+  // Catalog key, e.g. "cpu" | "memory" | "disk" | "storage_class". Keys the
+  // manager catalog does not know are dropped on receipt (logged).
+  string key = 1;
+  bool required = 2;
+  // Default from the provisioner config; empty = the backend's built-in
+  // default.
+  string default_value = 3;
+  // Inclusive bounds for QUANTITY params; empty = unbounded on that side.
+  string min_value = 4;
+  string max_value = 5;
+  // Allowed values for constrained params (none today); empty = free-form.
+  repeated string options = 6;
 }
 
 // ProvisioningPhase is the lifecycle of one provisioning job. The manager
@@ -69,4 +104,9 @@ message ProvisioningStatus {
   // compose the same workload even if the workspace setting or allowlist later
   // changes.
   string runtime_image = 8;
+  // MachineParams are the user-provided parameter overrides persisted at
+  // ProvisionMachine time (catalog-keyed), so replayed jobs rebuild the same
+  // workload. Shipped verbatim into ProvisionMachineJob; never re-validated
+  // on the replay path (Appendix A finding: the workload the user asked for).
+  map<string, string> machine_params = 9;
 }

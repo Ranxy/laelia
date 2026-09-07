@@ -98,6 +98,7 @@ func convertToV1ProvisioningStatus(p *storepb.ProvisioningStatus) *v1pb.Provisio
 		WorkloadName:   p.WorkloadName,
 		WorkloadLabels: p.WorkloadLabels,
 		RuntimeImage:   p.RuntimeImage,
+		MachineParams:  p.GetMachineParams(),
 	}
 	if p.PendingAt > 0 {
 		out.PendingAt = timestamppb.New(time.Unix(p.PendingAt, 0))

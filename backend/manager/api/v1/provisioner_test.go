@@ -5,6 +5,7 @@ import (
 	"time"
 
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
 func phaseOf(p *storepb.ProvisioningStatus) storepb.ProvisioningPhase {
@@ -327,5 +328,62 @@ func TestResolveProvisionRuntimeImage(t *testing.T) {
 	}
 	if got := resolveProvisionRuntimeImage("", ""); got != "" {
 		t.Errorf("no image anywhere must resolve empty, got %q", got)
+	}
+}
+
+// TestMachineParamsFromReady locks in the Ready-frame schema conversion:
+// catalog keys survive with their constraints, unknown keys, duplicates, and
+// malformed entries are dropped so a (possibly newer) provisioner can never
+// poison the persisted schema.
+func TestMachineParamsFromReady(t *testing.T) {
+	ready := &v1pb.ProvisionerReady{
+		MachineParams: []*v1pb.MachineParamSpec{
+			{Key: "cpu", DefaultValue: "1", MinValue: "250m", MaxValue: "8"},
+			{Key: "memory", DefaultValue: "2Gi", MinValue: "512Mi", MaxValue: "32Gi"},
+			{Key: "gpu"},                                     // unknown to the catalog
+			{Key: "cpu", DefaultValue: "2"},                  // duplicate
+			{Key: "disk", DefaultValue: "not-a-quantity"},    // malformed
+			{Key: "storage_class", DefaultValue: "fast-ssd"}, // string, no bounds
+		},
+	}
+	got := machineParamsFromReady(ready)
+	if len(got) != 3 {
+		t.Fatalf("machineParamsFromReady = %d entries, want 3 (cpu, memory, storage_class)", len(got))
+	}
+	if got[0].GetKey() != "cpu" || got[0].GetDefaultValue() != "1" || got[0].GetMinValue() != "250m" {
+		t.Errorf("first surviving entry = %+v, want cpu/1/250m", got[0])
+	}
+	if got[1].GetKey() != "memory" {
+		t.Errorf("second surviving entry = %q, want memory", got[1].GetKey())
+	}
+	if got[2].GetKey() != "storage_class" {
+		t.Errorf("third surviving entry = %q, want storage_class", got[2].GetKey())
+	}
+}
+
+func TestMachineParamsFromReadyEmpty(t *testing.T) {
+	if got := machineParamsFromReady(&v1pb.ProvisionerReady{}); got != nil {
+		t.Errorf("empty Ready schema = %v, want nil", got)
+	}
+}
+
+// TestConvertToV1MachineParams locks in the catalog-type resolution on the
+// v1 exposure path.
+func TestConvertToV1MachineParams(t *testing.T) {
+	out := convertToV1MachineParams([]*storepb.MachineParamSpec{
+		{Key: "cpu", DefaultValue: "1"},
+		{Key: "storage_class"},
+	})
+	if len(out) != 2 {
+		t.Fatalf("convertToV1MachineParams = %d entries, want 2", len(out))
+	}
+	if out[0].GetType() != v1pb.MachineParamType_MACHINE_PARAM_TYPE_QUANTITY {
+		t.Errorf("cpu type = %v, want QUANTITY", out[0].GetType())
+	}
+	if out[1].GetType() != v1pb.MachineParamType_MACHINE_PARAM_TYPE_STRING {
+		t.Errorf("storage_class type = %v, want STRING", out[1].GetType())
+	}
+	if got := convertToV1MachineParams(nil); got != nil {
+		t.Errorf("empty schema = %v, want nil", got)
 	}
 }

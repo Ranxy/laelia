@@ -1026,6 +1026,9 @@ provision → machine ONLINE → upgrade → delete → PVC gone).
   credential).
 - `linux-arm64` embedded target + per-provisioner arch.
 - Per-machine spec overrides (resources, storage size) in the create dialog.
+  (Implemented — reference: `provisioner-machine-params-design.md`: a
+  manager-owned parameter catalog + per-provisioner schema reported in
+  `ProvisionerReady`, validated per-machine at `ProvisionMachine` time.)
 - `RetryProvisionMachine` (re-run a FAILED job without delete/recreate).
 - Re-credentialing a provisioned machine in place.
 - Namespace-per-machine / k8s `SecurityContext` hardening profiles.

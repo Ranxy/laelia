@@ -146,6 +146,16 @@ func TestConfigDigest(t *testing.T) {
 	same := &Config{Backend: "kubernetes", ExtraEnv: map[string]string{"B": "2", "A": "1"}}
 	assert.Equal(t, shuffled.Digest(), same.Digest())
 
+	// Parameter bounds affect the digest, in stable key order.
+	bounded := &Config{Backend: "kubernetes", ParamBounds: map[string]paramBounds{
+		"cpu": {Min: "250m", Max: "8"}, "memory": {Min: "512Mi", Max: "32Gi"},
+	}}
+	boundedShuffled := &Config{Backend: "kubernetes", ParamBounds: map[string]paramBounds{
+		"memory": {Min: "512Mi", Max: "32Gi"}, "cpu": {Min: "250m", Max: "8"},
+	}}
+	assert.Equal(t, bounded.Digest(), boundedShuffled.Digest())
+	assert.NotEqual(t, cfg.Digest(), bounded.Digest())
+
 	changed := &Config{Backend: "kubernetes", Namespace: "other"}
 	assert.NotEqual(t, cfg.Digest(), changed.Digest())
 }

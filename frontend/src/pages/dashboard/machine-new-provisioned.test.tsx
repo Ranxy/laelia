@@ -234,7 +234,8 @@ describe("MachineNewProvisionedPanel", () => {
       expect(mockedActions.provisionMachine).toHaveBeenCalledWith(
         "provisioners/p1",
         "Cloud Box",
-        ""
+        "",
+        undefined
       );
       expect(mockRouter.navigate).toHaveBeenCalledWith("/machines/m1");
     });
@@ -264,7 +265,8 @@ describe("MachineNewProvisionedPanel", () => {
       expect(mockedActions.provisionMachine).toHaveBeenCalledWith(
         "provisioners/p1",
         "Cloud Box",
-        "registry.example.com/team/app:v1"
+        "registry.example.com/team/app:v1",
+        undefined
       );
       expect(mockRouter.navigate).toHaveBeenCalledWith("/machines/m1");
     });
@@ -297,7 +299,8 @@ describe("MachineNewProvisionedPanel", () => {
       expect(mockedActions.provisionMachine).toHaveBeenCalledWith(
         "provisioners/p1",
         "Cloud Box",
-        ""
+        "",
+        undefined
       );
     });
   });
@@ -354,5 +357,115 @@ describe("MachineNewProvisionedPanel", () => {
       await screen.findByText("runtime image not configured")
     ).toBeInTheDocument();
     expect(mockRouter.navigate).not.toHaveBeenCalled();
+  });
+});
+
+describe("MachineNewProvisionedPanel params", () => {
+  function parametrizedProvisioner(): Provisioner {
+    return provisioner("provisioners/p1", "Prod Cluster", {
+      status: {
+        connected: true,
+        version: "v0.0.1",
+        machineParams: [
+          {
+            key: "cpu",
+            defaultValue: "1",
+            minValue: "250m",
+            maxValue: "8",
+          },
+          { key: "memory", defaultValue: "2Gi" },
+          { key: "gpu", defaultValue: "0" }, // unknown key renders raw
+        ],
+      },
+    } as never);
+  }
+
+  it("renders the selected provisioner's schema with defaults as placeholders", async () => {
+    useAppStore.setState({ provisioners: [parametrizedProvisioner()] });
+    render(<MachineNewProvisionedPanel />);
+
+    fireEvent.click(await screen.findByText("Prod Cluster"));
+    expect(
+      screen.getByText("machine.new.provisioned.params-title")
+    ).toBeInTheDocument();
+    const cpu = screen.getByLabelText(/machine\.param\.cpu/);
+    expect(cpu).toHaveAttribute("placeholder", "1");
+    expect(screen.getByLabelText(/machine\.param\.memory/)).toHaveAttribute(
+      "placeholder",
+      "2Gi"
+    );
+    // A key the frontend does not know renders under its raw catalog name.
+    expect(screen.getByLabelText(/^gpu$/)).toBeInTheDocument();
+    expect(
+      screen.getByText("machine.new.provisioned.param-range")
+    ).toBeInTheDocument();
+  });
+
+  it("hides the parameter section for provisioners without a schema", async () => {
+    useAppStore.setState({
+      provisioners: [provisioner("provisioners/p1", "Prod Cluster")],
+    });
+    render(<MachineNewProvisionedPanel />);
+    fireEvent.click(await screen.findByText("Prod Cluster"));
+    expect(
+      screen.queryByText("machine.new.provisioned.params-title")
+    ).not.toBeInTheDocument();
+  });
+
+  it("submits only the non-empty trimmed values keyed by catalog key", async () => {
+    mockedActions.provisionMachine.mockResolvedValue({
+      name: "machines/m1",
+      title: "Cloud Box",
+    });
+    useAppStore.setState({ provisioners: [parametrizedProvisioner()] });
+    render(<MachineNewProvisionedPanel />);
+
+    fireEvent.click(await screen.findByText("Prod Cluster"));
+    fireEvent.change(screen.getByLabelText("machine.new.name-label"), {
+      target: { value: "Cloud Box" },
+    });
+    fireEvent.change(screen.getByLabelText(/machine\.param\.cpu/), {
+      target: { value: "  4  " },
+    });
+    // memory is left empty → the provisioner default applies; gpu filled →
+    // unknown keys still submit (the manager validates catalog membership).
+    fireEvent.change(screen.getByLabelText(/^gpu$/), {
+      target: { value: "1" },
+    });
+    fireEvent.click(screen.getByText("machine.new.provisioned.create"));
+
+    await waitFor(() => {
+      expect(mockedActions.provisionMachine).toHaveBeenCalledWith(
+        "provisioners/p1",
+        "Cloud Box",
+        "",
+        { cpu: "4", gpu: "1" }
+      );
+      expect(mockRouter.navigate).toHaveBeenCalledWith("/machines/m1");
+    });
+  });
+
+  it("submits no params argument when every field stays empty", async () => {
+    mockedActions.provisionMachine.mockResolvedValue({
+      name: "machines/m1",
+      title: "Cloud Box",
+    });
+    useAppStore.setState({ provisioners: [parametrizedProvisioner()] });
+    render(<MachineNewProvisionedPanel />);
+
+    fireEvent.click(await screen.findByText("Prod Cluster"));
+    fireEvent.change(screen.getByLabelText("machine.new.name-label"), {
+      target: { value: "Cloud Box" },
+    });
+    fireEvent.click(screen.getByText("machine.new.provisioned.create"));
+
+    await waitFor(() => {
+      expect(mockedActions.provisionMachine).toHaveBeenCalledWith(
+        "provisioners/p1",
+        "Cloud Box",
+        "",
+        undefined
+      );
+    });
   });
 });

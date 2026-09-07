@@ -659,6 +659,10 @@
         "machine-title": "Name the machine",
         "offline": "Offline",
         "offline-hint": "Offline provisioners can't create machines until they connect.",
+        "param-default": "Provisioner default",
+        "param-range": "{{range}}",
+        "params-hint": "Leave empty to use the provisioner's configured default. Values are validated against this provisioner's declared limits.",
+        "params-title": "Machine parameters",
         "pick-hint": "The machine's workload is created by the selected provisioner in its backend.",
         "pick-title": "Choose a provisioner",
         "provisioner-offline": "This provisioner is offline. It must be connected to provision a machine.",
@@ -675,6 +679,12 @@
     "no-agents": "No agents hosted on this machine yet.",
     "no-providers": "No providers discovered yet. Start the machine app on the host and click Refresh.",
     "no-selection": "Select a machine to view its details.",
+    "param": {
+      "cpu": "CPU",
+      "disk": "Disk size",
+      "memory": "Memory",
+      "storage-class": "Storage class"
+    },
     "profile": {
       "edit-not-allowed": "Only the machine's creator or a workspace admin can manage this machine.",
       "load-failed": "Failed to load this machine. It may have been deleted or the request failed.",
@@ -690,6 +700,7 @@
       "backend": "Backend",
       "delete-data": "Deprovisioning deletes this machine's data volume (provisioner retention policy).",
       "failed-at": "Failed at",
+      "params": "Parameters",
       "pending-at": "Pending since",
       "phase": "Phase",
       "phase-deleted": "Deleted",

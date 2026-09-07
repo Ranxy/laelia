@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strings"
@@ -39,9 +40,20 @@ type Config struct {
 	// Storage sizes machine data volumes (backend passthrough; the kubernetes
 	// backend uses it for the data PVC). Empty size = backend default.
 	Storage backend.Storage `yaml:"storage"`
+	// ParamBounds limits the machine parameters users may set at
+	// ProvisionMachine time (catalog keys → inclusive min/max, k8s
+	// quantities; an omitted side is unbounded). Reported with the parameter
+	// schema and enforced by the manager.
+	ParamBounds map[string]paramBounds `yaml:"param_bounds"`
 	// ExtraEnv passes additional environment entries into machine workloads
 	// (e.g. LAELIA_INSECURE for a self-signed manager certificate).
 	ExtraEnv map[string]string `yaml:"extra_env"`
+}
+
+// paramBounds are the yaml shape of one parameter's inclusive bounds.
+type paramBounds struct {
+	Min string `yaml:"min"`
+	Max string `yaml:"max"`
 }
 
 // loadConfig reads the yaml config (when --config is set) and applies the
@@ -96,12 +108,17 @@ func (c *Config) validate() error {
 
 // backendConfig is the backend-neutral slice handed to the backend factory.
 func (c *Config) backendConfig() backend.Config {
+	bounds := make(map[string]backend.ParamBounds, len(c.ParamBounds))
+	for key, b := range c.ParamBounds {
+		bounds[key] = backend.ParamBounds{Min: b.Min, Max: b.Max}
+	}
 	return backend.Config{
-		Namespace:  c.Namespace,
-		RetainData: c.RetainData,
-		Resources:  c.Resources,
-		Storage:    c.Storage,
-		ExtraEnv:   c.ExtraEnv,
+		Namespace:   c.Namespace,
+		RetainData:  c.RetainData,
+		Resources:   c.Resources,
+		Storage:     c.Storage,
+		ExtraEnv:    c.ExtraEnv,
+		ParamBounds: bounds,
 	}
 }
 
@@ -130,5 +147,19 @@ func (c *Config) Digest() string {
 	writeSortedEntries("resource_requests", c.Resources.Requests)
 	writeSortedEntries("resource_limits", c.Resources.Limits)
 	writeSortedEntries("extra_env", c.ExtraEnv)
+	writeSortedBounds(h, "param_bounds", c.ParamBounds)
 	return hex.EncodeToString(h.Sum(nil))[:12]
+}
+
+// writeSortedBounds hashes the parameter-bounds map in stable key order.
+func writeSortedBounds(h io.Writer, label string, entries map[string]paramBounds) {
+	keys := make([]string, 0, len(entries))
+	for k := range entries {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	_, _ = fmt.Fprintf(h, "%s.count=%d\n", label, len(keys))
+	for _, k := range keys {
+		_, _ = fmt.Fprintf(h, "%s.%s={min:%s,max:%s}\n", label, k, entries[k].Min, entries[k].Max)
+	}
 }

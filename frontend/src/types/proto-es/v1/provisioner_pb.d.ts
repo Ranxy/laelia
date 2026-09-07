@@ -2,7 +2,7 @@
 // @generated from file v1/provisioner.proto (package laelia.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 import type { EmptySchema, Timestamp } from "@bufbuild/protobuf/wkt";
 import type { Ping, Pong } from "./command_pb";
@@ -216,6 +216,17 @@ export declare type ProvisionMachineRequest = Message<"laelia.v1.ProvisionMachin
    * @generated from field: string runtime_image = 4;
    */
   runtimeImage: string;
+
+  /**
+   * Per-machine parameter overrides keyed by catalog key ("cpu", "memory",
+   * "disk", ...). Every key must be declared by the target provisioner's
+   * schema and pass its type/bounds validation; values persist on the machine
+   * so replayed provisioning jobs rebuild the same workload. Empty = the
+   * provisioner's configured defaults.
+   *
+   * @generated from field: map<string, string> machine_params = 5;
+   */
+  machineParams: { [key: string]: string };
 };
 
 /**
@@ -223,6 +234,69 @@ export declare type ProvisionMachineRequest = Message<"laelia.v1.ProvisionMachin
  * Use `create(ProvisionMachineRequestSchema)` to create a new message.
  */
 export declare const ProvisionMachineRequestSchema: GenMessage<ProvisionMachineRequest>;
+
+/**
+ * MachineParamSpec is one provisioner-declared machine parameter: a
+ * manager-catalog key plus per-instance constraints reported in
+ * ProvisionerReady and persisted in the provisioner status. The UI renders
+ * the create form from this list.
+ *
+ * @generated from message laelia.v1.MachineParamSpec
+ */
+export declare type MachineParamSpec = Message<"laelia.v1.MachineParamSpec"> & {
+  /**
+   * Catalog key, e.g. "cpu" | "memory" | "disk" | "storage_class".
+   *
+   * @generated from field: string key = 1;
+   */
+  key: string;
+
+  /**
+   * Type resolved by the manager from the catalog.
+   *
+   * @generated from field: laelia.v1.MachineParamType type = 2;
+   */
+  type: MachineParamType;
+
+  /**
+   * @generated from field: bool required = 3;
+   */
+  required: boolean;
+
+  /**
+   * Default from the provisioner config; empty = the backend's built-in
+   * default (shown as the form placeholder; untouched fields keep tracking
+   * the admin config).
+   *
+   * @generated from field: string default_value = 4;
+   */
+  defaultValue: string;
+
+  /**
+   * Inclusive bounds for QUANTITY params; empty = unbounded on that side.
+   *
+   * @generated from field: string min_value = 5;
+   */
+  minValue: string;
+
+  /**
+   * @generated from field: string max_value = 6;
+   */
+  maxValue: string;
+
+  /**
+   * Allowed values for constrained params (none today); empty = free-form.
+   *
+   * @generated from field: repeated string options = 7;
+   */
+  options: string[];
+};
+
+/**
+ * Describes the message laelia.v1.MachineParamSpec.
+ * Use `create(MachineParamSpecSchema)` to create a new message.
+ */
+export declare const MachineParamSpecSchema: GenMessage<MachineParamSpec>;
 
 /**
  * Provisioner is a registered worker that creates machine workloads in one
@@ -329,6 +403,15 @@ export declare type ProvisionerStatus = Message<"laelia.v1.ProvisionerStatus"> &
    * @generated from field: bool retain_data = 7;
    */
   retainData: boolean;
+
+  /**
+   * MachineParams is the parameter schema reported in the last
+   * ProvisionerReady frame (manager-catalog keys only, types resolved
+   * manager-side), so the create form renders even while offline.
+   *
+   * @generated from field: repeated laelia.v1.MachineParamSpec machine_params = 8;
+   */
+  machineParams: MachineParamSpec[];
 };
 
 /**
@@ -458,6 +541,16 @@ export declare type ProvisionerReady = Message<"laelia.v1.ProvisionerReady"> & {
    * @generated from field: bool retain_data = 6;
    */
   retainData: boolean;
+
+  /**
+   * MachineParams is the machine-parameter schema this provisioner instance
+   * accepts: manager-catalog keys with per-instance defaults and bounds
+   * sourced from its config. The manager validates and filters it (unknown
+   * catalog keys are dropped) before persisting.
+   *
+   * @generated from field: repeated laelia.v1.MachineParamSpec machine_params = 7;
+   */
+  machineParams: MachineParamSpec[];
 };
 
 /**
@@ -541,6 +634,16 @@ export declare type ProvisionMachineJob = Message<"laelia.v1.ProvisionMachineJob
    * @generated from field: string bootstrap_script = 10;
    */
   bootstrapScript: string;
+
+  /**
+   * User-provided parameter overrides (catalog-keyed), validated manager-side
+   * at ProvisionMachine time. Backends merge them over their own config
+   * defaults, applying only keys they know; replayed jobs carry them
+   * verbatim.
+   *
+   * @generated from field: map<string, string> machine_params = 11;
+   */
+  machineParams: { [key: string]: string };
 };
 
 /**
@@ -635,6 +738,38 @@ export declare type ProvisionerDisconnectNotice = Message<"laelia.v1.Provisioner
  * Use `create(ProvisionerDisconnectNoticeSchema)` to create a new message.
  */
 export declare const ProvisionerDisconnectNoticeSchema: GenMessage<ProvisionerDisconnectNotice>;
+
+/**
+ * MachineParamType is the value type of one catalog parameter, resolved by
+ * the manager from its catalog (the provisioner reports keys, not types).
+ *
+ * @generated from enum laelia.v1.MachineParamType
+ */
+export enum MachineParamType {
+  /**
+   * @generated from enum value: MACHINE_PARAM_TYPE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * QUANTITY is a k8s-style quantity string ("500m", "2Gi").
+   *
+   * @generated from enum value: MACHINE_PARAM_TYPE_QUANTITY = 1;
+   */
+  QUANTITY = 1,
+
+  /**
+   * STRING is a DNS-1123-label-safe string (e.g. a storage class name).
+   *
+   * @generated from enum value: MACHINE_PARAM_TYPE_STRING = 2;
+   */
+  STRING = 2,
+}
+
+/**
+ * Describes the enum laelia.v1.MachineParamType.
+ */
+export declare const MachineParamTypeSchema: GenEnum<MachineParamType>;
 
 /**
  * ProvisionerService manages provisioners (management-plane workers that

@@ -26,14 +26,42 @@ func cloneStoreProvisionerStatus(st *storepb.ProvisionerStatus) *storepb.Provisi
 	if st == nil {
 		return &storepb.ProvisionerStatus{}
 	}
-	return &storepb.ProvisionerStatus{
+	out := &storepb.ProvisionerStatus{
 		Connected:    st.Connected,
 		LastSeen:     st.LastSeen,
 		Version:      st.Version,
 		Backend:      st.Backend,
 		AutoUpgrade:  st.AutoUpgrade,
 		ConfigDigest: st.ConfigDigest,
+		RetainData:   st.RetainData,
 	}
+	if n := len(st.MachineParams); n > 0 {
+		out.MachineParams = make([]*storepb.MachineParamSpec, n)
+		copy(out.MachineParams, st.MachineParams)
+	}
+	return out
+}
+
+// machineParamsFromReady converts the Ready frame's reported parameter schema
+// into its persisted store form, filtered against the manager catalog
+// (unknown keys, duplicates, and malformed entries are dropped — the
+// provisioner may be newer than this manager).
+func machineParamsFromReady(ready *v1pb.ProvisionerReady) []*storepb.MachineParamSpec {
+	if len(ready.GetMachineParams()) == 0 {
+		return nil
+	}
+	specs := make([]*storepb.MachineParamSpec, 0, len(ready.GetMachineParams()))
+	for _, in := range ready.GetMachineParams() {
+		specs = append(specs, &storepb.MachineParamSpec{
+			Key:          in.GetKey(),
+			Required:     in.GetRequired(),
+			DefaultValue: in.GetDefaultValue(),
+			MinValue:     in.GetMinValue(),
+			MaxValue:     in.GetMaxValue(),
+			Options:      in.GetOptions(),
+		})
+	}
+	return provision.ValidateMachineSchema(specs)
 }
 
 // ProvisionerStreamService implements ProvisionerStreamService
@@ -145,13 +173,14 @@ func (s *ProvisionerStreamService) handleReady(provisioner *store.ProvisionerMes
 		return
 	}
 	status := &storepb.ProvisionerStatus{
-		Connected:    true,
-		LastSeen:     time.Now().Unix(),
-		Version:      ready.GetVersion(),
-		Backend:      ready.GetBackend(),
-		AutoUpgrade:  ready.GetAutoUpgrade(),
-		RetainData:   ready.GetRetainData(),
-		ConfigDigest: ready.GetConfigDigest(),
+		Connected:     true,
+		LastSeen:      time.Now().Unix(),
+		Version:       ready.GetVersion(),
+		Backend:       ready.GetBackend(),
+		AutoUpgrade:   ready.GetAutoUpgrade(),
+		RetainData:    ready.GetRetainData(),
+		ConfigDigest:  ready.GetConfigDigest(),
+		MachineParams: machineParamsFromReady(ready),
 	}
 	if ready.GetBackend() != "" && ready.GetBackend() != provisioner.Backend {
 		slog.Warn("provisioner reports a backend that differs from its registry row",

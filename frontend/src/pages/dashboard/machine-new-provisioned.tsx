@@ -9,9 +9,70 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useWorkspacePolicy } from "@/hooks/use-workspace-policy";
 import { describeError } from "@/lib/connect-errors";
+import { machineParamLabelKey } from "@/lib/machine-params";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
-import type { Provisioner } from "@/types/proto-es/v1/provisioner_pb";
+import type {
+  MachineParamSpec,
+  Provisioner,
+} from "@/types/proto-es/v1/provisioner_pb";
+
+// ParamInputs renders one input per schema-declared parameter. Inputs start
+// empty: the default is the placeholder, so untouched fields keep tracking
+// the provisioner's admin-configured defaults. Only non-empty values submit.
+function ParamInputs({
+  params,
+  values,
+  onChange,
+}: {
+  params: MachineParamSpec[];
+  values: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+}) {
+  const { t } = useTranslation();
+  if (params.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm font-medium text-control">
+        {t("machine.new.provisioned.params-title")}
+      </p>
+      {params.map((param) => {
+        const labelKey = machineParamLabelKey(param.key);
+        return (
+          <div key={param.key} className="flex flex-col gap-1">
+            <label
+              htmlFor={`machine-new-provisioned-param-${param.key}`}
+              className="text-sm font-medium text-control"
+            >
+              {labelKey ? t(labelKey) : param.key}
+              {(param.minValue || param.maxValue) && (
+                <span className="ml-2 text-xs font-normal text-control-light">
+                  {t("machine.new.provisioned.param-range", {
+                    range: `${param.minValue || "·"} – ${param.maxValue || "·"}`,
+                  })}
+                </span>
+              )}
+            </label>
+            <Input
+              id={`machine-new-provisioned-param-${param.key}`}
+              value={values[param.key] ?? ""}
+              placeholder={
+                param.defaultValue || t("machine.new.provisioned.param-default")
+              }
+              onChange={(e) => {
+                onChange(param.key, e.target.value);
+              }}
+              spellCheck={false}
+            />
+          </div>
+        );
+      })}
+      <p className="text-xs text-control-light">
+        {t("machine.new.provisioned.params-hint")}
+      </p>
+    </div>
+  );
+}
 
 // MachineNewProvisionedPanel is the "Provisioned" tab of the create-machine
 // page: pick a provisioner, name the machine, and the provisioner creates the
@@ -29,6 +90,9 @@ export function MachineNewProvisionedPanel() {
   const [title, setTitle] = useState("");
   // Optional per-machine runtime image; empty = the workspace default.
   const [runtimeImage, setRuntimeImage] = useState("");
+  // Per-machine parameter values keyed by catalog key; empty = the
+  // provisioner's configured default applies.
+  const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
@@ -45,6 +109,12 @@ export function MachineNewProvisionedPanel() {
   // The picker only offers connected provisioners; offline ones are shown but
   // disabled. The backend validates liveness again at ProvisionMachine time.
   const connected = (p: Provisioner): boolean => p.status?.connected ?? false;
+
+  // The schema of the currently selected provisioner: the create form renders
+  // one input per declared parameter, even while the provisioner is offline
+  // (the backend still fails fast at ProvisionMachine time).
+  const selectedSchema =
+    provisioners.find((p) => p.name === selected)?.status?.machineParams ?? [];
 
   async function handleCreate() {
     if (!selected) {
@@ -63,9 +133,22 @@ export function MachineNewProvisionedPanel() {
     setCreating(true);
     setError("");
     try {
+      // Only non-empty values submit: an untouched field keeps tracking the
+      // provisioner's configured default.
+      const machineParams: Record<string, string> = {};
+      for (const param of selectedSchema) {
+        const value = paramValues[param.key]?.trim();
+        if (value) machineParams[param.key] = value;
+      }
+      const hasParams = Object.keys(machineParams).length > 0;
       const machine = await useAppStore
         .getState()
-        .provisionMachine(selected, title.trim(), runtimeImage.trim());
+        .provisionMachine(
+          selected,
+          title.trim(),
+          runtimeImage.trim(),
+          hasParams ? machineParams : undefined
+        );
       navigate(`/machines/${machine.name.replace(/^machines\//, "")}`);
     } catch (err) {
       setError(describeError(err));
@@ -182,6 +265,17 @@ export function MachineNewProvisionedPanel() {
               }}
             />
           </div>
+          {selectedSchema.length > 0 && (
+            <div className="border-t border-control-border pt-4">
+              <ParamInputs
+                params={selectedSchema}
+                values={paramValues}
+                onChange={(key, value) => {
+                  setParamValues((prev) => ({ ...prev, [key]: value }));
+                }}
+              />
+            </div>
+          )}
           {allowCustomImages && (
             <div className="flex flex-col gap-1">
               <label

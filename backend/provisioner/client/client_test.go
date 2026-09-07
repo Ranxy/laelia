@@ -78,6 +78,33 @@ func TestMachineSpecFromJobAppliesManagerURLOverride(t *testing.T) {
 	assert.Equal(t, "https://manager.test", plain.machineSpecFromJob(job, spec.MachineID).ManagerURL)
 }
 
+func TestMachineSpecFromJobCarriesParams(t *testing.T) {
+	c := &Client{cfg: Config{}}
+	job := &v1pb.ProvisionMachineJob{
+		Machine:       "machines/1f0a9c2d-4e5b-4c6a-8d7e-0f1a2b3c4d5e",
+		MachineParams: map[string]string{"cpu": "2", "memory": "4Gi"},
+	}
+	spec := c.machineSpecFromJob(job, "1f0a9c2d-4e5b-4c6a-8d7e-0f1a2b3c4d5e")
+	assert.Equal(t, job.GetMachineParams(), spec.Params,
+		"parameter overrides travel to the backend verbatim (no re-validation)")
+}
+
+func TestMachineParamsReadyRoundTrip(t *testing.T) {
+	specs := []*storepb.MachineParamSpec{
+		{Key: "cpu", DefaultValue: "1", MinValue: "250m", MaxValue: "8"},
+		{Key: "storage_class", DefaultValue: "fast-ssd"},
+	}
+	got := machineParamsReady(specs)
+	require.Len(t, got, 2)
+	assert.Equal(t, "cpu", got[0].GetKey())
+	assert.Equal(t, "1", got[0].GetDefaultValue())
+	assert.Equal(t, "250m", got[0].GetMinValue())
+	assert.Equal(t, "8", got[0].GetMaxValue())
+	assert.Equal(t, "storage_class", got[1].GetKey())
+	assert.Equal(t, "fast-ssd", got[1].GetDefaultValue())
+	assert.Nil(t, machineParamsReady(nil))
+}
+
 func TestHandleProvisionJobRejectsMalformedMachine(_ *testing.T) {
 	c := &Client{cfg: Config{}}
 	// Must not panic; malformed names are dropped with a log.
@@ -194,6 +221,9 @@ func TestExponentialBackoff(t *testing.T) {
 type fakeBackend struct{}
 
 func (*fakeBackend) Name() string { return "fake" }
+func (*fakeBackend) MachineParams() []*storepb.MachineParamSpec {
+	return nil
+}
 func (*fakeBackend) Start(context.Context, chan<- backend.Event) error {
 	return nil
 }

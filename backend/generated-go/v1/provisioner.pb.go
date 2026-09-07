@@ -24,6 +24,59 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// MachineParamType is the value type of one catalog parameter, resolved by
+// the manager from its catalog (the provisioner reports keys, not types).
+type MachineParamType int32
+
+const (
+	MachineParamType_MACHINE_PARAM_TYPE_UNSPECIFIED MachineParamType = 0
+	// QUANTITY is a k8s-style quantity string ("500m", "2Gi").
+	MachineParamType_MACHINE_PARAM_TYPE_QUANTITY MachineParamType = 1
+	// STRING is a DNS-1123-label-safe string (e.g. a storage class name).
+	MachineParamType_MACHINE_PARAM_TYPE_STRING MachineParamType = 2
+)
+
+// Enum value maps for MachineParamType.
+var (
+	MachineParamType_name = map[int32]string{
+		0: "MACHINE_PARAM_TYPE_UNSPECIFIED",
+		1: "MACHINE_PARAM_TYPE_QUANTITY",
+		2: "MACHINE_PARAM_TYPE_STRING",
+	}
+	MachineParamType_value = map[string]int32{
+		"MACHINE_PARAM_TYPE_UNSPECIFIED": 0,
+		"MACHINE_PARAM_TYPE_QUANTITY":    1,
+		"MACHINE_PARAM_TYPE_STRING":      2,
+	}
+)
+
+func (x MachineParamType) Enum() *MachineParamType {
+	p := new(MachineParamType)
+	*p = x
+	return p
+}
+
+func (x MachineParamType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MachineParamType) Descriptor() protoreflect.EnumDescriptor {
+	return file_v1_provisioner_proto_enumTypes[0].Descriptor()
+}
+
+func (MachineParamType) Type() protoreflect.EnumType {
+	return &file_v1_provisioner_proto_enumTypes[0]
+}
+
+func (x MachineParamType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MachineParamType.Descriptor instead.
+func (MachineParamType) EnumDescriptor() ([]byte, []int) {
+	return file_v1_provisioner_proto_rawDescGZIP(), []int{0}
+}
+
 type CreateProvisionerRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The provisioner to create: title, backend, and optional description.
@@ -442,7 +495,13 @@ type ProvisionMachineRequest struct {
 	// reference and match the admin-configured custom-image allowlist (an empty
 	// allowlist disables custom images). Persisted on the machine so replayed
 	// provisioning jobs rebuild the same workload.
-	RuntimeImage  string `protobuf:"bytes,4,opt,name=runtime_image,json=runtimeImage,proto3" json:"runtime_image,omitempty"`
+	RuntimeImage string `protobuf:"bytes,4,opt,name=runtime_image,json=runtimeImage,proto3" json:"runtime_image,omitempty"`
+	// Per-machine parameter overrides keyed by catalog key ("cpu", "memory",
+	// "disk", ...). Every key must be declared by the target provisioner's
+	// schema and pass its type/bounds validation; values persist on the machine
+	// so replayed provisioning jobs rebuild the same workload. Empty = the
+	// provisioner's configured defaults.
+	MachineParams map[string]string `protobuf:"bytes,5,rep,name=machine_params,json=machineParams,proto3" json:"machine_params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -505,6 +564,116 @@ func (x *ProvisionMachineRequest) GetRuntimeImage() string {
 	return ""
 }
 
+func (x *ProvisionMachineRequest) GetMachineParams() map[string]string {
+	if x != nil {
+		return x.MachineParams
+	}
+	return nil
+}
+
+// MachineParamSpec is one provisioner-declared machine parameter: a
+// manager-catalog key plus per-instance constraints reported in
+// ProvisionerReady and persisted in the provisioner status. The UI renders
+// the create form from this list.
+type MachineParamSpec struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Catalog key, e.g. "cpu" | "memory" | "disk" | "storage_class".
+	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// Type resolved by the manager from the catalog.
+	Type     MachineParamType `protobuf:"varint,2,opt,name=type,proto3,enum=laelia.v1.MachineParamType" json:"type,omitempty"`
+	Required bool             `protobuf:"varint,3,opt,name=required,proto3" json:"required,omitempty"`
+	// Default from the provisioner config; empty = the backend's built-in
+	// default (shown as the form placeholder; untouched fields keep tracking
+	// the admin config).
+	DefaultValue string `protobuf:"bytes,4,opt,name=default_value,json=defaultValue,proto3" json:"default_value,omitempty"`
+	// Inclusive bounds for QUANTITY params; empty = unbounded on that side.
+	MinValue string `protobuf:"bytes,5,opt,name=min_value,json=minValue,proto3" json:"min_value,omitempty"`
+	MaxValue string `protobuf:"bytes,6,opt,name=max_value,json=maxValue,proto3" json:"max_value,omitempty"`
+	// Allowed values for constrained params (none today); empty = free-form.
+	Options       []string `protobuf:"bytes,7,rep,name=options,proto3" json:"options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MachineParamSpec) Reset() {
+	*x = MachineParamSpec{}
+	mi := &file_v1_provisioner_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MachineParamSpec) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MachineParamSpec) ProtoMessage() {}
+
+func (x *MachineParamSpec) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_provisioner_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MachineParamSpec.ProtoReflect.Descriptor instead.
+func (*MachineParamSpec) Descriptor() ([]byte, []int) {
+	return file_v1_provisioner_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *MachineParamSpec) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *MachineParamSpec) GetType() MachineParamType {
+	if x != nil {
+		return x.Type
+	}
+	return MachineParamType_MACHINE_PARAM_TYPE_UNSPECIFIED
+}
+
+func (x *MachineParamSpec) GetRequired() bool {
+	if x != nil {
+		return x.Required
+	}
+	return false
+}
+
+func (x *MachineParamSpec) GetDefaultValue() string {
+	if x != nil {
+		return x.DefaultValue
+	}
+	return ""
+}
+
+func (x *MachineParamSpec) GetMinValue() string {
+	if x != nil {
+		return x.MinValue
+	}
+	return ""
+}
+
+func (x *MachineParamSpec) GetMaxValue() string {
+	if x != nil {
+		return x.MaxValue
+	}
+	return ""
+}
+
+func (x *MachineParamSpec) GetOptions() []string {
+	if x != nil {
+		return x.Options
+	}
+	return nil
+}
+
 // Provisioner is a registered worker that creates machine workloads in one
 // virtualization backend on the manager's behalf.
 type Provisioner struct {
@@ -527,7 +696,7 @@ type Provisioner struct {
 
 func (x *Provisioner) Reset() {
 	*x = Provisioner{}
-	mi := &file_v1_provisioner_proto_msgTypes[9]
+	mi := &file_v1_provisioner_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -539,7 +708,7 @@ func (x *Provisioner) String() string {
 func (*Provisioner) ProtoMessage() {}
 
 func (x *Provisioner) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_provisioner_proto_msgTypes[9]
+	mi := &file_v1_provisioner_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -552,7 +721,7 @@ func (x *Provisioner) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Provisioner.ProtoReflect.Descriptor instead.
 func (*Provisioner) Descriptor() ([]byte, []int) {
-	return file_v1_provisioner_proto_rawDescGZIP(), []int{9}
+	return file_v1_provisioner_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Provisioner) GetName() string {
@@ -623,14 +792,18 @@ type ProvisionerStatus struct {
 	ConfigDigest string                 `protobuf:"bytes,6,opt,name=config_digest,json=configDigest,proto3" json:"config_digest,omitempty"`
 	// RetainData echoes the provisioner's configured data retention; the
 	// manager sends it as keep_data on teardown jobs (design §6.4).
-	RetainData    bool `protobuf:"varint,7,opt,name=retain_data,json=retainData,proto3" json:"retain_data,omitempty"`
+	RetainData bool `protobuf:"varint,7,opt,name=retain_data,json=retainData,proto3" json:"retain_data,omitempty"`
+	// MachineParams is the parameter schema reported in the last
+	// ProvisionerReady frame (manager-catalog keys only, types resolved
+	// manager-side), so the create form renders even while offline.
+	MachineParams []*MachineParamSpec `protobuf:"bytes,8,rep,name=machine_params,json=machineParams,proto3" json:"machine_params,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProvisionerStatus) Reset() {
 	*x = ProvisionerStatus{}
-	mi := &file_v1_provisioner_proto_msgTypes[10]
+	mi := &file_v1_provisioner_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -642,7 +815,7 @@ func (x *ProvisionerStatus) String() string {
 func (*ProvisionerStatus) ProtoMessage() {}
 
 func (x *ProvisionerStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_provisioner_proto_msgTypes[10]
+	mi := &file_v1_provisioner_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -655,7 +828,7 @@ func (x *ProvisionerStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProvisionerStatus.ProtoReflect.Descriptor instead.
 func (*ProvisionerStatus) Descriptor() ([]byte, []int) {
-	return file_v1_provisioner_proto_rawDescGZIP(), []int{10}
+	return file_v1_provisioner_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ProvisionerStatus) GetConnected() bool {
@@ -707,6 +880,13 @@ func (x *ProvisionerStatus) GetRetainData() bool {
 	return false
 }
 
+func (x *ProvisionerStatus) GetMachineParams() []*MachineParamSpec {
+	if x != nil {
+		return x.MachineParams
+	}
+	return nil
+}
+
 type ProvisionerStreamMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Message:
@@ -721,7 +901,7 @@ type ProvisionerStreamMessage struct {
 
 func (x *ProvisionerStreamMessage) Reset() {
 	*x = ProvisionerStreamMessage{}
-	mi := &file_v1_provisioner_proto_msgTypes[11]
+	mi := &file_v1_provisioner_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -733,7 +913,7 @@ func (x *ProvisionerStreamMessage) String() string {
 func (*ProvisionerStreamMessage) ProtoMessage() {}
 
 func (x *ProvisionerStreamMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_provisioner_proto_msgTypes[11]
+	mi := &file_v1_provisioner_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -746,7 +926,7 @@ func (x *ProvisionerStreamMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProvisionerStreamMessage.ProtoReflect.Descriptor instead.
 func (*ProvisionerStreamMessage) Descriptor() ([]byte, []int) {
-	return file_v1_provisioner_proto_rawDescGZIP(), []int{11}
+	return file_v1_provisioner_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ProvisionerStreamMessage) GetMessage() isProvisionerStreamMessage_Message {
@@ -821,7 +1001,7 @@ type ManagerProvisionerStreamMessage struct {
 
 func (x *ManagerProvisionerStreamMessage) Reset() {
 	*x = ManagerProvisionerStreamMessage{}
-	mi := &file_v1_provisioner_proto_msgTypes[12]
+	mi := &file_v1_provisioner_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -833,7 +1013,7 @@ func (x *ManagerProvisionerStreamMessage) String() string {
 func (*ManagerProvisionerStreamMessage) ProtoMessage() {}
 
 func (x *ManagerProvisionerStreamMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_provisioner_proto_msgTypes[12]
+	mi := &file_v1_provisioner_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -846,7 +1026,7 @@ func (x *ManagerProvisionerStreamMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ManagerProvisionerStreamMessage.ProtoReflect.Descriptor instead.
 func (*ManagerProvisionerStreamMessage) Descriptor() ([]byte, []int) {
-	return file_v1_provisioner_proto_rawDescGZIP(), []int{12}
+	return file_v1_provisioner_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ManagerProvisionerStreamMessage) GetMessage() isManagerProvisionerStreamMessage_Message {
@@ -936,14 +1116,19 @@ type ProvisionerReady struct {
 	AutoUpgrade bool `protobuf:"varint,5,opt,name=auto_upgrade,json=autoUpgrade,proto3" json:"auto_upgrade,omitempty"`
 	// RetainData echoes the provisioner's config flag; persisted in the
 	// provisioner status and used as keep_data on teardown jobs (design §6.4).
-	RetainData    bool `protobuf:"varint,6,opt,name=retain_data,json=retainData,proto3" json:"retain_data,omitempty"`
+	RetainData bool `protobuf:"varint,6,opt,name=retain_data,json=retainData,proto3" json:"retain_data,omitempty"`
+	// MachineParams is the machine-parameter schema this provisioner instance
+	// accepts: manager-catalog keys with per-instance defaults and bounds
+	// sourced from its config. The manager validates and filters it (unknown
+	// catalog keys are dropped) before persisting.
+	MachineParams []*MachineParamSpec `protobuf:"bytes,7,rep,name=machine_params,json=machineParams,proto3" json:"machine_params,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProvisionerReady) Reset() {
 	*x = ProvisionerReady{}
-	mi := &file_v1_provisioner_proto_msgTypes[13]
+	mi := &file_v1_provisioner_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -955,7 +1140,7 @@ func (x *ProvisionerReady) String() string {
 func (*ProvisionerReady) ProtoMessage() {}
 
 func (x *ProvisionerReady) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_provisioner_proto_msgTypes[13]
+	mi := &file_v1_provisioner_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -968,7 +1153,7 @@ func (x *ProvisionerReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProvisionerReady.ProtoReflect.Descriptor instead.
 func (*ProvisionerReady) Descriptor() ([]byte, []int) {
-	return file_v1_provisioner_proto_rawDescGZIP(), []int{13}
+	return file_v1_provisioner_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ProvisionerReady) GetVersion() string {
@@ -1013,6 +1198,13 @@ func (x *ProvisionerReady) GetRetainData() bool {
 	return false
 }
 
+func (x *ProvisionerReady) GetMachineParams() []*MachineParamSpec {
+	if x != nil {
+		return x.MachineParams
+	}
+	return nil
+}
+
 // ProvisionMachineJob carries everything the provisioner needs to create one
 // machine workload. The refresh token is the machine's durable credential:
 // the provisioner stores it in a backend secret (never in a CR) and the pod
@@ -1037,13 +1229,18 @@ type ProvisionMachineJob struct {
 	MachineLabels map[string]string `protobuf:"bytes,9,rep,name=machine_labels,json=machineLabels,proto3" json:"machine_labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// The manager-rendered bootstrap script (init container payload).
 	BootstrapScript string `protobuf:"bytes,10,opt,name=bootstrap_script,json=bootstrapScript,proto3" json:"bootstrap_script,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// User-provided parameter overrides (catalog-keyed), validated manager-side
+	// at ProvisionMachine time. Backends merge them over their own config
+	// defaults, applying only keys they know; replayed jobs carry them
+	// verbatim.
+	MachineParams map[string]string `protobuf:"bytes,11,rep,name=machine_params,json=machineParams,proto3" json:"machine_params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProvisionMachineJob) Reset() {
 	*x = ProvisionMachineJob{}
-	mi := &file_v1_provisioner_proto_msgTypes[14]
+	mi := &file_v1_provisioner_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1055,7 +1252,7 @@ func (x *ProvisionMachineJob) String() string {
 func (*ProvisionMachineJob) ProtoMessage() {}
 
 func (x *ProvisionMachineJob) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_provisioner_proto_msgTypes[14]
+	mi := &file_v1_provisioner_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1068,7 +1265,7 @@ func (x *ProvisionMachineJob) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProvisionMachineJob.ProtoReflect.Descriptor instead.
 func (*ProvisionMachineJob) Descriptor() ([]byte, []int) {
-	return file_v1_provisioner_proto_rawDescGZIP(), []int{14}
+	return file_v1_provisioner_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ProvisionMachineJob) GetMachine() string {
@@ -1141,6 +1338,13 @@ func (x *ProvisionMachineJob) GetBootstrapScript() string {
 	return ""
 }
 
+func (x *ProvisionMachineJob) GetMachineParams() map[string]string {
+	if x != nil {
+		return x.MachineParams
+	}
+	return nil
+}
+
 type DeprovisionMachineJob struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Machine string                 `protobuf:"bytes,1,opt,name=machine,proto3" json:"machine,omitempty"`
@@ -1153,7 +1357,7 @@ type DeprovisionMachineJob struct {
 
 func (x *DeprovisionMachineJob) Reset() {
 	*x = DeprovisionMachineJob{}
-	mi := &file_v1_provisioner_proto_msgTypes[15]
+	mi := &file_v1_provisioner_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1165,7 +1369,7 @@ func (x *DeprovisionMachineJob) String() string {
 func (*DeprovisionMachineJob) ProtoMessage() {}
 
 func (x *DeprovisionMachineJob) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_provisioner_proto_msgTypes[15]
+	mi := &file_v1_provisioner_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1178,7 +1382,7 @@ func (x *DeprovisionMachineJob) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeprovisionMachineJob.ProtoReflect.Descriptor instead.
 func (*DeprovisionMachineJob) Descriptor() ([]byte, []int) {
-	return file_v1_provisioner_proto_rawDescGZIP(), []int{15}
+	return file_v1_provisioner_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DeprovisionMachineJob) GetMachine() string {
@@ -1211,7 +1415,7 @@ type ProvisionJobProgress struct {
 
 func (x *ProvisionJobProgress) Reset() {
 	*x = ProvisionJobProgress{}
-	mi := &file_v1_provisioner_proto_msgTypes[16]
+	mi := &file_v1_provisioner_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1223,7 +1427,7 @@ func (x *ProvisionJobProgress) String() string {
 func (*ProvisionJobProgress) ProtoMessage() {}
 
 func (x *ProvisionJobProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_provisioner_proto_msgTypes[16]
+	mi := &file_v1_provisioner_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1236,7 +1440,7 @@ func (x *ProvisionJobProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProvisionJobProgress.ProtoReflect.Descriptor instead.
 func (*ProvisionJobProgress) Descriptor() ([]byte, []int) {
-	return file_v1_provisioner_proto_rawDescGZIP(), []int{16}
+	return file_v1_provisioner_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ProvisionJobProgress) GetMachine() string {
@@ -1281,7 +1485,7 @@ type ProvisionerDisconnectNotice struct {
 
 func (x *ProvisionerDisconnectNotice) Reset() {
 	*x = ProvisionerDisconnectNotice{}
-	mi := &file_v1_provisioner_proto_msgTypes[17]
+	mi := &file_v1_provisioner_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1293,7 +1497,7 @@ func (x *ProvisionerDisconnectNotice) String() string {
 func (*ProvisionerDisconnectNotice) ProtoMessage() {}
 
 func (x *ProvisionerDisconnectNotice) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_provisioner_proto_msgTypes[17]
+	mi := &file_v1_provisioner_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1306,7 +1510,7 @@ func (x *ProvisionerDisconnectNotice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProvisionerDisconnectNotice.ProtoReflect.Descriptor instead.
 func (*ProvisionerDisconnectNotice) Descriptor() ([]byte, []int) {
-	return file_v1_provisioner_proto_rawDescGZIP(), []int{17}
+	return file_v1_provisioner_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ProvisionerDisconnectNotice) GetReason() string {
@@ -1353,13 +1557,25 @@ const file_v1_provisioner_proto_rawDesc = "" +
 	"\x05token\x18\x02 \x01(\tB\x03\xe0A\x03R\x05token\"J\n" +
 	"\x18DeleteProvisionerRequest\x12.\n" +
 	"\x04name\x18\x01 \x01(\tB\x1a\xe0A\x02\xfaA\x14\n" +
-	"\x12laelia/ProvisionerR\x04name\"\xad\x01\n" +
+	"\x12laelia/ProvisionerR\x04name\"\xcd\x02\n" +
 	"\x17ProvisionMachineRequest\x12<\n" +
 	"\vprovisioner\x18\x01 \x01(\tB\x1a\xe0A\x02\xfaA\x14\n" +
 	"\x12laelia/ProvisionerR\vprovisioner\x12\x19\n" +
 	"\x05title\x18\x02 \x01(\tB\x03\xe0A\x02R\x05title\x12\x14\n" +
 	"\x05owner\x18\x03 \x01(\tR\x05owner\x12#\n" +
-	"\rruntime_image\x18\x04 \x01(\tR\fruntimeImage\"\xf1\x02\n" +
+	"\rruntime_image\x18\x04 \x01(\tR\fruntimeImage\x12\\\n" +
+	"\x0emachine_params\x18\x05 \x03(\v25.laelia.v1.ProvisionMachineRequest.MachineParamsEntryR\rmachineParams\x1a@\n" +
+	"\x12MachineParamsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xef\x01\n" +
+	"\x10MachineParamSpec\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x124\n" +
+	"\x04type\x18\x02 \x01(\x0e2\x1b.laelia.v1.MachineParamTypeB\x03\xe0A\x03R\x04type\x12\x1a\n" +
+	"\brequired\x18\x03 \x01(\bR\brequired\x12#\n" +
+	"\rdefault_value\x18\x04 \x01(\tR\fdefaultValue\x12\x1b\n" +
+	"\tmin_value\x18\x05 \x01(\tR\bminValue\x12\x1b\n" +
+	"\tmax_value\x18\x06 \x01(\tR\bmaxValue\x12\x18\n" +
+	"\aoptions\x18\a \x03(\tR\aoptions\"\xf1\x02\n" +
 	"\vProvisioner\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x18\n" +
@@ -1371,7 +1587,7 @@ const file_v1_provisioner_proto_rawDesc = "" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\tcreatedAt\x12\"\n" +
 	"\n" +
 	"created_by\x18\b \x01(\tB\x03\xe0A\x03R\tcreatedBy:3\xeaA0\n" +
-	"\x12laelia/Provisioner\x12\x1aprovisioners/{provisioner}\"\x87\x02\n" +
+	"\x12laelia/Provisioner\x12\x1aprovisioners/{provisioner}\"\xd0\x02\n" +
 	"\x11ProvisionerStatus\x12\x1c\n" +
 	"\tconnected\x18\x01 \x01(\bR\tconnected\x127\n" +
 	"\tlast_seen\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\blastSeen\x12\x18\n" +
@@ -1380,7 +1596,8 @@ const file_v1_provisioner_proto_rawDesc = "" +
 	"\fauto_upgrade\x18\x05 \x01(\bR\vautoUpgrade\x12#\n" +
 	"\rconfig_digest\x18\x06 \x01(\tR\fconfigDigest\x12\x1f\n" +
 	"\vretain_data\x18\a \x01(\bR\n" +
-	"retainData\"\xc7\x01\n" +
+	"retainData\x12G\n" +
+	"\x0emachine_params\x18\b \x03(\v2\x1b.laelia.v1.MachineParamSpecB\x03\xe0A\x03R\rmachineParams\"\xc7\x01\n" +
 	"\x18ProvisionerStreamMessage\x123\n" +
 	"\x05ready\x18\x01 \x01(\v2\x1b.laelia.v1.ProvisionerReadyH\x00R\x05ready\x12D\n" +
 	"\fjob_progress\x18\x02 \x01(\v2\x1f.laelia.v1.ProvisionJobProgressH\x00R\vjobProgress\x12%\n" +
@@ -1391,7 +1608,7 @@ const file_v1_provisioner_proto_rawDesc = "" +
 	"\x0fdeprovision_job\x18\x02 \x01(\v2 .laelia.v1.DeprovisionMachineJobH\x00R\x0edeprovisionJob\x12%\n" +
 	"\x04pong\x18\x03 \x01(\v2\x0f.laelia.v1.PongH\x00R\x04pong\x12U\n" +
 	"\x11disconnect_notice\x18\x04 \x01(\v2&.laelia.v1.ProvisionerDisconnectNoticeH\x00R\x10disconnectNoticeB\t\n" +
-	"\amessage\"\xd3\x01\n" +
+	"\amessage\"\x97\x02\n" +
 	"\x10ProvisionerReady\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x18\n" +
 	"\abackend\x18\x02 \x01(\tR\abackend\x12\"\n" +
@@ -1399,7 +1616,8 @@ const file_v1_provisioner_proto_rawDesc = "" +
 	"\rconfig_digest\x18\x04 \x01(\tR\fconfigDigest\x12!\n" +
 	"\fauto_upgrade\x18\x05 \x01(\bR\vautoUpgrade\x12\x1f\n" +
 	"\vretain_data\x18\x06 \x01(\bR\n" +
-	"retainData\"\xe1\x03\n" +
+	"retainData\x12B\n" +
+	"\x0emachine_params\x18\a \x03(\v2\x1b.laelia.v1.MachineParamSpecR\rmachineParams\"\xfd\x04\n" +
 	"\x13ProvisionMachineJob\x12\x18\n" +
 	"\amachine\x18\x01 \x01(\tR\amachine\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12!\n" +
@@ -1412,8 +1630,12 @@ const file_v1_provisioner_proto_rawDesc = "" +
 	"\rbinary_target\x18\b \x01(\tR\fbinaryTarget\x12X\n" +
 	"\x0emachine_labels\x18\t \x03(\v21.laelia.v1.ProvisionMachineJob.MachineLabelsEntryR\rmachineLabels\x12)\n" +
 	"\x10bootstrap_script\x18\n" +
-	" \x01(\tR\x0fbootstrapScript\x1a@\n" +
+	" \x01(\tR\x0fbootstrapScript\x12X\n" +
+	"\x0emachine_params\x18\v \x03(\v21.laelia.v1.ProvisionMachineJob.MachineParamsEntryR\rmachineParams\x1a@\n" +
 	"\x12MachineLabelsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a@\n" +
+	"\x12MachineParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"N\n" +
 	"\x15DeprovisionMachineJob\x12\x18\n" +
@@ -1426,7 +1648,11 @@ const file_v1_provisioner_proto_rawDesc = "" +
 	"\rworkload_name\x18\x04 \x01(\tR\fworkloadName\"O\n" +
 	"\x1bProvisionerDisconnectNotice\x12\x16\n" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\x12\x18\n" +
-	"\adeleted\x18\x02 \x01(\bR\adeleted2\xa6\x06\n" +
+	"\adeleted\x18\x02 \x01(\bR\adeleted*v\n" +
+	"\x10MachineParamType\x12\"\n" +
+	"\x1eMACHINE_PARAM_TYPE_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bMACHINE_PARAM_TYPE_QUANTITY\x10\x01\x12\x1d\n" +
+	"\x19MACHINE_PARAM_TYPE_STRING\x10\x022\xa6\x06\n" +
 	"\x12ProvisionerService\x12\x86\x01\n" +
 	"\x11CreateProvisioner\x12#.laelia.v1.CreateProvisionerRequest\x1a$.laelia.v1.CreateProvisionerResponse\"&\x8a\xea0\x1alaelia.provisioners.create\x90\xea0\x01\x98\xea0\x01\x12|\n" +
 	"\x10ListProvisioners\x12\".laelia.v1.ListProvisionersRequest\x1a#.laelia.v1.ListProvisionersResponse\"\x1f\x8a\xea0\x17laelia.provisioners.get\x90\xea0\x01\x12r\n" +
@@ -1449,70 +1675,80 @@ func file_v1_provisioner_proto_rawDescGZIP() []byte {
 	return file_v1_provisioner_proto_rawDescData
 }
 
-var file_v1_provisioner_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_v1_provisioner_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_v1_provisioner_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_v1_provisioner_proto_goTypes = []any{
-	(*CreateProvisionerRequest)(nil),        // 0: laelia.v1.CreateProvisionerRequest
-	(*CreateProvisionerResponse)(nil),       // 1: laelia.v1.CreateProvisionerResponse
-	(*ListProvisionersRequest)(nil),         // 2: laelia.v1.ListProvisionersRequest
-	(*ListProvisionersResponse)(nil),        // 3: laelia.v1.ListProvisionersResponse
-	(*GetProvisionerRequest)(nil),           // 4: laelia.v1.GetProvisionerRequest
-	(*RotateProvisionerTokenRequest)(nil),   // 5: laelia.v1.RotateProvisionerTokenRequest
-	(*RotateProvisionerTokenResponse)(nil),  // 6: laelia.v1.RotateProvisionerTokenResponse
-	(*DeleteProvisionerRequest)(nil),        // 7: laelia.v1.DeleteProvisionerRequest
-	(*ProvisionMachineRequest)(nil),         // 8: laelia.v1.ProvisionMachineRequest
-	(*Provisioner)(nil),                     // 9: laelia.v1.Provisioner
-	(*ProvisionerStatus)(nil),               // 10: laelia.v1.ProvisionerStatus
-	(*ProvisionerStreamMessage)(nil),        // 11: laelia.v1.ProvisionerStreamMessage
-	(*ManagerProvisionerStreamMessage)(nil), // 12: laelia.v1.ManagerProvisionerStreamMessage
-	(*ProvisionerReady)(nil),                // 13: laelia.v1.ProvisionerReady
-	(*ProvisionMachineJob)(nil),             // 14: laelia.v1.ProvisionMachineJob
-	(*DeprovisionMachineJob)(nil),           // 15: laelia.v1.DeprovisionMachineJob
-	(*ProvisionJobProgress)(nil),            // 16: laelia.v1.ProvisionJobProgress
-	(*ProvisionerDisconnectNotice)(nil),     // 17: laelia.v1.ProvisionerDisconnectNotice
-	nil,                                     // 18: laelia.v1.ProvisionMachineJob.MachineLabelsEntry
-	(*timestamppb.Timestamp)(nil),           // 19: google.protobuf.Timestamp
-	(*Ping)(nil),                            // 20: laelia.v1.Ping
-	(*Pong)(nil),                            // 21: laelia.v1.Pong
-	(ProvisioningPhase)(0),                  // 22: laelia.v1.ProvisioningPhase
-	(*emptypb.Empty)(nil),                   // 23: google.protobuf.Empty
-	(*Machine)(nil),                         // 24: laelia.v1.Machine
+	(MachineParamType)(0),                   // 0: laelia.v1.MachineParamType
+	(*CreateProvisionerRequest)(nil),        // 1: laelia.v1.CreateProvisionerRequest
+	(*CreateProvisionerResponse)(nil),       // 2: laelia.v1.CreateProvisionerResponse
+	(*ListProvisionersRequest)(nil),         // 3: laelia.v1.ListProvisionersRequest
+	(*ListProvisionersResponse)(nil),        // 4: laelia.v1.ListProvisionersResponse
+	(*GetProvisionerRequest)(nil),           // 5: laelia.v1.GetProvisionerRequest
+	(*RotateProvisionerTokenRequest)(nil),   // 6: laelia.v1.RotateProvisionerTokenRequest
+	(*RotateProvisionerTokenResponse)(nil),  // 7: laelia.v1.RotateProvisionerTokenResponse
+	(*DeleteProvisionerRequest)(nil),        // 8: laelia.v1.DeleteProvisionerRequest
+	(*ProvisionMachineRequest)(nil),         // 9: laelia.v1.ProvisionMachineRequest
+	(*MachineParamSpec)(nil),                // 10: laelia.v1.MachineParamSpec
+	(*Provisioner)(nil),                     // 11: laelia.v1.Provisioner
+	(*ProvisionerStatus)(nil),               // 12: laelia.v1.ProvisionerStatus
+	(*ProvisionerStreamMessage)(nil),        // 13: laelia.v1.ProvisionerStreamMessage
+	(*ManagerProvisionerStreamMessage)(nil), // 14: laelia.v1.ManagerProvisionerStreamMessage
+	(*ProvisionerReady)(nil),                // 15: laelia.v1.ProvisionerReady
+	(*ProvisionMachineJob)(nil),             // 16: laelia.v1.ProvisionMachineJob
+	(*DeprovisionMachineJob)(nil),           // 17: laelia.v1.DeprovisionMachineJob
+	(*ProvisionJobProgress)(nil),            // 18: laelia.v1.ProvisionJobProgress
+	(*ProvisionerDisconnectNotice)(nil),     // 19: laelia.v1.ProvisionerDisconnectNotice
+	nil,                                     // 20: laelia.v1.ProvisionMachineRequest.MachineParamsEntry
+	nil,                                     // 21: laelia.v1.ProvisionMachineJob.MachineLabelsEntry
+	nil,                                     // 22: laelia.v1.ProvisionMachineJob.MachineParamsEntry
+	(*timestamppb.Timestamp)(nil),           // 23: google.protobuf.Timestamp
+	(*Ping)(nil),                            // 24: laelia.v1.Ping
+	(*Pong)(nil),                            // 25: laelia.v1.Pong
+	(ProvisioningPhase)(0),                  // 26: laelia.v1.ProvisioningPhase
+	(*emptypb.Empty)(nil),                   // 27: google.protobuf.Empty
+	(*Machine)(nil),                         // 28: laelia.v1.Machine
 }
 var file_v1_provisioner_proto_depIdxs = []int32{
-	9,  // 0: laelia.v1.CreateProvisionerRequest.provisioner:type_name -> laelia.v1.Provisioner
-	9,  // 1: laelia.v1.CreateProvisionerResponse.provisioner:type_name -> laelia.v1.Provisioner
-	9,  // 2: laelia.v1.ListProvisionersResponse.provisioners:type_name -> laelia.v1.Provisioner
-	9,  // 3: laelia.v1.RotateProvisionerTokenResponse.provisioner:type_name -> laelia.v1.Provisioner
-	10, // 4: laelia.v1.Provisioner.status:type_name -> laelia.v1.ProvisionerStatus
-	19, // 5: laelia.v1.Provisioner.created_at:type_name -> google.protobuf.Timestamp
-	19, // 6: laelia.v1.ProvisionerStatus.last_seen:type_name -> google.protobuf.Timestamp
-	13, // 7: laelia.v1.ProvisionerStreamMessage.ready:type_name -> laelia.v1.ProvisionerReady
-	16, // 8: laelia.v1.ProvisionerStreamMessage.job_progress:type_name -> laelia.v1.ProvisionJobProgress
-	20, // 9: laelia.v1.ProvisionerStreamMessage.ping:type_name -> laelia.v1.Ping
-	14, // 10: laelia.v1.ManagerProvisionerStreamMessage.provision_job:type_name -> laelia.v1.ProvisionMachineJob
-	15, // 11: laelia.v1.ManagerProvisionerStreamMessage.deprovision_job:type_name -> laelia.v1.DeprovisionMachineJob
-	21, // 12: laelia.v1.ManagerProvisionerStreamMessage.pong:type_name -> laelia.v1.Pong
-	17, // 13: laelia.v1.ManagerProvisionerStreamMessage.disconnect_notice:type_name -> laelia.v1.ProvisionerDisconnectNotice
-	18, // 14: laelia.v1.ProvisionMachineJob.machine_labels:type_name -> laelia.v1.ProvisionMachineJob.MachineLabelsEntry
-	22, // 15: laelia.v1.ProvisionJobProgress.phase:type_name -> laelia.v1.ProvisioningPhase
-	0,  // 16: laelia.v1.ProvisionerService.CreateProvisioner:input_type -> laelia.v1.CreateProvisionerRequest
-	2,  // 17: laelia.v1.ProvisionerService.ListProvisioners:input_type -> laelia.v1.ListProvisionersRequest
-	4,  // 18: laelia.v1.ProvisionerService.GetProvisioner:input_type -> laelia.v1.GetProvisionerRequest
-	5,  // 19: laelia.v1.ProvisionerService.RotateProvisionerToken:input_type -> laelia.v1.RotateProvisionerTokenRequest
-	7,  // 20: laelia.v1.ProvisionerService.DeleteProvisioner:input_type -> laelia.v1.DeleteProvisionerRequest
-	8,  // 21: laelia.v1.ProvisionerService.ProvisionMachine:input_type -> laelia.v1.ProvisionMachineRequest
-	11, // 22: laelia.v1.ProvisionerStreamService.ProvisionerChannel:input_type -> laelia.v1.ProvisionerStreamMessage
-	1,  // 23: laelia.v1.ProvisionerService.CreateProvisioner:output_type -> laelia.v1.CreateProvisionerResponse
-	3,  // 24: laelia.v1.ProvisionerService.ListProvisioners:output_type -> laelia.v1.ListProvisionersResponse
-	9,  // 25: laelia.v1.ProvisionerService.GetProvisioner:output_type -> laelia.v1.Provisioner
-	6,  // 26: laelia.v1.ProvisionerService.RotateProvisionerToken:output_type -> laelia.v1.RotateProvisionerTokenResponse
-	23, // 27: laelia.v1.ProvisionerService.DeleteProvisioner:output_type -> google.protobuf.Empty
-	24, // 28: laelia.v1.ProvisionerService.ProvisionMachine:output_type -> laelia.v1.Machine
-	12, // 29: laelia.v1.ProvisionerStreamService.ProvisionerChannel:output_type -> laelia.v1.ManagerProvisionerStreamMessage
-	23, // [23:30] is the sub-list for method output_type
-	16, // [16:23] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	11, // 0: laelia.v1.CreateProvisionerRequest.provisioner:type_name -> laelia.v1.Provisioner
+	11, // 1: laelia.v1.CreateProvisionerResponse.provisioner:type_name -> laelia.v1.Provisioner
+	11, // 2: laelia.v1.ListProvisionersResponse.provisioners:type_name -> laelia.v1.Provisioner
+	11, // 3: laelia.v1.RotateProvisionerTokenResponse.provisioner:type_name -> laelia.v1.Provisioner
+	20, // 4: laelia.v1.ProvisionMachineRequest.machine_params:type_name -> laelia.v1.ProvisionMachineRequest.MachineParamsEntry
+	0,  // 5: laelia.v1.MachineParamSpec.type:type_name -> laelia.v1.MachineParamType
+	12, // 6: laelia.v1.Provisioner.status:type_name -> laelia.v1.ProvisionerStatus
+	23, // 7: laelia.v1.Provisioner.created_at:type_name -> google.protobuf.Timestamp
+	23, // 8: laelia.v1.ProvisionerStatus.last_seen:type_name -> google.protobuf.Timestamp
+	10, // 9: laelia.v1.ProvisionerStatus.machine_params:type_name -> laelia.v1.MachineParamSpec
+	15, // 10: laelia.v1.ProvisionerStreamMessage.ready:type_name -> laelia.v1.ProvisionerReady
+	18, // 11: laelia.v1.ProvisionerStreamMessage.job_progress:type_name -> laelia.v1.ProvisionJobProgress
+	24, // 12: laelia.v1.ProvisionerStreamMessage.ping:type_name -> laelia.v1.Ping
+	16, // 13: laelia.v1.ManagerProvisionerStreamMessage.provision_job:type_name -> laelia.v1.ProvisionMachineJob
+	17, // 14: laelia.v1.ManagerProvisionerStreamMessage.deprovision_job:type_name -> laelia.v1.DeprovisionMachineJob
+	25, // 15: laelia.v1.ManagerProvisionerStreamMessage.pong:type_name -> laelia.v1.Pong
+	19, // 16: laelia.v1.ManagerProvisionerStreamMessage.disconnect_notice:type_name -> laelia.v1.ProvisionerDisconnectNotice
+	10, // 17: laelia.v1.ProvisionerReady.machine_params:type_name -> laelia.v1.MachineParamSpec
+	21, // 18: laelia.v1.ProvisionMachineJob.machine_labels:type_name -> laelia.v1.ProvisionMachineJob.MachineLabelsEntry
+	22, // 19: laelia.v1.ProvisionMachineJob.machine_params:type_name -> laelia.v1.ProvisionMachineJob.MachineParamsEntry
+	26, // 20: laelia.v1.ProvisionJobProgress.phase:type_name -> laelia.v1.ProvisioningPhase
+	1,  // 21: laelia.v1.ProvisionerService.CreateProvisioner:input_type -> laelia.v1.CreateProvisionerRequest
+	3,  // 22: laelia.v1.ProvisionerService.ListProvisioners:input_type -> laelia.v1.ListProvisionersRequest
+	5,  // 23: laelia.v1.ProvisionerService.GetProvisioner:input_type -> laelia.v1.GetProvisionerRequest
+	6,  // 24: laelia.v1.ProvisionerService.RotateProvisionerToken:input_type -> laelia.v1.RotateProvisionerTokenRequest
+	8,  // 25: laelia.v1.ProvisionerService.DeleteProvisioner:input_type -> laelia.v1.DeleteProvisionerRequest
+	9,  // 26: laelia.v1.ProvisionerService.ProvisionMachine:input_type -> laelia.v1.ProvisionMachineRequest
+	13, // 27: laelia.v1.ProvisionerStreamService.ProvisionerChannel:input_type -> laelia.v1.ProvisionerStreamMessage
+	2,  // 28: laelia.v1.ProvisionerService.CreateProvisioner:output_type -> laelia.v1.CreateProvisionerResponse
+	4,  // 29: laelia.v1.ProvisionerService.ListProvisioners:output_type -> laelia.v1.ListProvisionersResponse
+	11, // 30: laelia.v1.ProvisionerService.GetProvisioner:output_type -> laelia.v1.Provisioner
+	7,  // 31: laelia.v1.ProvisionerService.RotateProvisionerToken:output_type -> laelia.v1.RotateProvisionerTokenResponse
+	27, // 32: laelia.v1.ProvisionerService.DeleteProvisioner:output_type -> google.protobuf.Empty
+	28, // 33: laelia.v1.ProvisionerService.ProvisionMachine:output_type -> laelia.v1.Machine
+	14, // 34: laelia.v1.ProvisionerStreamService.ProvisionerChannel:output_type -> laelia.v1.ManagerProvisionerStreamMessage
+	28, // [28:35] is the sub-list for method output_type
+	21, // [21:28] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_v1_provisioner_proto_init() }
@@ -1523,12 +1759,12 @@ func file_v1_provisioner_proto_init() {
 	file_v1_annotation_proto_init()
 	file_v1_command_proto_init()
 	file_v1_machine_proto_init()
-	file_v1_provisioner_proto_msgTypes[11].OneofWrappers = []any{
+	file_v1_provisioner_proto_msgTypes[12].OneofWrappers = []any{
 		(*ProvisionerStreamMessage_Ready)(nil),
 		(*ProvisionerStreamMessage_JobProgress)(nil),
 		(*ProvisionerStreamMessage_Ping)(nil),
 	}
-	file_v1_provisioner_proto_msgTypes[12].OneofWrappers = []any{
+	file_v1_provisioner_proto_msgTypes[13].OneofWrappers = []any{
 		(*ManagerProvisionerStreamMessage_ProvisionJob)(nil),
 		(*ManagerProvisionerStreamMessage_DeprovisionJob)(nil),
 		(*ManagerProvisionerStreamMessage_Pong)(nil),
@@ -1539,13 +1775,14 @@ func file_v1_provisioner_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_provisioner_proto_rawDesc), len(file_v1_provisioner_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   19,
+			NumEnums:      1,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
 		GoTypes:           file_v1_provisioner_proto_goTypes,
 		DependencyIndexes: file_v1_provisioner_proto_depIdxs,
+		EnumInfos:         file_v1_provisioner_proto_enumTypes,
 		MessageInfos:      file_v1_provisioner_proto_msgTypes,
 	}.Build()
 	File_v1_provisioner_proto = out.File

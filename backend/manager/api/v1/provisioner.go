@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"regexp"
 	"strings"
 	"time"
@@ -492,11 +493,43 @@ func (s *ProvisionerService) convertToProvisioner(ctx context.Context, p *store.
 			AutoUpgrade:  st.AutoUpgrade,
 			RetainData:   st.RetainData,
 			ConfigDigest: st.ConfigDigest,
+			// The persisted schema already passed catalog validation at
+			// Ready time, so the type lookup always succeeds; an unknown key
+			// (impossible to persist) would be skipped rather than shown.
+			MachineParams: convertToV1MachineParams(st.GetMachineParams()),
 		}
 		if st.LastSeen > 0 {
 			status.LastSeen = timestamppb.New(time.Unix(st.LastSeen, 0))
 		}
 		out.Status = status
+	}
+	return out
+}
+
+// convertToV1MachineParams maps the persisted schema into its v1 form,
+// resolving each key's value type from the manager catalog.
+func convertToV1MachineParams(specs []*storepb.MachineParamSpec) []*v1pb.MachineParamSpec {
+	if len(specs) == 0 {
+		return nil
+	}
+	out := make([]*v1pb.MachineParamSpec, 0, len(specs))
+	for _, spec := range specs {
+		typ, ok := provision.CatalogType(spec.GetKey())
+		if !ok {
+			// Unpersistable by construction (the schema validator drops
+			// unknown keys); skip defensively instead of surfacing it.
+			slog.Warn("persisted machine parameter has no catalog type; skipping", "key", spec.GetKey())
+			continue
+		}
+		out = append(out, &v1pb.MachineParamSpec{
+			Key:          spec.GetKey(),
+			Type:         v1pb.MachineParamType(typ),
+			Required:     spec.GetRequired(),
+			DefaultValue: spec.GetDefaultValue(),
+			MinValue:     spec.GetMinValue(),
+			MaxValue:     spec.GetMaxValue(),
+			Options:      spec.GetOptions(),
+		})
 	}
 	return out
 }
@@ -534,6 +567,16 @@ func (s *ProvisionerService) ProvisionMachine(ctx context.Context, req *connect.
 	owner, err := s.resolveProvisionedMachineOwner(ctx, req.Msg.GetOwner())
 	if err != nil {
 		return nil, err
+	}
+
+	// Per-machine parameters: validated against the manager catalog and this
+	// provisioner's reported schema (fresh — the connected check above
+	// guarantees the Ready frame was just stamped), then persisted on the
+	// machine so replayed jobs rebuild the same workload.
+	machineParams, err := provision.ValidateMachineParams(
+		provisioner.Status.GetMachineParams(), req.Msg.GetMachineParams())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	// The pod downloads the machine binary from this manager at boot; without
@@ -619,7 +662,8 @@ func (s *ProvisionerService) ProvisionMachine(ctx context.Context, req *connect.
 			PendingAt: now.Unix(),
 			// The user-provided image (empty = workspace default) is persisted
 			// on the row so replayed jobs compose the same workload.
-			RuntimeImage: customImage,
+			RuntimeImage:  customImage,
+			MachineParams: machineParams,
 		},
 	}, &store.MachineTokenMessage{
 		TokenHash:   hashToken(refreshToken),
@@ -747,6 +791,10 @@ func composeProvisionMachineJob(
 		BinaryTarget:    binaryTarget,
 		MachineLabels:   map[string]string{"provisioner": provisioner.Name, "owner": ownerHandle},
 		BootstrapScript: bootstrapScript,
+		// Verbatim from the machine row (Appendix A finding A5): replayed
+		// jobs rebuild the workload the user asked for even if the schema
+		// shrank in between. Never re-validated here.
+		MachineParams: machine.Provisioning.GetMachineParams(),
 	}, nil
 }
 
@@ -909,6 +957,7 @@ func cloneProvisioningStatus(p *storepb.ProvisioningStatus) *storepb.Provisionin
 		Error:         p.Error,
 		WorkloadName:  p.WorkloadName,
 		RuntimeImage:  p.RuntimeImage,
+		MachineParams: maps.Clone(p.GetMachineParams()),
 		PendingAt:     p.PendingAt,
 		ProvisionedAt: p.ProvisionedAt,
 		FailedAt:      p.FailedAt,

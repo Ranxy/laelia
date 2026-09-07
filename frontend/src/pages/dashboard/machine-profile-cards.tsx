@@ -28,6 +28,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { describeError } from "@/lib/connect-errors";
+import { machineParamLabelKey } from "@/lib/machine-params";
 import {
   buildMachineInstallCommand,
   buildMachineSetupCommand,
@@ -107,6 +108,12 @@ export const MachineProvisioningCard = memo(function MachineProvisioningCard({
   const [backend, setBackend] = useState("");
   const [retainData, setRetainData] = useState<boolean | undefined>(undefined);
 
+  // The persisted parameter overrides, key-sorted for a stable display; a
+  // key unknown to this frontend renders under its raw catalog name.
+  const provisioningParams = Object.entries(
+    provisioning?.machineParams ?? {}
+  ).sort(([a], [b]) => a.localeCompare(b));
+
   // Resolve the provisioner's friendly identity once per bound provisioner;
   // a failed lookup (no permission, provisioner deleted) falls back to the
   // raw resource name rather than hiding the card.
@@ -160,6 +167,18 @@ export const MachineProvisioningCard = memo(function MachineProvisioningCard({
           {provisioning?.failedAt && (
             <Field label={t("machine.provisioning.failed-at")}>
               {formatTimestamp(provisioning.failedAt)}
+            </Field>
+          )}
+          {provisioningParams.length > 0 && (
+            <Field label={t("machine.provisioning.params")}>
+              <span className="font-mono text-xs">
+                {provisioningParams
+                  .map(([key, value]) => {
+                    const labelKey = machineParamLabelKey(key);
+                    return `${labelKey ? t(labelKey) : key}: ${value}`;
+                  })
+                  .join(" · ")}
+              </span>
             </Field>
           )}
         </dl>

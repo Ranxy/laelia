@@ -53,6 +53,20 @@ resources:
   requests: {}
   limits: {}
 
+# Optional bounds users may size machine parameters within at create time
+# (docs/deploy.md §8.3a). An omitted side is unbounded; the values here are
+# reported to the manager and enforced at ProvisionMachine time.
+paramBounds: {}
+#   cpu:
+#     min: "250m"
+#     max: "8"
+#   memory:
+#     min: "512Mi"
+#     max: "32Gi"
+#   disk:
+#     min: "1Gi"
+#     max: "500Gi"
+
 # Extra env passthrough to machine containers, e.g.
 #   extraEnv:
 #     LAELIA_INSECURE: "true"

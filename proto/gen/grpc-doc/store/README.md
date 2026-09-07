@@ -64,10 +64,13 @@
     - [Policy.Type](#laelia-store-Policy-Type)
   
 - [store/provisioner.proto](#store_provisioner-proto)
+    - [MachineParamSpec](#laelia-store-MachineParamSpec)
     - [ProvisionerStatus](#laelia-store-ProvisionerStatus)
     - [ProvisioningStatus](#laelia-store-ProvisioningStatus)
+    - [ProvisioningStatus.MachineParamsEntry](#laelia-store-ProvisioningStatus-MachineParamsEntry)
     - [ProvisioningStatus.WorkloadLabelsEntry](#laelia-store-ProvisioningStatus-WorkloadLabelsEntry)
   
+    - [MachineParamType](#laelia-store-MachineParamType)
     - [ProvisioningPhase](#laelia-store-ProvisioningPhase)
   
 - [store/role.proto](#store_role-proto)
@@ -959,6 +962,28 @@ EnvironmentTierPolicy is the tier of an environment.
 
 
 
+<a name="laelia-store-MachineParamSpec"></a>
+
+### MachineParamSpec
+MachineParamSpec is one provisioner-declared machine parameter, mirroring
+one manager-catalog key with per-instance constraints. Persisted in
+provisioner.status (jsonb — no SQL migration).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  | Catalog key, e.g. &#34;cpu&#34; | &#34;memory&#34; | &#34;disk&#34; | &#34;storage_class&#34;. Keys the manager catalog does not know are dropped on receipt (logged). |
+| required | [bool](#bool) |  |  |
+| default_value | [string](#string) |  | Default from the provisioner config; empty = the backend&#39;s built-in default. |
+| min_value | [string](#string) |  | Inclusive bounds for QUANTITY params; empty = unbounded on that side. |
+| max_value | [string](#string) |  |  |
+| options | [string](#string) | repeated | Allowed values for constrained params (none today); empty = free-form. |
+
+
+
+
+
+
 <a name="laelia-store-ProvisionerStatus"></a>
 
 ### ProvisionerStatus
@@ -976,6 +1001,7 @@ provisioner.status (jsonb).
 | auto_upgrade | [bool](#bool) |  | AutoUpgrade echoes the provisioner&#39;s config flag: when true the manager auto-triggers binary upgrades for this provisioner&#39;s machines. |
 | config_digest | [string](#string) |  | ConfigDigest is a short hash of the provisioner&#39;s effective config, reported for drift visibility (e.g. manager_url_override in effect). |
 | retain_data | [bool](#bool) |  | RetainData echoes the provisioner&#39;s config flag; the manager sends it as keep_data on DeprovisionMachineJob so teardown honors the retention the provisioner was configured with (design §6.4). |
+| machine_params | [MachineParamSpec](#laelia-store-MachineParamSpec) | repeated | MachineParams is the machine-parameter schema reported in the last ProvisionerReady frame: the manager-catalog keys this provisioner instance accepts, with per-instance defaults and bounds. Validated and filtered manager-side (unknown catalog keys are dropped, never persisted). |
 
 
 
@@ -1000,6 +1026,23 @@ store-proto convention (see MachineStatus).
 | provisioned_at | [int64](#int64) |  |  |
 | failed_at | [int64](#int64) |  |  |
 | runtime_image | [string](#string) |  | RuntimeImage is the machine-specific runtime image provided at ProvisionMachine time (custom image). Empty = the workspace default from ProvisioningSetting.runtime_image. Persisted so replayed provisioning jobs compose the same workload even if the workspace setting or allowlist later changes. |
+| machine_params | [ProvisioningStatus.MachineParamsEntry](#laelia-store-ProvisioningStatus-MachineParamsEntry) | repeated | MachineParams are the user-provided parameter overrides persisted at ProvisionMachine time (catalog-keyed), so replayed jobs rebuild the same workload. Shipped verbatim into ProvisionMachineJob; never re-validated on the replay path (Appendix A finding: the workload the user asked for). |
+
+
+
+
+
+
+<a name="laelia-store-ProvisioningStatus-MachineParamsEntry"></a>
+
+### ProvisioningStatus.MachineParamsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
 
 
 
@@ -1022,6 +1065,21 @@ store-proto convention (see MachineStatus).
 
 
  
+
+
+<a name="laelia-store-MachineParamType"></a>
+
+### MachineParamType
+MachineParamType is the value type of one catalog parameter. The type is
+manager-catalog knowledge (resolved by key); it is mirrored on the v1 spec
+for UI rendering.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| MACHINE_PARAM_TYPE_UNSPECIFIED | 0 |  |
+| MACHINE_PARAM_TYPE_QUANTITY | 1 | QUANTITY is a k8s-style quantity string (&#34;500m&#34;, &#34;2Gi&#34;). |
+| MACHINE_PARAM_TYPE_STRING | 2 | MACHINE_PARAM_TYPE_STRING is a DNS-1123-label-safe string (e.g. a storage class name). |
+
 
 
 <a name="laelia-store-ProvisioningPhase"></a>

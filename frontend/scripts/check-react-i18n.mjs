@@ -52,6 +52,10 @@ const DYNAMIC_PREFIXES = [
   "command.stream-",
   // global-search.tsx time-range filter translated via t(timeLabelKey(value)).
   "globalSearch.time-",
+  // Machine-parameter catalog key map in lib/machine-params.ts, translated
+  // via t(labelKey) in machine-new-provisioned.tsx and
+  // machine-profile-cards.tsx.
+  "machine.param.",
   // token-usage-card.tsx rows: { key: "command.token-*" } translated via
   // t(row.key); the literal keys live in a data array, not a t("…") call.
   "command.token-input",

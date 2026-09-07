@@ -33,6 +33,7 @@ import (
 	clog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	"github.com/Ranxy/laelia/backend/common/machineparam"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	"github.com/Ranxy/laelia/backend/provisioner/backend"
 	laeliav1 "github.com/Ranxy/laelia/backend/provisioner/backend/kubernetes/api/v1"
@@ -134,6 +135,31 @@ func New(cfg backend.Config) (backend.Backend, error) {
 // Name matches the provisioner row's backend field.
 func (*Backend) Name() string { return "kubernetes" }
 
+// MachineParams declares the parameters this provisioner instance accepts:
+// cpu/memory/disk always (defaults from the config, disk resolved to the
+// effective PVC size), storage_class only when the config pins one — a
+// free-text class name against an unknown cluster is exactly the failure
+// provisioning refuses to hand to users. Bounds come from the config's
+// param_bounds (docs/plan/provisioner-machine-params-design.md §5.1).
+func (b *Backend) MachineParams() []*storepb.MachineParamSpec {
+	spec := func(key, def string) *storepb.MachineParamSpec {
+		s := &storepb.MachineParamSpec{Key: key, DefaultValue: def}
+		if bounds, ok := b.cfg.ParamBounds[key]; ok {
+			s.MinValue, s.MaxValue = bounds.Min, bounds.Max
+		}
+		return s
+	}
+	specs := []*storepb.MachineParamSpec{
+		spec(machineparam.CPU, b.cfg.Resources.Requests[machineparam.CPU]),
+		spec(machineparam.Memory, b.cfg.Resources.Requests[machineparam.Memory]),
+		spec(machineparam.Disk, b.storageSize.String()),
+	}
+	if class := b.cfg.Storage.StorageClassName; class != "" {
+		specs = append(specs, spec(machineparam.StorageClass, class))
+	}
+	return specs
+}
+
 // Start launches the controller-runtime manager (caches, watches, workers)
 // and returns once the caches are synced — or when the manager fails to
 // start. Events flow through ch until ctx is done.
@@ -176,7 +202,17 @@ func (b *Backend) Provision(ctx context.Context, spec backend.MachineSpec, refre
 	name := workloadStem(spec.MachineID)
 
 	cr := &laeliav1.LaeliaMachine{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns}}
-	err := b.upsert(ctx, cr, func() error {
+	resources := resourcesFor(b.cfg.Resources)
+	storage := laeliav1.LaeliaMachineStorageSpec{
+		Size:             b.storageSize.DeepCopy(),
+		StorageClassName: b.cfg.Storage.StorageClassName,
+	}
+	var err error
+	resources, err = applyMachineParams(resources, &storage, spec.Params)
+	if err != nil {
+		return errors.Wrap(err, "failed to apply the machine parameters")
+	}
+	err = b.upsert(ctx, cr, func() error {
 		cr.Labels = crLabels(spec)
 		cr.Spec = laeliav1.LaeliaMachineSpec{
 			MachineID:       spec.MachineID,
@@ -187,13 +223,10 @@ func (b *Backend) Provision(ctx context.Context, spec backend.MachineSpec, refre
 			BinaryTarget:    spec.BinaryTarget,
 			BootstrapSecret: name,
 			RetainData:      b.cfg.RetainData,
-			Resources:       resourcesFor(b.cfg.Resources),
-			Storage: laeliav1.LaeliaMachineStorageSpec{
-				Size:             b.storageSize.DeepCopy(),
-				StorageClassName: b.cfg.Storage.StorageClassName,
-			},
-			ExtraEnv: envVarsFor(b.cfg.ExtraEnv),
-			Labels:   spec.Labels,
+			Resources:       resources,
+			Storage:         storage,
+			ExtraEnv:        envVarsFor(b.cfg.ExtraEnv),
+			Labels:          spec.Labels,
 		}
 		return nil
 	})
@@ -446,6 +479,56 @@ func resourcesFor(res backend.Resources) *corev1.ResourceRequirements {
 		out.Limits = lim
 	}
 	return out
+}
+
+// applyMachineParams merges the job's parameter overrides (validated
+// manager-side against the schema) over the config defaults, applying only
+// the catalog keys this backend knows; unknown keys are ignored so a key
+// persisted by a newer manager never rejects an older provisioner binary
+// (design Appendix A, finding F2). CPU/memory set request and limit to the
+// same value — one knob, Guaranteed QoS for that resource; absent keys keep
+// the config defaults.
+func applyMachineParams(
+	resources *corev1.ResourceRequirements,
+	storage *laeliav1.LaeliaMachineStorageSpec,
+	params map[string]string,
+) (*corev1.ResourceRequirements, error) {
+	if len(params) == 0 {
+		return resources, nil
+	}
+	for _, key := range slices.Sorted(maps.Keys(params)) {
+		value := params[key]
+		switch key {
+		case machineparam.CPU, machineparam.Memory:
+			q, err := resource.ParseQuantity(value)
+			if err != nil {
+				return resources, errors.Wrapf(err, "machine parameter %q value %q", key, value)
+			}
+			if resources == nil {
+				resources = &corev1.ResourceRequirements{}
+			}
+			if resources.Requests == nil {
+				resources.Requests = corev1.ResourceList{}
+			}
+			if resources.Limits == nil {
+				resources.Limits = corev1.ResourceList{}
+			}
+			name := corev1.ResourceName(key)
+			resources.Requests[name] = q
+			resources.Limits[name] = q
+		case machineparam.Disk:
+			q, err := resource.ParseQuantity(value)
+			if err != nil {
+				return resources, errors.Wrapf(err, "machine parameter %q value %q", key, value)
+			}
+			storage.Size = q
+		case machineparam.StorageClass:
+			storage.StorageClassName = value
+		default:
+			// Not a key this backend knows (Appendix A, F2): ignore.
+		}
+	}
+	return resources, nil
 }
 
 func parseQuantities(entries map[string]string) corev1.ResourceList {

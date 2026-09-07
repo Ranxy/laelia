@@ -155,9 +155,46 @@ message ProvisionMachineRequest {
   // allowlist disables custom images). Persisted on the machine so replayed
   // provisioning jobs rebuild the same workload.
   string runtime_image = 4;
+  // Per-machine parameter overrides keyed by catalog key ("cpu", "memory",
+  // "disk", ...). Every key must be declared by the target provisioner's
+  // schema and pass its type/bounds validation; values persist on the machine
+  // so replayed provisioning jobs rebuild the same workload. Empty = the
+  // provisioner's configured defaults.
+  map<string, string> machine_params = 5;
 }
 
 // ========== Resource Definition ==========
+
+// MachineParamType is the value type of one catalog parameter, resolved by
+// the manager from its catalog (the provisioner reports keys, not types).
+enum MachineParamType {
+  MACHINE_PARAM_TYPE_UNSPECIFIED = 0;
+  // QUANTITY is a k8s-style quantity string ("500m", "2Gi").
+  MACHINE_PARAM_TYPE_QUANTITY = 1;
+  // STRING is a DNS-1123-label-safe string (e.g. a storage class name).
+  MACHINE_PARAM_TYPE_STRING = 2;
+}
+
+// MachineParamSpec is one provisioner-declared machine parameter: a
+// manager-catalog key plus per-instance constraints reported in
+// ProvisionerReady and persisted in the provisioner status. The UI renders
+// the create form from this list.
+message MachineParamSpec {
+  // Catalog key, e.g. "cpu" | "memory" | "disk" | "storage_class".
+  string key = 1;
+  // Type resolved by the manager from the catalog.
+  MachineParamType type = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool required = 3;
+  // Default from the provisioner config; empty = the backend's built-in
+  // default (shown as the form placeholder; untouched fields keep tracking
+  // the admin config).
+  string default_value = 4;
+  // Inclusive bounds for QUANTITY params; empty = unbounded on that side.
+  string min_value = 5;
+  string max_value = 6;
+  // Allowed values for constrained params (none today); empty = free-form.
+  repeated string options = 7;
+}
 
 // Provisioner is a registered worker that creates machine workloads in one
 // virtualization backend on the manager's behalf.
@@ -193,6 +230,10 @@ message ProvisionerStatus {
   // RetainData echoes the provisioner's configured data retention; the
   // manager sends it as keep_data on teardown jobs (design §6.4).
   bool retain_data = 7;
+  // MachineParams is the parameter schema reported in the last
+  // ProvisionerReady frame (manager-catalog keys only, types resolved
+  // manager-side), so the create form renders even while offline.
+  repeated MachineParamSpec machine_params = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // ========== Provisioner Control Channel messages ==========
@@ -230,6 +271,11 @@ message ProvisionerReady {
   // RetainData echoes the provisioner's config flag; persisted in the
   // provisioner status and used as keep_data on teardown jobs (design §6.4).
   bool retain_data = 6;
+  // MachineParams is the machine-parameter schema this provisioner instance
+  // accepts: manager-catalog keys with per-instance defaults and bounds
+  // sourced from its config. The manager validates and filters it (unknown
+  // catalog keys are dropped) before persisting.
+  repeated MachineParamSpec machine_params = 7;
 }
 
 // ProvisionMachineJob carries everything the provisioner needs to create one
@@ -255,6 +301,11 @@ message ProvisionMachineJob {
   map<string, string> machine_labels = 9;
   // The manager-rendered bootstrap script (init container payload).
   string bootstrap_script = 10;
+  // User-provided parameter overrides (catalog-keyed), validated manager-side
+  // at ProvisionMachine time. Backends merge them over their own config
+  // defaults, applying only keys they know; replayed jobs carry them
+  // verbatim.
+  map<string, string> machine_params = 11;
 }
 
 message DeprovisionMachineJob {

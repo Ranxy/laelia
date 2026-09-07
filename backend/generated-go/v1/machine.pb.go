@@ -1992,7 +1992,11 @@ type ProvisioningStatus struct {
 	FailedAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=failed_at,json=failedAt,proto3" json:"failed_at,omitempty"`
 	// The machine-specific runtime image the workload runs (custom image
 	// provided at ProvisionMachine time); empty = the workspace default.
-	RuntimeImage  string `protobuf:"bytes,8,opt,name=runtime_image,json=runtimeImage,proto3" json:"runtime_image,omitempty"`
+	RuntimeImage string `protobuf:"bytes,8,opt,name=runtime_image,json=runtimeImage,proto3" json:"runtime_image,omitempty"`
+	// The user-provided parameter overrides persisted at ProvisionMachine time
+	// (catalog-keyed, e.g. {"cpu": "2", "memory": "4Gi"}); empty = the
+	// provisioner's configured defaults.
+	MachineParams map[string]string `protobuf:"bytes,9,rep,name=machine_params,json=machineParams,proto3" json:"machine_params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2081,6 +2085,13 @@ func (x *ProvisioningStatus) GetRuntimeImage() string {
 		return x.RuntimeImage
 	}
 	return ""
+}
+
+func (x *ProvisioningStatus) GetMachineParams() map[string]string {
+	if x != nil {
+		return x.MachineParams
+	}
+	return nil
 }
 
 type MachineInfo struct {
@@ -3514,7 +3525,7 @@ const file_v1_machine_proto_rawDesc = "" +
 	"\x0fUpgradeProgress\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x14\n" +
 	"\x05stage\x18\x02 \x01(\tR\x05stage\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error\"\xfe\x03\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\x99\x05\n" +
 	"\x12ProvisioningStatus\x122\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x1c.laelia.v1.ProvisioningPhaseR\x05phase\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12#\n" +
@@ -3524,8 +3535,12 @@ const file_v1_machine_proto_rawDesc = "" +
 	"pending_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tpendingAt\x12A\n" +
 	"\x0eprovisioned_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\rprovisionedAt\x127\n" +
 	"\tfailed_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\bfailedAt\x12#\n" +
-	"\rruntime_image\x18\b \x01(\tR\fruntimeImage\x1aA\n" +
+	"\rruntime_image\x18\b \x01(\tR\fruntimeImage\x12W\n" +
+	"\x0emachine_params\x18\t \x03(\v20.laelia.v1.ProvisioningStatus.MachineParamsEntryR\rmachineParams\x1aA\n" +
 	"\x13WorkloadLabelsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a@\n" +
+	"\x12MachineParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xad\x03\n" +
 	"\vMachineInfo\x12\x1a\n" +
@@ -3683,7 +3698,7 @@ func file_v1_machine_proto_rawDescGZIP() []byte {
 }
 
 var file_v1_machine_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_v1_machine_proto_msgTypes = make([]protoimpl.MessageInfo, 52)
+var file_v1_machine_proto_msgTypes = make([]protoimpl.MessageInfo, 53)
 var file_v1_machine_proto_goTypes = []any{
 	(ProvisioningPhase)(0),                   // 0: laelia.v1.ProvisioningPhase
 	(MachineStatus_ConnectionState)(0),       // 1: laelia.v1.MachineStatus.ConnectionState
@@ -3737,121 +3752,123 @@ var file_v1_machine_proto_goTypes = []any{
 	(*MachineWorkspaceScanResponse)(nil),     // 49: laelia.v1.MachineWorkspaceScanResponse
 	nil,                                      // 50: laelia.v1.Machine.LabelsEntry
 	nil,                                      // 51: laelia.v1.ProvisioningStatus.WorkloadLabelsEntry
-	nil,                                      // 52: laelia.v1.MachineInfo.LabelsEntry
-	nil,                                      // 53: laelia.v1.DiscoverModels.EnvEntry
-	(*AgentSummary)(nil),                     // 54: laelia.v1.AgentSummary
-	(*AgentProviderInfo)(nil),                // 55: laelia.v1.AgentProviderInfo
-	(*AgentACPConfig)(nil),                   // 56: laelia.v1.AgentACPConfig
-	(*AgentModelOption)(nil),                 // 57: laelia.v1.AgentModelOption
-	(*timestamppb.Timestamp)(nil),            // 58: google.protobuf.Timestamp
-	(State)(0),                               // 59: laelia.v1.State
-	(*AgentCapability)(nil),                  // 60: laelia.v1.AgentCapability
-	(*Ping)(nil),                             // 61: laelia.v1.Ping
-	(*ProvidersDiscovered)(nil),              // 62: laelia.v1.ProvidersDiscovered
-	(*DiscoverProviders)(nil),                // 63: laelia.v1.DiscoverProviders
-	(*Pong)(nil),                             // 64: laelia.v1.Pong
-	(*emptypb.Empty)(nil),                    // 65: google.protobuf.Empty
+	nil,                                      // 52: laelia.v1.ProvisioningStatus.MachineParamsEntry
+	nil,                                      // 53: laelia.v1.MachineInfo.LabelsEntry
+	nil,                                      // 54: laelia.v1.DiscoverModels.EnvEntry
+	(*AgentSummary)(nil),                     // 55: laelia.v1.AgentSummary
+	(*AgentProviderInfo)(nil),                // 56: laelia.v1.AgentProviderInfo
+	(*AgentACPConfig)(nil),                   // 57: laelia.v1.AgentACPConfig
+	(*AgentModelOption)(nil),                 // 58: laelia.v1.AgentModelOption
+	(*timestamppb.Timestamp)(nil),            // 59: google.protobuf.Timestamp
+	(State)(0),                               // 60: laelia.v1.State
+	(*AgentCapability)(nil),                  // 61: laelia.v1.AgentCapability
+	(*Ping)(nil),                             // 62: laelia.v1.Ping
+	(*ProvidersDiscovered)(nil),              // 63: laelia.v1.ProvidersDiscovered
+	(*DiscoverProviders)(nil),                // 64: laelia.v1.DiscoverProviders
+	(*Pong)(nil),                             // 65: laelia.v1.Pong
+	(*emptypb.Empty)(nil),                    // 66: google.protobuf.Empty
 }
 var file_v1_machine_proto_depIdxs = []int32{
 	28, // 0: laelia.v1.TransferMachineOwnershipResponse.machine:type_name -> laelia.v1.Machine
-	54, // 1: laelia.v1.ListMachineAgentsResponse.agents:type_name -> laelia.v1.AgentSummary
-	55, // 2: laelia.v1.RefreshMachineProvidersResponse.providers:type_name -> laelia.v1.AgentProviderInfo
-	56, // 3: laelia.v1.RefreshMachineModelsRequest.acp_config:type_name -> laelia.v1.AgentACPConfig
-	57, // 4: laelia.v1.RefreshMachineModelsResponse.models:type_name -> laelia.v1.AgentModelOption
+	55, // 1: laelia.v1.ListMachineAgentsResponse.agents:type_name -> laelia.v1.AgentSummary
+	56, // 2: laelia.v1.RefreshMachineProvidersResponse.providers:type_name -> laelia.v1.AgentProviderInfo
+	57, // 3: laelia.v1.RefreshMachineModelsRequest.acp_config:type_name -> laelia.v1.AgentACPConfig
+	58, // 4: laelia.v1.RefreshMachineModelsResponse.models:type_name -> laelia.v1.AgentModelOption
 	48, // 5: laelia.v1.ListMachineWorkspacesResponse.workspaces:type_name -> laelia.v1.MachineWorkspaceSummary
 	33, // 6: laelia.v1.ConnectMachineRequest.info:type_name -> laelia.v1.MachineInfo
 	34, // 7: laelia.v1.ConnectMachineResponse.initial_status:type_name -> laelia.v1.MachineStatus
 	35, // 8: laelia.v1.ConnectMachineResponse.assigned_agents:type_name -> laelia.v1.AgentAssignment
-	58, // 9: laelia.v1.MachineHeartbeatResponse.next_heartbeat_at:type_name -> google.protobuf.Timestamp
-	58, // 10: laelia.v1.MachineHeartbeatResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
-	58, // 11: laelia.v1.RefreshMachineTokenResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
+	59, // 9: laelia.v1.MachineHeartbeatResponse.next_heartbeat_at:type_name -> google.protobuf.Timestamp
+	59, // 10: laelia.v1.MachineHeartbeatResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
+	59, // 11: laelia.v1.RefreshMachineTokenResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
 	29, // 12: laelia.v1.ListMachinesResponse.machines:type_name -> laelia.v1.MachineSummary
-	59, // 13: laelia.v1.Machine.state:type_name -> laelia.v1.State
+	60, // 13: laelia.v1.Machine.state:type_name -> laelia.v1.State
 	33, // 14: laelia.v1.Machine.info:type_name -> laelia.v1.MachineInfo
 	34, // 15: laelia.v1.Machine.status:type_name -> laelia.v1.MachineStatus
-	58, // 16: laelia.v1.Machine.created_at:type_name -> google.protobuf.Timestamp
+	59, // 16: laelia.v1.Machine.created_at:type_name -> google.protobuf.Timestamp
 	50, // 17: laelia.v1.Machine.labels:type_name -> laelia.v1.Machine.LabelsEntry
 	31, // 18: laelia.v1.Machine.upgrade_status:type_name -> laelia.v1.UpgradeProgress
 	32, // 19: laelia.v1.Machine.provisioning:type_name -> laelia.v1.ProvisioningStatus
-	59, // 20: laelia.v1.MachineSummary.state:type_name -> laelia.v1.State
+	60, // 20: laelia.v1.MachineSummary.state:type_name -> laelia.v1.State
 	34, // 21: laelia.v1.MachineSummary.status:type_name -> laelia.v1.MachineStatus
-	58, // 22: laelia.v1.MachineSummary.created_at:type_name -> google.protobuf.Timestamp
+	59, // 22: laelia.v1.MachineSummary.created_at:type_name -> google.protobuf.Timestamp
 	32, // 23: laelia.v1.MachineSummary.provisioning:type_name -> laelia.v1.ProvisioningStatus
 	0,  // 24: laelia.v1.ProvisioningStatus.phase:type_name -> laelia.v1.ProvisioningPhase
 	51, // 25: laelia.v1.ProvisioningStatus.workload_labels:type_name -> laelia.v1.ProvisioningStatus.WorkloadLabelsEntry
-	58, // 26: laelia.v1.ProvisioningStatus.pending_at:type_name -> google.protobuf.Timestamp
-	58, // 27: laelia.v1.ProvisioningStatus.provisioned_at:type_name -> google.protobuf.Timestamp
-	58, // 28: laelia.v1.ProvisioningStatus.failed_at:type_name -> google.protobuf.Timestamp
-	52, // 29: laelia.v1.MachineInfo.labels:type_name -> laelia.v1.MachineInfo.LabelsEntry
-	60, // 30: laelia.v1.MachineInfo.capability:type_name -> laelia.v1.AgentCapability
-	55, // 31: laelia.v1.MachineInfo.available_providers:type_name -> laelia.v1.AgentProviderInfo
-	1,  // 32: laelia.v1.MachineStatus.state:type_name -> laelia.v1.MachineStatus.ConnectionState
-	58, // 33: laelia.v1.MachineStatus.last_heartbeat_time:type_name -> google.protobuf.Timestamp
-	58, // 34: laelia.v1.MachineStatus.connected_time:type_name -> google.protobuf.Timestamp
-	56, // 35: laelia.v1.AgentAssignment.acp_config:type_name -> laelia.v1.AgentACPConfig
-	38, // 36: laelia.v1.MachineStreamMessage.machine_ready:type_name -> laelia.v1.MachineReady
-	61, // 37: laelia.v1.MachineStreamMessage.ping:type_name -> laelia.v1.Ping
-	62, // 38: laelia.v1.MachineStreamMessage.providers_discovered:type_name -> laelia.v1.ProvidersDiscovered
-	43, // 39: laelia.v1.MachineStreamMessage.disconnect_notice:type_name -> laelia.v1.MachineDisconnectNotice
-	49, // 40: laelia.v1.MachineStreamMessage.machine_workspace_scan_response:type_name -> laelia.v1.MachineWorkspaceScanResponse
-	31, // 41: laelia.v1.MachineStreamMessage.upgrade_progress:type_name -> laelia.v1.UpgradeProgress
-	45, // 42: laelia.v1.MachineStreamMessage.models_discovered:type_name -> laelia.v1.ModelsDiscovered
-	35, // 43: laelia.v1.ManagerMachineStreamMessage.agent_assignment:type_name -> laelia.v1.AgentAssignment
-	39, // 44: laelia.v1.ManagerMachineStreamMessage.remove_agent:type_name -> laelia.v1.RemoveAgent
-	42, // 45: laelia.v1.ManagerMachineStreamMessage.agent_config_update:type_name -> laelia.v1.AgentConfigUpdate
-	63, // 46: laelia.v1.ManagerMachineStreamMessage.discover_providers:type_name -> laelia.v1.DiscoverProviders
-	64, // 47: laelia.v1.ManagerMachineStreamMessage.pong:type_name -> laelia.v1.Pong
-	46, // 48: laelia.v1.ManagerMachineStreamMessage.reload_agent_assignment:type_name -> laelia.v1.ReloadAgentAssignment
-	47, // 49: laelia.v1.ManagerMachineStreamMessage.machine_workspace_scan_request:type_name -> laelia.v1.MachineWorkspaceScanRequest
-	41, // 50: laelia.v1.ManagerMachineStreamMessage.delete_agent_workspace:type_name -> laelia.v1.DeleteAgentWorkspace
-	30, // 51: laelia.v1.ManagerMachineStreamMessage.upgrade_request:type_name -> laelia.v1.UpgradeRequest
-	44, // 52: laelia.v1.ManagerMachineStreamMessage.discover_models:type_name -> laelia.v1.DiscoverModels
-	40, // 53: laelia.v1.ManagerMachineStreamMessage.restart_agent:type_name -> laelia.v1.RestartAgent
-	56, // 54: laelia.v1.AgentConfigUpdate.acp_config:type_name -> laelia.v1.AgentACPConfig
-	53, // 55: laelia.v1.DiscoverModels.env:type_name -> laelia.v1.DiscoverModels.EnvEntry
-	57, // 56: laelia.v1.ModelsDiscovered.models:type_name -> laelia.v1.AgentModelOption
-	35, // 57: laelia.v1.ReloadAgentAssignment.assignment:type_name -> laelia.v1.AgentAssignment
-	58, // 58: laelia.v1.MachineWorkspaceSummary.last_modified:type_name -> google.protobuf.Timestamp
-	48, // 59: laelia.v1.MachineWorkspaceScanResponse.workspaces:type_name -> laelia.v1.MachineWorkspaceSummary
-	24, // 60: laelia.v1.MachineService.ListMachines:input_type -> laelia.v1.ListMachinesRequest
-	26, // 61: laelia.v1.MachineService.GetMachine:input_type -> laelia.v1.GetMachineRequest
-	27, // 62: laelia.v1.MachineService.DeleteMachine:input_type -> laelia.v1.DeleteMachineRequest
-	2,  // 63: laelia.v1.MachineService.UpdateMachine:input_type -> laelia.v1.UpdateMachineRequest
-	3,  // 64: laelia.v1.MachineService.TransferMachineOwnership:input_type -> laelia.v1.TransferMachineOwnershipRequest
-	5,  // 65: laelia.v1.MachineService.RevokeMachineToken:input_type -> laelia.v1.RevokeMachineTokenRequest
-	7,  // 66: laelia.v1.MachineService.ForceDisconnectMachine:input_type -> laelia.v1.ForceDisconnectMachineRequest
-	8,  // 67: laelia.v1.MachineService.ListMachineAgents:input_type -> laelia.v1.ListMachineAgentsRequest
-	10, // 68: laelia.v1.MachineService.RefreshMachineProviders:input_type -> laelia.v1.RefreshMachineProvidersRequest
-	12, // 69: laelia.v1.MachineService.RefreshMachineModels:input_type -> laelia.v1.RefreshMachineModelsRequest
-	14, // 70: laelia.v1.MachineService.UpgradeMachine:input_type -> laelia.v1.UpgradeMachineRequest
-	15, // 71: laelia.v1.MachineService.ListMachineWorkspaces:input_type -> laelia.v1.ListMachineWorkspacesRequest
-	17, // 72: laelia.v1.MachineService.ConnectMachine:input_type -> laelia.v1.ConnectMachineRequest
-	19, // 73: laelia.v1.MachineService.MachineHeartbeat:input_type -> laelia.v1.MachineHeartbeatRequest
-	21, // 74: laelia.v1.MachineService.MachineDisconnect:input_type -> laelia.v1.MachineDisconnectRequest
-	22, // 75: laelia.v1.MachineService.RefreshMachineToken:input_type -> laelia.v1.RefreshMachineTokenRequest
-	36, // 76: laelia.v1.MachineStreamService.MachineChannel:input_type -> laelia.v1.MachineStreamMessage
-	25, // 77: laelia.v1.MachineService.ListMachines:output_type -> laelia.v1.ListMachinesResponse
-	28, // 78: laelia.v1.MachineService.GetMachine:output_type -> laelia.v1.Machine
-	65, // 79: laelia.v1.MachineService.DeleteMachine:output_type -> google.protobuf.Empty
-	28, // 80: laelia.v1.MachineService.UpdateMachine:output_type -> laelia.v1.Machine
-	4,  // 81: laelia.v1.MachineService.TransferMachineOwnership:output_type -> laelia.v1.TransferMachineOwnershipResponse
-	6,  // 82: laelia.v1.MachineService.RevokeMachineToken:output_type -> laelia.v1.RevokeMachineTokenResponse
-	65, // 83: laelia.v1.MachineService.ForceDisconnectMachine:output_type -> google.protobuf.Empty
-	9,  // 84: laelia.v1.MachineService.ListMachineAgents:output_type -> laelia.v1.ListMachineAgentsResponse
-	11, // 85: laelia.v1.MachineService.RefreshMachineProviders:output_type -> laelia.v1.RefreshMachineProvidersResponse
-	13, // 86: laelia.v1.MachineService.RefreshMachineModels:output_type -> laelia.v1.RefreshMachineModelsResponse
-	65, // 87: laelia.v1.MachineService.UpgradeMachine:output_type -> google.protobuf.Empty
-	16, // 88: laelia.v1.MachineService.ListMachineWorkspaces:output_type -> laelia.v1.ListMachineWorkspacesResponse
-	18, // 89: laelia.v1.MachineService.ConnectMachine:output_type -> laelia.v1.ConnectMachineResponse
-	20, // 90: laelia.v1.MachineService.MachineHeartbeat:output_type -> laelia.v1.MachineHeartbeatResponse
-	65, // 91: laelia.v1.MachineService.MachineDisconnect:output_type -> google.protobuf.Empty
-	23, // 92: laelia.v1.MachineService.RefreshMachineToken:output_type -> laelia.v1.RefreshMachineTokenResponse
-	37, // 93: laelia.v1.MachineStreamService.MachineChannel:output_type -> laelia.v1.ManagerMachineStreamMessage
-	77, // [77:94] is the sub-list for method output_type
-	60, // [60:77] is the sub-list for method input_type
-	60, // [60:60] is the sub-list for extension type_name
-	60, // [60:60] is the sub-list for extension extendee
-	0,  // [0:60] is the sub-list for field type_name
+	59, // 26: laelia.v1.ProvisioningStatus.pending_at:type_name -> google.protobuf.Timestamp
+	59, // 27: laelia.v1.ProvisioningStatus.provisioned_at:type_name -> google.protobuf.Timestamp
+	59, // 28: laelia.v1.ProvisioningStatus.failed_at:type_name -> google.protobuf.Timestamp
+	52, // 29: laelia.v1.ProvisioningStatus.machine_params:type_name -> laelia.v1.ProvisioningStatus.MachineParamsEntry
+	53, // 30: laelia.v1.MachineInfo.labels:type_name -> laelia.v1.MachineInfo.LabelsEntry
+	61, // 31: laelia.v1.MachineInfo.capability:type_name -> laelia.v1.AgentCapability
+	56, // 32: laelia.v1.MachineInfo.available_providers:type_name -> laelia.v1.AgentProviderInfo
+	1,  // 33: laelia.v1.MachineStatus.state:type_name -> laelia.v1.MachineStatus.ConnectionState
+	59, // 34: laelia.v1.MachineStatus.last_heartbeat_time:type_name -> google.protobuf.Timestamp
+	59, // 35: laelia.v1.MachineStatus.connected_time:type_name -> google.protobuf.Timestamp
+	57, // 36: laelia.v1.AgentAssignment.acp_config:type_name -> laelia.v1.AgentACPConfig
+	38, // 37: laelia.v1.MachineStreamMessage.machine_ready:type_name -> laelia.v1.MachineReady
+	62, // 38: laelia.v1.MachineStreamMessage.ping:type_name -> laelia.v1.Ping
+	63, // 39: laelia.v1.MachineStreamMessage.providers_discovered:type_name -> laelia.v1.ProvidersDiscovered
+	43, // 40: laelia.v1.MachineStreamMessage.disconnect_notice:type_name -> laelia.v1.MachineDisconnectNotice
+	49, // 41: laelia.v1.MachineStreamMessage.machine_workspace_scan_response:type_name -> laelia.v1.MachineWorkspaceScanResponse
+	31, // 42: laelia.v1.MachineStreamMessage.upgrade_progress:type_name -> laelia.v1.UpgradeProgress
+	45, // 43: laelia.v1.MachineStreamMessage.models_discovered:type_name -> laelia.v1.ModelsDiscovered
+	35, // 44: laelia.v1.ManagerMachineStreamMessage.agent_assignment:type_name -> laelia.v1.AgentAssignment
+	39, // 45: laelia.v1.ManagerMachineStreamMessage.remove_agent:type_name -> laelia.v1.RemoveAgent
+	42, // 46: laelia.v1.ManagerMachineStreamMessage.agent_config_update:type_name -> laelia.v1.AgentConfigUpdate
+	64, // 47: laelia.v1.ManagerMachineStreamMessage.discover_providers:type_name -> laelia.v1.DiscoverProviders
+	65, // 48: laelia.v1.ManagerMachineStreamMessage.pong:type_name -> laelia.v1.Pong
+	46, // 49: laelia.v1.ManagerMachineStreamMessage.reload_agent_assignment:type_name -> laelia.v1.ReloadAgentAssignment
+	47, // 50: laelia.v1.ManagerMachineStreamMessage.machine_workspace_scan_request:type_name -> laelia.v1.MachineWorkspaceScanRequest
+	41, // 51: laelia.v1.ManagerMachineStreamMessage.delete_agent_workspace:type_name -> laelia.v1.DeleteAgentWorkspace
+	30, // 52: laelia.v1.ManagerMachineStreamMessage.upgrade_request:type_name -> laelia.v1.UpgradeRequest
+	44, // 53: laelia.v1.ManagerMachineStreamMessage.discover_models:type_name -> laelia.v1.DiscoverModels
+	40, // 54: laelia.v1.ManagerMachineStreamMessage.restart_agent:type_name -> laelia.v1.RestartAgent
+	57, // 55: laelia.v1.AgentConfigUpdate.acp_config:type_name -> laelia.v1.AgentACPConfig
+	54, // 56: laelia.v1.DiscoverModels.env:type_name -> laelia.v1.DiscoverModels.EnvEntry
+	58, // 57: laelia.v1.ModelsDiscovered.models:type_name -> laelia.v1.AgentModelOption
+	35, // 58: laelia.v1.ReloadAgentAssignment.assignment:type_name -> laelia.v1.AgentAssignment
+	59, // 59: laelia.v1.MachineWorkspaceSummary.last_modified:type_name -> google.protobuf.Timestamp
+	48, // 60: laelia.v1.MachineWorkspaceScanResponse.workspaces:type_name -> laelia.v1.MachineWorkspaceSummary
+	24, // 61: laelia.v1.MachineService.ListMachines:input_type -> laelia.v1.ListMachinesRequest
+	26, // 62: laelia.v1.MachineService.GetMachine:input_type -> laelia.v1.GetMachineRequest
+	27, // 63: laelia.v1.MachineService.DeleteMachine:input_type -> laelia.v1.DeleteMachineRequest
+	2,  // 64: laelia.v1.MachineService.UpdateMachine:input_type -> laelia.v1.UpdateMachineRequest
+	3,  // 65: laelia.v1.MachineService.TransferMachineOwnership:input_type -> laelia.v1.TransferMachineOwnershipRequest
+	5,  // 66: laelia.v1.MachineService.RevokeMachineToken:input_type -> laelia.v1.RevokeMachineTokenRequest
+	7,  // 67: laelia.v1.MachineService.ForceDisconnectMachine:input_type -> laelia.v1.ForceDisconnectMachineRequest
+	8,  // 68: laelia.v1.MachineService.ListMachineAgents:input_type -> laelia.v1.ListMachineAgentsRequest
+	10, // 69: laelia.v1.MachineService.RefreshMachineProviders:input_type -> laelia.v1.RefreshMachineProvidersRequest
+	12, // 70: laelia.v1.MachineService.RefreshMachineModels:input_type -> laelia.v1.RefreshMachineModelsRequest
+	14, // 71: laelia.v1.MachineService.UpgradeMachine:input_type -> laelia.v1.UpgradeMachineRequest
+	15, // 72: laelia.v1.MachineService.ListMachineWorkspaces:input_type -> laelia.v1.ListMachineWorkspacesRequest
+	17, // 73: laelia.v1.MachineService.ConnectMachine:input_type -> laelia.v1.ConnectMachineRequest
+	19, // 74: laelia.v1.MachineService.MachineHeartbeat:input_type -> laelia.v1.MachineHeartbeatRequest
+	21, // 75: laelia.v1.MachineService.MachineDisconnect:input_type -> laelia.v1.MachineDisconnectRequest
+	22, // 76: laelia.v1.MachineService.RefreshMachineToken:input_type -> laelia.v1.RefreshMachineTokenRequest
+	36, // 77: laelia.v1.MachineStreamService.MachineChannel:input_type -> laelia.v1.MachineStreamMessage
+	25, // 78: laelia.v1.MachineService.ListMachines:output_type -> laelia.v1.ListMachinesResponse
+	28, // 79: laelia.v1.MachineService.GetMachine:output_type -> laelia.v1.Machine
+	66, // 80: laelia.v1.MachineService.DeleteMachine:output_type -> google.protobuf.Empty
+	28, // 81: laelia.v1.MachineService.UpdateMachine:output_type -> laelia.v1.Machine
+	4,  // 82: laelia.v1.MachineService.TransferMachineOwnership:output_type -> laelia.v1.TransferMachineOwnershipResponse
+	6,  // 83: laelia.v1.MachineService.RevokeMachineToken:output_type -> laelia.v1.RevokeMachineTokenResponse
+	66, // 84: laelia.v1.MachineService.ForceDisconnectMachine:output_type -> google.protobuf.Empty
+	9,  // 85: laelia.v1.MachineService.ListMachineAgents:output_type -> laelia.v1.ListMachineAgentsResponse
+	11, // 86: laelia.v1.MachineService.RefreshMachineProviders:output_type -> laelia.v1.RefreshMachineProvidersResponse
+	13, // 87: laelia.v1.MachineService.RefreshMachineModels:output_type -> laelia.v1.RefreshMachineModelsResponse
+	66, // 88: laelia.v1.MachineService.UpgradeMachine:output_type -> google.protobuf.Empty
+	16, // 89: laelia.v1.MachineService.ListMachineWorkspaces:output_type -> laelia.v1.ListMachineWorkspacesResponse
+	18, // 90: laelia.v1.MachineService.ConnectMachine:output_type -> laelia.v1.ConnectMachineResponse
+	20, // 91: laelia.v1.MachineService.MachineHeartbeat:output_type -> laelia.v1.MachineHeartbeatResponse
+	66, // 92: laelia.v1.MachineService.MachineDisconnect:output_type -> google.protobuf.Empty
+	23, // 93: laelia.v1.MachineService.RefreshMachineToken:output_type -> laelia.v1.RefreshMachineTokenResponse
+	37, // 94: laelia.v1.MachineStreamService.MachineChannel:output_type -> laelia.v1.ManagerMachineStreamMessage
+	78, // [78:95] is the sub-list for method output_type
+	61, // [61:78] is the sub-list for method input_type
+	61, // [61:61] is the sub-list for extension type_name
+	61, // [61:61] is the sub-list for extension extendee
+	0,  // [0:61] is the sub-list for field type_name
 }
 
 func init() { file_v1_machine_proto_init() }
@@ -3891,7 +3908,7 @@ func file_v1_machine_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_machine_proto_rawDesc), len(file_v1_machine_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   52,
+			NumMessages:   53,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

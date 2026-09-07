@@ -506,6 +506,10 @@ message ProvisioningStatus {
   // The machine-specific runtime image the workload runs (custom image
   // provided at ProvisionMachine time); empty = the workspace default.
   string runtime_image = 8;
+  // The user-provided parameter overrides persisted at ProvisionMachine time
+  // (catalog-keyed, e.g. {"cpu": "2", "memory": "4Gi"}); empty = the
+  // provisioner's configured defaults.
+  map<string, string> machine_params = 9;
 }
 
 message MachineInfo {

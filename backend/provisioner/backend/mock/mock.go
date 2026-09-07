@@ -27,7 +27,8 @@ type Backend struct {
 
 	mu                  sync.Mutex
 	eventCh             chan<- backend.Event
-	workloads           map[string]string // machineID → workload name
+	workloads           map[string]string            // machineID → workload name
+	lastParams          map[string]map[string]string // machineID → last Provision's spec.Params
 	provisionCalls      int
 	deprovisionCalls    int
 	shutdownCalls       int
@@ -52,6 +53,9 @@ func init() {
 // Name matches the provisioner row's backend field for tests that register
 // the mock.
 func (*Backend) Name() string { return "mock" }
+
+// MachineParams reports no parameters: the mock has no sizing concept.
+func (*Backend) MachineParams() []*storepb.MachineParamSpec { return nil }
 
 // Start records the event channel the client drains.
 func (m *Backend) Start(_ context.Context, ch chan<- backend.Event) error {
@@ -78,6 +82,10 @@ func (m *Backend) Provision(ctx context.Context, spec backend.MachineSpec, _ str
 		workload = backend.WorkloadName(m.namespace, spec.MachineID)
 		m.workloads[spec.MachineID] = workload
 	}
+	if m.lastParams == nil {
+		m.lastParams = map[string]map[string]string{}
+	}
+	m.lastParams[spec.MachineID] = spec.Params
 	ch, gate := m.eventCh, m.gate
 	m.mu.Unlock()
 
@@ -182,6 +190,14 @@ func (m *Backend) WorkloadFor(machineID string) (string, bool) {
 	defer m.mu.Unlock()
 	name, ok := m.workloads[machineID]
 	return name, ok
+}
+
+// ParamsFor returns the spec.Params of the last Provision call for one
+// machine — the passthrough the client layer is responsible for.
+func (m *Backend) ParamsFor(machineID string) map[string]string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.lastParams[machineID]
 }
 
 // SetGate installs the channel Provision waits on right before PROVISIONED —

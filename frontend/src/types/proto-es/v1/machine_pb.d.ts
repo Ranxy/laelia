@@ -932,6 +932,15 @@ export declare type ProvisioningStatus = Message<"laelia.v1.ProvisioningStatus">
    * @generated from field: string runtime_image = 8;
    */
   runtimeImage: string;
+
+  /**
+   * The user-provided parameter overrides persisted at ProvisionMachine time
+   * (catalog-keyed, e.g. {"cpu": "2", "memory": "4Gi"}); empty = the
+   * provisioner's configured defaults.
+   *
+   * @generated from field: map<string, string> machine_params = 9;
+   */
+  machineParams: { [key: string]: string };
 };
 
 /**

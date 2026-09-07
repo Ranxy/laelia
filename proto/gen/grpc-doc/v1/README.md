@@ -468,6 +468,7 @@
     - [ManagerMachineStreamMessage](#laelia-v1-ManagerMachineStreamMessage)
     - [ModelsDiscovered](#laelia-v1-ModelsDiscovered)
     - [ProvisioningStatus](#laelia-v1-ProvisioningStatus)
+    - [ProvisioningStatus.MachineParamsEntry](#laelia-v1-ProvisioningStatus-MachineParamsEntry)
     - [ProvisioningStatus.WorkloadLabelsEntry](#laelia-v1-ProvisioningStatus-WorkloadLabelsEntry)
     - [RefreshMachineModelsRequest](#laelia-v1-RefreshMachineModelsRequest)
     - [RefreshMachineModelsResponse](#laelia-v1-RefreshMachineModelsResponse)
@@ -549,11 +550,14 @@
     - [GetProvisionerRequest](#laelia-v1-GetProvisionerRequest)
     - [ListProvisionersRequest](#laelia-v1-ListProvisionersRequest)
     - [ListProvisionersResponse](#laelia-v1-ListProvisionersResponse)
+    - [MachineParamSpec](#laelia-v1-MachineParamSpec)
     - [ManagerProvisionerStreamMessage](#laelia-v1-ManagerProvisionerStreamMessage)
     - [ProvisionJobProgress](#laelia-v1-ProvisionJobProgress)
     - [ProvisionMachineJob](#laelia-v1-ProvisionMachineJob)
     - [ProvisionMachineJob.MachineLabelsEntry](#laelia-v1-ProvisionMachineJob-MachineLabelsEntry)
+    - [ProvisionMachineJob.MachineParamsEntry](#laelia-v1-ProvisionMachineJob-MachineParamsEntry)
     - [ProvisionMachineRequest](#laelia-v1-ProvisionMachineRequest)
+    - [ProvisionMachineRequest.MachineParamsEntry](#laelia-v1-ProvisionMachineRequest-MachineParamsEntry)
     - [Provisioner](#laelia-v1-Provisioner)
     - [ProvisionerDisconnectNotice](#laelia-v1-ProvisionerDisconnectNotice)
     - [ProvisionerReady](#laelia-v1-ProvisionerReady)
@@ -561,6 +565,8 @@
     - [ProvisionerStreamMessage](#laelia-v1-ProvisionerStreamMessage)
     - [RotateProvisionerTokenRequest](#laelia-v1-RotateProvisionerTokenRequest)
     - [RotateProvisionerTokenResponse](#laelia-v1-RotateProvisionerTokenResponse)
+  
+    - [MachineParamType](#laelia-v1-MachineParamType)
   
     - [ProvisionerService](#laelia-v1-ProvisionerService)
     - [ProvisionerStreamService](#laelia-v1-ProvisionerStreamService)
@@ -8114,6 +8120,23 @@ provisioner, carried on Machine.provisioning.
 | provisioned_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | failed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | runtime_image | [string](#string) |  | The machine-specific runtime image the workload runs (custom image provided at ProvisionMachine time); empty = the workspace default. |
+| machine_params | [ProvisioningStatus.MachineParamsEntry](#laelia-v1-ProvisioningStatus-MachineParamsEntry) | repeated | The user-provided parameter overrides persisted at ProvisionMachine time (catalog-keyed, e.g. {&#34;cpu&#34;: &#34;2&#34;, &#34;memory&#34;: &#34;4Gi&#34;}); empty = the provisioner&#39;s configured defaults. |
+
+
+
+
+
+
+<a name="laelia-v1-ProvisioningStatus-MachineParamsEntry"></a>
+
+### ProvisioningStatus.MachineParamsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
 
 
 
@@ -9278,6 +9301,30 @@ ListUsers: any authenticated member may read the workspace&#39;s presence.
 
 
 
+<a name="laelia-v1-MachineParamSpec"></a>
+
+### MachineParamSpec
+MachineParamSpec is one provisioner-declared machine parameter: a
+manager-catalog key plus per-instance constraints reported in
+ProvisionerReady and persisted in the provisioner status. The UI renders
+the create form from this list.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  | Catalog key, e.g. &#34;cpu&#34; | &#34;memory&#34; | &#34;disk&#34; | &#34;storage_class&#34;. |
+| type | [MachineParamType](#laelia-v1-MachineParamType) |  | Type resolved by the manager from the catalog. |
+| required | [bool](#bool) |  |  |
+| default_value | [string](#string) |  | Default from the provisioner config; empty = the backend&#39;s built-in default (shown as the form placeholder; untouched fields keep tracking the admin config). |
+| min_value | [string](#string) |  | Inclusive bounds for QUANTITY params; empty = unbounded on that side. |
+| max_value | [string](#string) |  |  |
+| options | [string](#string) | repeated | Allowed values for constrained params (none today); empty = free-form. |
+
+
+
+
+
+
 <a name="laelia-v1-ManagerProvisionerStreamMessage"></a>
 
 ### ManagerProvisionerStreamMessage
@@ -9337,6 +9384,7 @@ picks it up at first boot.
 | binary_target | [string](#string) |  | Machine binary target to install, e.g. &#34;linux-x64&#34;. |
 | machine_labels | [ProvisionMachineJob.MachineLabelsEntry](#laelia-v1-ProvisionMachineJob-MachineLabelsEntry) | repeated |  |
 | bootstrap_script | [string](#string) |  | The manager-rendered bootstrap script (init container payload). |
+| machine_params | [ProvisionMachineJob.MachineParamsEntry](#laelia-v1-ProvisionMachineJob-MachineParamsEntry) | repeated | User-provided parameter overrides (catalog-keyed), validated manager-side at ProvisionMachine time. Backends merge them over their own config defaults, applying only keys they know; replayed jobs carry them verbatim. |
 
 
 
@@ -9346,6 +9394,22 @@ picks it up at first boot.
 <a name="laelia-v1-ProvisionMachineJob-MachineLabelsEntry"></a>
 
 ### ProvisionMachineJob.MachineLabelsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ProvisionMachineJob-MachineParamsEntry"></a>
+
+### ProvisionMachineJob.MachineParamsEntry
 
 
 
@@ -9371,6 +9435,23 @@ picks it up at first boot.
 | title | [string](#string) |  | Machine title. |
 | owner | [string](#string) |  | Target owner, users/{id}. Empty = caller. Naming another user requires a workspace admin (checked in the handler, like machine ownership transfer). |
 | runtime_image | [string](#string) |  | Optional custom runtime image for this machine&#39;s workload, overriding the workspace ProvisioningSetting.runtime_image default. Must be a valid image reference and match the admin-configured custom-image allowlist (an empty allowlist disables custom images). Persisted on the machine so replayed provisioning jobs rebuild the same workload. |
+| machine_params | [ProvisionMachineRequest.MachineParamsEntry](#laelia-v1-ProvisionMachineRequest-MachineParamsEntry) | repeated | Per-machine parameter overrides keyed by catalog key (&#34;cpu&#34;, &#34;memory&#34;, &#34;disk&#34;, ...). Every key must be declared by the target provisioner&#39;s schema and pass its type/bounds validation; values persist on the machine so replayed provisioning jobs rebuild the same workload. Empty = the provisioner&#39;s configured defaults. |
+
+
+
+
+
+
+<a name="laelia-v1-ProvisionMachineRequest-MachineParamsEntry"></a>
+
+### ProvisionMachineRequest.MachineParamsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
 
 
 
@@ -9430,6 +9511,7 @@ virtualization backend on the manager&#39;s behalf.
 | config_digest | [string](#string) |  | Short hash of the provisioner&#39;s effective config, surfaced for drift visibility (e.g. a manager_url_override in effect). |
 | auto_upgrade | [bool](#bool) |  | AutoUpgrade echoes the provisioner&#39;s config flag; persisted in the provisioner status and honored by the manager&#39;s auto-upgrade loop. |
 | retain_data | [bool](#bool) |  | RetainData echoes the provisioner&#39;s config flag; persisted in the provisioner status and used as keep_data on teardown jobs (design §6.4). |
+| machine_params | [MachineParamSpec](#laelia-v1-MachineParamSpec) | repeated | MachineParams is the machine-parameter schema this provisioner instance accepts: manager-catalog keys with per-instance defaults and bounds sourced from its config. The manager validates and filters it (unknown catalog keys are dropped) before persisting. |
 
 
 
@@ -9452,6 +9534,7 @@ ProvisionerChannel stream.
 | auto_upgrade | [bool](#bool) |  |  |
 | config_digest | [string](#string) |  |  |
 | retain_data | [bool](#bool) |  | RetainData echoes the provisioner&#39;s configured data retention; the manager sends it as keep_data on teardown jobs (design §6.4). |
+| machine_params | [MachineParamSpec](#laelia-v1-MachineParamSpec) | repeated | MachineParams is the parameter schema reported in the last ProvisionerReady frame (manager-catalog keys only, types resolved manager-side), so the create form renders even while offline. |
 
 
 
@@ -9507,6 +9590,20 @@ ProvisionerChannel stream.
 
 
  
+
+
+<a name="laelia-v1-MachineParamType"></a>
+
+### MachineParamType
+MachineParamType is the value type of one catalog parameter, resolved by
+the manager from its catalog (the provisioner reports keys, not types).
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| MACHINE_PARAM_TYPE_UNSPECIFIED | 0 |  |
+| MACHINE_PARAM_TYPE_QUANTITY | 1 | QUANTITY is a k8s-style quantity string (&#34;500m&#34;, &#34;2Gi&#34;). |
+| MACHINE_PARAM_TYPE_STRING | 2 | STRING is a DNS-1123-label-safe string (e.g. a storage class name). |
+
 
  
 

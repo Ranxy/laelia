@@ -193,11 +193,12 @@ func (c *Client) runOnce(ctx context.Context) error {
 	// Ready is the first frame; it also fires the (lazy) HTTP request.
 	if err := c.sendStream(&v1pb.ProvisionerStreamMessage{
 		Message: &v1pb.ProvisionerStreamMessage_Ready{Ready: &v1pb.ProvisionerReady{
-			Version:      version.Version,
-			Backend:      c.cfg.Backend,
-			ConfigDigest: c.cfg.ConfigDigest,
-			AutoUpgrade:  c.cfg.AutoUpgrade,
-			RetainData:   c.cfg.RetainData,
+			Version:       version.Version,
+			Backend:       c.cfg.Backend,
+			ConfigDigest:  c.cfg.ConfigDigest,
+			AutoUpgrade:   c.cfg.AutoUpgrade,
+			RetainData:    c.cfg.RetainData,
+			MachineParams: machineParamsReady(c.backend.MachineParams()),
 		}},
 	}); err != nil {
 		return err
@@ -345,6 +346,26 @@ func (c *Client) handleDeprovisionJob(ctx context.Context, job *v1pb.Deprovision
 	}
 }
 
+// machineParamsReady converts the backend's schema report into its wire form
+// (store-shaped: the manager resolves the value types from its catalog).
+func machineParamsReady(specs []*storepb.MachineParamSpec) []*v1pb.MachineParamSpec {
+	if len(specs) == 0 {
+		return nil
+	}
+	out := make([]*v1pb.MachineParamSpec, 0, len(specs))
+	for _, spec := range specs {
+		out = append(out, &v1pb.MachineParamSpec{
+			Key:          spec.GetKey(),
+			Required:     spec.GetRequired(),
+			DefaultValue: spec.GetDefaultValue(),
+			MinValue:     spec.GetMinValue(),
+			MaxValue:     spec.GetMaxValue(),
+			Options:      spec.GetOptions(),
+		})
+	}
+	return out
+}
+
 // machineSpecFromJob builds the backend-neutral spec; manager_url_override
 // redirects pods to an in-cluster manager URL (design §7.2).
 func (c *Client) machineSpecFromJob(job *v1pb.ProvisionMachineJob, machineID string) backend.MachineSpec {
@@ -361,6 +382,7 @@ func (c *Client) machineSpecFromJob(job *v1pb.ProvisionMachineJob, machineID str
 		BinaryTarget:    job.GetBinaryTarget(),
 		BootstrapScript: job.GetBootstrapScript(),
 		Labels:          job.GetMachineLabels(),
+		Params:          job.GetMachineParams(),
 	}
 }
 

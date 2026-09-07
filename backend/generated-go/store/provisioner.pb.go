@@ -21,6 +21,61 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// MachineParamType is the value type of one catalog parameter. The type is
+// manager-catalog knowledge (resolved by key); it is mirrored on the v1 spec
+// for UI rendering.
+type MachineParamType int32
+
+const (
+	MachineParamType_MACHINE_PARAM_TYPE_UNSPECIFIED MachineParamType = 0
+	// QUANTITY is a k8s-style quantity string ("500m", "2Gi").
+	MachineParamType_MACHINE_PARAM_TYPE_QUANTITY MachineParamType = 1
+	// MACHINE_PARAM_TYPE_STRING is a DNS-1123-label-safe string (e.g. a
+	// storage class name).
+	MachineParamType_MACHINE_PARAM_TYPE_STRING MachineParamType = 2
+)
+
+// Enum value maps for MachineParamType.
+var (
+	MachineParamType_name = map[int32]string{
+		0: "MACHINE_PARAM_TYPE_UNSPECIFIED",
+		1: "MACHINE_PARAM_TYPE_QUANTITY",
+		2: "MACHINE_PARAM_TYPE_STRING",
+	}
+	MachineParamType_value = map[string]int32{
+		"MACHINE_PARAM_TYPE_UNSPECIFIED": 0,
+		"MACHINE_PARAM_TYPE_QUANTITY":    1,
+		"MACHINE_PARAM_TYPE_STRING":      2,
+	}
+)
+
+func (x MachineParamType) Enum() *MachineParamType {
+	p := new(MachineParamType)
+	*p = x
+	return p
+}
+
+func (x MachineParamType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MachineParamType) Descriptor() protoreflect.EnumDescriptor {
+	return file_store_provisioner_proto_enumTypes[0].Descriptor()
+}
+
+func (MachineParamType) Type() protoreflect.EnumType {
+	return &file_store_provisioner_proto_enumTypes[0]
+}
+
+func (x MachineParamType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MachineParamType.Descriptor instead.
+func (MachineParamType) EnumDescriptor() ([]byte, []int) {
+	return file_store_provisioner_proto_rawDescGZIP(), []int{0}
+}
+
 // ProvisioningPhase is the lifecycle of one provisioning job. The manager
 // records the phase on machine.provisioning; the provisioner drives the
 // transitions through ProvisionJobProgress frames.
@@ -77,11 +132,11 @@ func (x ProvisioningPhase) String() string {
 }
 
 func (ProvisioningPhase) Descriptor() protoreflect.EnumDescriptor {
-	return file_store_provisioner_proto_enumTypes[0].Descriptor()
+	return file_store_provisioner_proto_enumTypes[1].Descriptor()
 }
 
 func (ProvisioningPhase) Type() protoreflect.EnumType {
-	return &file_store_provisioner_proto_enumTypes[0]
+	return &file_store_provisioner_proto_enumTypes[1]
 }
 
 func (x ProvisioningPhase) Number() protoreflect.EnumNumber {
@@ -90,7 +145,7 @@ func (x ProvisioningPhase) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ProvisioningPhase.Descriptor instead.
 func (ProvisioningPhase) EnumDescriptor() ([]byte, []int) {
-	return file_store_provisioner_proto_rawDescGZIP(), []int{0}
+	return file_store_provisioner_proto_rawDescGZIP(), []int{1}
 }
 
 // ProvisionerStatus is the storage-layer runtime status of a provisioner,
@@ -116,7 +171,12 @@ type ProvisionerStatus struct {
 	// RetainData echoes the provisioner's config flag; the manager sends it as
 	// keep_data on DeprovisionMachineJob so teardown honors the retention the
 	// provisioner was configured with (design §6.4).
-	RetainData    bool `protobuf:"varint,7,opt,name=retain_data,json=retainData,proto3" json:"retain_data,omitempty"`
+	RetainData bool `protobuf:"varint,7,opt,name=retain_data,json=retainData,proto3" json:"retain_data,omitempty"`
+	// MachineParams is the machine-parameter schema reported in the last
+	// ProvisionerReady frame: the manager-catalog keys this provisioner
+	// instance accepts, with per-instance defaults and bounds. Validated and
+	// filtered manager-side (unknown catalog keys are dropped, never persisted).
+	MachineParams []*MachineParamSpec `protobuf:"bytes,8,rep,name=machine_params,json=machineParams,proto3" json:"machine_params,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -200,6 +260,106 @@ func (x *ProvisionerStatus) GetRetainData() bool {
 	return false
 }
 
+func (x *ProvisionerStatus) GetMachineParams() []*MachineParamSpec {
+	if x != nil {
+		return x.MachineParams
+	}
+	return nil
+}
+
+// MachineParamSpec is one provisioner-declared machine parameter, mirroring
+// one manager-catalog key with per-instance constraints. Persisted in
+// provisioner.status (jsonb — no SQL migration).
+type MachineParamSpec struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Catalog key, e.g. "cpu" | "memory" | "disk" | "storage_class". Keys the
+	// manager catalog does not know are dropped on receipt (logged).
+	Key      string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Required bool   `protobuf:"varint,2,opt,name=required,proto3" json:"required,omitempty"`
+	// Default from the provisioner config; empty = the backend's built-in
+	// default.
+	DefaultValue string `protobuf:"bytes,3,opt,name=default_value,json=defaultValue,proto3" json:"default_value,omitempty"`
+	// Inclusive bounds for QUANTITY params; empty = unbounded on that side.
+	MinValue string `protobuf:"bytes,4,opt,name=min_value,json=minValue,proto3" json:"min_value,omitempty"`
+	MaxValue string `protobuf:"bytes,5,opt,name=max_value,json=maxValue,proto3" json:"max_value,omitempty"`
+	// Allowed values for constrained params (none today); empty = free-form.
+	Options       []string `protobuf:"bytes,6,rep,name=options,proto3" json:"options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MachineParamSpec) Reset() {
+	*x = MachineParamSpec{}
+	mi := &file_store_provisioner_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MachineParamSpec) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MachineParamSpec) ProtoMessage() {}
+
+func (x *MachineParamSpec) ProtoReflect() protoreflect.Message {
+	mi := &file_store_provisioner_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MachineParamSpec.ProtoReflect.Descriptor instead.
+func (*MachineParamSpec) Descriptor() ([]byte, []int) {
+	return file_store_provisioner_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *MachineParamSpec) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *MachineParamSpec) GetRequired() bool {
+	if x != nil {
+		return x.Required
+	}
+	return false
+}
+
+func (x *MachineParamSpec) GetDefaultValue() string {
+	if x != nil {
+		return x.DefaultValue
+	}
+	return ""
+}
+
+func (x *MachineParamSpec) GetMinValue() string {
+	if x != nil {
+		return x.MinValue
+	}
+	return ""
+}
+
+func (x *MachineParamSpec) GetMaxValue() string {
+	if x != nil {
+		return x.MaxValue
+	}
+	return ""
+}
+
+func (x *MachineParamSpec) GetOptions() []string {
+	if x != nil {
+		return x.Options
+	}
+	return nil
+}
+
 // ProvisioningStatus is the storage-layer provisioning state carried on the
 // machine row (machine.provisioning). Epoch-second timestamps follow the
 // store-proto convention (see MachineStatus).
@@ -219,14 +379,19 @@ type ProvisioningStatus struct {
 	// ProvisioningSetting.runtime_image. Persisted so replayed provisioning jobs
 	// compose the same workload even if the workspace setting or allowlist later
 	// changes.
-	RuntimeImage  string `protobuf:"bytes,8,opt,name=runtime_image,json=runtimeImage,proto3" json:"runtime_image,omitempty"`
+	RuntimeImage string `protobuf:"bytes,8,opt,name=runtime_image,json=runtimeImage,proto3" json:"runtime_image,omitempty"`
+	// MachineParams are the user-provided parameter overrides persisted at
+	// ProvisionMachine time (catalog-keyed), so replayed jobs rebuild the same
+	// workload. Shipped verbatim into ProvisionMachineJob; never re-validated
+	// on the replay path (Appendix A finding: the workload the user asked for).
+	MachineParams map[string]string `protobuf:"bytes,9,rep,name=machine_params,json=machineParams,proto3" json:"machine_params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProvisioningStatus) Reset() {
 	*x = ProvisioningStatus{}
-	mi := &file_store_provisioner_proto_msgTypes[1]
+	mi := &file_store_provisioner_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -238,7 +403,7 @@ func (x *ProvisioningStatus) String() string {
 func (*ProvisioningStatus) ProtoMessage() {}
 
 func (x *ProvisioningStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_store_provisioner_proto_msgTypes[1]
+	mi := &file_store_provisioner_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -251,7 +416,7 @@ func (x *ProvisioningStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProvisioningStatus.ProtoReflect.Descriptor instead.
 func (*ProvisioningStatus) Descriptor() ([]byte, []int) {
-	return file_store_provisioner_proto_rawDescGZIP(), []int{1}
+	return file_store_provisioner_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ProvisioningStatus) GetPhase() ProvisioningPhase {
@@ -310,11 +475,18 @@ func (x *ProvisioningStatus) GetRuntimeImage() string {
 	return ""
 }
 
+func (x *ProvisioningStatus) GetMachineParams() map[string]string {
+	if x != nil {
+		return x.MachineParams
+	}
+	return nil
+}
+
 var File_store_provisioner_proto protoreflect.FileDescriptor
 
 const file_store_provisioner_proto_rawDesc = "" +
 	"\n" +
-	"\x17store/provisioner.proto\x12\flaelia.store\"\xeb\x01\n" +
+	"\x17store/provisioner.proto\x12\flaelia.store\"\xb2\x02\n" +
 	"\x11ProvisionerStatus\x12\x1c\n" +
 	"\tconnected\x18\x01 \x01(\bR\tconnected\x12\x1b\n" +
 	"\tlast_seen\x18\x02 \x01(\x03R\blastSeen\x12\x18\n" +
@@ -323,7 +495,15 @@ const file_store_provisioner_proto_rawDesc = "" +
 	"\fauto_upgrade\x18\x05 \x01(\bR\vautoUpgrade\x12#\n" +
 	"\rconfig_digest\x18\x06 \x01(\tR\fconfigDigest\x12\x1f\n" +
 	"\vretain_data\x18\a \x01(\bR\n" +
-	"retainData\"\xb0\x03\n" +
+	"retainData\x12E\n" +
+	"\x0emachine_params\x18\b \x03(\v2\x1e.laelia.store.MachineParamSpecR\rmachineParams\"\xb9\x01\n" +
+	"\x10MachineParamSpec\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1a\n" +
+	"\brequired\x18\x02 \x01(\bR\brequired\x12#\n" +
+	"\rdefault_value\x18\x03 \x01(\tR\fdefaultValue\x12\x1b\n" +
+	"\tmin_value\x18\x04 \x01(\tR\bminValue\x12\x1b\n" +
+	"\tmax_value\x18\x05 \x01(\tR\bmaxValue\x12\x18\n" +
+	"\aoptions\x18\x06 \x03(\tR\aoptions\"\xce\x04\n" +
 	"\x12ProvisioningStatus\x125\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x1f.laelia.store.ProvisioningPhaseR\x05phase\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12#\n" +
@@ -333,10 +513,18 @@ const file_store_provisioner_proto_rawDesc = "" +
 	"pending_at\x18\x05 \x01(\x03R\tpendingAt\x12%\n" +
 	"\x0eprovisioned_at\x18\x06 \x01(\x03R\rprovisionedAt\x12\x1b\n" +
 	"\tfailed_at\x18\a \x01(\x03R\bfailedAt\x12#\n" +
-	"\rruntime_image\x18\b \x01(\tR\fruntimeImage\x1aA\n" +
+	"\rruntime_image\x18\b \x01(\tR\fruntimeImage\x12Z\n" +
+	"\x0emachine_params\x18\t \x03(\v23.laelia.store.ProvisioningStatus.MachineParamsEntryR\rmachineParams\x1aA\n" +
 	"\x13WorkloadLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*\x86\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a@\n" +
+	"\x12MachineParamsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*v\n" +
+	"\x10MachineParamType\x12\"\n" +
+	"\x1eMACHINE_PARAM_TYPE_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bMACHINE_PARAM_TYPE_QUANTITY\x10\x01\x12\x1d\n" +
+	"\x19MACHINE_PARAM_TYPE_STRING\x10\x02*\x86\x02\n" +
 	"\x11ProvisioningPhase\x12\"\n" +
 	"\x1ePROVISIONING_PHASE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aPROVISIONING_PHASE_PENDING\x10\x01\x12#\n" +
@@ -358,22 +546,27 @@ func file_store_provisioner_proto_rawDescGZIP() []byte {
 	return file_store_provisioner_proto_rawDescData
 }
 
-var file_store_provisioner_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_store_provisioner_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_store_provisioner_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_store_provisioner_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_store_provisioner_proto_goTypes = []any{
-	(ProvisioningPhase)(0),     // 0: laelia.store.ProvisioningPhase
-	(*ProvisionerStatus)(nil),  // 1: laelia.store.ProvisionerStatus
-	(*ProvisioningStatus)(nil), // 2: laelia.store.ProvisioningStatus
-	nil,                        // 3: laelia.store.ProvisioningStatus.WorkloadLabelsEntry
+	(MachineParamType)(0),      // 0: laelia.store.MachineParamType
+	(ProvisioningPhase)(0),     // 1: laelia.store.ProvisioningPhase
+	(*ProvisionerStatus)(nil),  // 2: laelia.store.ProvisionerStatus
+	(*MachineParamSpec)(nil),   // 3: laelia.store.MachineParamSpec
+	(*ProvisioningStatus)(nil), // 4: laelia.store.ProvisioningStatus
+	nil,                        // 5: laelia.store.ProvisioningStatus.WorkloadLabelsEntry
+	nil,                        // 6: laelia.store.ProvisioningStatus.MachineParamsEntry
 }
 var file_store_provisioner_proto_depIdxs = []int32{
-	0, // 0: laelia.store.ProvisioningStatus.phase:type_name -> laelia.store.ProvisioningPhase
-	3, // 1: laelia.store.ProvisioningStatus.workload_labels:type_name -> laelia.store.ProvisioningStatus.WorkloadLabelsEntry
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	3, // 0: laelia.store.ProvisionerStatus.machine_params:type_name -> laelia.store.MachineParamSpec
+	1, // 1: laelia.store.ProvisioningStatus.phase:type_name -> laelia.store.ProvisioningPhase
+	5, // 2: laelia.store.ProvisioningStatus.workload_labels:type_name -> laelia.store.ProvisioningStatus.WorkloadLabelsEntry
+	6, // 3: laelia.store.ProvisioningStatus.machine_params:type_name -> laelia.store.ProvisioningStatus.MachineParamsEntry
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_store_provisioner_proto_init() }
@@ -386,8 +579,8 @@ func file_store_provisioner_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_provisioner_proto_rawDesc), len(file_store_provisioner_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   3,
+			NumEnums:      2,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

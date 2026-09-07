@@ -1990,6 +1990,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ProvisioningStatus.MachineParamsEntry"><span class="badge">M</span>ProvisioningStatus.MachineParamsEntry</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ProvisioningStatus.WorkloadLabelsEntry"><span class="badge">M</span>ProvisioningStatus.WorkloadLabelsEntry</a>
                 </li>
               
@@ -2302,6 +2306,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.MachineParamSpec"><span class="badge">M</span>MachineParamSpec</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ManagerProvisionerStreamMessage"><span class="badge">M</span>ManagerProvisionerStreamMessage</a>
                 </li>
               
@@ -2318,7 +2326,15 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ProvisionMachineJob.MachineParamsEntry"><span class="badge">M</span>ProvisionMachineJob.MachineParamsEntry</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ProvisionMachineRequest"><span class="badge">M</span>ProvisionMachineRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ProvisionMachineRequest.MachineParamsEntry"><span class="badge">M</span>ProvisionMachineRequest.MachineParamsEntry</a>
                 </li>
               
                 <li>
@@ -2349,6 +2365,10 @@
                   <a href="#laelia.v1.RotateProvisionerTokenResponse"><span class="badge">M</span>RotateProvisionerTokenResponse</a>
                 </li>
               
+              
+                <li>
+                  <a href="#laelia.v1.MachineParamType"><span class="badge">E</span>MachineParamType</a>
+                </li>
               
               
               
@@ -20015,6 +20035,46 @@ phase badge. Set only for provisioned machines. </p></td>
 provided at ProvisionMachine time); empty = the workspace default. </p></td>
                 </tr>
               
+                <tr>
+                  <td>machine_params</td>
+                  <td><a href="#laelia.v1.ProvisioningStatus.MachineParamsEntry">ProvisioningStatus.MachineParamsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>The user-provided parameter overrides persisted at ProvisionMachine time
+(catalog-keyed, e.g. {&#34;cpu&#34;: &#34;2&#34;, &#34;memory&#34;: &#34;4Gi&#34;}); empty = the
+provisioner&#39;s configured defaults. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvisioningStatus.MachineParamsEntry">ProvisioningStatus.MachineParamsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -22303,6 +22363,74 @@ retention; default (false) deletes it with the workload. </p></td>
 
         
       
+        <h3 id="laelia.v1.MachineParamSpec">MachineParamSpec</h3>
+        <p>MachineParamSpec is one provisioner-declared machine parameter: a</p><p>manager-catalog key plus per-instance constraints reported in</p><p>ProvisionerReady and persisted in the provisioner status. The UI renders</p><p>the create form from this list.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Catalog key, e.g. &#34;cpu&#34; | &#34;memory&#34; | &#34;disk&#34; | &#34;storage_class&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>type</td>
+                  <td><a href="#laelia.v1.MachineParamType">MachineParamType</a></td>
+                  <td></td>
+                  <td><p>Type resolved by the manager from the catalog. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>required</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>default_value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Default from the provisioner config; empty = the backend&#39;s built-in
+default (shown as the form placeholder; untouched fields keep tracking
+the admin config). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>min_value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Inclusive bounds for QUANTITY params; empty = unbounded on that side. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>max_value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>options</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>Allowed values for constrained params (none today); empty = free-form. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ManagerProvisionerStreamMessage">ManagerProvisionerStreamMessage</h3>
         <p></p>
 
@@ -22475,6 +22603,16 @@ above, bound to fingerprint. </p></td>
                   <td><p>The manager-rendered bootstrap script (init container payload). </p></td>
                 </tr>
               
+                <tr>
+                  <td>machine_params</td>
+                  <td><a href="#laelia.v1.ProvisionMachineJob.MachineParamsEntry">ProvisionMachineJob.MachineParamsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>User-provided parameter overrides (catalog-keyed), validated manager-side
+at ProvisionMachine time. Backends merge them over their own config
+defaults, applying only keys they know; replayed jobs carry them
+verbatim. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -22483,6 +22621,37 @@ above, bound to fingerprint. </p></td>
         
       
         <h3 id="laelia.v1.ProvisionMachineJob.MachineLabelsEntry">ProvisionMachineJob.MachineLabelsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvisionMachineJob.MachineParamsEntry">ProvisionMachineJob.MachineParamsEntry</h3>
         <p></p>
 
         
@@ -22554,6 +22723,48 @@ workspace ProvisioningSetting.runtime_image default. Must be a valid image
 reference and match the admin-configured custom-image allowlist (an empty
 allowlist disables custom images). Persisted on the machine so replayed
 provisioning jobs rebuild the same workload. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_params</td>
+                  <td><a href="#laelia.v1.ProvisionMachineRequest.MachineParamsEntry">ProvisionMachineRequest.MachineParamsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>Per-machine parameter overrides keyed by catalog key (&#34;cpu&#34;, &#34;memory&#34;,
+&#34;disk&#34;, ...). Every key must be declared by the target provisioner&#39;s
+schema and pass its type/bounds validation; values persist on the machine
+so replayed provisioning jobs rebuild the same workload. Empty = the
+provisioner&#39;s configured defaults. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvisionMachineRequest.MachineParamsEntry">ProvisionMachineRequest.MachineParamsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -22726,6 +22937,16 @@ provisioner status and honored by the manager&#39;s auto-upgrade loop. </p></td>
 provisioner status and used as keep_data on teardown jobs (design §6.4). </p></td>
                 </tr>
               
+                <tr>
+                  <td>machine_params</td>
+                  <td><a href="#laelia.v1.MachineParamSpec">MachineParamSpec</a></td>
+                  <td>repeated</td>
+                  <td><p>MachineParams is the machine-parameter schema this provisioner instance
+accepts: manager-catalog keys with per-instance defaults and bounds
+sourced from its config. The manager validates and filters it (unknown
+catalog keys are dropped) before persisting. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -22791,6 +23012,15 @@ provisioner status and used as keep_data on teardown jobs (design §6.4). </p></
                   <td></td>
                   <td><p>RetainData echoes the provisioner&#39;s configured data retention; the
 manager sends it as keep_data on teardown jobs (design §6.4). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_params</td>
+                  <td><a href="#laelia.v1.MachineParamSpec">MachineParamSpec</a></td>
+                  <td>repeated</td>
+                  <td><p>MachineParams is the parameter schema reported in the last
+ProvisionerReady frame (manager-catalog keys only, types resolved
+manager-side), so the create form renders even while offline. </p></td>
                 </tr>
               
             </tbody>
@@ -22901,6 +23131,35 @@ manager sends it as keep_data on teardown jobs (design §6.4). </p></td>
         
       
 
+      
+        <h3 id="laelia.v1.MachineParamType">MachineParamType</h3>
+        <p>MachineParamType is the value type of one catalog parameter, resolved by</p><p>the manager from its catalog (the provisioner reports keys, not types).</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>MACHINE_PARAM_TYPE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>MACHINE_PARAM_TYPE_QUANTITY</td>
+                <td>1</td>
+                <td><p>QUANTITY is a k8s-style quantity string (&#34;500m&#34;, &#34;2Gi&#34;).</p></td>
+              </tr>
+            
+              <tr>
+                <td>MACHINE_PARAM_TYPE_STRING</td>
+                <td>2</td>
+                <td><p>STRING is a DNS-1123-label-safe string (e.g. a storage class name).</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
       
 
       

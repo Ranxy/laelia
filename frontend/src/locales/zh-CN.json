@@ -659,6 +659,10 @@
         "machine-title": "命名机器",
         "offline": "离线",
         "offline-hint": "离线的 provisioner 在连接之前无法创建机器。",
+        "param-default": "Provisioner 默认值",
+        "param-range": "{{range}}",
+        "params-hint": "留空使用 provisioner 配置的默认值;填写的值会按该 provisioner 声明的范围校验。",
+        "params-title": "机器参数",
         "pick-hint": "机器的工作负载由所选 provisioner 在其后端中创建。",
         "pick-title": "选择 provisioner",
         "provisioner-offline": "此 provisioner 处于离线状态。请先将其连接后再创建机器。",
@@ -675,6 +679,12 @@
     "no-agents": "该机器上尚未托管任何 Agent。",
     "no-providers": "尚未发现任何 Provider。请在宿主上启动机器应用并点击刷新。",
     "no-selection": "选择一台机器以查看详情。",
+    "param": {
+      "cpu": "CPU",
+      "disk": "磁盘大小",
+      "memory": "内存",
+      "storage-class": "存储类"
+    },
     "profile": {
       "edit-not-allowed": "仅机器的创建者或工作区管理员可管理此机器。",
       "load-failed": "加载机器失败。它可能已被删除,或请求出错。",
@@ -690,6 +700,7 @@
       "backend": "后端",
       "delete-data": "删除机器时会一并删除其数据卷(遵循 provisioner 的保留策略)。",
       "failed-at": "失败时间",
+      "params": "参数",
       "pending-at": "入队时间",
       "phase": "阶段",
       "phase-deleted": "已删除",

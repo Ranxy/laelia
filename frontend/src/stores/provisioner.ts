@@ -41,13 +41,17 @@ export interface ProvisionerSlice {
   deleteProvisioner: (name: string) => Promise<void>;
   // provisionMachine enqueues a provisioning job for a machine owned by the
   // caller. runtimeImage optionally overrides the workspace default image for
-  // this machine alone (must match the admin-configured allowlist). The
-  // created Machine carries its provisioning status; the caller navigates to
-  // the machine profile which polls until the machine is ONLINE.
+  // this machine alone (must match the admin-configured allowlist).
+  // machineParams optionally sets per-machine parameters (catalog-keyed, e.g.
+  // {"cpu": "2"}); every key must be declared by the provisioner's schema and
+  // pass its validation. The created Machine carries its provisioning status;
+  // the caller navigates to the machine profile which polls until the machine
+  // is ONLINE.
   provisionMachine: (
     provisioner: string,
     title: string,
-    runtimeImage?: string
+    runtimeImage?: string,
+    machineParams?: Record<string, string>
   ) => Promise<Machine>;
 }
 
@@ -139,12 +143,13 @@ export const createProvisionerSlice: AppSliceCreator<ProvisionerSlice> = (
     }));
   },
 
-  async provisionMachine(provisioner, title, runtimeImage) {
+  async provisionMachine(provisioner, title, runtimeImage, machineParams) {
     return provisionerServiceClient.provisionMachine(
       create(ProvisionMachineRequestSchema, {
         provisioner,
         title,
         runtimeImage: runtimeImage ?? "",
+        machineParams: machineParams ?? {},
       })
     );
   },

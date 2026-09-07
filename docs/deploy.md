@@ -630,9 +630,17 @@ storage: { size: 10Gi, storage_class: "" } # PVC size/class per machine (storage
 resources:
   requests: { cpu: "1", memory: "2Gi" }
   limits: { memory: "4Gi" }
+param_bounds:                              # optional bounds for user-settable machine parameters
+  cpu:    { min: "250m",  max: "8"     }   # (design: provisioner-machine-params-design.md); an omitted
+  memory: { min: "512Mi", max: "32Gi" }    # side is unbounded; users may override these values
+  disk:   { min: "1Gi",   max: "500Gi" }   # per machine at create time, defaults keep applying
 extra_env:                                 # passthrough env on the machine container
   LAELIA_INSECURE: "true"                  # for https managers with self-signed certs
 ```
+
+Machine parameters (§8.3a): the values above are defaults users may override
+per machine at create time; `resources`/`storage` stay the fallback for
+machines whose user leaves a field empty.
 
 `--allow-http` is required when `manager_url` is plain HTTP (dev only).
 

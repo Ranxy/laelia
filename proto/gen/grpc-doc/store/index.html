@@ -417,6 +417,10 @@
             <ul>
               
                 <li>
+                  <a href="#laelia.store.MachineParamSpec"><span class="badge">M</span>MachineParamSpec</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.store.ProvisionerStatus"><span class="badge">M</span>ProvisionerStatus</a>
                 </li>
               
@@ -425,9 +429,17 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.store.ProvisioningStatus.MachineParamsEntry"><span class="badge">M</span>ProvisioningStatus.MachineParamsEntry</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.store.ProvisioningStatus.WorkloadLabelsEntry"><span class="badge">M</span>ProvisioningStatus.WorkloadLabelsEntry</a>
                 </li>
               
+              
+                <li>
+                  <a href="#laelia.store.MachineParamType"><span class="badge">E</span>MachineParamType</a>
+                </li>
               
                 <li>
                   <a href="#laelia.store.ProvisioningPhase"><span class="badge">E</span>ProvisioningPhase</a>
@@ -2675,6 +2687,67 @@ is authorized from this policy at authorization time.</p></td>
       <p></p>
 
       
+        <h3 id="laelia.store.MachineParamSpec">MachineParamSpec</h3>
+        <p>MachineParamSpec is one provisioner-declared machine parameter, mirroring</p><p>one manager-catalog key with per-instance constraints. Persisted in</p><p>provisioner.status (jsonb — no SQL migration).</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Catalog key, e.g. &#34;cpu&#34; | &#34;memory&#34; | &#34;disk&#34; | &#34;storage_class&#34;. Keys the
+manager catalog does not know are dropped on receipt (logged). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>required</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>default_value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Default from the provisioner config; empty = the backend&#39;s built-in
+default. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>min_value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Inclusive bounds for QUANTITY params; empty = unbounded on that side. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>max_value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>options</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>Allowed values for constrained params (none today); empty = free-form. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.store.ProvisionerStatus">ProvisionerStatus</h3>
         <p>ProvisionerStatus is the storage-layer runtime status of a provisioner,</p><p>stamped by the manager from ProvisionerChannel stream events. It lives in</p><p>provisioner.status (jsonb).</p>
 
@@ -2737,6 +2810,16 @@ reported for drift visibility (e.g. manager_url_override in effect). </p></td>
                   <td><p>RetainData echoes the provisioner&#39;s config flag; the manager sends it as
 keep_data on DeprovisionMachineJob so teardown honors the retention the
 provisioner was configured with (design §6.4). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_params</td>
+                  <td><a href="#laelia.store.MachineParamSpec">MachineParamSpec</a></td>
+                  <td>repeated</td>
+                  <td><p>MachineParams is the machine-parameter schema reported in the last
+ProvisionerReady frame: the manager-catalog keys this provisioner
+instance accepts, with per-instance defaults and bounds. Validated and
+filtered manager-side (unknown catalog keys are dropped, never persisted). </p></td>
                 </tr>
               
             </tbody>
@@ -2816,6 +2899,47 @@ compose the same workload even if the workspace setting or allowlist later
 changes. </p></td>
                 </tr>
               
+                <tr>
+                  <td>machine_params</td>
+                  <td><a href="#laelia.store.ProvisioningStatus.MachineParamsEntry">ProvisioningStatus.MachineParamsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>MachineParams are the user-provided parameter overrides persisted at
+ProvisionMachine time (catalog-keyed), so replayed jobs rebuild the same
+workload. Shipped verbatim into ProvisionMachineJob; never re-validated
+on the replay path (Appendix A finding: the workload the user asked for). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.ProvisioningStatus.MachineParamsEntry">ProvisioningStatus.MachineParamsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -2855,6 +2979,36 @@ changes. </p></td>
         
       
 
+      
+        <h3 id="laelia.store.MachineParamType">MachineParamType</h3>
+        <p>MachineParamType is the value type of one catalog parameter. The type is</p><p>manager-catalog knowledge (resolved by key); it is mirrored on the v1 spec</p><p>for UI rendering.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>MACHINE_PARAM_TYPE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>MACHINE_PARAM_TYPE_QUANTITY</td>
+                <td>1</td>
+                <td><p>QUANTITY is a k8s-style quantity string (&#34;500m&#34;, &#34;2Gi&#34;).</p></td>
+              </tr>
+            
+              <tr>
+                <td>MACHINE_PARAM_TYPE_STRING</td>
+                <td>2</td>
+                <td><p>MACHINE_PARAM_TYPE_STRING is a DNS-1123-label-safe string (e.g. a
+storage class name).</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
       
         <h3 id="laelia.store.ProvisioningPhase">ProvisioningPhase</h3>
         <p>ProvisioningPhase is the lifecycle of one provisioning job. The manager</p><p>records the phase on machine.provisioning; the provisioner drives the</p><p>transitions through ProvisionJobProgress frames.</p>
