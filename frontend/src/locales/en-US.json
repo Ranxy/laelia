@@ -660,8 +660,10 @@
         "offline": "Offline",
         "offline-hint": "Offline provisioners can't create machines until they connect.",
         "param-default": "Provisioner default",
-        "param-range": "{{range}}",
-        "params-hint": "Leave empty to use the provisioner's configured default. Values are validated against this provisioner's declared limits.",
+        "param-default-short": "default",
+        "param-use-default": "Use default",
+        "param-use-default-aria": "Use the provisioner default for {{param}}",
+        "params-hint": "Drag the sliders to size the machine — values are validated against this provisioner's declared limits. Leave \"Use default\" on to track the provisioner's configured default.",
         "params-title": "Machine parameters",
         "pick-hint": "The machine's workload is created by the selected provisioner in its backend.",
         "pick-title": "Choose a provisioner",
@@ -683,7 +685,8 @@
       "cpu": "CPU",
       "disk": "Disk size",
       "memory": "Memory",
-      "storage-class": "Storage class"
+      "storage-class": "Storage class",
+      "unit-cores": "cores"
     },
     "profile": {
       "edit-not-allowed": "Only the machine's creator or a workspace admin can manage this machine.",

@@ -133,11 +133,22 @@ Both persistence points are existing jsonb columns — **no SQL migration**.
 
 ## 7. Frontend
 
-- **Create form** (`machine-new-provisioned.tsx`): one input per schema entry
-  for the selected provisioner; inputs start **empty**, `default_value` is the
-  placeholder, min/max render as a range hint; only non-empty trimmed values
-  submit (`stores/provisioner.ts` `provisionMachine` 4th arg). A key unknown
-  to the frontend renders under its raw catalog name.
+- **Create form** (`machine-new-provisioned.tsx`): one control per schema
+  entry for the selected provisioner. QUANTITY params (cpu/memory/disk) render
+  a **"use default" switch (on initially) plus a linked slider + number input
+  in human units** (cores / Gi): the slider range comes from the spec's
+  min/max with built-in per-key fallbacks when the admin configured no bounds
+  (cpu 0.25–16 cores step 0.25, memory 1–64Gi, disk 1–500Gi step 1; a
+  configured bound overrides its side). Untouched params keep tracking the
+  admin config, and the controls stay live while the switch is on — dragging
+  the slider or typing a number flips the switch off and takes the param
+  over. Overridden values clamp into the range and serialize back to k8s
+  quantity strings at submit ("0.5" cores → "500m", "8" Gi → "8Gi"). STRING
+  and unknown keys stay free-text inputs (empty = default; filled values
+  submit verbatim). Quantity parsing/formatting lives in
+  `src/lib/machine-params.ts` (`machine-params.test.ts` pins the subset,
+  mirroring `backend/common/quantity`); the Slider primitive is
+  `src/components/ui/slider.tsx` (Base UI).
 - **Profile card** (`machine-profile-cards.tsx`): persisted
   `provisioning.machineParams` shown read-only, key-sorted.
 - Labels come from `src/lib/machine-params.ts` → `machine.param.<key>` locale

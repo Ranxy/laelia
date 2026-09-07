@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -374,13 +375,30 @@ describe("MachineNewProvisionedPanel params", () => {
             maxValue: "8",
           },
           { key: "memory", defaultValue: "2Gi" },
+          { key: "disk" }, // no default → short "default" placeholder
           { key: "gpu", defaultValue: "0" }, // unknown key renders raw
         ],
       },
     } as never);
   }
 
-  it("renders the selected provisioner's schema with defaults as placeholders", async () => {
+  function uncheckDefault(key: string) {
+    fireEvent.click(screen.getByTestId(`use-default-${key}`));
+  }
+
+  // The param label names both the number input and the slider thumb's hidden
+  // range input; the number input is pinned by its element id.
+  function numberInput(key: string) {
+    return screen.getByLabelText(`machine.param.${key}`, {
+      selector: `#machine-new-provisioned-param-${key}`,
+    });
+  }
+
+  function paramRow(key: string) {
+    return within(screen.getByTestId(`param-row-${key}`));
+  }
+
+  it("renders slider rows seeded with the defaults and keeps unknown keys as text inputs", async () => {
     useAppStore.setState({ provisioners: [parametrizedProvisioner()] });
     render(<MachineNewProvisionedPanel />);
 
@@ -388,17 +406,49 @@ describe("MachineNewProvisionedPanel params", () => {
     expect(
       screen.getByText("machine.new.provisioned.params-title")
     ).toBeInTheDocument();
-    const cpu = screen.getByLabelText(/machine\.param\.cpu/);
-    expect(cpu).toHaveAttribute("placeholder", "1");
-    expect(screen.getByLabelText(/machine\.param\.memory/)).toHaveAttribute(
-      "placeholder",
-      "2Gi"
-    );
-    // A key the frontend does not know renders under its raw catalog name.
-    expect(screen.getByLabelText(/^gpu$/)).toBeInTheDocument();
+
+    // cpu: the admin bounds 250m–8 become the slider range; the default
+    // (1 core) seeds the slider + input while the switch is on — and the
+    // controls stay live so dragging takes over without unchecking first.
+    const cpuSlider = screen.getByRole("slider", { name: "machine.param.cpu" });
+    expect(cpuSlider).toHaveAttribute("min", "0.25");
+    expect(cpuSlider).toHaveAttribute("max", "8");
+    expect(cpuSlider).toHaveAttribute("aria-valuenow", "1");
+    expect(cpuSlider).toBeEnabled();
+    const cpuInput = numberInput("cpu");
+    expect(cpuInput).toBeEnabled();
+    expect(cpuInput).toHaveValue("1");
     expect(
-      screen.getByText("machine.new.provisioned.param-range")
+      paramRow("cpu").getByText("machine.param.unit-cores")
     ).toBeInTheDocument();
+    expect(screen.getByTestId("use-default-cpu")).toBeChecked();
+
+    // memory: no admin bounds → the built-in 1–64Gi fallback; 2Gi default.
+    const memorySlider = screen.getByRole("slider", {
+      name: "machine.param.memory",
+    });
+    expect(memorySlider).toHaveAttribute("min", "1");
+    expect(memorySlider).toHaveAttribute("max", "64");
+    expect(memorySlider).toHaveAttribute("aria-valuenow", "2");
+    expect(numberInput("memory")).toHaveValue("2");
+
+    // disk: no default → the input shows the short placeholder (no unit
+    // suffix crowding it) and the 1–500Gi fallback keeps the 10Gi-style
+    // defaults reachable at step 1.
+    const diskSlider = screen.getByRole("slider", {
+      name: "machine.param.disk",
+    });
+    expect(diskSlider).toHaveAttribute("min", "1");
+    expect(diskSlider).toHaveAttribute("max", "500");
+    expect(diskSlider).toHaveAttribute("step", "1");
+    expect(numberInput("disk")).toHaveAttribute(
+      "placeholder",
+      "machine.new.provisioned.param-default-short"
+    );
+    expect(paramRow("disk").queryByText("Gi")).not.toBeInTheDocument();
+
+    // A key the frontend does not know renders as a raw text input.
+    expect(screen.getByLabelText(/^gpu$/)).toHaveAttribute("placeholder", "0");
   });
 
   it("hides the parameter section for provisioners without a schema", async () => {
@@ -412,7 +462,7 @@ describe("MachineNewProvisionedPanel params", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("submits only the non-empty trimmed values keyed by catalog key", async () => {
+  it("dragging a slider takes the param over from its default and converts on submit", async () => {
     mockedActions.provisionMachine.mockResolvedValue({
       name: "machines/m1",
       title: "Cloud Box",
@@ -424,11 +474,14 @@ describe("MachineNewProvisionedPanel params", () => {
     fireEvent.change(screen.getByLabelText("machine.new.name-label"), {
       target: { value: "Cloud Box" },
     });
-    fireEvent.change(screen.getByLabelText(/machine\.param\.cpu/), {
-      target: { value: "  4  " },
+
+    // Dragging the memory slider while the default switch is on flips the
+    // switch off and submits the dragged value as "4Gi".
+    fireEvent.change(paramRow("memory").getByRole("slider"), {
+      target: { value: "4" },
     });
-    // memory is left empty → the provisioner default applies; gpu filled →
-    // unknown keys still submit (the manager validates catalog membership).
+    expect(screen.getByTestId("use-default-memory")).not.toBeChecked();
+    // Unknown keys stay free-text and submit verbatim.
     fireEvent.change(screen.getByLabelText(/^gpu$/), {
       target: { value: "1" },
     });
@@ -439,13 +492,106 @@ describe("MachineNewProvisionedPanel params", () => {
         "provisioners/p1",
         "Cloud Box",
         "",
-        { cpu: "4", gpu: "1" }
+        { memory: "4Gi", gpu: "1" }
       );
       expect(mockRouter.navigate).toHaveBeenCalledWith("/machines/m1");
     });
   });
 
-  it("submits no params argument when every field stays empty", async () => {
+  it("taking over cpu via the switch seeds the default, then edits submit", async () => {
+    mockedActions.provisionMachine.mockResolvedValue({
+      name: "machines/m1",
+      title: "Cloud Box",
+    });
+    useAppStore.setState({ provisioners: [parametrizedProvisioner()] });
+    render(<MachineNewProvisionedPanel />);
+
+    fireEvent.click(await screen.findByText("Prod Cluster"));
+    fireEvent.change(screen.getByLabelText("machine.new.name-label"), {
+      target: { value: "Cloud Box" },
+    });
+
+    // Unchecking seeds the default (1 core); the user then edits it to 4.
+    uncheckDefault("cpu");
+    fireEvent.change(numberInput("cpu"), {
+      target: { value: "4" },
+    });
+    fireEvent.click(screen.getByText("machine.new.provisioned.create"));
+
+    await waitFor(() => {
+      expect(mockedActions.provisionMachine).toHaveBeenCalledWith(
+        "provisioners/p1",
+        "Cloud Box",
+        "",
+        { cpu: "4" }
+      );
+      expect(mockRouter.navigate).toHaveBeenCalledWith("/machines/m1");
+    });
+  });
+
+  it("typing an out-of-bounds value takes over and clamps at submit", async () => {
+    mockedActions.provisionMachine.mockResolvedValue({
+      name: "machines/m1",
+      title: "Cloud Box",
+    });
+    useAppStore.setState({ provisioners: [parametrizedProvisioner()] });
+    render(<MachineNewProvisionedPanel />);
+
+    fireEvent.click(await screen.findByText("Prod Cluster"));
+    fireEvent.change(screen.getByLabelText("machine.new.name-label"), {
+      target: { value: "Cloud Box" },
+    });
+    // Typing into the live input flips the default switch off by itself.
+    fireEvent.change(numberInput("cpu"), {
+      target: { value: "999" },
+    });
+    expect(screen.getByTestId("use-default-cpu")).not.toBeChecked();
+    fireEvent.click(screen.getByText("machine.new.provisioned.create"));
+
+    await waitFor(() => {
+      expect(mockedActions.provisionMachine).toHaveBeenCalledWith(
+        "provisioners/p1",
+        "Cloud Box",
+        "",
+        { cpu: "8" }
+      );
+    });
+  });
+
+  it("re-checking default reverts the input to the default value", async () => {
+    mockedActions.provisionMachine.mockResolvedValue({
+      name: "machines/m1",
+      title: "Cloud Box",
+    });
+    useAppStore.setState({ provisioners: [parametrizedProvisioner()] });
+    render(<MachineNewProvisionedPanel />);
+
+    fireEvent.click(await screen.findByText("Prod Cluster"));
+
+    // Typed takeover, then back to default: the box shows the default again.
+    fireEvent.change(numberInput("cpu"), { target: { value: "5" } });
+    fireEvent.click(screen.getByTestId("use-default-cpu"));
+    expect(screen.getByTestId("use-default-cpu")).toBeChecked();
+    expect(numberInput("cpu")).toHaveValue("1");
+
+    // Dragged takeover, then back to default.
+    fireEvent.change(paramRow("memory").getByRole("slider"), {
+      target: { value: "4" },
+    });
+    fireEvent.click(screen.getByTestId("use-default-memory"));
+    expect(numberInput("memory")).toHaveValue("2");
+
+    // A param without a configured default clears to its short placeholder.
+    fireEvent.change(numberInput("disk"), { target: { value: "50" } });
+    fireEvent.click(screen.getByTestId("use-default-disk"));
+    expect(numberInput("disk")).toHaveValue("");
+    expect(numberInput("disk")).toHaveAttribute(
+      "placeholder",
+      "machine.new.provisioned.param-default-short"
+    );
+  });
+
+  it("submits no params argument when every param keeps its default", async () => {
     mockedActions.provisionMachine.mockResolvedValue({
       name: "machines/m1",
       title: "Cloud Box",

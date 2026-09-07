@@ -660,8 +660,10 @@
         "offline": "离线",
         "offline-hint": "离线的 provisioner 在连接之前无法创建机器。",
         "param-default": "Provisioner 默认值",
-        "param-range": "{{range}}",
-        "params-hint": "留空使用 provisioner 配置的默认值;填写的值会按该 provisioner 声明的范围校验。",
+        "param-default-short": "默认",
+        "param-use-default": "使用默认值",
+        "param-use-default-aria": "沿用{{param}}的 Provisioner 默认值",
+        "params-hint": "拖动滑条即可选择机器规格,数值会按该 provisioner 声明的范围校验;保持\"使用默认值\"开启则沿用 provisioner 配置的默认值。",
         "params-title": "机器参数",
         "pick-hint": "机器的工作负载由所选 provisioner 在其后端中创建。",
         "pick-title": "选择 provisioner",
@@ -683,7 +685,8 @@
       "cpu": "CPU",
       "disk": "磁盘大小",
       "memory": "内存",
-      "storage-class": "存储类"
+      "storage-class": "存储类",
+      "unit-cores": "核"
     },
     "profile": {
       "edit-not-allowed": "仅机器的创建者或工作区管理员可管理此机器。",

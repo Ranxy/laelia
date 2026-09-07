@@ -6,10 +6,21 @@ import { Card } from "@/components/profile-common";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
+import { Slider } from "@/components/ui/slider";
 import { useWorkspacePolicy } from "@/hooks/use-workspace-policy";
 import { describeError } from "@/lib/connect-errors";
-import { machineParamLabelKey } from "@/lib/machine-params";
+import {
+  formatQuantityDisplay,
+  type MachineParamSliderRange,
+  machineParamLabelKey,
+  machineParamQuantity,
+  machineParamQuantityUnits,
+  machineParamSliderRange,
+  roundQuantityDisplay,
+} from "@/lib/machine-params";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type {
@@ -17,17 +28,149 @@ import type {
   Provisioner,
 } from "@/types/proto-es/v1/provisioner_pb";
 
-// ParamInputs renders one input per schema-declared parameter. Inputs start
-// empty: the default is the placeholder, so untouched fields keep tracking
-// the provisioner's admin-configured defaults. Only non-empty values submit.
+function clampToRange(n: number, range: MachineParamSliderRange): number {
+  return Math.min(Math.max(n, range.min), range.max);
+}
+
+// QuantityParamRow renders one QUANTITY parameter: a "use default" switch
+// (on for untouched fields, which keep tracking the provisioner's configured
+// default) plus a linked slider + number input in human units (cores / Gi).
+// The slider range comes from the provisioner's declared bounds, falling back
+// to the built-in per-key range when the admin configured none. The controls
+// stay live even while the switch is on: dragging the slider or typing a
+// number takes the param over and flips the switch off.
+function QuantityParamRow({
+  param,
+  label,
+  range,
+  value,
+  useDefault,
+  onValueChange,
+  onUseDefaultChange,
+}: {
+  param: MachineParamSpec;
+  label: string;
+  range: MachineParamSliderRange;
+  value: string | undefined;
+  useDefault: boolean;
+  onValueChange: (key: string, value: string) => void;
+  onUseDefaultChange: (key: string, useDefault: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const inputId = `machine-new-provisioned-param-${param.key}`;
+  const unit = machineParamQuantityUnits[param.key];
+  // Bumped each time the switch flips back on so the number input remounts
+  // and re-reads the default: Base UI's NumberField freezes its visible text
+  // while its input-sync ref is unset (until blur), so a controlled value
+  // change alone can leave stale typed text in the box.
+  const [defaultEpoch, setDefaultEpoch] = useState(0);
+  const defaultDisplay = param.defaultValue
+    ? formatQuantityDisplay(param.key, param.defaultValue)
+    : null;
+  // Position the slider/input take over from: the clamped default, or the
+  // range floor when the default is unset or unparseable.
+  const seed = clampToRange(
+    defaultDisplay !== null ? Number(defaultDisplay) : range.min,
+    range
+  );
+  // With the switch on, the input mirrors the default (empty + a short
+  // "default" placeholder when the provisioner reports none); off, it edits
+  // the value.
+  const current = useDefault
+    ? defaultDisplay !== null
+      ? Number(defaultDisplay)
+      : null
+    : roundQuantityDisplay(Number(value ?? seed));
+  return (
+    <div className="flex flex-col gap-1" data-testid={`param-row-${param.key}`}>
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={inputId} className="text-sm font-medium text-control">
+          {label}
+        </label>
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-control-light">
+          <Checkbox
+            checked={useDefault}
+            data-testid={`use-default-${param.key}`}
+            aria-label={t("machine.new.provisioned.param-use-default-aria", {
+              param: label,
+            })}
+            onCheckedChange={(next) => {
+              onUseDefaultChange(param.key, next);
+              if (next) {
+                setDefaultEpoch((epoch) => epoch + 1);
+              } else if (!value) {
+                onValueChange(param.key, String(seed));
+              }
+            }}
+            size="sm"
+          />
+          {t("machine.new.provisioned.param-use-default")}
+        </label>
+      </div>
+      <div className="flex items-center gap-3">
+        <Slider
+          className="flex-1"
+          value={current ?? seed}
+          min={range.min}
+          max={range.max}
+          step={range.step}
+          aria-label={label}
+          onValueChange={(v) => {
+            if (useDefault) onUseDefaultChange(param.key, false);
+            onValueChange(param.key, String(roundQuantityDisplay(v)));
+          }}
+        />
+        <NumberInput
+          key={`default-${defaultEpoch}`}
+          id={inputId}
+          className="w-28"
+          value={current}
+          min={range.min}
+          max={range.max}
+          step={range.step}
+          placeholder={
+            useDefault && defaultDisplay === null
+              ? t("machine.new.provisioned.param-default-short")
+              : undefined
+          }
+          suffix={
+            current !== null
+              ? unit?.labelKey
+                ? t(unit.labelKey)
+                : "Gi"
+              : undefined
+          }
+          onValueChange={(v) => {
+            if (v !== null) {
+              if (useDefault) onUseDefaultChange(param.key, false);
+              onValueChange(param.key, String(roundQuantityDisplay(v)));
+            }
+          }}
+        />
+      </div>
+      <div className="flex justify-between text-xs text-control-light">
+        <span>{roundQuantityDisplay(range.min)}</span>
+        <span>{roundQuantityDisplay(range.max)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ParamInputs renders one control per schema-declared parameter. QUANTITY
+// params (cpu/memory/disk) render as slider rows above; STRING and unknown
+// future keys stay free-text inputs whose empty value tracks the default.
 function ParamInputs({
   params,
   values,
+  useDefaults,
   onChange,
+  onUseDefaultChange,
 }: {
   params: MachineParamSpec[];
   values: Record<string, string>;
+  useDefaults: Record<string, boolean>;
   onChange: (key: string, value: string) => void;
+  onUseDefaultChange: (key: string, useDefault: boolean) => void;
 }) {
   const { t } = useTranslation();
   if (params.length === 0) return null;
@@ -38,33 +181,47 @@ function ParamInputs({
       </p>
       {params.map((param) => {
         const labelKey = machineParamLabelKey(param.key);
+        const label = labelKey ? t(labelKey) : param.key;
+        const range = machineParamSliderRange(
+          param.key,
+          param.minValue,
+          param.maxValue
+        );
+        if (!range) {
+          return (
+            <div key={param.key} className="flex flex-col gap-1">
+              <label
+                htmlFor={`machine-new-provisioned-param-${param.key}`}
+                className="text-sm font-medium text-control"
+              >
+                {label}
+              </label>
+              <Input
+                id={`machine-new-provisioned-param-${param.key}`}
+                value={values[param.key] ?? ""}
+                placeholder={
+                  param.defaultValue ||
+                  t("machine.new.provisioned.param-default")
+                }
+                onChange={(e) => {
+                  onChange(param.key, e.target.value);
+                }}
+                spellCheck={false}
+              />
+            </div>
+          );
+        }
         return (
-          <div key={param.key} className="flex flex-col gap-1">
-            <label
-              htmlFor={`machine-new-provisioned-param-${param.key}`}
-              className="text-sm font-medium text-control"
-            >
-              {labelKey ? t(labelKey) : param.key}
-              {(param.minValue || param.maxValue) && (
-                <span className="ml-2 text-xs font-normal text-control-light">
-                  {t("machine.new.provisioned.param-range", {
-                    range: `${param.minValue || "·"} – ${param.maxValue || "·"}`,
-                  })}
-                </span>
-              )}
-            </label>
-            <Input
-              id={`machine-new-provisioned-param-${param.key}`}
-              value={values[param.key] ?? ""}
-              placeholder={
-                param.defaultValue || t("machine.new.provisioned.param-default")
-              }
-              onChange={(e) => {
-                onChange(param.key, e.target.value);
-              }}
-              spellCheck={false}
-            />
-          </div>
+          <QuantityParamRow
+            key={param.key}
+            param={param}
+            label={label}
+            range={range}
+            value={values[param.key]}
+            useDefault={useDefaults[param.key] ?? true}
+            onValueChange={onChange}
+            onUseDefaultChange={onUseDefaultChange}
+          />
         );
       })}
       <p className="text-xs text-control-light">
@@ -90,9 +247,13 @@ export function MachineNewProvisionedPanel() {
   const [title, setTitle] = useState("");
   // Optional per-machine runtime image; empty = the workspace default.
   const [runtimeImage, setRuntimeImage] = useState("");
-  // Per-machine parameter values keyed by catalog key; empty = the
-  // provisioner's configured default applies.
+  // Per-machine parameter values keyed by catalog key, in display units for
+  // quantity params (cores / Gi); quantity keys with the default switch on
+  // (the initial state, tracked in useParamDefault) stay unsubmitted.
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
+  const [useParamDefault, setUseParamDefault] = useState<
+    Record<string, boolean>
+  >({});
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
@@ -133,12 +294,30 @@ export function MachineNewProvisionedPanel() {
     setCreating(true);
     setError("");
     try {
-      // Only non-empty values submit: an untouched field keeps tracking the
-      // provisioner's configured default.
+      // Slider params with the default switch on never submit; overridden
+      // quantity values clamp to the declared range and convert back to k8s
+      // quantity strings ("0.5" cores → "500m"). String and unknown keys keep
+      // the free-text rule: non-empty trimmed values submit verbatim.
       const machineParams: Record<string, string> = {};
       for (const param of selectedSchema) {
-        const value = paramValues[param.key]?.trim();
-        if (value) machineParams[param.key] = value;
+        const range = machineParamSliderRange(
+          param.key,
+          param.minValue,
+          param.maxValue
+        );
+        if (range && (useParamDefault[param.key] ?? true)) continue;
+        const raw = paramValues[param.key]?.trim();
+        if (!raw) continue;
+        const parsed = Number(raw);
+        if (range && Number.isFinite(parsed)) {
+          const quantity = machineParamQuantity(
+            param.key,
+            clampToRange(parsed, range)
+          );
+          if (quantity) machineParams[param.key] = quantity;
+          continue;
+        }
+        machineParams[param.key] = raw;
       }
       const hasParams = Object.keys(machineParams).length > 0;
       const machine = await useAppStore
@@ -270,8 +449,15 @@ export function MachineNewProvisionedPanel() {
               <ParamInputs
                 params={selectedSchema}
                 values={paramValues}
+                useDefaults={useParamDefault}
                 onChange={(key, value) => {
                   setParamValues((prev) => ({ ...prev, [key]: value }));
+                }}
+                onUseDefaultChange={(key, useDefault) => {
+                  setUseParamDefault((prev) => ({
+                    ...prev,
+                    [key]: useDefault,
+                  }));
                 }}
               />
             </div>

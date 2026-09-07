@@ -190,7 +190,9 @@ describe("settings-roles", () => {
     expect(mock.createRole).not.toHaveBeenCalled();
   });
 
-  it("edits a role from the edit sheet", async () => {
+  // 15s test timeout: under full-suite parallel load the chained findBy waits
+  // can outlast the 5s default (seen as an intermittent full-run timeout).
+  it("edits a role from the edit sheet", { timeout: 15000 }, async () => {
     mock.listRoles.mockResolvedValue({
       roles: [
         role({
