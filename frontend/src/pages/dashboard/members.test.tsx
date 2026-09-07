@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PRESENCES_QUERY_KEY } from "@/hooks/use-presence-heartbeat";
+import { PRESENCE_QUERY_KEY } from "@/hooks/use-presence";
 import { useAppStore } from "@/stores";
 import type { MemberSummary } from "@/stores/ui-models";
 import type { Conversation } from "@/types/proto-es/v1/command_pb";
@@ -57,15 +57,15 @@ function seedStore() {
   });
 }
 
-// Human presence badges read the Query cache now (the dashboard heartbeat is
-// its only writer); presence tests seed it via presenceSeeds at render time.
-let presenceSeeds: Record<string, boolean> = {};
+// Human presence badges read the presence Query cache (the read loop is its
+// only writer); presence tests seed it via presenceSeeds at render time.
+let presenceSeeds: Record<string, { online: boolean; lastSeenAt?: Date }> = {};
 
 function renderPage() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  client.setQueryData(PRESENCES_QUERY_KEY, { ...presenceSeeds });
+  client.setQueryData(PRESENCE_QUERY_KEY, { ...presenceSeeds });
   const router = createMemoryRouter(
     [
       {
@@ -237,18 +237,22 @@ describe("MembersPage presence badge", () => {
   });
 
   it("shows Online/Offline string badges for humans like the agents page", () => {
-    presenceSeeds = { "users/1": true };
+    presenceSeeds = { "users/1": { online: true } };
     renderPage();
 
-    // Alice (users/1) heartbeated recently → Online badge; Bob has no
-    // heartbeat → Offline badge. The row-level "User" label is replaced by
-    // the presence badge, mirroring the agents' ConnectionBadge.
+    // Alice (users/1) heartbeated recently → Online badge; Bob is absent from
+    // the full response (never heartbeated) → Offline badge. The row-level
+    // "User" label is replaced by the presence badge, mirroring the agents'
+    // ConnectionBadge.
     expect(screen.getByText("chat.presence-online")).toBeTruthy();
     expect(screen.getByText("chat.presence-offline")).toBeTruthy();
   });
 
   it("leaves agent rows on the connection badge, not the presence one", () => {
-    presenceSeeds = { "users/1": true, "agents/beta": true };
+    presenceSeeds = {
+      "users/1": { online: true },
+      "agents/beta": { online: true },
+    };
     renderPage();
 
     // The beta agent is ONLINE, but agent rows use the ConnectionBadge
@@ -258,5 +262,36 @@ describe("MembersPage presence badge", () => {
 
     // And both agent rows render the mocked ConnectionBadge stub.
     expect(screen.getAllByTestId("conn")).toHaveLength(2);
+  });
+
+  it("tooltips an offline human's badge with its last heartbeat", () => {
+    presenceSeeds = {
+      "users/1": {
+        online: false,
+        lastSeenAt: new Date(Date.now() - 5 * 60_000), // 5 minutes ago
+      },
+      "users/2": { online: false },
+    };
+    renderPage();
+
+    // Both humans are offline; only the one with a recorded heartbeat (Alice)
+    // carries the "last seen" tooltip on its badge.
+    const badges = screen.getAllByText("chat.presence-offline");
+    expect(badges).toHaveLength(2);
+    const titles = new Set(badges.map((b) => b.getAttribute("title")));
+    expect(titles).toContain("chat.presence-last-minutes");
+    expect(titles).toContain(null);
+  });
+
+  it("shows no last-seen tooltip for a user the server has never seen", () => {
+    presenceSeeds = {
+      "users/1": { online: false },
+      "users/2": { online: false },
+    };
+    renderPage();
+
+    for (const badge of screen.getAllByText("chat.presence-offline")) {
+      expect(badge.getAttribute("title")).toBeNull();
+    }
   });
 });

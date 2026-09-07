@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 // usePolling is the shared component-level data-polling primitive: a
 // fixed-cadence interval with visibility gating, replacing the hand-rolled
 // setInterval effects previously inlined in page components (the pattern
-// established in use-presence-heartbeat and activity-list).
+// established in use-presence and activity-list).
 //
 // Contract:
 // - Fixed cadence: fn fires every intervalMs regardless of how long the
@@ -12,12 +12,16 @@ import { useEffect, useRef } from "react";
 // - Visibility gated: while document.hidden, every tick is a no-op, so a
 //   background tab stops issuing requests without tearing down the timer.
 //   A visibilitychange listener calls fn once immediately when the tab goes
-//   hidden→visible (mirroring use-presence-heartbeat), instead of waiting up
+//   hidden→visible (mirroring use-presence), instead of waiting up
 //   to a full interval for the next tick.
 // - Cleanup: on unmount — or whenever the interval restarts — both the
 //   interval and the visibilitychange listener are removed.
 // - enabled=false (opts) starts nothing: no interval, no listener. Flipping
 //   enabled back to true recreates both.
+// - fireOnMount (opts) invokes fn once immediately when the loop starts (and
+//   again on every restart), instead of waiting a full interval for the first
+//   tick. The presence heartbeat is the motivating case: a user must be
+//   reported online on page load, not 30s in.
 // - fn is kept in a ref and never in the effect deps: callers may pass an
 //   inline closure created every render — no useCallback needed — and each
 //   tick always invokes the latest fn. Only intervalMs/enabled changes
@@ -25,9 +29,10 @@ import { useEffect, useRef } from "react";
 export function usePolling(
   fn: () => void | Promise<void>,
   intervalMs: number,
-  opts?: { enabled?: boolean }
+  opts?: { enabled?: boolean; fireOnMount?: boolean }
 ): void {
   const enabled = opts?.enabled ?? true;
+  const fireOnMount = opts?.fireOnMount ?? false;
   // Latest-ref pattern: sync the newest closure after each render without
   // making it a dependency of the polling effect.
   const fnRef = useRef(fn);
@@ -41,6 +46,7 @@ export function usePolling(
       if (document.hidden) return;
       void fnRef.current();
     };
+    if (fireOnMount) tick();
     const handle = setInterval(tick, intervalMs);
     const onVisible = () => {
       if (!document.hidden) tick();
@@ -50,5 +56,5 @@ export function usePolling(
       clearInterval(handle);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [enabled, intervalMs]);
+  }, [enabled, intervalMs, fireOnMount]);
 }

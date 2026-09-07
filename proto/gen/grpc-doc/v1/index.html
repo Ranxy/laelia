@@ -1311,10 +1311,6 @@
                 </li>
               
                 <li>
-                  <a href="#laelia.v1.Presence"><span class="badge">M</span>Presence</a>
-                </li>
-              
-                <li>
                   <a href="#laelia.v1.PromptReleaseNotice"><span class="badge">M</span>PromptReleaseNotice</a>
                 </li>
               
@@ -1408,14 +1404,6 @@
               
                 <li>
                   <a href="#laelia.v1.SteerMessage"><span class="badge">M</span>SteerMessage</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.SyncPresenceRequest"><span class="badge">M</span>SyncPresenceRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.SyncPresenceResponse"><span class="badge">M</span>SyncPresenceResponse</a>
                 </li>
               
                 <li>
@@ -2240,6 +2228,41 @@
               
                 <li>
                   <a href="#laelia.v1.NotificationService"><span class="badge">S</span>NotificationService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#v1%2fpresence_service.proto">v1/presence_service.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.v1.ListPresenceRequest"><span class="badge">M</span>ListPresenceRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListPresenceResponse"><span class="badge">M</span>ListPresenceResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.Presence"><span class="badge">M</span>Presence</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SendHeartbeatRequest"><span class="badge">M</span>SendHeartbeatRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SendHeartbeatResponse"><span class="badge">M</span>SendHeartbeatResponse</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#laelia.v1.PresenceService"><span class="badge">S</span>PresenceService</a>
                 </li>
               
             </ul>
@@ -13234,37 +13257,6 @@ rooted at the given message name. Empty posts a normal channel message. </p></td
 
         
       
-        <h3 id="laelia.v1.Presence">Presence</h3>
-        <p>Presence is one queried principal's online state.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>name</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>name is the queried principal&#39;s resource name, as requested. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>online</td>
-                  <td><a href="#bool">bool</a></td>
-                  <td></td>
-                  <td><p>online is true while the principal is currently online. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
         <h3 id="laelia.v1.PromptReleaseNotice">PromptReleaseNotice</h3>
         <p>PromptReleaseNotice tells an agent that its system prompt has changed. The</p><p>manager pushes it when persona/team/owner changes (dynamic) or when the</p><p>machine's bundled static prompt is out of date. The agent injects it into the</p><p>current turn when steerable, otherwise on the next drain turn, and acks with</p><p>PromptReleaseNoticeAck.</p>
 
@@ -14190,57 +14182,6 @@ TODO. Only valid for top-level messages (thread_root must be empty). </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.SyncPresenceRequest">SyncPresenceRequest</h3>
-        <p>SyncPresenceRequest asks for the online state of a batch of principals. The</p><p>calling principal's own presence heartbeat is recorded before answering.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>names</td>
-                  <td><a href="#string">string</a></td>
-                  <td>repeated</td>
-                  <td><p>names are the principals to query (&#34;users/&lt;handle&gt;&#34; or &#34;agents/&lt;id&gt;&#34;).
-Duplicates are collapsed; the list is capped at 200 entries. Agents are
-accepted but always answered offline (agent presence comes from the
-agent connection state, not from presence heartbeats). </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.SyncPresenceResponse">SyncPresenceResponse</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>presences</td>
-                  <td><a href="#laelia.v1.Presence">Presence</a></td>
-                  <td>repeated</td>
-                  <td><p>presences carries one entry per requested name. </p></td>
                 </tr>
               
             </tbody>
@@ -16232,20 +16173,6 @@ UNREAD.</p></td>
                 <td><a href="#laelia.v1.MarkActivityDoneResponse">MarkActivityDoneResponse</a></td>
                 <td><p>MarkActivityDone marks a single activity item DONE for the authenticated
 user, hiding it from All and Unread. The caller&#39;s own id must own the row.</p></td>
-              </tr>
-            
-              <tr>
-                <td>SyncPresence</td>
-                <td><a href="#laelia.v1.SyncPresenceRequest">SyncPresenceRequest</a></td>
-                <td><a href="#laelia.v1.SyncPresenceResponse">SyncPresenceResponse</a></td>
-                <td><p>SyncPresence records the calling principal&#39;s presence heartbeat and returns
-the current online state of the requested principals. Any authenticated
-principal (user or agent) may call it. The caller&#39;s own presence is updated
-as a side effect; a caller can only query other principals&#39; presence, never
-report it. Human presence is a sliding window: a user is online while its
-last heartbeat is within the manager&#39;s presence TTL. Agent presence is NOT
-answered here (agents are always answered offline) — AgentService.ListAgents
-status.state is the authoritative agent connection signal.</p></td>
               </tr>
             
           </tbody>
@@ -22026,6 +21953,137 @@ when Web Push is disabled.</p></td>
 user. The name is &#34;users/{user}/pushSubscriptions/{endpointKey}&#34; where
 endpointKey is the URL-safe base64 of the subscription endpoint; the name&#39;s
 user must be the caller.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="v1/presence_service.proto">v1/presence_service.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.v1.ListPresenceRequest">ListPresenceRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.ListPresenceResponse">ListPresenceResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>presences</td>
+                  <td><a href="#laelia.v1.Presence">Presence</a></td>
+                  <td>repeated</td>
+                  <td><p>presences carries one entry per tracked user (rows with heartbeat
+history); users never seen are simply absent. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.Presence">Presence</h3>
+        <p>Presence is one human user's online state.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>name is the user&#39;s resource name (&#34;users/&lt;handle&gt;&#34;) — the same shape
+the frontend keys conversation peers and rosters by. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>online</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>online is true while the user&#39;s last heartbeat is within the manager&#39;s
+presence TTL, computed at query time. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_seen_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p>last_seen_at is the time of the user&#39;s last heartbeat; clients render
+&#34;last seen&#34; hints for offline users from it. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SendHeartbeatRequest">SendHeartbeatRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.SendHeartbeatResponse">SendHeartbeatResponse</h3>
+        <p></p>
+
+        
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="laelia.v1.PresenceService">PresenceService</h3>
+        <p>PresenceService tracks which human users are currently online. It is a</p><p>heartbeat system: the web frontend sends one SendHeartbeat per cadence</p><p>(identity comes from the auth context, so a caller can never report</p><p>presence for someone else), and reads the whole workspace's presence with</p><p>ListPresence. A user is online while its last heartbeat is within the</p><p>manager's presence TTL. Agents are NOT tracked here — their connection</p><p>state is authoritative in AgentService.ListAgents. Visibility matches</p><p>ListUsers: any authenticated member may read the workspace's presence.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>SendHeartbeat</td>
+                <td><a href="#laelia.v1.SendHeartbeatRequest">SendHeartbeatRequest</a></td>
+                <td><a href="#laelia.v1.SendHeartbeatResponse">SendHeartbeatResponse</a></td>
+                <td><p>SendHeartbeat records the calling human user&#39;s presence heartbeat.
+Agent callers are answered OK as a no-op — agents are not tracked here.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ListPresence</td>
+                <td><a href="#laelia.v1.ListPresenceRequest">ListPresenceRequest</a></td>
+                <td><a href="#laelia.v1.ListPresenceResponse">ListPresenceResponse</a></td>
+                <td><p>ListPresence answers the presence of every tracked human user. The set
+is defined by the server (bounded by workspace size), so clients never
+tell the server what to query. A user absent from the response has
+never sent a heartbeat (effectively offline).</p></td>
               </tr>
             
           </tbody>

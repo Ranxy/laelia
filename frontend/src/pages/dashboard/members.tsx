@@ -10,8 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { TwoPaneShell } from "@/components/ui/two-pane-shell";
-import { useOnlineUsers } from "@/hooks/use-presence-heartbeat";
+import { useUserPresence } from "@/hooks/use-presence";
 import { useAvatar } from "@/lib/avatar-cache";
+import { formatLastSeen } from "@/lib/presence";
 import { avatarNameForAgentId, avatarNameForUserId } from "@/lib/resource";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -347,11 +348,17 @@ function MemberRow({
     ? avatarNameForAgentId(resourceId)
     : avatarNameForUserId(resourceId);
   const avatarSrc = useAvatar(avatarName);
-  // Human presence reads the heartbeat map (refreshed by the dashboard
-  // heartbeat tick); agent presence rides the ConnectionBadge like the
-  // Agents page. Both surfaces render the same "Online"/"Offline" strings.
-  const onlineUsers = useOnlineUsers();
-  const userOnline = !isAgent && onlineUsers[member.name] === true;
+  // Human presence reads the whole-workspace presence map (server-defined
+  // set, independent of this page's load timing); agent presence rides the
+  // ConnectionBadge like the Agents page. Both surfaces render the same
+  // "Online"/"Offline" strings, and an offline human's badge tooltips its
+  // last heartbeat. While the map is still loading, render no badge: "no
+  // data yet" is not "offline".
+  const userPresence = useUserPresence(isAgent ? undefined : member.name);
+  const lastSeenTitle =
+    userPresence?.lastSeenAt && !userPresence.online
+      ? formatLastSeen(userPresence.lastSeenAt, t)
+      : undefined;
 
   return (
     <RailRow
@@ -385,11 +392,13 @@ function MemberRow({
           state={member.connectionState}
           enabled={member.enabled}
         />
-      ) : userOnline ? (
+      ) : userPresence?.online ? (
         <Badge variant="success">{t("chat.presence-online")}</Badge>
-      ) : (
-        <Badge variant="secondary">{t("chat.presence-offline")}</Badge>
-      )}
+      ) : userPresence ? (
+        <Badge variant="secondary" title={lastSeenTitle}>
+          {t("chat.presence-offline")}
+        </Badge>
+      ) : null}
     </RailRow>
   );
 }

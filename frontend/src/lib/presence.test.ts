@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAgentOnline, peerPresenceOnline } from "./presence";
+import { agentPeerOnline, formatLastSeen, isAgentOnline } from "./presence";
 
 describe("isAgentOnline", () => {
   it("counts only the ONLINE connection state", () => {
@@ -17,34 +17,54 @@ describe("isAgentOnline", () => {
   });
 });
 
-describe("peerPresenceOnline", () => {
+describe("agentPeerOnline", () => {
   const agents = [
     { name: "agents/online", status: { state: 1 } },
     { name: "agents/offline", status: { state: 2 } },
   ];
 
   it("answers agent peers from the roster connection state", () => {
-    expect(peerPresenceOnline("agents/online", true, agents, {})).toBe(true);
-    expect(peerPresenceOnline("agents/offline", true, agents, {})).toBe(false);
-    expect(peerPresenceOnline("agents/ghost", true, agents, {})).toBe(false);
+    expect(agentPeerOnline("agents/online", agents)).toBe(true);
+    expect(agentPeerOnline("agents/offline", agents)).toBe(false);
+    expect(agentPeerOnline("agents/ghost", agents)).toBe(false);
   });
 
-  it("answers user peers from the heartbeat map", () => {
-    const onlineUsers = { "users/alice": true, "users/bob": false };
-    expect(peerPresenceOnline("users/alice", false, agents, onlineUsers)).toBe(
-      true
-    );
-    // An explicit offline heartbeat renders no badge (false), not undefined.
-    expect(peerPresenceOnline("users/bob", false, agents, onlineUsers)).toBe(
-      false
-    );
-    expect(peerPresenceOnline("users/ghost", false, agents, onlineUsers)).toBe(
-      false
+  it("answers false for an absent peer", () => {
+    expect(agentPeerOnline(undefined, agents)).toBe(false);
+  });
+});
+
+describe("formatLastSeen", () => {
+  // The translator stands in for i18next: every phrase is number-agnostic
+  // (compact unit style), so one catalog form per locale carries all counts.
+  const t = (key: string, opts?: Record<string, unknown>) =>
+    `${key}:${opts?.count ?? opts?.time ?? ""}`;
+
+  it("says just-now inside a minute", () => {
+    const now = new Date("2026-01-01T12:00:00Z");
+    expect(formatLastSeen(new Date("2026-01-01T11:59:30Z"), t, now)).toBe(
+      "chat.presence-last-just-now:"
     );
   });
 
-  it("returns undefined for an absent peer (no badge at all)", () => {
-    expect(peerPresenceOnline(undefined, true, agents, {})).toBeUndefined();
-    expect(peerPresenceOnline(undefined, false, agents, {})).toBeUndefined();
+  it("formats minutes, hours, and days with the elapsed count", () => {
+    const now = new Date("2026-01-01T12:00:00Z");
+    expect(formatLastSeen(new Date("2026-01-01T11:55:00Z"), t, now)).toBe(
+      "chat.presence-last-minutes:5"
+    );
+    expect(formatLastSeen(new Date("2026-01-01T09:00:00Z"), t, now)).toBe(
+      "chat.presence-last-hours:3"
+    );
+    expect(formatLastSeen(new Date("2025-12-28T12:00:00Z"), t, now)).toBe(
+      "chat.presence-last-days:4"
+    );
+  });
+
+  it("falls back to a locale date beyond a week", () => {
+    const now = new Date("2026-01-01T12:00:00Z");
+    const longAgo = new Date("2025-11-01T12:00:00Z");
+    expect(formatLastSeen(longAgo, t, now)).toBe(
+      `chat.presence-last-date:${longAgo.toLocaleDateString()}`
+    );
   });
 });

@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+// PresenceService tracks which human users are currently online. It is a
+// heartbeat system: the web frontend sends one SendHeartbeat per cadence
+// (identity comes from the auth context, so a caller can never report
+// presence for someone else), and reads the whole workspace's presence with
+// ListPresence. A user is online while its last heartbeat is within the
+// manager's presence TTL. Agents are NOT tracked here — their connection
+// state is authoritative in AgentService.ListAgents. Visibility matches
+// ListUsers: any authenticated member may read the workspace's presence.
+service PresenceService {
+  // SendHeartbeat records the calling human user's presence heartbeat.
+  // Agent callers are answered OK as a no-op — agents are not tracked here.
+  rpc SendHeartbeat(SendHeartbeatRequest) returns (SendHeartbeatResponse) {}
+
+  // ListPresence answers the presence of every tracked human user. The set
+  // is defined by the server (bounded by workspace size), so clients never
+  // tell the server what to query. A user absent from the response has
+  // never sent a heartbeat (effectively offline).
+  rpc ListPresence(ListPresenceRequest) returns (ListPresenceResponse) {}
+}
+
+message SendHeartbeatRequest {}
+
+message SendHeartbeatResponse {}
+
+message ListPresenceRequest {}
+
+// Presence is one human user's online state.
+message Presence {
+  // name is the user's resource name ("users/<handle>") — the same shape
+  // the frontend keys conversation peers and rosters by.
+  string name = 1;
+  // online is true while the user's last heartbeat is within the manager's
+  // presence TTL, computed at query time.
+  bool online = 2;
+  // last_seen_at is the time of the user's last heartbeat; clients render
+  // "last seen" hints for offline users from it.
+  google.protobuf.Timestamp last_seen_at = 3;
+}
+
+message ListPresenceResponse {
+  // presences carries one entry per tracked user (rows with heartbeat
+  // history); users never seen are simply absent.
+  repeated Presence presences = 1;
+}

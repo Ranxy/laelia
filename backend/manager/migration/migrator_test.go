@@ -343,9 +343,30 @@ CREATE INDEX IF NOT EXISTS idx_conversation_agent_dm ON conversation (agent_dm_a
 	assertHistoryVersionsConn(t, conn, baselineVersion)
 }
 
+// embeddedLatestVersion computes the newest version of the real embedded
+// migration tree, mirroring what a fresh install records. Hard-coding the
+// number here would break the gate every time an incremental lands.
+func embeddedLatestVersion(t *testing.T) semver.Version {
+	t.Helper()
+	files, err := getSortedVersionedFiles(migrationFS)
+	if err != nil {
+		t.Fatalf("walk embedded migration tree: %v", err)
+	}
+	return computeLatestVersion(files)
+}
+
+// nextVersionPath returns an injected-incremental filename one patch above
+// the given version, e.g. latest 1.1.30 -> migration/1.1/0031##test.sql.
+func nextVersionPath(v semver.Version) (path, version string) {
+	next := semver.Version{Major: v.Major, Minor: v.Minor, Patch: v.Patch + 1}
+	return fmt.Sprintf("migration/%d.%d/%04d##test.sql", next.Major, next.Minor, next.Patch), next.String()
+}
+
 func TestMigrateSchema_FreshInstall(t *testing.T) {
 	db := integrationDB(t)
 	ctx := context.Background()
+
+	latest := embeddedLatestVersion(t).String()
 
 	if err := MigrateSchema(ctx, db); err != nil {
 		t.Fatalf("MigrateSchema (fresh): %v", err)
@@ -357,35 +378,38 @@ func TestMigrateSchema_FreshInstall(t *testing.T) {
 	if !tableExistsQ(t, db, schemaMigrationHistory) {
 		t.Fatal("schema_migration_history missing after fresh install")
 	}
-	assertHistoryVersions(t, db, "1.0.0")
+	assertHistoryVersions(t, db, latest)
 
 	// Second run is a no-op: still one row, no error.
 	if err := MigrateSchema(ctx, db); err != nil {
 		t.Fatalf("MigrateSchema (idempotent re-run): %v", err)
 	}
-	assertHistoryVersions(t, db, "1.0.0")
+	assertHistoryVersions(t, db, latest)
 }
 
 func TestMigrateSchema_Upgrade(t *testing.T) {
 	db := integrationDB(t)
 	ctx := context.Background()
 
-	// Fresh install with the real embedded tree (no incrementals yet).
+	// Fresh install with the real embedded tree (records its latest version).
+	latest := embeddedLatestVersion(t)
 	if err := MigrateSchema(ctx, db); err != nil {
 		t.Fatalf("MigrateSchema (fresh): %v", err)
 	}
-	assertHistoryVersions(t, db, "1.0.0")
+	assertHistoryVersions(t, db, latest.String())
 
-	// Inject a fake newer incremental migration via a test FS. The upgrade path
-	// does not re-read LATEST.sql (schema already exists), so the test FS only
-	// needs the incremental file.
+	// Inject a fake newer incremental via a test FS. The upgrade path does not
+	// re-read LATEST.sql (schema already exists), so the test FS only needs the
+	// incremental file — one patch above the recorded version so the upgrade
+	// loop actually picks it up.
 	latestBuf, err := fs.ReadFile(migrationFS, latestSchemaFileName)
 	if err != nil {
 		t.Fatalf("read embedded LATEST.sql: %v", err)
 	}
+	incrementalPath, incrementalVersion := nextVersionPath(latest)
 	testFS := fstest.MapFS{
-		"migration/LATEST.sql":         {Data: latestBuf},
-		"migration/1.0/0001##test.sql": {Data: []byte("CREATE TABLE IF NOT EXISTS test_upgrade_marker (id int);")},
+		"migration/LATEST.sql": {Data: latestBuf},
+		incrementalPath:        {Data: []byte("CREATE TABLE IF NOT EXISTS test_upgrade_marker (id int);")},
 	}
 
 	if err := migrateSchemaFS(ctx, db, testFS); err != nil {
@@ -395,7 +419,7 @@ func TestMigrateSchema_Upgrade(t *testing.T) {
 	if !tableExistsQ(t, db, "test_upgrade_marker") {
 		t.Fatal("upgrade migration did not create test_upgrade_marker")
 	}
-	assertHistoryVersions(t, db, "1.0.0", "1.0.1")
+	assertHistoryVersions(t, db, latest.String(), incrementalVersion)
 }
 
 // --- helpers ---

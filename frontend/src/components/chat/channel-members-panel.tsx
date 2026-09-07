@@ -10,7 +10,7 @@ import { MemberPicker as IamMemberPicker } from "@/components/member-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { groupServiceClient, userServiceClient } from "@/connect";
-import { useOnlineUsers } from "@/hooks/use-presence-heartbeat";
+import { usePresenceMap } from "@/hooks/use-presence";
 import { useAvatar } from "@/lib/avatar-cache";
 import { isAgentOnline } from "@/lib/presence";
 import { avatarNameForAgentId, avatarNameForUserId } from "@/lib/resource";
@@ -93,9 +93,10 @@ export function ChannelMembersPanel({
   const removeChannelMember = useAppStore((s) => s.removeChannelMember);
   // Presence inputs for the roster rows' green badge, same sources as the
   // chat list: agents from the roster's connection state, humans from the
-  // presence heartbeat slice (refreshed by the dashboard heartbeat tick).
+  // whole-workspace presence map (server-defined set, independent of this
+  // roster's load timing).
   const agents = useAppStore((s) => s.agents);
-  const onlineUsers = useOnlineUsers();
+  const { presences } = usePresenceMap();
   const onlineAgentNames = useMemo(() => {
     const online = new Set<string>();
     for (const a of agents) {
@@ -298,7 +299,7 @@ export function ChannelMembersPanel({
               online={
                 m.memberType === 2
                   ? onlineAgentNames.has(`agents/${m.memberId}`)
-                  : onlineUsers[`users/${m.memberId}`] === true
+                  : presences[`users/${m.memberId}`]?.online === true
               }
               agent={
                 m.memberType === 2 ? agentsById.get(m.memberId) : undefined

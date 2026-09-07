@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ChatConversationPage and ChannelConversationView read the presence map out
-// of the Query cache through useOnlineUsers — tests render under a fresh
+// of the Query cache through usePresenceMap — tests render under a fresh
 // provider (the badge data itself is covered by use-presence.test.tsx).
 function renderWithQuery(ui: React.ReactElement) {
   const client = new QueryClient({

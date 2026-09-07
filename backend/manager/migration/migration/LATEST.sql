@@ -1108,3 +1108,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_provisioner_unique_resource_id ON provisio
 ALTER TABLE machine ADD COLUMN IF NOT EXISTS provisioner_id int REFERENCES provisioner(id);
 ALTER TABLE machine ADD COLUMN IF NOT EXISTS provisioning jsonb;
 CREATE INDEX IF NOT EXISTS idx_machine_provisioner ON machine(provisioner_id) WHERE provisioner_id IS NOT NULL;
+
+-- Human user presence: last web heartbeat per user handle, powering the
+-- online badge and "last seen" hints. A user is online while its last
+-- heartbeat is within the manager's presence TTL (store.PresenceTTL). The
+-- handle matches principal.handle (no FK: presence is ephemeral runtime
+-- state; rows for deleted principals are harmless dead keys that simply
+-- answer offline). Only human users are written here — agents carry their
+-- connection state in AgentService, not in this table.
+CREATE TABLE IF NOT EXISTS user_presence (
+    handle       text PRIMARY KEY,
+    -- Time of the user's last web heartbeat (upserted on every beat).
+    last_seen_at timestamptz NOT NULL
+);

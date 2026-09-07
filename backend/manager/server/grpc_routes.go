@@ -20,7 +20,6 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/component/mailer"
-	"github.com/Ranxy/laelia/backend/manager/component/presence"
 	"github.com/Ranxy/laelia/backend/manager/component/roomhub"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
@@ -67,11 +66,10 @@ func configureV1Routers(
 	userService := apiv1.NewUserService(stores, profile, stateCfg, iamManager, s3clientmanager, mailerSender)
 	authService := apiv1.NewAuthService(stores, secret, profile, stateCfg, mailerSender)
 	agentService := apiv1.NewAgentService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager, s3clientmanager)
-	// Chat presence: an in-process registry of the last web heartbeat per
-	// user, consulted by the chat page's online badge. Single-process only,
-	// like the roomhub it sits beside.
-	presenceRegistry := presence.New()
-	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager, iamManager, hub, presenceRegistry)
+	// Human presence: heartbeat state lives in the user_presence table, so it
+	// survives restarts and any later multi-instance deployment.
+	presenceService := apiv1.NewPresenceService(stores)
+	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager, iamManager, hub)
 	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)
 	machineService := apiv1.NewMachineService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager)
 	deviceService := apiv1.NewDeviceService(deviceStore, stores, secret, profile, iamManager)
@@ -157,6 +155,8 @@ func configureV1Routers(
 	connectHandlers[agentPath] = agentHandler
 	commandPath, commandHandler := v1connect.NewCommandServiceHandler(commandService, handlerOpts)
 	connectHandlers[commandPath] = commandHandler
+	presencePath, presenceHandler := v1connect.NewPresenceServiceHandler(presenceService, handlerOpts)
+	connectHandlers[presencePath] = presenceHandler
 	agentCmdPath, agentCmdHandler := v1connect.NewAgentStreamServiceHandler(agentCommandService, handlerOpts)
 	connectHandlers[agentCmdPath] = agentCmdHandler
 	machinePath, machineHandler := v1connect.NewMachineServiceHandler(machineService, handlerOpts)
@@ -203,6 +203,7 @@ func configureV1Routers(
 			v1connect.AuthServiceName,
 			v1connect.AgentServiceName,
 			v1connect.CommandServiceName,
+			v1connect.PresenceServiceName,
 			v1connect.AgentStreamServiceName,
 			v1connect.MachineServiceName,
 			v1connect.DeviceServiceName,

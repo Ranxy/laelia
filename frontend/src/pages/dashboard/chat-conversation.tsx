@@ -43,9 +43,9 @@ import { useAvatar } from "@/lib/avatar-cache";
 import "@/lib/markdown";
 import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { useMessageScroller } from "@/hooks/use-message-scroller";
-import { useOnlineUsers } from "@/hooks/use-presence-heartbeat";
+import { useUserPresence } from "@/hooks/use-presence";
 import { useWindowedMessageRange } from "@/hooks/use-windowed-message-range";
-import { peerPresenceOnline } from "@/lib/presence";
+import { agentPeerOnline, formatLastSeen } from "@/lib/presence";
 import { toastManager } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -225,10 +225,9 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const enterToSend = currentUser?.chatPreferences?.enterToSend ?? true;
   const fetchAgents = useAppStore((s) => s.fetchAgents);
   // DM-peer presence inputs for the header badge, same sources as the left
-  // rail: agents from the roster's connection state, humans from the presence
-  // heartbeat slice. Both are refreshed by ChatLayout's 30s tick.
+  // rail: agents from the roster's connection state, humans from the
+  // whole-workspace presence map.
   const agents = useAppStore((s) => s.agents);
-  const onlineUsers = useOnlineUsers();
   const openThread = useAppStore((s) => s.openThread);
   const closeThread = useAppStore((s) => s.closeThread);
   const activeThreadRoot = useAppStore((s) => s.activeThreadRoot);
@@ -413,12 +412,24 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const peerAvatarName = peer ? `${peer}/avatar` : undefined;
   const peerAvatarSrc = useAvatar(peerAvatarName);
   const peerId = peer ? (peer.split("/").pop() ?? "") : "";
-  const peerOnline = peerPresenceOnline(
-    peer,
-    isDm || isAgentDm,
-    agents,
-    onlineUsers
-  );
+  // Human-DM presence reads the whole-workspace presence map; agent-DM
+  // presence reads the agent roster's connection state. Undefined means the
+  // map has not loaded yet (no badge, not "offline").
+  const peerUserPresence = useUserPresence(isUserDm ? peer : undefined);
+  const peerOnline = isUserDm
+    ? peerUserPresence?.online
+    : isDm || isAgentDm
+      ? agentPeerOnline(peer, agents)
+      : undefined;
+  // Offline human peers surface their last heartbeat ("last seen") in the
+  // badge tooltip instead of the bare online flag.
+  const peerOnlineTitle = peerOnline
+    ? t("chat.presence-online")
+    : peerUserPresence &&
+        !peerUserPresence.online &&
+        peerUserPresence.lastSeenAt
+      ? formatLastSeen(peerUserPresence.lastSeenAt, t)
+      : undefined;
 
   // The thread panel is open only when it belongs to the currently-viewed
   // channel; switching channels closes it (see init()).
@@ -811,7 +822,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             src={peerAvatarSrc}
             seed={peerId || (channel?.title ?? "")}
             online={peerOnline}
-            title={peerOnline ? t("chat.presence-online") : undefined}
+            title={peerOnlineTitle}
           />
         ) : (
           <div

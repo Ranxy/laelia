@@ -240,9 +240,6 @@ const (
 	// CommandServiceMarkActivityDoneProcedure is the fully-qualified name of the CommandService's
 	// MarkActivityDone RPC.
 	CommandServiceMarkActivityDoneProcedure = "/laelia.v1.CommandService/MarkActivityDone"
-	// CommandServiceSyncPresenceProcedure is the fully-qualified name of the CommandService's
-	// SyncPresence RPC.
-	CommandServiceSyncPresenceProcedure = "/laelia.v1.CommandService/SyncPresence"
 	// AgentStreamServiceAgentChannelProcedure is the fully-qualified name of the AgentStreamService's
 	// AgentChannel RPC.
 	AgentStreamServiceAgentChannelProcedure = "/laelia.v1.AgentStreamService/AgentChannel"
@@ -448,15 +445,6 @@ type CommandServiceClient interface {
 	// MarkActivityDone marks a single activity item DONE for the authenticated
 	// user, hiding it from All and Unread. The caller's own id must own the row.
 	MarkActivityDone(context.Context, *connect.Request[v1.MarkActivityDoneRequest]) (*connect.Response[v1.MarkActivityDoneResponse], error)
-	// SyncPresence records the calling principal's presence heartbeat and returns
-	// the current online state of the requested principals. Any authenticated
-	// principal (user or agent) may call it. The caller's own presence is updated
-	// as a side effect; a caller can only query other principals' presence, never
-	// report it. Human presence is a sliding window: a user is online while its
-	// last heartbeat is within the manager's presence TTL. Agent presence is NOT
-	// answered here (agents are always answered offline) — AgentService.ListAgents
-	// status.state is the authoritative agent connection signal.
-	SyncPresence(context.Context, *connect.Request[v1.SyncPresenceRequest]) (*connect.Response[v1.SyncPresenceResponse], error)
 }
 
 // NewCommandServiceClient constructs a client for the laelia.v1.CommandService service. By default,
@@ -878,12 +866,6 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("MarkActivityDone")),
 			connect.WithClientOptions(opts...),
 		),
-		syncPresence: connect.NewClient[v1.SyncPresenceRequest, v1.SyncPresenceResponse](
-			httpClient,
-			baseURL+CommandServiceSyncPresenceProcedure,
-			connect.WithSchema(commandServiceMethods.ByName("SyncPresence")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -957,7 +939,6 @@ type commandServiceClient struct {
 	listFiles                 *connect.Client[v1.ListFilesRequest, v1.ListFilesResponse]
 	listActivities            *connect.Client[v1.ListActivitiesRequest, v1.ListActivitiesResponse]
 	markActivityDone          *connect.Client[v1.MarkActivityDoneRequest, v1.MarkActivityDoneResponse]
-	syncPresence              *connect.Client[v1.SyncPresenceRequest, v1.SyncPresenceResponse]
 }
 
 // ListCommands calls laelia.v1.CommandService.ListCommands.
@@ -1300,11 +1281,6 @@ func (c *commandServiceClient) MarkActivityDone(ctx context.Context, req *connec
 	return c.markActivityDone.CallUnary(ctx, req)
 }
 
-// SyncPresence calls laelia.v1.CommandService.SyncPresence.
-func (c *commandServiceClient) SyncPresence(ctx context.Context, req *connect.Request[v1.SyncPresenceRequest]) (*connect.Response[v1.SyncPresenceResponse], error) {
-	return c.syncPresence.CallUnary(ctx, req)
-}
-
 // CommandServiceHandler is an implementation of the laelia.v1.CommandService service.
 type CommandServiceHandler interface {
 	ListCommands(context.Context, *connect.Request[v1.ListCommandsRequest]) (*connect.Response[v1.ListCommandsResponse], error)
@@ -1505,15 +1481,6 @@ type CommandServiceHandler interface {
 	// MarkActivityDone marks a single activity item DONE for the authenticated
 	// user, hiding it from All and Unread. The caller's own id must own the row.
 	MarkActivityDone(context.Context, *connect.Request[v1.MarkActivityDoneRequest]) (*connect.Response[v1.MarkActivityDoneResponse], error)
-	// SyncPresence records the calling principal's presence heartbeat and returns
-	// the current online state of the requested principals. Any authenticated
-	// principal (user or agent) may call it. The caller's own presence is updated
-	// as a side effect; a caller can only query other principals' presence, never
-	// report it. Human presence is a sliding window: a user is online while its
-	// last heartbeat is within the manager's presence TTL. Agent presence is NOT
-	// answered here (agents are always answered offline) — AgentService.ListAgents
-	// status.state is the authoritative agent connection signal.
-	SyncPresence(context.Context, *connect.Request[v1.SyncPresenceRequest]) (*connect.Response[v1.SyncPresenceResponse], error)
 }
 
 // NewCommandServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -1931,12 +1898,6 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("MarkActivityDone")),
 		connect.WithHandlerOptions(opts...),
 	)
-	commandServiceSyncPresenceHandler := connect.NewUnaryHandler(
-		CommandServiceSyncPresenceProcedure,
-		svc.SyncPresence,
-		connect.WithSchema(commandServiceMethods.ByName("SyncPresence")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/laelia.v1.CommandService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CommandServiceListCommandsProcedure:
@@ -2075,8 +2036,6 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceListActivitiesHandler.ServeHTTP(w, r)
 		case CommandServiceMarkActivityDoneProcedure:
 			commandServiceMarkActivityDoneHandler.ServeHTTP(w, r)
-		case CommandServiceSyncPresenceProcedure:
-			commandServiceSyncPresenceHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -2356,10 +2315,6 @@ func (UnimplementedCommandServiceHandler) ListActivities(context.Context, *conne
 
 func (UnimplementedCommandServiceHandler) MarkActivityDone(context.Context, *connect.Request[v1.MarkActivityDoneRequest]) (*connect.Response[v1.MarkActivityDoneResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.MarkActivityDone is not implemented"))
-}
-
-func (UnimplementedCommandServiceHandler) SyncPresence(context.Context, *connect.Request[v1.SyncPresenceRequest]) (*connect.Response[v1.SyncPresenceResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.SyncPresence is not implemented"))
 }
 
 // AgentStreamServiceClient is a client for the laelia.v1.AgentStreamService service.

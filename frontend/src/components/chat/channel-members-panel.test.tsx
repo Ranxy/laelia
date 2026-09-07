@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PRESENCES_QUERY_KEY } from "@/hooks/use-presence-heartbeat";
+import { PRESENCE_QUERY_KEY } from "@/hooks/use-presence";
 import type { ChannelMember } from "@/types/proto-es/v1/command_pb";
 import { ChannelMembersPanel } from "./channel-members-panel";
 
@@ -21,6 +21,7 @@ vi.mock("@/lib/avatar-cache", () => ({
 // member detail sheet also fetches the clicked user/agent through these.
 vi.mock("@/connect", () => ({
   groupServiceClient: {},
+  presenceServiceClient: {},
   userServiceClient: {
     getUser: vi.fn(async () => ({
       name: "users/alice",
@@ -70,7 +71,10 @@ const roster: ChannelMember[] = [
 ] as unknown as ChannelMember[];
 
 function seedStore(overrides: Record<string, unknown> = {}) {
-  presenceSeeds = { "users/alice": true, "users/bob": false };
+  presenceSeeds = {
+    "users/alice": { online: true },
+    "users/bob": { online: false },
+  };
   useAppStore.setState({
     channelMembersByConv: { "conversations/c1": roster },
     channelMembersLoading: {},
@@ -94,9 +98,9 @@ afterEach(() => {
 });
 
 // The panel renders the member detail Sheet, which uses useNavigate. Human
-// presence badges read the Query cache now (the dashboard heartbeat is its
-// only writer), so the render seeds it from the presenceSeeds map.
-let presenceSeeds: Record<string, boolean> = {};
+// presence badges read the presence Query cache (the read loop is its only
+// writer), so the render seeds it from the presenceSeeds map.
+let presenceSeeds: Record<string, { online: boolean }> = {};
 
 function renderPanel(
   props?: Partial<Parameters<typeof ChannelMembersPanel>[0]>
@@ -104,7 +108,7 @@ function renderPanel(
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  client.setQueryData(PRESENCES_QUERY_KEY, { ...presenceSeeds });
+  client.setQueryData(PRESENCE_QUERY_KEY, { ...presenceSeeds });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>

@@ -81,7 +81,7 @@ function seedStore() {
 
 function renderPage() {
   // The page renders conversation rows / member panels that read the presence
-  // map through useOnlineUsers (Query cache) — provide a provider, seeded empty.
+  // map through usePresenceMap (Query cache) — provide a provider, seeded empty.
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });

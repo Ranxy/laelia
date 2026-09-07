@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useIsDesktop } from "@/hooks/use-is-desktop";
-import { useOnlineUsers } from "@/hooks/use-presence-heartbeat";
+import { usePresenceMap } from "@/hooks/use-presence";
 import { useAvatar } from "@/lib/avatar-cache";
 import { isAgentOnline } from "@/lib/presence";
 import { formatConversationListTime } from "@/lib/time-format";
@@ -99,10 +99,10 @@ export function ConversationList() {
   // ("You: ..."); last_message_principal_id carries the sender handle.
   const myPrincipalId = useAppStore((s) => s.currentUser?.handle);
   // Presence inputs for the DM rows' green badge: agents online come from the
-  // agent roster's connection state, humans from the presence heartbeat slice.
-  // Both are refreshed by ChatLayout's 30s tick.
+  // agent roster's connection state, humans from the whole-workspace presence
+  // map (server-defined set, independent of what this list has loaded).
   const agents = useAppStore((s) => s.agents);
-  const onlineUsers = useOnlineUsers();
+  const { presences } = usePresenceMap();
   const isDesktop = useIsDesktop();
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -390,14 +390,14 @@ export function ConversationList() {
           const active = id === conversationId;
           const unread = unreadByConv[conv.name] ?? 0;
           // Online state of the DM peer (the badge's data): agent DMs read the
-          // agent roster, user DMs read the presence heartbeat map. Channels
-          // and peers with no data yet stay undefined (no badge).
+          // agent roster, user DMs read the presence map. Channels and
+          // not-yet-online peers stay undefined (no badge).
           const peerOnline = isDm
             ? conv.peer
               ? onlineAgentNames.has(conv.peer)
               : undefined
             : isUserDm && conv.peer
-              ? (onlineUsers[conv.peer] ?? undefined)
+              ? presences[conv.peer]?.online
               : undefined;
           return (
             <ConversationRow

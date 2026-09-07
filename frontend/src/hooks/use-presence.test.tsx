@@ -5,32 +5,42 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { queryClient as globalQueryClient } from "@/lib/query-client";
 import { useAppStore } from "@/stores";
 import {
-  PRESENCES_QUERY_KEY,
-  useOnlineUsers,
+  PRESENCE_QUERY_KEY,
   usePresenceHeartbeat,
-} from "./use-presence-heartbeat";
+  useUserPresence,
+} from "./use-presence";
 
-// --- mock @/connect so the heartbeat talks to a controllable server ---------
+// --- mock @/connect so the heartbeat and the read loop talk to a
+// --- controllable server -----------------------------------------------------
 const mock = vi.hoisted(() => ({
-  online: {} as Record<string, boolean>,
-  calls: [] as Array<{ names: string[] }>,
-  fail: false as boolean,
+  beats: 0,
+  beatFail: false,
+  readFail: false,
+  // The server-defined whole-workspace presence the read loop gets back.
+  presences: {} as Record<string, { online: boolean; seconds?: bigint }>,
 }));
 
 vi.mock("@/connect", () => ({
-  commandServiceClient: {
-    async syncPresence(args: { names: string[] }) {
-      mock.calls.push(args);
-      if (mock.fail) throw new Error("boom");
+  presenceServiceClient: {
+    async sendHeartbeat() {
+      mock.beats += 1;
+      if (mock.beatFail) throw new Error("boom");
+      return {};
+    },
+    async listPresence() {
+      if (mock.readFail) throw new Error("boom");
       return {
-        presences: args.names.map((name) => ({
+        presences: Object.entries(mock.presences).map(([name, p]) => ({
           name,
-          online: mock.online[name] ?? false,
+          online: p.online,
+          lastSeenAt: p.seconds ? { seconds: p.seconds, nanos: 0 } : undefined,
         })),
       };
     },
-    // The heartbeat's same-cadence silent agents refresh rides the real slice
-    // action → the global queryClient → this client.
+  },
+  // The heartbeat's same-cadence silent agents refresh rides the real slice
+  // action → the global queryClient → this client.
+  commandServiceClient: {
     async listAgents() {
       return { agents: [], nextPageToken: "" };
     },
@@ -38,18 +48,6 @@ vi.mock("@/connect", () => ({
 }));
 
 // --- harness ----------------------------------------------------------------
-
-function setupStore(rosters: {
-  channels?: unknown[];
-  users?: unknown[];
-  channelMembersByConv?: Record<string, unknown[]>;
-}) {
-  useAppStore.setState({
-    channels: (rosters.channels ?? []) as never,
-    users: (rosters.users ?? []) as never,
-    channelMembersByConv: (rosters.channelMembersByConv ?? {}) as never,
-  });
-}
 
 function wrapperFor(client: QueryClient) {
   return function QueryWrapper({ children }: { children: ReactNode }) {
@@ -59,20 +57,16 @@ function wrapperFor(client: QueryClient) {
   };
 }
 
-// Mount the heartbeat with a reader of the same cache — production mounts
-// exactly one client, so the hook under test and useOnlineUsers share it.
-function mountBeatAndReader(opts?: {
-  channels?: unknown[];
-  users?: unknown[];
-  channelMembersByConv?: Record<string, unknown[]>;
-}) {
+// Mount the heartbeat with a useUserPresence reader — production mounts the
+// heartbeat once at the dashboard layout while consumers subscribe to the
+// shared cache.
+function mountBeatAndReader(name?: string) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  if (opts) setupStore(opts);
   const useBeatWithReader = () => {
     usePresenceHeartbeat();
-    return useOnlineUsers();
+    return useUserPresence(name);
   };
   return {
     client,
@@ -80,134 +74,105 @@ function mountBeatAndReader(opts?: {
   };
 }
 
-// Trigger one extra beat deterministically (the cadence test uses fake timers
-// instead).
-async function refetchPresence(client: QueryClient) {
-  await act(async () => {
-    await client.refetchQueries({ queryKey: PRESENCES_QUERY_KEY });
-  });
-}
-
 beforeEach(() => {
-  mock.online = {};
-  mock.calls = [];
-  mock.fail = false;
-  useAppStore.setState({ channels: [], users: [], channelMembersByConv: {} });
-  globalQueryClient.removeQueries({ queryKey: PRESENCES_QUERY_KEY });
+  mock.beats = 0;
+  mock.beatFail = false;
+  mock.readFail = false;
+  mock.presences = {};
+  globalQueryClient.removeQueries({ queryKey: PRESENCE_QUERY_KEY });
 });
 
 // --- heartbeat contract ------------------------------------------------------
 
 describe("usePresenceHeartbeat", () => {
-  it("beats immediately on mount with every human name the UI can show", async () => {
-    const { result } = mountBeatAndReader({
-      channels: [{ peer: "users/alice" }],
-      users: [{ name: "users/bob" }],
-      channelMembersByConv: {
-        c1: [{ memberType: 1, memberId: "carol" }],
-      },
-    });
-
-    await vi.waitFor(() => expect(mock.calls.length).toBe(1));
-    expect(mock.calls[0].names.sort().join()).toBe(
-      "users/alice,users/bob,users/carol"
-    );
-    // The online map lands in the cache for readers.
-    await vi.waitFor(() =>
-      expect(result.current).toEqual({
-        "users/alice": false,
-        "users/bob": false,
-        "users/carol": false,
-      })
-    );
-  });
-
-  it("drops agent names — their online signal lives on the agents slice", async () => {
-    mountBeatAndReader({
-      channels: [{ peer: "agents/rei" }, { peer: "users/alice" }],
-    });
-    await vi.waitFor(() => expect(mock.calls.length).toBe(1));
-    expect(mock.calls[0].names).toEqual(["users/alice"]);
-  });
-
-  it("still heartbeats with an empty query list (keeps the caller online)", async () => {
+  it("beats immediately on mount, regardless of what the store has loaded", async () => {
+    // The redesign's core property: the heartbeat never consults the Zustand
+    // store, so a refresh with an empty store still beats right away (the old
+    // first-beat race sent an empty name list and echoed nothing back).
     mountBeatAndReader();
-
-    await vi.waitFor(() => expect(mock.calls.length).toBe(1));
-    expect(mock.calls[0].names).toEqual([]);
+    await vi.waitFor(() => expect(mock.beats).toBe(1));
   });
 
-  it("caps the query at the server's 200-name limit", async () => {
-    mountBeatAndReader({
-      users: Array.from({ length: 300 }, (_, i) => ({ name: `users/u${i}` })),
-    });
+  it("keeps beating after a failed beat (silent, retried next beat)", async () => {
+    vi.useFakeTimers();
+    try {
+      mock.beatFail = true;
+      mountBeatAndReader();
+      await vi.advanceTimersByTimeAsync(0); // flush the mount beat
+      expect(mock.beats).toBe(1);
 
-    await vi.waitFor(() => expect(mock.calls.length).toBe(1));
-    expect(mock.calls[0].names).toHaveLength(200);
-  });
-
-  it("keeps the last known map when a beat fails", async () => {
-    mock.online = { "users/alice": true };
-    const { client, result } = mountBeatAndReader({
-      users: [{ name: "users/alice" }],
-    });
-    await vi.waitFor(() => expect(result.current["users/alice"]).toBe(true));
-
-    mock.fail = true;
-    await refetchPresence(client);
-
-    expect(mock.calls.length).toBe(2); // the failed beat did fire
-    expect(result.current["users/alice"]).toBe(true); // nothing was wiped
-  });
-
-  it("merges over peers learned from rosters that have since unloaded", async () => {
-    mock.online = { "users/alice": true };
-    const { client, result } = mountBeatAndReader({
-      users: [{ name: "users/alice" }],
-    });
-    await vi.waitFor(() => expect(result.current["users/alice"]).toBe(true));
-
-    setupStore({ users: [] });
-    mock.online = {};
-    await refetchPresence(client);
-
-    // Roster gone → the beat queries nobody, but the learned peer persists.
-    expect(mock.calls.at(-1)?.names).toEqual([]);
-    expect(result.current["users/alice"]).toBe(true);
-  });
-
-  it("keeps the map identity stable across a beat that learns nothing new", async () => {
-    mock.online = { "users/alice": true };
-    const { client, result } = mountBeatAndReader({
-      users: [{ name: "users/alice" }],
-    });
-    await vi.waitFor(() => expect(result.current["users/alice"]).toBe(true));
-
-    const before = result.current;
-    await refetchPresence(client);
-
-    expect(result.current).toEqual(before);
-    expect(result.current).toBe(before); // structural sharing — no re-render churn
+      mock.beatFail = false;
+      await vi.advanceTimersByTimeAsync(30_000); // the next cadence tick
+      expect(mock.beats).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
-// --- reader contract ---------------------------------------------------------
+// --- read contract -----------------------------------------------------------
 
-describe("useOnlineUsers", () => {
-  it("reads the heartbeat's cache without fetching on its own behalf", async () => {
-    mock.online = { "users/bob": false };
-    const { client: heartbeatClient, result } = mountBeatAndReader({
-      users: [{ name: "users/bob" }],
-    });
-    await vi.waitFor(() => expect(result.current["users/bob"]).toBe(false));
+describe("usePresenceMap", () => {
+  it("resolves a user from the server-defined full map with last seen", async () => {
+    mock.presences = {
+      "users/alice": { online: true, seconds: 1700000000n },
+    };
+    const { result } = mountBeatAndReader("users/alice");
 
-    // The reader hook (enabled: false) replays the shared cache — production
-    // mounts one client, so the standalone reader sees the same entry.
-    expect(heartbeatClient.getQueryData(PRESENCES_QUERY_KEY)).toEqual({
-      "users/bob": false,
-    });
-    // No beat of its own was triggered by the extra reader.
-    expect(mock.calls.length).toBe(1);
+    await vi.waitFor(() => expect(result.current).toBeDefined());
+    expect(result.current?.online).toBe(true);
+    expect(result.current?.lastSeenAt?.getTime()).toBe(1700000000 * 1000);
+  });
+
+  it("answers offline for a user absent from the loaded map", async () => {
+    mock.presences = { "users/alice": { online: true } };
+    const { result } = mountBeatAndReader("users/bob");
+
+    await vi.waitFor(() => expect(result.current).toBeDefined());
+    // Absent from a full response = never heartbeated = offline, never
+    // "unknown".
+    expect(result.current?.online).toBe(false);
+    expect(result.current?.lastSeenAt).toBeUndefined();
+  });
+
+  it("renders unknown (undefined) while the first fetch is in flight", () => {
+    const { result } = mountBeatAndReader("users/alice");
+    expect(result.current).toBeUndefined();
+  });
+
+  it("replaces the whole map every read — stale entries cannot survive", async () => {
+    // Regression for the old merge-forever cache: a peer learned "online"
+    // must drop out once the server stops reporting it, not stick around.
+    mock.presences = { "users/alice": { online: true } };
+    const { client, result } = mountBeatAndReader("users/alice");
+    await vi.waitFor(() => expect(result.current?.online).toBe(true));
+
+    mock.presences = {};
+    await refetchPresenceMap(client);
+
+    await vi.waitFor(() => expect(result.current?.online).toBe(false));
+    expect(
+      client.getQueryData<Record<string, unknown>>(PRESENCE_QUERY_KEY)
+    ).toEqual({});
+  });
+
+  it("keeps the previous map while a read fails, then recovers", async () => {
+    mock.presences = { "users/alice": { online: true } };
+    const { client, result } = mountBeatAndReader("users/alice");
+    await vi.waitFor(() => expect(result.current?.online).toBe(true));
+
+    mock.readFail = true;
+    await refetchPresenceMap(client);
+    expect(result.current?.online).toBe(true); // frozen at last known
+
+    mock.readFail = false;
+    await refetchPresenceMap(client);
+    expect(result.current?.online).toBe(true);
+  });
+
+  it("answers unknown for a missing name argument", () => {
+    const { result } = mountBeatAndReader(undefined);
+    expect(result.current).toBeUndefined();
   });
 });
 
@@ -215,13 +180,21 @@ describe("useOnlineUsers", () => {
 
 describe("presence reset", () => {
   it("clears the presence cache on logout reset (cleanup registration)", () => {
-    globalQueryClient.setQueryData(PRESENCES_QUERY_KEY, {
-      "users/alice": true,
+    globalQueryClient.setQueryData(PRESENCE_QUERY_KEY, {
+      "users/alice": { online: true },
     });
 
     useAppStore.getState().reset();
 
-    expect(globalQueryClient.getQueryData(PRESENCES_QUERY_KEY)).toBeUndefined();
+    expect(globalQueryClient.getQueryData(PRESENCE_QUERY_KEY)).toBeUndefined();
     expect(useAppStore.getState().channels).toEqual([]);
   });
 });
+
+// --- helpers -----------------------------------------------------------------
+
+async function refetchPresenceMap(client: QueryClient) {
+  await act(async () => {
+    await client.refetchQueries({ queryKey: PRESENCE_QUERY_KEY });
+  });
+}

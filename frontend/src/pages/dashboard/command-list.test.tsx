@@ -36,6 +36,9 @@ const mock = vi.hoisted(() => ({
 
 vi.mock("@/connect", () => ({
   commandServiceClient: { listCommands: mock.listCommands },
+  // Presence surfaces rendered by the members shell read the presence map;
+  // they stay cache-seeded here, so an inert client stub is enough.
+  presenceServiceClient: { sendHeartbeat: vi.fn(async () => ({})) },
 }));
 
 function seedStore() {

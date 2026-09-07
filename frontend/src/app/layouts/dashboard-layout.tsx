@@ -13,7 +13,7 @@ import { RoutePermissionGate } from "@/app/layouts/route-permission-gate";
 import { MobileHeader } from "@/components/mobile-header";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { DesktopSidebar } from "@/components/sidebar";
-import { usePresenceHeartbeat } from "@/hooks/use-presence-heartbeat";
+import { usePresenceHeartbeat } from "@/hooks/use-presence";
 import { useSwipeBack } from "@/hooks/use-swipe-back";
 import { toastManager } from "@/lib/toast";
 import { reconcilePushSubscription, suppressRoute } from "@/lib/web-push";

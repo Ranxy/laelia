@@ -228,3 +228,21 @@ func TestCommandTokenUsageTablePresent(t *testing.T) {
 		}
 	}
 }
+
+// TestUserPresenceTablePresent locks in the user_presence table that backs
+// the human online badge: one row per user handle holding its last web
+// heartbeat. The table must be created idempotently; the upsert-shaped write
+// path is guarded in the store layer.
+func TestUserPresenceTablePresent(t *testing.T) {
+	sql := latestSQL(t)
+
+	for _, want := range []string{
+		"CREATE TABLE IF NOT EXISTS user_presence",
+		"handle       text PRIMARY KEY",
+		"last_seen_at timestamptz NOT NULL",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration missing user_presence declaration: %q", want)
+		}
+	}
+}

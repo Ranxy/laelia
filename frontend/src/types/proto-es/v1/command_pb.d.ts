@@ -5649,75 +5649,6 @@ export declare type SearchChatHistoryEntry = Message<"laelia.v1.SearchChatHistor
 export declare const SearchChatHistoryEntrySchema: GenMessage<SearchChatHistoryEntry>;
 
 /**
- * SyncPresenceRequest asks for the online state of a batch of principals. The
- * calling principal's own presence heartbeat is recorded before answering.
- *
- * @generated from message laelia.v1.SyncPresenceRequest
- */
-export declare type SyncPresenceRequest = Message<"laelia.v1.SyncPresenceRequest"> & {
-  /**
-   * names are the principals to query ("users/<handle>" or "agents/<id>").
-   * Duplicates are collapsed; the list is capped at 200 entries. Agents are
-   * accepted but always answered offline (agent presence comes from the
-   * agent connection state, not from presence heartbeats).
-   *
-   * @generated from field: repeated string names = 1;
-   */
-  names: string[];
-};
-
-/**
- * Describes the message laelia.v1.SyncPresenceRequest.
- * Use `create(SyncPresenceRequestSchema)` to create a new message.
- */
-export declare const SyncPresenceRequestSchema: GenMessage<SyncPresenceRequest>;
-
-/**
- * Presence is one queried principal's online state.
- *
- * @generated from message laelia.v1.Presence
- */
-export declare type Presence = Message<"laelia.v1.Presence"> & {
-  /**
-   * name is the queried principal's resource name, as requested.
-   *
-   * @generated from field: string name = 1;
-   */
-  name: string;
-
-  /**
-   * online is true while the principal is currently online.
-   *
-   * @generated from field: bool online = 2;
-   */
-  online: boolean;
-};
-
-/**
- * Describes the message laelia.v1.Presence.
- * Use `create(PresenceSchema)` to create a new message.
- */
-export declare const PresenceSchema: GenMessage<Presence>;
-
-/**
- * @generated from message laelia.v1.SyncPresenceResponse
- */
-export declare type SyncPresenceResponse = Message<"laelia.v1.SyncPresenceResponse"> & {
-  /**
-   * presences carries one entry per requested name.
-   *
-   * @generated from field: repeated laelia.v1.Presence presences = 1;
-   */
-  presences: Presence[];
-};
-
-/**
- * Describes the message laelia.v1.SyncPresenceResponse.
- * Use `create(SyncPresenceResponseSchema)` to create a new message.
- */
-export declare const SyncPresenceResponseSchema: GenMessage<SyncPresenceResponse>;
-
-/**
  * @generated from enum laelia.v1.CommandStatus
  */
 export enum CommandStatus {
@@ -6810,23 +6741,6 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof MarkActivityDoneRequestSchema;
     output: typeof MarkActivityDoneResponseSchema;
-  },
-  /**
-   * SyncPresence records the calling principal's presence heartbeat and returns
-   * the current online state of the requested principals. Any authenticated
-   * principal (user or agent) may call it. The caller's own presence is updated
-   * as a side effect; a caller can only query other principals' presence, never
-   * report it. Human presence is a sliding window: a user is online while its
-   * last heartbeat is within the manager's presence TTL. Agent presence is NOT
-   * answered here (agents are always answered offline) — AgentService.ListAgents
-   * status.state is the authoritative agent connection signal.
-   *
-   * @generated from rpc laelia.v1.CommandService.SyncPresence
-   */
-  syncPresence: {
-    methodKind: "unary";
-    input: typeof SyncPresenceRequestSchema;
-    output: typeof SyncPresenceResponseSchema;
   },
 }>;
 

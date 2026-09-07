@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PRESENCES_QUERY_KEY } from "@/hooks/use-presence-heartbeat";
+import { PRESENCE_QUERY_KEY } from "@/hooks/use-presence";
 
 // ConversationList uses react-i18next (no provider in tests) and the app
 // store. Stub i18n with a key/count mapper so assertions read the keys, and
@@ -22,9 +22,9 @@ const mock = vi.hoisted(() => ({
   currentUser: { name: "users/ran-user-1", handle: "ran-user-1" },
   unreadByConv: {} as Record<string, number>,
   // Presence inputs: the agent roster (with connection state) and the human
-  // presence heartbeat map, both read by the DM rows' green badge.
+  // presence map, both read by the DM rows' green badge.
   agents: [] as Array<Record<string, unknown>>,
-  onlineUsers: {} as Record<string, boolean>,
+  presences: {} as Record<string, { online: boolean }>,
   setConversationPinned: vi.fn(),
   setConversationClosed: vi.fn(),
   setConversationMuted: vi.fn(),
@@ -44,7 +44,6 @@ vi.mock("@/stores", () => ({
       setConversationMuted: mock.setConversationMuted,
       currentUser: mock.currentUser,
       agents: mock.agents,
-      onlineUsers: mock.onlineUsers,
     }),
 }));
 
@@ -57,6 +56,7 @@ vi.mock("react-router-dom", () => ({
 vi.mock("@/connect", () => ({
   agentServiceClient: {},
   userServiceClient: {},
+  presenceServiceClient: {},
 }));
 
 // The undo toast is app chrome; capture the add call and drive the action
@@ -79,7 +79,7 @@ beforeEach(() => {
   mock.unreadByConv = {};
   mock.channels = [];
   mock.agents = [];
-  mock.onlineUsers = {};
+  mock.presences = {};
   mock.useIsDesktop.mockReturnValue(true);
 });
 
@@ -97,13 +97,13 @@ function channel(overrides: Record<string, unknown> = {}): Conversation {
   } as unknown as Conversation;
 }
 
-// Human presence badges read the Query cache now (the dashboard heartbeat is
-// its only writer), so tests seed it with the mock map at render time.
+// Human presence badges read the presence Query cache (the read loop is its
+// only writer), so tests seed it with the mock map at render time.
 function renderList() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  client.setQueryData(PRESENCES_QUERY_KEY, { ...mock.onlineUsers });
+  client.setQueryData(PRESENCE_QUERY_KEY, { ...mock.presences });
   return render(
     <QueryClientProvider client={client}>
       <ConversationList />
@@ -578,7 +578,7 @@ describe("ConversationList presence badge", () => {
     document.body.innerHTML = "";
     mock.channels = [];
     mock.agents = [];
-    mock.onlineUsers = {};
+    mock.presences = {};
   });
 
   it("badges an online agent DM peer and not an offline one", () => {
@@ -613,8 +613,11 @@ describe("ConversationList presence badge", () => {
     expect(screen.getAllByTestId("presence-badge")).toHaveLength(1);
   });
 
-  it("badges an online human DM peer from the presence heartbeat map", () => {
-    mock.onlineUsers = { "users/alice": true, "users/bob": false };
+  it("badges an online human DM peer from the presence map", () => {
+    mock.presences = {
+      "users/alice": { online: true },
+      "users/bob": { online: false },
+    };
     mock.channels = [
       channel({
         name: "conversations/ch1",
@@ -635,7 +638,7 @@ describe("ConversationList presence badge", () => {
   });
 
   it("never badges channel rows", () => {
-    mock.onlineUsers = { "users/alice": true };
+    mock.presences = { "users/alice": { online: true } };
     mock.channels = [
       channel({ name: "conversations/ch1", title: "Design", type: 2 }),
     ];

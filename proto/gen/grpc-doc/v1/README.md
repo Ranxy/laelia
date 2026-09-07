@@ -292,7 +292,6 @@
     - [Pong](#laelia-v1-Pong)
     - [PostMessageRequest](#laelia-v1-PostMessageRequest)
     - [PostMessageResponse](#laelia-v1-PostMessageResponse)
-    - [Presence](#laelia-v1-Presence)
     - [PromptReleaseNotice](#laelia-v1-PromptReleaseNotice)
     - [PromptReleaseNoticeAck](#laelia-v1-PromptReleaseNoticeAck)
     - [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered)
@@ -317,8 +316,6 @@
     - [SetConversationPinnedResponse](#laelia-v1-SetConversationPinnedResponse)
     - [SteerCommandRequest](#laelia-v1-SteerCommandRequest)
     - [SteerMessage](#laelia-v1-SteerMessage)
-    - [SyncPresenceRequest](#laelia-v1-SyncPresenceRequest)
-    - [SyncPresenceResponse](#laelia-v1-SyncPresenceResponse)
     - [TaskInfo](#laelia-v1-TaskInfo)
     - [TeamContext](#laelia-v1-TeamContext)
     - [TextDeltaPayload](#laelia-v1-TextDeltaPayload)
@@ -534,6 +531,15 @@
     - [UpdatePushConfigResponse](#laelia-v1-UpdatePushConfigResponse)
   
     - [NotificationService](#laelia-v1-NotificationService)
+  
+- [v1/presence_service.proto](#v1_presence_service-proto)
+    - [ListPresenceRequest](#laelia-v1-ListPresenceRequest)
+    - [ListPresenceResponse](#laelia-v1-ListPresenceResponse)
+    - [Presence](#laelia-v1-Presence)
+    - [SendHeartbeatRequest](#laelia-v1-SendHeartbeatRequest)
+    - [SendHeartbeatResponse](#laelia-v1-SendHeartbeatResponse)
+  
+    - [PresenceService](#laelia-v1-PresenceService)
   
 - [v1/provisioner.proto](#v1_provisioner-proto)
     - [CreateProvisionerRequest](#laelia-v1-CreateProvisionerRequest)
@@ -5265,22 +5271,6 @@ is never populated here.
 
 
 
-<a name="laelia-v1-Presence"></a>
-
-### Presence
-Presence is one queried principal&#39;s online state.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | name is the queried principal&#39;s resource name, as requested. |
-| online | [bool](#bool) |  | online is true while the principal is currently online. |
-
-
-
-
-
-
 <a name="laelia-v1-PromptReleaseNotice"></a>
 
 ### PromptReleaseNotice
@@ -5709,37 +5699,6 @@ mid-turn steering ignores it.
 | ----- | ---- | ----- | ----------- |
 | command_id | [string](#string) |  |  |
 | text | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-SyncPresenceRequest"></a>
-
-### SyncPresenceRequest
-SyncPresenceRequest asks for the online state of a batch of principals. The
-calling principal&#39;s own presence heartbeat is recorded before answering.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| names | [string](#string) | repeated | names are the principals to query (&#34;users/&lt;handle&gt;&#34; or &#34;agents/&lt;id&gt;&#34;). Duplicates are collapsed; the list is capped at 200 entries. Agents are accepted but always answered offline (agent presence comes from the agent connection state, not from presence heartbeats). |
-
-
-
-
-
-
-<a name="laelia-v1-SyncPresenceResponse"></a>
-
-### SyncPresenceResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| presences | [Presence](#laelia-v1-Presence) | repeated | presences carries one entry per requested name. |
 
 
 
@@ -6457,7 +6416,6 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | ListFiles | [ListFilesRequest](#laelia-v1-ListFilesRequest) | [ListFilesResponse](#laelia-v1-ListFilesResponse) | ListFiles returns the files attached to a conversation. The caller must be a member. |
 | ListActivities | [ListActivitiesRequest](#laelia-v1-ListActivitiesRequest) | [ListActivitiesResponse](#laelia-v1-ListActivitiesResponse) | ListActivities returns the authenticated user&#39;s activity feed: chat messages relevant to them, tagged with category flags (mention/task/reminder/thread). The caller&#39;s own id is the implicit filter; default read_state_filter is UNREAD. |
 | MarkActivityDone | [MarkActivityDoneRequest](#laelia-v1-MarkActivityDoneRequest) | [MarkActivityDoneResponse](#laelia-v1-MarkActivityDoneResponse) | MarkActivityDone marks a single activity item DONE for the authenticated user, hiding it from All and Unread. The caller&#39;s own id must own the row. |
-| SyncPresence | [SyncPresenceRequest](#laelia-v1-SyncPresenceRequest) | [SyncPresenceResponse](#laelia-v1-SyncPresenceResponse) | SyncPresence records the calling principal&#39;s presence heartbeat and returns the current online state of the requested principals. Any authenticated principal (user or agent) may call it. The caller&#39;s own presence is updated as a side effect; a caller can only query other principals&#39; presence, never report it. Human presence is a sliding window: a user is online while its last heartbeat is within the manager&#39;s presence TTL. Agent presence is NOT answered here (agents are always answered offline) — AgentService.ListAgents status.state is the authoritative agent connection signal. |
 
  
 
@@ -9102,6 +9060,102 @@ UpdatePushConfig.
 | ListPushSubscriptions | [ListPushSubscriptionsRequest](#laelia-v1-ListPushSubscriptionsRequest) | [ListPushSubscriptionsResponse](#laelia-v1-ListPushSubscriptionsResponse) | ListPushSubscriptions returns every push subscription registered for the authenticated user, one per device/browser. The frontend uses it to render whether the current browser is subscribed and to reconcile a browser-side subscription that is missing server-side. |
 | CreatePushSubscription | [CreatePushSubscriptionRequest](#laelia-v1-CreatePushSubscriptionRequest) | [PushSubscription](#laelia-v1-PushSubscription) | CreatePushSubscription registers a browser push subscription for the authenticated user. Idempotent on (user, endpoint): re-subscribing the same browser refreshes its p256dh/auth keys. Returns FailedPrecondition when Web Push is disabled. |
 | DeletePushSubscription | [DeletePushSubscriptionRequest](#laelia-v1-DeletePushSubscriptionRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | DeletePushSubscription removes a push subscription for the authenticated user. The name is &#34;users/{user}/pushSubscriptions/{endpointKey}&#34; where endpointKey is the URL-safe base64 of the subscription endpoint; the name&#39;s user must be the caller. |
+
+ 
+
+
+
+<a name="v1_presence_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/presence_service.proto
+
+
+
+<a name="laelia-v1-ListPresenceRequest"></a>
+
+### ListPresenceRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-ListPresenceResponse"></a>
+
+### ListPresenceResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| presences | [Presence](#laelia-v1-Presence) | repeated | presences carries one entry per tracked user (rows with heartbeat history); users never seen are simply absent. |
+
+
+
+
+
+
+<a name="laelia-v1-Presence"></a>
+
+### Presence
+Presence is one human user&#39;s online state.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | name is the user&#39;s resource name (&#34;users/&lt;handle&gt;&#34;) — the same shape the frontend keys conversation peers and rosters by. |
+| online | [bool](#bool) |  | online is true while the user&#39;s last heartbeat is within the manager&#39;s presence TTL, computed at query time. |
+| last_seen_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | last_seen_at is the time of the user&#39;s last heartbeat; clients render &#34;last seen&#34; hints for offline users from it. |
+
+
+
+
+
+
+<a name="laelia-v1-SendHeartbeatRequest"></a>
+
+### SendHeartbeatRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-SendHeartbeatResponse"></a>
+
+### SendHeartbeatResponse
+
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="laelia-v1-PresenceService"></a>
+
+### PresenceService
+PresenceService tracks which human users are currently online. It is a
+heartbeat system: the web frontend sends one SendHeartbeat per cadence
+(identity comes from the auth context, so a caller can never report
+presence for someone else), and reads the whole workspace&#39;s presence with
+ListPresence. A user is online while its last heartbeat is within the
+manager&#39;s presence TTL. Agents are NOT tracked here — their connection
+state is authoritative in AgentService.ListAgents. Visibility matches
+ListUsers: any authenticated member may read the workspace&#39;s presence.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| SendHeartbeat | [SendHeartbeatRequest](#laelia-v1-SendHeartbeatRequest) | [SendHeartbeatResponse](#laelia-v1-SendHeartbeatResponse) | SendHeartbeat records the calling human user&#39;s presence heartbeat. Agent callers are answered OK as a no-op — agents are not tracked here. |
+| ListPresence | [ListPresenceRequest](#laelia-v1-ListPresenceRequest) | [ListPresenceResponse](#laelia-v1-ListPresenceResponse) | ListPresence answers the presence of every tracked human user. The set is defined by the server (bounded by workspace size), so clients never tell the server what to query. A user absent from the response has never sent a heartbeat (effectively offline). |
 
  
 

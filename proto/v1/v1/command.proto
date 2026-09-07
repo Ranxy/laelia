@@ -2123,16 +2123,6 @@ service CommandService {
     option (laelia.v1.permission) = "laelia.activities.markDone";
     option (laelia.v1.audit) = true;
   }
-
-  // SyncPresence records the calling principal's presence heartbeat and returns
-  // the current online state of the requested principals. Any authenticated
-  // principal (user or agent) may call it. The caller's own presence is updated
-  // as a side effect; a caller can only query other principals' presence, never
-  // report it. Human presence is a sliding window: a user is online while its
-  // last heartbeat is within the manager's presence TTL. Agent presence is NOT
-  // answered here (agents are always answered offline) — AgentService.ListAgents
-  // status.state is the authoritative agent connection signal.
-  rpc SyncPresence(SyncPresenceRequest) returns (SyncPresenceResponse) {}
 }
 
 service AgentStreamService {
@@ -2474,27 +2464,4 @@ message SearchChatHistoryEntry {
   // thread_context is set when message is a thread reply. It carries the thread
   // root so the UI can render the reply nested under its root message.
   SearchThreadContext thread_context = 6;
-}
-
-// SyncPresenceRequest asks for the online state of a batch of principals. The
-// calling principal's own presence heartbeat is recorded before answering.
-message SyncPresenceRequest {
-  // names are the principals to query ("users/<handle>" or "agents/<id>").
-  // Duplicates are collapsed; the list is capped at 200 entries. Agents are
-  // accepted but always answered offline (agent presence comes from the
-  // agent connection state, not from presence heartbeats).
-  repeated string names = 1;
-}
-
-// Presence is one queried principal's online state.
-message Presence {
-  // name is the queried principal's resource name, as requested.
-  string name = 1;
-  // online is true while the principal is currently online.
-  bool online = 2;
-}
-
-message SyncPresenceResponse {
-  // presences carries one entry per requested name.
-  repeated Presence presences = 1;
 }
