@@ -8155,6 +8155,7 @@ provisioner, carried on Machine.provisioning.
 | pending_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | provisioned_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | failed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| runtime_image | [string](#string) |  | The machine-specific runtime image the workload runs (custom image provided at ProvisionMachine time); empty = the workspace default. |
 
 
 
@@ -9315,6 +9316,7 @@ picks it up at first boot.
 | provisioner | [string](#string) |  | The provisioner that will create the workload, provisioners/{id}. |
 | title | [string](#string) |  | Machine title. |
 | owner | [string](#string) |  | Target owner, users/{id}. Empty = caller. Naming another user requires a workspace admin (checked in the handler, like machine ownership transfer). |
+| runtime_image | [string](#string) |  | Optional custom runtime image for this machine&#39;s workload, overriding the workspace ProvisioningSetting.runtime_image default. Must be a valid image reference and match the admin-configured custom-image allowlist (an empty allowlist disables custom images). Persisted on the machine so replayed provisioning jobs rebuild the same workload. |
 
 
 
@@ -9744,6 +9746,7 @@ signup is offered and which email suffixes are accepted.
 | require_email_verification | [bool](#bool) |  | Whether self-service signup must verify the email address by clicking a link before the account can sign in. Only meaningful when disallow_signup is false. |
 | external_url | [string](#string) |  | The workspace external URL. Public so the login page can build the OAuth redirect_uri from the same canonical base the backend uses for token exchange, instead of relying on the browser&#39;s current origin. |
 | disallow_user_create_machine | [bool](#bool) |  | Whether ordinary users (without laelia.machines.create) are disallowed from creating their own machines. Default false (allowed). |
+| allow_custom_images | [bool](#bool) |  | Whether users may provide a custom runtime image when provisioning a machine through a provisioner. Not a secret: the create-machine page uses it to hide the custom-image field; the backend still enforces the switch. |
 
 
 

@@ -50,6 +50,20 @@ function parseDomains(raw: string): string[] {
   return out;
 }
 
+// parseAllowlist splits a newline-separated custom-image allowlist into
+// trimmed, deduplicated entries — mirroring the backend normalization.
+function parseAllowlist(raw: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split("\n")) {
+    const entry = part.trim();
+    if (entry === "" || seen.has(entry)) continue;
+    seen.add(entry);
+    out.push(entry);
+  }
+  return out;
+}
+
 // ToggleField is a boolean GeneralForm field driven by one of the four
 // workspace toggles.
 type ToggleField =
@@ -109,6 +123,17 @@ export function SettingsGeneralPage() {
   const [runtimeImage, setRuntimeImage] = useState("");
   const [savedRuntimeImage, setSavedRuntimeImage] = useState("");
   const [savingRuntimeImage, setSavingRuntimeImage] = useState(false);
+  // Allowlist of custom runtime images users may provide at provision time.
+  // Edited as a newline-separated list, mirroring the domains field. The two
+  // switches save immediately on toggle (optimistic flip/revert like the
+  // workspace toggles below) and gate the list's visibility hierarchically.
+  const [imageAllowlist, setImageAllowlist] = useState("");
+  const [savedImageAllowlist, setSavedImageAllowlist] = useState("");
+  const [savingImageAllowlist, setSavingImageAllowlist] = useState(false);
+  const [allowCustomImages, setAllowCustomImages] = useState(false);
+  const [savingAllowCustomImages, setSavingAllowCustomImages] = useState(false);
+  const [allowlistEnabled, setAllowlistEnabled] = useState(false);
+  const [savingAllowlistEnabled, setSavingAllowlistEnabled] = useState(false);
   // Highlighted while the cross-page link from the provisioners page focuses
   // the Machine runtime image field.
   const [runtimeImageFocused, setRuntimeImageFocused] = useState(false);
@@ -159,6 +184,11 @@ export function SettingsGeneralPage() {
         if (cancelled) return;
         setRuntimeImage(provisioning?.runtimeImage ?? "");
         setSavedRuntimeImage(provisioning?.runtimeImage ?? "");
+        setAllowCustomImages(provisioning?.allowCustomImages ?? false);
+        setAllowlistEnabled(provisioning?.customImageAllowlistEnabled ?? false);
+        const allowlist = (provisioning?.customImageAllowlist ?? []).join("\n");
+        setImageAllowlist(allowlist);
+        setSavedImageAllowlist(allowlist);
       } catch {
         // The provisioning setting is optional on this page; a failed read
         // leaves the field empty and the save reports the error itself.
@@ -293,11 +323,77 @@ export function SettingsGeneralPage() {
     }
   }
 
+  async function handleToggleAllowCustomImages(v: boolean) {
+    const prev = allowCustomImages;
+    setAllowCustomImages(v);
+    setSavingAllowCustomImages(true);
+    try {
+      const cfg = await useAppStore
+        .getState()
+        .updateProvisioningConfig(
+          { allowCustomImages: v } satisfies Partial<ProvisioningSetting>,
+          ["value.provisioning.allow_custom_images"]
+        );
+      setAllowCustomImages(cfg?.allowCustomImages ?? v);
+    } catch (err) {
+      setAllowCustomImages(prev);
+      void showErrorToast(err, t("settings.general.save-failed"));
+    } finally {
+      setSavingAllowCustomImages(false);
+    }
+  }
+
+  async function handleToggleAllowlistEnabled(v: boolean) {
+    const prev = allowlistEnabled;
+    setAllowlistEnabled(v);
+    setSavingAllowlistEnabled(true);
+    try {
+      const cfg = await useAppStore.getState().updateProvisioningConfig(
+        {
+          customImageAllowlistEnabled: v,
+        } satisfies Partial<ProvisioningSetting>,
+        ["value.provisioning.custom_image_allowlist_enabled"]
+      );
+      setAllowlistEnabled(cfg?.customImageAllowlistEnabled ?? v);
+    } catch (err) {
+      setAllowlistEnabled(prev);
+      void showErrorToast(err, t("settings.general.save-failed"));
+    } finally {
+      setSavingAllowlistEnabled(false);
+    }
+  }
+
+  async function handleSaveImageAllowlist() {
+    setSavingImageAllowlist(true);
+    try {
+      const cfg = await useAppStore.getState().updateProvisioningConfig(
+        {
+          customImageAllowlist: parseAllowlist(imageAllowlist),
+        } satisfies Partial<ProvisioningSetting>,
+        ["value.provisioning.custom_image_allowlist"]
+      );
+      const saved = (cfg?.customImageAllowlist ?? []).join("\n");
+      setImageAllowlist(saved);
+      setSavedImageAllowlist(saved);
+      toastManager.add({
+        type: "success",
+        title: t("settings.general.saved"),
+      });
+    } catch (err) {
+      void showErrorToast(err, t("settings.general.save-failed"));
+    } finally {
+      setSavingImageAllowlist(false);
+    }
+  }
+
   const externalUrlDirty = form.externalUrl.trim() !== saved.externalUrl.trim();
   const domainsDirty =
     parseDomains(form.domains).join("\n") !==
     parseDomains(saved.domains).join("\n");
   const runtimeImageDirty = runtimeImage.trim() !== savedRuntimeImage.trim();
+  const imageAllowlistDirty =
+    parseAllowlist(imageAllowlist).join("\n") !==
+    parseAllowlist(savedImageAllowlist).join("\n");
 
   const set = <K extends keyof GeneralForm>(key: K, value: GeneralForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -382,6 +478,83 @@ export function SettingsGeneralPage() {
                 {t("common.save")}
               </Button>
             </div>
+
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-control-border pt-4">
+              <div>
+                <div className="text-sm font-medium text-main">
+                  {t("settings.general.allow-custom-images")}
+                </div>
+                <div className="mt-0.5 text-xs text-control-light">
+                  {t("settings.general.allow-custom-images-description")}
+                </div>
+              </div>
+              <Switch
+                checked={allowCustomImages}
+                onCheckedChange={handleToggleAllowCustomImages}
+                disabled={savingAllowCustomImages}
+                size="md"
+              />
+            </div>
+
+            {allowCustomImages && (
+              <>
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-control-border pt-4">
+                  <div>
+                    <div className="text-sm font-medium text-main">
+                      {t("settings.general.allowlist-enabled")}
+                    </div>
+                    <div className="mt-0.5 text-xs text-control-light">
+                      {t("settings.general.allowlist-enabled-description")}
+                    </div>
+                  </div>
+                  <Switch
+                    checked={allowlistEnabled}
+                    onCheckedChange={handleToggleAllowlistEnabled}
+                    disabled={savingAllowlistEnabled}
+                    size="md"
+                  />
+                </div>
+
+                {allowlistEnabled && (
+                  <div className="mt-4 flex flex-col gap-1 border-t border-control-border pt-4">
+                    <label
+                      htmlFor="general-image-allowlist"
+                      className="block text-sm font-medium text-main"
+                    >
+                      {t("settings.general.image-allowlist")}
+                    </label>
+                    <Textarea
+                      id="general-image-allowlist"
+                      value={imageAllowlist}
+                      placeholder={t(
+                        "settings.general.image-allowlist-placeholder"
+                      )}
+                      onChange={(e) => setImageAllowlist(e.target.value)}
+                      spellCheck={false}
+                      rows={3}
+                      className="mt-2"
+                    />
+                    <div className="mt-1.5 flex items-center justify-between gap-3">
+                      <p className="text-xs text-control-light">
+                        {t("settings.general.image-allowlist-hint")}
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={handleSaveImageAllowlist}
+                        disabled={savingImageAllowlist || !imageAllowlistDirty}
+                      >
+                        {savingImageAllowlist ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Save className="size-4" />
+                        )}
+                        {t("common.save")}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           <div className="flex items-center justify-between rounded-lg border border-control-border bg-background px-5 py-4 shadow-xs">

@@ -149,6 +149,12 @@ message ProvisionMachineRequest {
   // Target owner, users/{id}. Empty = caller. Naming another user requires a
   // workspace admin (checked in the handler, like machine ownership transfer).
   string owner = 3;
+  // Optional custom runtime image for this machine's workload, overriding the
+  // workspace ProvisioningSetting.runtime_image default. Must be a valid image
+  // reference and match the admin-configured custom-image allowlist (an empty
+  // allowlist disables custom images). Persisted on the machine so replayed
+  // provisioning jobs rebuild the same workload.
+  string runtime_image = 4;
 }
 
 // ========== Resource Definition ==========

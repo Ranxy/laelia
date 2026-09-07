@@ -924,6 +924,14 @@ export declare type ProvisioningStatus = Message<"laelia.v1.ProvisioningStatus">
    * @generated from field: google.protobuf.Timestamp failed_at = 7;
    */
   failedAt?: Timestamp | undefined;
+
+  /**
+   * The machine-specific runtime image the workload runs (custom image
+   * provided at ProvisionMachine time); empty = the workspace default.
+   *
+   * @generated from field: string runtime_image = 8;
+   */
+  runtimeImage: string;
 };
 
 /**

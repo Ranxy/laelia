@@ -503,6 +503,9 @@ message ProvisioningStatus {
   google.protobuf.Timestamp pending_at = 5;
   google.protobuf.Timestamp provisioned_at = 6;
   google.protobuf.Timestamp failed_at = 7;
+  // The machine-specific runtime image the workload runs (custom image
+  // provided at ProvisionMachine time); empty = the workspace default.
+  string runtime_image = 8;
 }
 
 message MachineInfo {

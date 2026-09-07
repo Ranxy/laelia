@@ -157,4 +157,9 @@ message GetWorkspaceInfoResponse {
   // Whether ordinary users (without laelia.machines.create) are disallowed
   // from creating their own machines. Default false (allowed).
   bool disallow_user_create_machine = 6;
+
+  // Whether users may provide a custom runtime image when provisioning a
+  // machine through a provisioner. Not a secret: the create-machine page uses
+  // it to hide the custom-image field; the backend still enforces the switch.
+  bool allow_custom_images = 7;
 }

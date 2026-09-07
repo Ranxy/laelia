@@ -436,7 +436,13 @@ type ProvisionMachineRequest struct {
 	Title string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	// Target owner, users/{id}. Empty = caller. Naming another user requires a
 	// workspace admin (checked in the handler, like machine ownership transfer).
-	Owner         string `protobuf:"bytes,3,opt,name=owner,proto3" json:"owner,omitempty"`
+	Owner string `protobuf:"bytes,3,opt,name=owner,proto3" json:"owner,omitempty"`
+	// Optional custom runtime image for this machine's workload, overriding the
+	// workspace ProvisioningSetting.runtime_image default. Must be a valid image
+	// reference and match the admin-configured custom-image allowlist (an empty
+	// allowlist disables custom images). Persisted on the machine so replayed
+	// provisioning jobs rebuild the same workload.
+	RuntimeImage  string `protobuf:"bytes,4,opt,name=runtime_image,json=runtimeImage,proto3" json:"runtime_image,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -488,6 +494,13 @@ func (x *ProvisionMachineRequest) GetTitle() string {
 func (x *ProvisionMachineRequest) GetOwner() string {
 	if x != nil {
 		return x.Owner
+	}
+	return ""
+}
+
+func (x *ProvisionMachineRequest) GetRuntimeImage() string {
+	if x != nil {
+		return x.RuntimeImage
 	}
 	return ""
 }
@@ -1340,12 +1353,13 @@ const file_v1_provisioner_proto_rawDesc = "" +
 	"\x05token\x18\x02 \x01(\tB\x03\xe0A\x03R\x05token\"J\n" +
 	"\x18DeleteProvisionerRequest\x12.\n" +
 	"\x04name\x18\x01 \x01(\tB\x1a\xe0A\x02\xfaA\x14\n" +
-	"\x12laelia/ProvisionerR\x04name\"\x88\x01\n" +
+	"\x12laelia/ProvisionerR\x04name\"\xad\x01\n" +
 	"\x17ProvisionMachineRequest\x12<\n" +
 	"\vprovisioner\x18\x01 \x01(\tB\x1a\xe0A\x02\xfaA\x14\n" +
 	"\x12laelia/ProvisionerR\vprovisioner\x12\x19\n" +
 	"\x05title\x18\x02 \x01(\tB\x03\xe0A\x02R\x05title\x12\x14\n" +
-	"\x05owner\x18\x03 \x01(\tR\x05owner\"\xf1\x02\n" +
+	"\x05owner\x18\x03 \x01(\tR\x05owner\x12#\n" +
+	"\rruntime_image\x18\x04 \x01(\tR\fruntimeImage\"\xf1\x02\n" +
 	"\vProvisioner\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x18\n" +

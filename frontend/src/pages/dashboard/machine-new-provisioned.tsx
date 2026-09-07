@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useWorkspacePolicy } from "@/hooks/use-workspace-policy";
 import { describeError } from "@/lib/connect-errors";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -26,8 +27,16 @@ export function MachineNewProvisionedPanel() {
 
   const [selected, setSelected] = useState("");
   const [title, setTitle] = useState("");
+  // Optional per-machine runtime image; empty = the workspace default.
+  const [runtimeImage, setRuntimeImage] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+
+  // The custom-image field is only offered when the workspace allows custom
+  // runtime images. The provisioning setting itself is admin-only, so the
+  // public GetWorkspaceInfo mirror (allowCustomImages) is what every user can
+  // read; the backend still enforces the switch at ProvisionMachine time.
+  const { allowCustomImages } = useWorkspacePolicy();
 
   useEffect(() => {
     void fetchProvisioners({ pageSize: 100 });
@@ -56,7 +65,7 @@ export function MachineNewProvisionedPanel() {
     try {
       const machine = await useAppStore
         .getState()
-        .provisionMachine(selected, title.trim());
+        .provisionMachine(selected, title.trim(), runtimeImage.trim());
       navigate(`/machines/${machine.name.replace(/^machines\//, "")}`);
     } catch (err) {
       setError(describeError(err));
@@ -173,6 +182,31 @@ export function MachineNewProvisionedPanel() {
               }}
             />
           </div>
+          {allowCustomImages && (
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="machine-new-provisioned-runtime-image"
+                className="text-sm font-medium text-control"
+              >
+                {t("machine.new.provisioned.custom-image-label")}
+              </label>
+              <Input
+                id="machine-new-provisioned-runtime-image"
+                value={runtimeImage}
+                placeholder={t(
+                  "machine.new.provisioned.custom-image-placeholder"
+                )}
+                onChange={(e) => {
+                  setRuntimeImage(e.target.value);
+                  setError("");
+                }}
+                spellCheck={false}
+              />
+              <p className="text-xs text-control-light">
+                {t("machine.new.provisioned.custom-image-hint")}
+              </p>
+            </div>
+          )}
           {error && <Alert variant="error" description={error} />}
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-control-light">

@@ -2,7 +2,9 @@ package v1
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"regexp"
 	"strings"
 	"time"
 
@@ -37,6 +39,149 @@ var knownProvisionerBackends = map[string]bool{
 // defaultBinaryTarget is the machine binary target provisioned pods install
 // when the ProvisioningSetting leaves binary_target empty (design §6.5).
 const defaultBinaryTarget = "linux-x64"
+
+// maxCustomImageLength bounds a user-provided runtime image reference.
+const maxCustomImageLength = 512
+
+// customImageRefPattern constrains custom runtime image references (and
+// allowlist entries, which may end in a "*" prefix wildcard) to safe
+// characters: no whitespace, quotes, shell metacharacters, or control
+// characters.
+var customImageRefPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:@/-]*\*?$`)
+
+// validateCustomImageRef checks the shape of one custom runtime image
+// reference (a ProvisionMachineRequest.runtime_image or an allowlist entry).
+// Policy (the allowlist) is a separate check against the workspace setting.
+func validateCustomImageRef(image string) error {
+	if image == "" {
+		return errors.New("runtime image is empty")
+	}
+	if len(image) > maxCustomImageLength {
+		return errors.Errorf("runtime image exceeds %d characters", maxCustomImageLength)
+	}
+	if !customImageRefPattern.MatchString(image) {
+		return errors.Errorf("runtime image %q is not a valid container image reference", image)
+	}
+	return nil
+}
+
+// canonicalDockerRegistry is the canonical host for references without an
+// explicit registry (Docker Hub), matching what `docker images` displays.
+const canonicalDockerRegistry = "docker.io"
+
+// splitImageRef splits a reference's explicit (or implied) registry host from
+// its repository path, applying Docker's defaults: a first path component
+// without a dot/colon (and not "localhost") is a Docker Hub namespace, and a
+// single-component reference is a Docker Hub library image.
+func splitImageRef(ref string) (registry, repo string) {
+	slash := strings.Index(ref, "/")
+	if slash < 0 {
+		return canonicalDockerRegistry, "library/" + ref
+	}
+	first, rest := ref[:slash], ref[slash+1:]
+	if strings.ContainsAny(first, ".:") || first == "localhost" {
+		return first, rest
+	}
+	return canonicalDockerRegistry, ref
+}
+
+// normalizeImageRef canonicalizes a container image reference the way Docker
+// resolves defaults: an implicit registry becomes docker.io, a single-path
+// component gains the library/ prefix (Docker Hub official images), and a
+// missing tag becomes :latest (never when a digest is present). A trailing "*"
+// (allowlist prefix pattern) is kept verbatim after canonicalizing its literal
+// head — no :latest defaulting, since the wildcard may stand for the tag or
+// any later component.
+func normalizeImageRef(image string) string {
+	if image == "" {
+		return ""
+	}
+	pattern := ""
+	if strings.HasSuffix(image, "*") {
+		pattern = "*"
+		image = strings.TrimSuffix(image, "*")
+		if image == "" {
+			return pattern
+		}
+	}
+
+	registry, repo := splitImageRef(image)
+	if pattern != "" {
+		return registry + "/" + repo + pattern
+	}
+
+	name := repo
+	tag := ""
+	digest := ""
+	if at := strings.Index(repo, "@"); at >= 0 {
+		name, digest = repo[:at], repo[at+1:]
+	} else if colon := strings.LastIndex(repo, ":"); colon >= 0 {
+		// After the registry split, a colon can only be a tag separator
+		// (ports only appear in the registry host).
+		name, tag = repo[:colon], repo[colon+1:]
+	}
+
+	canonical := registry + "/" + name
+	switch {
+	case digest != "":
+		canonical += "@" + digest
+	case tag != "":
+		canonical += ":" + tag
+	default:
+		canonical += ":latest"
+	}
+	return canonical
+}
+
+// customImageAllowed reports whether image matches the workspace custom-image
+// allowlist. Both the image and the entries are canonicalized first
+// (normalizeImageRef), so Docker's implicit defaults never split one image
+// across differently-written allowlist entries: "ubuntu:22.04" matches
+// "docker.io/library/*". An entry matches exactly, or as a prefix pattern
+// when it ends with "*" (e.g. "registry.example.com/team/*"). An empty
+// allowlist disables custom images entirely.
+func customImageAllowed(image string, allowlist []string) bool {
+	canonical := normalizeImageRef(image)
+	for _, entry := range allowlist {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		canonicalEntry := normalizeImageRef(entry)
+		if pattern, ok := strings.CutSuffix(canonicalEntry, "*"); ok {
+			if strings.HasPrefix(canonical, pattern) {
+				return true
+			}
+			continue
+		}
+		if canonicalEntry == canonical {
+			return true
+		}
+	}
+	return false
+}
+
+// normalizeCustomImageAllowlist trims each entry, drops empties, canonicalizes
+// it (normalizeImageRef — so "ubuntu" and "docker.io/library/ubuntu:latest" are
+// the same entry), and dedupes. Returns nil when nothing remains, so a cleared
+// allowlist round-trips as an empty list.
+func normalizeCustomImageAllowlist(entries []string) []string {
+	seen := make(map[string]struct{}, len(entries))
+	var out []string
+	for _, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		entry = normalizeImageRef(entry)
+		if _, ok := seen[entry]; ok {
+			continue
+		}
+		seen[entry] = struct{}{}
+		out = append(out, entry)
+	}
+	return out
+}
 
 // ProvisionerService implements ProvisionerService: admin RPCs managing the
 // provisioner registry (create with one-time token mint, rotate, delete with
@@ -398,7 +543,33 @@ func (s *ProvisionerService) ProvisionMachine(ctx context.Context, req *connect.
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get provisioning setting"))
 	}
-	if strings.TrimSpace(provisioning.GetRuntimeImage()) == "" {
+	// A custom runtime image replaces the workspace default for this machine
+	// alone, behind two switches: the feature master switch, and (when on)
+	// the optional allowlist enforcement.
+	customImage := strings.TrimSpace(req.Msg.GetRuntimeImage())
+	if customImage != "" {
+		if !provisioning.GetAllowCustomImages() {
+			return nil, connect.NewError(connect.CodeFailedPrecondition,
+				errors.New("custom runtime images are disabled; clear the custom image or ask a workspace admin to enable it"))
+		}
+		if err := validateCustomImageRef(customImage); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		if provisioning.GetCustomImageAllowlistEnabled() && !customImageAllowed(customImage, provisioning.GetCustomImageAllowlist()) {
+			msg := fmt.Sprintf("custom runtime image %q is not allowed; ask a workspace admin to add it to the custom image allowlist", customImage)
+			if canonical := normalizeImageRef(customImage); canonical != customImage {
+				// Docker's implicit defaults (docker.io/library/..., :latest)
+				// are what the admin must allowlist; surface the canonical
+				// form so the right entry is obvious.
+				msg = fmt.Sprintf("custom runtime image %q (canonical form %q) is not allowed; ask a workspace admin to add it to the custom image allowlist", customImage, canonical)
+			}
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New(msg))
+		}
+		// Persist the canonical form so the pod spec, replayed jobs, and the
+		// UI all show the fully-qualified image.
+		customImage = normalizeImageRef(customImage)
+	}
+	if customImage == "" && strings.TrimSpace(provisioning.GetRuntimeImage()) == "" {
 		return nil, connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("no runtime image configured; set it under Settings (machine provisioning) first"))
 	}
@@ -446,6 +617,9 @@ func (s *ProvisionerService) ProvisionMachine(ctx context.Context, req *connect.
 		Provisioning: &storepb.ProvisioningStatus{
 			Phase:     storepb.ProvisioningPhase_PROVISIONING_PHASE_PENDING,
 			PendingAt: now.Unix(),
+			// The user-provided image (empty = workspace default) is persisted
+			// on the row so replayed jobs compose the same workload.
+			RuntimeImage: customImage,
 		},
 	}, &store.MachineTokenMessage{
 		TokenHash:   hashToken(refreshToken),
@@ -533,7 +707,7 @@ func composeProvisionMachineJob(
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get provisioning setting")
 	}
-	runtimeImage := strings.TrimSpace(provisioning.GetRuntimeImage())
+	runtimeImage := resolveProvisionRuntimeImage(machine.Provisioning.GetRuntimeImage(), provisioning.GetRuntimeImage())
 	if runtimeImage == "" {
 		return nil, errors.New("no runtime image configured; set it under Settings (machine provisioning) first")
 	}
@@ -574,6 +748,17 @@ func composeProvisionMachineJob(
 		MachineLabels:   map[string]string{"provisioner": provisioner.Name, "owner": ownerHandle},
 		BootstrapScript: bootstrapScript,
 	}, nil
+}
+
+// resolveProvisionRuntimeImage picks a provisioning job's runtime image: the
+// machine's persisted custom image (set at provision time) wins over the
+// workspace default, so replayed jobs rebuild the same workload even if the
+// setting or allowlist changed in between.
+func resolveProvisionRuntimeImage(machineImage, workspaceImage string) string {
+	if image := strings.TrimSpace(machineImage); image != "" {
+		return image
+	}
+	return strings.TrimSpace(workspaceImage)
 }
 
 // resolveManagerURL resolves the manager URL pods use to download binaries
@@ -723,6 +908,7 @@ func cloneProvisioningStatus(p *storepb.ProvisioningStatus) *storepb.Provisionin
 		Phase:         p.Phase,
 		Error:         p.Error,
 		WorkloadName:  p.WorkloadName,
+		RuntimeImage:  p.RuntimeImage,
 		PendingAt:     p.PendingAt,
 		ProvisionedAt: p.ProvisionedAt,
 		FailedAt:      p.FailedAt,

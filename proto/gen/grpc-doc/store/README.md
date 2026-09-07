@@ -999,6 +999,7 @@ store-proto convention (see MachineStatus).
 | pending_at | [int64](#int64) |  |  |
 | provisioned_at | [int64](#int64) |  |  |
 | failed_at | [int64](#int64) |  |  |
+| runtime_image | [string](#string) |  | RuntimeImage is the machine-specific runtime image provided at ProvisionMachine time (custom image). Empty = the workspace default from ProvisioningSetting.runtime_image. Persisted so replayed provisioning jobs compose the same workload even if the workspace setting or allowlist later changes. |
 
 
 
@@ -1226,8 +1227,11 @@ ProvisioningSetting configures machine provisioning via provisioners.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| runtime_image | [string](#string) |  | runtime_image is the container image that provides the agent runtime environment for provisioned machine pods. It must NOT contain the laelia-machine binary — the binary is downloaded at pod start from this manager into the machine&#39;s data volume. ProvisionMachine refuses to run while this is empty. |
+| runtime_image | [string](#string) |  | runtime_image is the container image that provides the agent runtime environment for provisioned machine pods. It must NOT contain the laelia-machine binary — the binary is downloaded at pod start from this manager into the machine&#39;s data volume. ProvisionMachine refuses to run while this is empty (and no custom image was provided). |
 | binary_target | [string](#string) |  | binary_target is the machine binary target installed into provisioned pods (the manager&#39;s embedded manifest target). Default &#34;linux-x64&#34;. |
+| custom_image_allowlist | [string](#string) | repeated | custom_image_allowlist holds the runtime images users may provide at ProvisionMachine time instead of the workspace default. Each entry either matches an image reference exactly or, when it ends with &#34;*&#34;, acts as a prefix pattern (e.g. &#34;registry.example.com/team/*&#34;). Only consulted when allow_custom_images and custom_image_allowlist_enabled are both true; entries are canonicalized like image references on save. |
+| allow_custom_images | [bool](#bool) |  | allow_custom_images gates the whole custom-image path: when false, ProvisionMachine rejects any runtime_image and every machine uses runtime_image. Default false. |
+| custom_image_allowlist_enabled | [bool](#bool) |  | custom_image_allowlist_enabled turns allowlist enforcement on. When false (and allow_custom_images is true), any valid image reference is accepted. Default false (no restriction). |
 
 
 

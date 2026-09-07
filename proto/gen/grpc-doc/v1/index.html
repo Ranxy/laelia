@@ -20080,6 +20080,14 @@ phase badge. Set only for provisioned machines. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>runtime_image</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The machine-specific runtime image the workload runs (custom image
+provided at ProvisionMachine time); empty = the workspace default. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -22479,6 +22487,17 @@ above, bound to fingerprint. </p></td>
 workspace admin (checked in the handler, like machine ownership transfer). </p></td>
                 </tr>
               
+                <tr>
+                  <td>runtime_image</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Optional custom runtime image for this machine&#39;s workload, overriding the
+workspace ProvisioningSetting.runtime_image default. Must be a valid image
+reference and match the admin-configured custom-image allowlist (an empty
+allowlist disables custom images). Persisted on the machine so replayed
+provisioning jobs rebuild the same workload. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -23348,6 +23367,15 @@ exchange, instead of relying on the browser&#39;s current origin. </p></td>
                   <td></td>
                   <td><p>Whether ordinary users (without laelia.machines.create) are disallowed
 from creating their own machines. Default false (allowed). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>allow_custom_images</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Whether users may provide a custom runtime image when provisioning a
+machine through a provisioner. Not a secret: the create-machine page uses
+it to hide the custom-image field; the backend still enforces the switch. </p></td>
                 </tr>
               
             </tbody>

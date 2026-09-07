@@ -192,10 +192,12 @@ func newProvisionerTestEnv(t *testing.T) *provisionerTestEnv {
 	provisionerStreamService := NewProvisionerStreamService(stores, secret, profile, d)
 	machineService := NewMachineService(stores, secret, profile, nil, d, iam.NewManager(stores))
 	iamService := NewIamService(stores, iam.NewManager(stores))
+	settingService := NewSettingService(stores, nil, profile, iam.NewManager(stores))
 	mux.Handle(v1connect.NewProvisionerServiceHandler(provisionerService, handlerOpts))
 	mux.Handle(v1connect.NewProvisionerStreamServiceHandler(provisionerStreamService, handlerOpts))
 	mux.Handle(v1connect.NewMachineServiceHandler(machineService, handlerOpts))
 	mux.Handle(v1connect.NewIamServiceHandler(iamService, handlerOpts))
+	mux.Handle(v1connect.NewSettingServiceHandler(settingService, handlerOpts))
 
 	// The Connect protocol's bidi streaming (the provisioner channel) runs over
 	// HTTP/2; httptest's default server is HTTP/1.1 only, which kills the
@@ -281,6 +283,23 @@ func (f *fakeProvisioner) recvJob(timeout time.Duration) *v1pb.ProvisionMachineJ
 		}
 	}
 	return nil
+}
+
+// recvJobFor waits until a ProvisionJob frame for machineName arrives, skipping
+// other queued jobs (a reconnect replays every PENDING machine's job in no
+// guaranteed order), or nil on timeout.
+func (f *fakeProvisioner) recvJobFor(machineName string, timeout time.Duration) *v1pb.ProvisionMachineJob {
+	f.t.Helper()
+	deadline := time.Now().Add(timeout)
+	for {
+		job := f.recvJob(time.Until(deadline))
+		if job == nil {
+			return nil
+		}
+		if job.GetMachine() == machineName {
+			return job
+		}
+	}
 }
 
 func (f *fakeProvisioner) recvDeprovisionJob(timeout time.Duration) *v1pb.DeprovisionMachineJob {
@@ -607,6 +626,243 @@ func TestProvisionMachineFailsFast(t *testing.T) {
 	}))
 	require.Error(t, err)
 	assert.Equal(t, connect.CodePermissionDenied, connectErrCode(t, err))
+}
+
+// TestProvisionMachineCustomImage covers the user-provided runtime image path:
+// allowlist policy, per-machine persistence, and replay stability.
+func TestProvisionMachineCustomImage(t *testing.T) {
+	env := newProvisionerTestEnv(t)
+	ctx := context.Background()
+	memberClient := env.provisionerServiceClient(t, env.memberToken(t))
+
+	// Register a provisioner, connect it, and configure an allowlist.
+	created, err := env.provisionerServiceClient(t, env.adminToken(t)).CreateProvisioner(ctx, connect.NewRequest(&v1pb.CreateProvisionerRequest{
+		Provisioner: &v1pb.Provisioner{Title: "p-" + uuid8(), Backend: "kubernetes"},
+	}))
+	require.NoError(t, err)
+	provName := created.Msg.GetProvisioner().GetName()
+	setting, err := env.store.GetProvisioningSetting(ctx)
+	require.NoError(t, err)
+	require.NoError(t, env.store.UpsertSettingValue(ctx, storepb.SettingName_PROVISIONING, &storepb.ProvisioningSetting{
+		RuntimeImage: setting.RuntimeImage, BinaryTarget: "linux-x64",
+		AllowCustomImages:           true,
+		CustomImageAllowlistEnabled: true,
+		CustomImageAllowlist: []string{
+			"registry.example.com/team/*", "registry.example.com/pinned:v1",
+			"docker.io/library/*", // Docker Hub official images
+		},
+	}))
+	ready := &v1pb.ProvisionerReady{Version: "0.9.0", Backend: "kubernetes"}
+	fake := env.dialFakeProvisioner(t, created.Msg.GetToken(), ready)
+	defer fake.close()
+	require.Eventually(t, func() bool {
+		st := env.provisionerStatus(t, provName)
+		return st != nil && st.Connected
+	}, 5*time.Second, 50*time.Millisecond)
+
+	custom := "registry.example.com/team/app:v1"
+
+	// Rejected: malformed reference.
+	_, err = memberClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: provName, Title: "m", RuntimeImage: "not a valid/ref image",
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeInvalidArgument, connectErrCode(t, err))
+
+	// Rejected: well-formed but not on the allowlist.
+	_, err = memberClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: provName, Title: "m", RuntimeImage: "evil.example.com/team/app:v1",
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeFailedPrecondition, connectErrCode(t, err))
+
+	// Accepted: the allowlisted image overrides the workspace default on the
+	// job, on the response, and on the persisted row.
+	resp, err := memberClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: provName, Title: "custom image machine", RuntimeImage: custom,
+	}))
+	require.NoError(t, err)
+	require.Equal(t, custom, resp.Msg.GetProvisioning().GetRuntimeImage())
+	machineResourceID := strings.TrimPrefix(resp.Msg.GetName(), common.MachineNamePrefix)
+	row, err := env.store.GetMachineByResourceID(ctx, machineResourceID)
+	require.NoError(t, err)
+	require.Equal(t, custom, row.Provisioning.GetRuntimeImage())
+	job := fake.recvJob(10 * time.Second)
+	require.NotNil(t, job)
+	require.Equal(t, custom, job.GetRuntimeImage(), "the custom image must reach the provisioner")
+
+	// The exact-match allowlist entry works too.
+	_, err = memberClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: provName, Title: "pinned", RuntimeImage: "registry.example.com/pinned:v1",
+	}))
+	require.NoError(t, err)
+
+	// Replay: the persisted per-machine image survives the re-composition, so
+	// the re-delivered job rebuilds the same workload.
+	fake.close()
+	require.Eventually(t, func() bool {
+		st := env.provisionerStatus(t, provName)
+		return st != nil && !st.Connected
+	}, 5*time.Second, 50*time.Millisecond)
+	fake2 := env.dialFakeProvisioner(t, created.Msg.GetToken(), ready)
+	defer fake2.close()
+	replayed := fake2.recvJobFor(resp.Msg.GetName(), 10*time.Second)
+	require.NotNil(t, replayed)
+	require.Equal(t, custom, replayed.GetRuntimeImage(),
+		"the replayed job must carry the machine's persisted custom image, not the workspace default")
+
+	// A Docker Hub official image is written without its registry prefix; the
+	// request is canonicalized (docker.io/library/..., :latest defaults)
+	// before the allowlist match and before persistence.
+	const hubImage = "docker.io/library/ubuntu:22.04"
+	hub, err := memberClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: provName, Title: "docker hub machine", RuntimeImage: "ubuntu:22.04",
+	}))
+	require.NoError(t, err)
+	require.Equal(t, hubImage, hub.Msg.GetProvisioning().GetRuntimeImage(),
+		"the bare official image must be persisted in its canonical form")
+	hubRow, err := env.store.GetMachineByResourceID(ctx, strings.TrimPrefix(hub.Msg.GetName(), common.MachineNamePrefix))
+	require.NoError(t, err)
+	require.Equal(t, hubImage, hubRow.Provisioning.GetRuntimeImage())
+	hubJob := fake2.recvJobFor(hub.Msg.GetName(), 10*time.Second)
+	require.NotNil(t, hubJob)
+	require.Equal(t, hubImage, hubJob.GetRuntimeImage(),
+		"the provisioner must receive the canonical fully-qualified image")
+
+	// A machine without a custom image keeps using the workspace default.
+	plain, err := memberClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: provName, Title: "default image machine",
+	}))
+	require.NoError(t, err)
+	require.Empty(t, plain.Msg.GetProvisioning().GetRuntimeImage())
+	defaultJob := fake2.recvJobFor(plain.Msg.GetName(), 10*time.Second)
+	require.NotNil(t, defaultJob)
+	require.Equal(t, "laelia/machine-runtime:test", defaultJob.GetRuntimeImage())
+}
+
+// TestProvisionMachineCustomImageOverridesEmptySetting verifies that a custom
+// image also works when the workspace default runtime image is unset: the
+// custom image replaces it for that machine alone.
+func TestProvisionMachineCustomImageOverridesEmptySetting(t *testing.T) {
+	env := newProvisionerTestEnv(t)
+	ctx := context.Background()
+	memberClient := env.provisionerServiceClient(t, env.memberToken(t))
+
+	created, err := env.provisionerServiceClient(t, env.adminToken(t)).CreateProvisioner(ctx, connect.NewRequest(&v1pb.CreateProvisionerRequest{
+		Provisioner: &v1pb.Provisioner{Title: "p-" + uuid8(), Backend: "kubernetes"},
+	}))
+	require.NoError(t, err)
+	require.NoError(t, env.store.UpsertSettingValue(ctx, storepb.SettingName_PROVISIONING, &storepb.ProvisioningSetting{
+		RuntimeImage: "", BinaryTarget: "linux-x64",
+		AllowCustomImages:           true,
+		CustomImageAllowlistEnabled: true,
+		CustomImageAllowlist:        []string{"registry.example.com/*"},
+	}))
+	ready := &v1pb.ProvisionerReady{Version: "0.9.0", Backend: "kubernetes"}
+	fake := env.dialFakeProvisioner(t, created.Msg.GetToken(), ready)
+	defer fake.close()
+	require.Eventually(t, func() bool {
+		st := env.provisionerStatus(t, created.Msg.GetProvisioner().GetName())
+		return st != nil && st.Connected
+	}, 5*time.Second, 50*time.Millisecond)
+
+	// Without a custom image the missing default still fails fast...
+	_, err = memberClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: created.Msg.GetProvisioner().GetName(), Title: "m",
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeFailedPrecondition, connectErrCode(t, err))
+	assert.Contains(t, err.Error(), "no runtime image configured")
+
+	// ...but an allowlisted custom image provisions fine.
+	const custom = "registry.example.com/team/app:v2"
+	resp, err := memberClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: created.Msg.GetProvisioner().GetName(), Title: "m", RuntimeImage: custom,
+	}))
+	require.NoError(t, err)
+	require.Equal(t, custom, resp.Msg.GetProvisioning().GetRuntimeImage())
+	job := fake.recvJob(10 * time.Second)
+	require.NotNil(t, job)
+	require.Equal(t, custom, job.GetRuntimeImage())
+}
+
+// TestProvisionMachineCustomImageSwitches covers the two settings switches:
+// the feature master switch gates the whole custom-image path, and with the
+// master on but allowlist enforcement off any valid image is accepted.
+func TestProvisionMachineCustomImageSwitches(t *testing.T) {
+	env := newProvisionerTestEnv(t)
+	ctx := context.Background()
+	memberClient := env.provisionerServiceClient(t, env.memberToken(t))
+
+	created, err := env.provisionerServiceClient(t, env.adminToken(t)).CreateProvisioner(ctx, connect.NewRequest(&v1pb.CreateProvisionerRequest{
+		Provisioner: &v1pb.Provisioner{Title: "p-" + uuid8(), Backend: "kubernetes"},
+	}))
+	require.NoError(t, err)
+	provName := created.Msg.GetProvisioner().GetName()
+	setting, err := env.store.GetProvisioningSetting(ctx)
+	require.NoError(t, err)
+	ready := &v1pb.ProvisionerReady{Version: "0.9.0", Backend: "kubernetes"}
+	fake := env.dialFakeProvisioner(t, created.Msg.GetToken(), ready)
+	defer fake.close()
+	require.Eventually(t, func() bool {
+		st := env.provisionerStatus(t, provName)
+		return st != nil && st.Connected
+	}, 5*time.Second, 50*time.Millisecond)
+
+	// Master switch off (the default): any custom image is rejected, even one
+	// that would trivially pass an allowlist.
+	_, err = memberClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: provName, Title: "m", RuntimeImage: "registry.example.com/team/app:v1",
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeFailedPrecondition, connectErrCode(t, err))
+	require.Contains(t, err.Error(), "custom runtime images are disabled")
+
+	// Master on, allowlist enforcement off: any valid image is accepted —
+	// including one no allowlist would permit.
+	require.NoError(t, env.store.UpsertSettingValue(ctx, storepb.SettingName_PROVISIONING, &storepb.ProvisioningSetting{
+		RuntimeImage: setting.RuntimeImage, BinaryTarget: "linux-x64",
+		AllowCustomImages: true,
+	}))
+	resp, err := memberClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: provName, Title: "ungoverned image", RuntimeImage: "evil.example.com/whatever:tag",
+	}))
+	require.NoError(t, err, "with allowlist enforcement off the image needs no allowlist entry")
+	require.Equal(t, "evil.example.com/whatever:tag", resp.Msg.GetProvisioning().GetRuntimeImage())
+	job := fake.recvJob(10 * time.Second)
+	require.NotNil(t, job)
+	require.Equal(t, "evil.example.com/whatever:tag", job.GetRuntimeImage())
+
+	// The malformed-image shape gate still applies with enforcement off.
+	_, err = memberClient.ProvisionMachine(ctx, connect.NewRequest(&v1pb.ProvisionMachineRequest{
+		Provisioner: provName, Title: "m", RuntimeImage: "not a valid/ref image",
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeInvalidArgument, connectErrCode(t, err))
+}
+
+// TestWorkspaceInfoSurfacesAllowCustomImages verifies the public
+// GetWorkspaceInfo carries the provisioning custom-image switch: the setting
+// itself is admin-only, so this is the only signal every user (including a
+// plain member) can read to decide whether the create-machine custom-image
+// field is shown.
+func TestWorkspaceInfoSurfacesAllowCustomImages(t *testing.T) {
+	env := newProvisionerTestEnv(t)
+	ctx := context.Background()
+	// No Authorization header: GetWorkspaceInfo is allow_without_credential.
+	settingClient := v1connect.NewSettingServiceClient(env.server.Client(), env.server.URL)
+
+	info, err := settingClient.GetWorkspaceInfo(ctx, connect.NewRequest(&v1pb.GetWorkspaceInfoRequest{}))
+	require.NoError(t, err)
+	require.False(t, info.Msg.GetAllowCustomImages(), "custom images must be disabled by default")
+
+	require.NoError(t, env.store.UpsertSettingValue(ctx, storepb.SettingName_PROVISIONING, &storepb.ProvisioningSetting{
+		RuntimeImage: "laelia/machine-runtime:test", BinaryTarget: "linux-x64",
+		AllowCustomImages: true,
+	}))
+	info, err = settingClient.GetWorkspaceInfo(ctx, connect.NewRequest(&v1pb.GetWorkspaceInfoRequest{}))
+	require.NoError(t, err)
+	require.True(t, info.Msg.GetAllowCustomImages(), "the switch must surface through the public workspace info")
 }
 
 // TestProvisionerTokenVersionKillsAccess verifies the rotate path end to end:

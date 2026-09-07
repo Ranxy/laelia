@@ -333,6 +333,11 @@ func (s *SettingService) updateProvisioning(ctx context.Context, req *connect.Re
 		if err := mergeProvisioningPaths(req.Msg.GetUpdateMask().GetPaths(), payload, cfg); err != nil {
 			return nil, err
 		}
+		for _, entry := range cfg.GetCustomImageAllowlist() {
+			if err := validateCustomImageRef(entry); err != nil {
+				return nil, connect.NewError(connect.CodeInvalidArgument, err)
+			}
+		}
 		return cfg, nil
 	})
 	if err != nil {
@@ -552,6 +557,9 @@ func mergePasswordRestrictionPaths(paths []string, src, dst *models.PasswordRest
 var provisioningPaths = []string{
 	"value.provisioning.runtime_image",
 	"value.provisioning.binary_target",
+	"value.provisioning.allow_custom_images",
+	"value.provisioning.custom_image_allowlist_enabled",
+	"value.provisioning.custom_image_allowlist",
 }
 
 func mergeProvisioningPaths(paths []string, src, dst *models.ProvisioningSetting) error {
@@ -561,6 +569,12 @@ func mergeProvisioningPaths(paths []string, src, dst *models.ProvisioningSetting
 			dst.RuntimeImage = strings.TrimSpace(src.GetRuntimeImage())
 		case "binary_target":
 			dst.BinaryTarget = strings.TrimSpace(src.GetBinaryTarget())
+		case "allow_custom_images":
+			dst.AllowCustomImages = src.GetAllowCustomImages()
+		case "custom_image_allowlist_enabled":
+			dst.CustomImageAllowlistEnabled = src.GetCustomImageAllowlistEnabled()
+		case "custom_image_allowlist":
+			dst.CustomImageAllowlist = normalizeCustomImageAllowlist(src.GetCustomImageAllowlist())
 		default:
 			return invalidMaskPath("value.provisioning." + field)
 		}
@@ -718,11 +732,22 @@ func (s *SettingService) UpdateDebugConfig(_ context.Context, req *connect.Reque
 }
 
 // GetWorkspaceInfo returns the workspace signup policy for the
-// unauthenticated sign-in/sign-up pages. No auth required.
+// unauthenticated sign-in/sign-up pages, plus the non-secret provisioning
+// flags the create-machine page renders from (custom runtime images). No auth
+// required.
 func (s *SettingService) GetWorkspaceInfo(ctx context.Context, _ *connect.Request[v1pb.GetWorkspaceInfoRequest]) (*connect.Response[v1pb.GetWorkspaceInfoResponse], error) {
 	setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, pkgerrors.Wrap(err, "failed to get workspace general setting"))
+	}
+	// Best-effort: a provisioning-read failure must not break the public
+	// auth pages; the field then renders as disabled (the backend enforces
+	// the real switch).
+	allowCustomImages := false
+	if provisioning, err := s.store.GetProvisioningSetting(ctx); err != nil {
+		slog.Warn("failed to get provisioning setting for workspace info", "error", err)
+	} else {
+		allowCustomImages = provisioning.GetAllowCustomImages()
 	}
 	return connect.NewResponse(&v1pb.GetWorkspaceInfoResponse{
 		DisallowSignup:            setting.DisallowSignup,
@@ -730,6 +755,7 @@ func (s *SettingService) GetWorkspaceInfo(ctx context.Context, _ *connect.Reques
 		Domains:                   setting.Domains,
 		RequireEmailVerification:  store.RequireEmailVerification(setting),
 		DisallowUserCreateMachine: setting.DisallowUserCreateMachine,
+		AllowCustomImages:         allowCustomImages,
 	}), nil
 }
 

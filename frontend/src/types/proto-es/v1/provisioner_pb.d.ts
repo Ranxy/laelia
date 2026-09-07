@@ -205,6 +205,17 @@ export declare type ProvisionMachineRequest = Message<"laelia.v1.ProvisionMachin
    * @generated from field: string owner = 3;
    */
   owner: string;
+
+  /**
+   * Optional custom runtime image for this machine's workload, overriding the
+   * workspace ProvisioningSetting.runtime_image default. Must be a valid image
+   * reference and match the admin-configured custom-image allowlist (an empty
+   * allowlist disables custom images). Persisted on the machine so replayed
+   * provisioning jobs rebuild the same workload.
+   *
+   * @generated from field: string runtime_image = 4;
+   */
+  runtimeImage: string;
 };
 
 /**

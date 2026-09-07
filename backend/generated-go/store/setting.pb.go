@@ -1099,13 +1099,28 @@ type ProvisioningSetting struct {
 	// environment for provisioned machine pods. It must NOT contain the
 	// laelia-machine binary — the binary is downloaded at pod start from this
 	// manager into the machine's data volume. ProvisionMachine refuses to run
-	// while this is empty.
+	// while this is empty (and no custom image was provided).
 	RuntimeImage string `protobuf:"bytes,1,opt,name=runtime_image,json=runtimeImage,proto3" json:"runtime_image,omitempty"`
 	// binary_target is the machine binary target installed into provisioned
 	// pods (the manager's embedded manifest target). Default "linux-x64".
-	BinaryTarget  string `protobuf:"bytes,2,opt,name=binary_target,json=binaryTarget,proto3" json:"binary_target,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	BinaryTarget string `protobuf:"bytes,2,opt,name=binary_target,json=binaryTarget,proto3" json:"binary_target,omitempty"`
+	// custom_image_allowlist holds the runtime images users may provide at
+	// ProvisionMachine time instead of the workspace default. Each entry either
+	// matches an image reference exactly or, when it ends with "*", acts as a
+	// prefix pattern (e.g. "registry.example.com/team/*"). Only consulted when
+	// allow_custom_images and custom_image_allowlist_enabled are both true;
+	// entries are canonicalized like image references on save.
+	CustomImageAllowlist []string `protobuf:"bytes,3,rep,name=custom_image_allowlist,json=customImageAllowlist,proto3" json:"custom_image_allowlist,omitempty"`
+	// allow_custom_images gates the whole custom-image path: when false,
+	// ProvisionMachine rejects any runtime_image and every machine uses
+	// runtime_image. Default false.
+	AllowCustomImages bool `protobuf:"varint,4,opt,name=allow_custom_images,json=allowCustomImages,proto3" json:"allow_custom_images,omitempty"`
+	// custom_image_allowlist_enabled turns allowlist enforcement on. When false
+	// (and allow_custom_images is true), any valid image reference is accepted.
+	// Default false (no restriction).
+	CustomImageAllowlistEnabled bool `protobuf:"varint,5,opt,name=custom_image_allowlist_enabled,json=customImageAllowlistEnabled,proto3" json:"custom_image_allowlist_enabled,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
 }
 
 func (x *ProvisioningSetting) Reset() {
@@ -1150,6 +1165,27 @@ func (x *ProvisioningSetting) GetBinaryTarget() string {
 		return x.BinaryTarget
 	}
 	return ""
+}
+
+func (x *ProvisioningSetting) GetCustomImageAllowlist() []string {
+	if x != nil {
+		return x.CustomImageAllowlist
+	}
+	return nil
+}
+
+func (x *ProvisioningSetting) GetAllowCustomImages() bool {
+	if x != nil {
+		return x.AllowCustomImages
+	}
+	return false
+}
+
+func (x *ProvisioningSetting) GetCustomImageAllowlistEnabled() bool {
+	if x != nil {
+		return x.CustomImageAllowlistEnabled
+	}
+	return false
 }
 
 type EnvironmentSetting_Environment struct {
@@ -1309,10 +1345,13 @@ const file_store_setting_proto_rawDesc = "" +
 	"\x05Scope\x12\x15\n" +
 	"\x11SCOPE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tSCOPE_ALL\x10\x01\x12\x16\n" +
-	"\x12SCOPE_USER_CREATED\x10\x02\"_\n" +
+	"\x12SCOPE_USER_CREATED\x10\x02\"\x8a\x02\n" +
 	"\x13ProvisioningSetting\x12#\n" +
 	"\rruntime_image\x18\x01 \x01(\tR\fruntimeImage\x12#\n" +
-	"\rbinary_target\x18\x02 \x01(\tR\fbinaryTarget*\xe2\x02\n" +
+	"\rbinary_target\x18\x02 \x01(\tR\fbinaryTarget\x124\n" +
+	"\x16custom_image_allowlist\x18\x03 \x03(\tR\x14customImageAllowlist\x12.\n" +
+	"\x13allow_custom_images\x18\x04 \x01(\bR\x11allowCustomImages\x12C\n" +
+	"\x1ecustom_image_allowlist_enabled\x18\x05 \x01(\bR\x1bcustomImageAllowlistEnabled*\xe2\x02\n" +
 	"\vSettingName\x12\x1c\n" +
 	"\x18SETTING_NAME_UNSPECIFIED\x10\x00\x12\x0f\n" +
 	"\vAUTH_SECRET\x10\x01\x12\x11\n" +

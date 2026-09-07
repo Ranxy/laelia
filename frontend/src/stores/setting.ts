@@ -139,6 +139,9 @@ export const passwordRestrictionPaths = [
 export const provisioningPaths = [
   "value.provisioning.runtime_image",
   "value.provisioning.binary_target",
+  "value.provisioning.allow_custom_images",
+  "value.provisioning.custom_image_allowlist_enabled",
+  "value.provisioning.custom_image_allowlist",
 ] as const;
 
 // settingResourceName maps a setting to its resource name, matching the

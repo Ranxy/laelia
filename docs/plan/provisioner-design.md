@@ -578,11 +578,20 @@ message ProvisioningSetting {
   // Container image that provides the agent runtime environment for
   // provisioned machine pods. It must NOT contain the laelia-machine binary —
   // the binary is downloaded at pod start from this manager into the machine's
-  // PVC. Required before ProvisionMachine will succeed.
+  // PVC. Required before ProvisionMachine will succeed (unless the request
+  // carries a custom image, §6.7).
   string runtime_image = 1;
   // Machine binary target to install into provisioned pods. Default
   // "linux-x64". (When linux-arm64 embedding lands, this becomes per-provisioner.)
   string binary_target = 2;
+  // Runtime images users may provide at ProvisionMachine time (§6.7). Exact
+  // match, or prefix when the entry ends with "*". Enforced only when
+  // custom_image_allowlist_enabled is on.
+  repeated string custom_image_allowlist = 3;
+  // Gates the whole custom-image path; default false.
+  bool allow_custom_images = 4;
+  // Turns allowlist enforcement on; default false (no restriction).
+  bool custom_image_allowlist_enabled = 5;
 }
 ```
 
@@ -603,6 +612,62 @@ push the same `UpgradeRequest` the manual `UpgradeMachine` RPC sends (target
 fixed to the embedded `linux-x64` build). The existing progress reporting and
 crash-safety (supervisor swap + exec in place) apply unchanged. Manual upgrade
 stays available regardless.
+
+### 6.7 Custom runtime image (per-machine override, implemented 2026-09-07)
+
+`ProvisionMachineRequest` carries an optional `runtime_image`: the caller may
+override the workspace default image for that one machine. Permission is the
+same as provisioning itself — anyone who may call `ProvisionMachine` may
+customize the image (decision confirmed with product owner) — behind two
+admin switches on `ProvisioningSetting` (Settings → General):
+
+- **`allow_custom_images`** (default off) gates the whole path: when off,
+  `ProvisionMachine` rejects any `runtime_image` (`FailedPrecondition`) and
+  every machine uses the workspace default. The provisioning setting itself is
+  admin-only, so the switch is mirrored through the public `GetWorkspaceInfo`
+  (`GetWorkspaceInfoResponse.allow_custom_images` — not a secret; best-effort
+  read that renders disabled on error): the create-machine page hides the
+  custom-image field from it via the shared `useWorkspacePolicy` hook, and the
+  backend remains the enforcement point.
+- **`custom_image_allowlist_enabled`** (default off, only shown when the
+  master switch is on) turns allowlist enforcement on; when off, any valid
+  image reference is accepted. The allowlist itself is only displayed when
+  this switch is on.
+
+Policy gates (manager-side, `backend/manager/api/v1/provisioner.go`):
+
+- **Shape**: `validateCustomImageRef` requires image-reference characters only
+  (`[A-Za-z0-9._:@/-]`, alphanumeric head, ≤512 chars) — no whitespace, quotes,
+  shell metacharacters, or control characters reach a pod spec.
+- **Canonicalization**: `normalizeImageRef` applies Docker's implicit defaults
+  to both the request image and the allowlist entries before any comparison or
+  persistence — an implicit registry becomes `docker.io`, a single-path
+  component gains `library/` (Docker Hub official images), and a missing tag
+  becomes `:latest` (never with a digest). So `ubuntu:22.04`,
+  `library/ubuntu:22.04`, and `docker.io/library/ubuntu:22.04` are one image:
+  the request is persisted (and pushed to the provisioner) in its canonical
+  form, and an allowlist entry written bare still matches. Wildcard entries
+  canonicalize their literal head only (no `:latest` injection); an empty
+  head (`*`) matches everything.
+- **Allowlist**: `ProvisioningSetting.custom_image_allowlist` (Settings →
+  General, admin-managed via `UpdateSetting`) holds the permitted references;
+  it is enforced only when `custom_image_allowlist_enabled` is on. An entry
+  matches exactly, or as a prefix pattern when it ends with `*`
+  (e.g. `registry.example.com/team/*`). **An empty list with enforcement on
+  allows nothing** (secure default). A non-allowlisted image is rejected with
+  `FailedPrecondition` (the error names the canonical form when it differs, so
+  the admin knows which entry to add); a malformed one with `InvalidArgument`.
+- **Persistence**: the canonical image is stored on
+  `machine.provisioning.runtime_image` (store `ProvisioningStatus` — a JSONB
+  field, no schema migration). `composeProvisionMachineJob` prefers the
+  machine's persisted image over the workspace setting, so **replayed jobs
+  rebuild the same workload even if the setting or allowlist changed in
+  between**. It is exposed read-only on the v1 `ProvisioningStatus` for
+  visibility.
+
+Everything else (binary target, bootstrap script, manager URL) keeps coming
+from the workspace configuration; the custom image must still satisfy the
+image contract (§8.3) since the init container runs inside it.
 
 ## 7. Provisioner binary
 

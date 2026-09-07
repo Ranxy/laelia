@@ -1990,8 +1990,11 @@ type ProvisioningStatus struct {
 	PendingAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=pending_at,json=pendingAt,proto3" json:"pending_at,omitempty"`
 	ProvisionedAt  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=provisioned_at,json=provisionedAt,proto3" json:"provisioned_at,omitempty"`
 	FailedAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=failed_at,json=failedAt,proto3" json:"failed_at,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// The machine-specific runtime image the workload runs (custom image
+	// provided at ProvisionMachine time); empty = the workspace default.
+	RuntimeImage  string `protobuf:"bytes,8,opt,name=runtime_image,json=runtimeImage,proto3" json:"runtime_image,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProvisioningStatus) Reset() {
@@ -2071,6 +2074,13 @@ func (x *ProvisioningStatus) GetFailedAt() *timestamppb.Timestamp {
 		return x.FailedAt
 	}
 	return nil
+}
+
+func (x *ProvisioningStatus) GetRuntimeImage() string {
+	if x != nil {
+		return x.RuntimeImage
+	}
+	return ""
 }
 
 type MachineInfo struct {
@@ -3504,7 +3514,7 @@ const file_v1_machine_proto_rawDesc = "" +
 	"\x0fUpgradeProgress\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x14\n" +
 	"\x05stage\x18\x02 \x01(\tR\x05stage\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error\"\xd9\x03\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\xfe\x03\n" +
 	"\x12ProvisioningStatus\x122\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x1c.laelia.v1.ProvisioningPhaseR\x05phase\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12#\n" +
@@ -3513,7 +3523,8 @@ const file_v1_machine_proto_rawDesc = "" +
 	"\n" +
 	"pending_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tpendingAt\x12A\n" +
 	"\x0eprovisioned_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\rprovisionedAt\x127\n" +
-	"\tfailed_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\bfailedAt\x1aA\n" +
+	"\tfailed_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\bfailedAt\x12#\n" +
+	"\rruntime_image\x18\b \x01(\tR\fruntimeImage\x1aA\n" +
 	"\x13WorkloadLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xad\x03\n" +

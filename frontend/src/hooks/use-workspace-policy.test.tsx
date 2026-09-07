@@ -38,6 +38,7 @@ describe("useWorkspacePolicy", () => {
       enforceIdentityDomain: true,
       domains: ["example.com"],
       disallowUserCreateMachine: true,
+      allowCustomImages: true,
     });
 
     mount();
@@ -53,6 +54,7 @@ describe("useWorkspacePolicy", () => {
       enforceIdentityDomain: true,
       allowedDomains: ["example.com"],
       userCreateMachineDisallowed: true,
+      allowCustomImages: true,
     });
   });
 
@@ -86,6 +88,9 @@ describe("useWorkspacePolicy", () => {
       enforceIdentityDomain: false,
       allowedDomains: [],
       userCreateMachineDisallowed: false,
+      // Permissive default: the create-machine custom-image field stays
+      // visible until the policy arrives (the backend enforces the switch).
+      allowCustomImages: true,
     });
     inFlight.unmount();
 

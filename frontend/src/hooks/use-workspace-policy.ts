@@ -25,6 +25,12 @@ export interface WorkspacePolicy {
   // empty list so callers can render the hint purely from `length`.
   allowedDomains: string[];
   userCreateMachineDisallowed: boolean;
+  // Whether users may provide a custom runtime image when provisioning a
+  // machine. The provisioning setting is admin-only, so this public mirror is
+  // what the create-machine page renders from. Default true (permissive): the
+  // field stays visible until/unless the policy says otherwise — the backend
+  // enforces the real switch.
+  allowCustomImages: boolean;
 }
 
 const DEFAULT_POLICY: WorkspacePolicy = {
@@ -33,6 +39,7 @@ const DEFAULT_POLICY: WorkspacePolicy = {
   enforceIdentityDomain: false,
   allowedDomains: [],
   userCreateMachineDisallowed: false,
+  allowCustomImages: true,
 };
 
 export function useWorkspacePolicy(): WorkspacePolicy {
@@ -48,6 +55,7 @@ export function useWorkspacePolicy(): WorkspacePolicy {
       enforceIdentityDomain: res.enforceIdentityDomain,
       allowedDomains: res.enforceIdentityDomain ? (res.domains ?? []) : [],
       userCreateMachineDisallowed: res.disallowUserCreateMachine,
+      allowCustomImages: res.allowCustomImages,
     }),
   });
 

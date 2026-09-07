@@ -16,6 +16,20 @@ vi.mock("react-router-dom", () => ({
   useNavigate: () => mockRouter.navigate,
 }));
 
+// The panel reads the custom-image switch from the public workspace policy
+// (GetWorkspaceInfo); tests drive it through this mocked hook.
+const mockedPolicy = vi.hoisted(() => ({
+  signupDisallowed: false,
+  requireEmailVerification: false,
+  enforceIdentityDomain: false,
+  allowedDomains: [] as string[],
+  userCreateMachineDisallowed: false,
+  allowCustomImages: true,
+}));
+vi.mock("@/hooks/use-workspace-policy", () => ({
+  useWorkspacePolicy: () => mockedPolicy,
+}));
+
 import { useAppStore } from "@/stores";
 import type { Provisioner } from "@/types/proto-es/v1/provisioner_pb";
 import { MachineNewPage } from "./machine-new";
@@ -59,6 +73,9 @@ beforeEach(() => {
   mockedActions.provisionMachine.mockReset();
   mockRouter.navigate.mockReset();
   mockedActions.fetchProvisioners.mockResolvedValue(undefined);
+  // Permissive default: the custom-image field stays visible unless a test
+  // flips the mocked workspace policy to allowCustomImages: false.
+  mockedPolicy.allowCustomImages = true;
 });
 
 afterEach(() => {
@@ -216,9 +233,72 @@ describe("MachineNewProvisionedPanel", () => {
     await waitFor(() => {
       expect(mockedActions.provisionMachine).toHaveBeenCalledWith(
         "provisioners/p1",
-        "Cloud Box"
+        "Cloud Box",
+        ""
       );
       expect(mockRouter.navigate).toHaveBeenCalledWith("/machines/m1");
+    });
+  });
+
+  it("passes the trimmed custom runtime image through to provisionMachine", async () => {
+    mockedActions.provisionMachine.mockResolvedValue({
+      name: "machines/m1",
+      title: "Cloud Box",
+    });
+    useAppStore.setState({
+      provisioners: [provisioner("provisioners/p1", "Prod Cluster")],
+    });
+    render(<MachineNewProvisionedPanel />);
+
+    fireEvent.click(await screen.findByText("Prod Cluster"));
+    fireEvent.change(screen.getByLabelText("machine.new.name-label"), {
+      target: { value: "Cloud Box" },
+    });
+    fireEvent.change(
+      screen.getByLabelText("machine.new.provisioned.custom-image-label"),
+      { target: { value: "  registry.example.com/team/app:v1  " } }
+    );
+    fireEvent.click(screen.getByText("machine.new.provisioned.create"));
+
+    await waitFor(() => {
+      expect(mockedActions.provisionMachine).toHaveBeenCalledWith(
+        "provisioners/p1",
+        "Cloud Box",
+        "registry.example.com/team/app:v1"
+      );
+      expect(mockRouter.navigate).toHaveBeenCalledWith("/machines/m1");
+    });
+  });
+
+  it("hides the custom image field when the workspace disables custom images", async () => {
+    mockedPolicy.allowCustomImages = false;
+    useAppStore.setState({
+      provisioners: [provisioner("provisioners/p1", "Prod Cluster")],
+    });
+    render(<MachineNewProvisionedPanel />);
+
+    expect(await screen.findByText("Prod Cluster")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.queryByLabelText("machine.new.provisioned.custom-image-label")
+      ).not.toBeInTheDocument();
+    });
+    // Creating without the field still works (workspace default image).
+    fireEvent.click(screen.getByText("Prod Cluster"));
+    mockedActions.provisionMachine.mockResolvedValue({
+      name: "machines/m1",
+      title: "Cloud Box",
+    });
+    fireEvent.change(screen.getByLabelText("machine.new.name-label"), {
+      target: { value: "Cloud Box" },
+    });
+    fireEvent.click(screen.getByText("machine.new.provisioned.create"));
+    await waitFor(() => {
+      expect(mockedActions.provisionMachine).toHaveBeenCalledWith(
+        "provisioners/p1",
+        "Cloud Box",
+        ""
+      );
     });
   });
 

@@ -40,9 +40,15 @@ export interface ProvisionerSlice {
   rotateProvisionerToken: (name: string, reason?: string) => Promise<string>;
   deleteProvisioner: (name: string) => Promise<void>;
   // provisionMachine enqueues a provisioning job for a machine owned by the
-  // caller. The created Machine carries its provisioning status; the caller
-  // navigates to the machine profile which polls until the machine is ONLINE.
-  provisionMachine: (provisioner: string, title: string) => Promise<Machine>;
+  // caller. runtimeImage optionally overrides the workspace default image for
+  // this machine alone (must match the admin-configured allowlist). The
+  // created Machine carries its provisioning status; the caller navigates to
+  // the machine profile which polls until the machine is ONLINE.
+  provisionMachine: (
+    provisioner: string,
+    title: string,
+    runtimeImage?: string
+  ) => Promise<Machine>;
 }
 
 // Query cache key for this slice (ADR-1: query keys live with the slice that
@@ -133,9 +139,13 @@ export const createProvisionerSlice: AppSliceCreator<ProvisionerSlice> = (
     }));
   },
 
-  async provisionMachine(provisioner, title) {
+  async provisionMachine(provisioner, title, runtimeImage) {
     return provisionerServiceClient.provisionMachine(
-      create(ProvisionMachineRequestSchema, { provisioner, title })
+      create(ProvisionMachineRequestSchema, {
+        provisioner,
+        title,
+        runtimeImage: runtimeImage ?? "",
+      })
     );
   },
 });

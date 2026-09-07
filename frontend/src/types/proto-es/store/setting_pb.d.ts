@@ -442,7 +442,7 @@ export declare type ProvisioningSetting = Message<"laelia.store.ProvisioningSett
    * environment for provisioned machine pods. It must NOT contain the
    * laelia-machine binary — the binary is downloaded at pod start from this
    * manager into the machine's data volume. ProvisionMachine refuses to run
-   * while this is empty.
+   * while this is empty (and no custom image was provided).
    *
    * @generated from field: string runtime_image = 1;
    */
@@ -455,6 +455,36 @@ export declare type ProvisioningSetting = Message<"laelia.store.ProvisioningSett
    * @generated from field: string binary_target = 2;
    */
   binaryTarget: string;
+
+  /**
+   * custom_image_allowlist holds the runtime images users may provide at
+   * ProvisionMachine time instead of the workspace default. Each entry either
+   * matches an image reference exactly or, when it ends with "*", acts as a
+   * prefix pattern (e.g. "registry.example.com/team/*"). Only consulted when
+   * allow_custom_images and custom_image_allowlist_enabled are both true;
+   * entries are canonicalized like image references on save.
+   *
+   * @generated from field: repeated string custom_image_allowlist = 3;
+   */
+  customImageAllowlist: string[];
+
+  /**
+   * allow_custom_images gates the whole custom-image path: when false,
+   * ProvisionMachine rejects any runtime_image and every machine uses
+   * runtime_image. Default false.
+   *
+   * @generated from field: bool allow_custom_images = 4;
+   */
+  allowCustomImages: boolean;
+
+  /**
+   * custom_image_allowlist_enabled turns allowlist enforcement on. When false
+   * (and allow_custom_images is true), any valid image reference is accepted.
+   * Default false (no restriction).
+   *
+   * @generated from field: bool custom_image_allowlist_enabled = 5;
+   */
+  customImageAllowlistEnabled: boolean;
 };
 
 /**

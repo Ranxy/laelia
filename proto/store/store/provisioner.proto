@@ -63,4 +63,10 @@ message ProvisioningStatus {
   int64 pending_at = 5;
   int64 provisioned_at = 6;
   int64 failed_at = 7;
+  // RuntimeImage is the machine-specific runtime image provided at
+  // ProvisionMachine time (custom image). Empty = the workspace default from
+  // ProvisioningSetting.runtime_image. Persisted so replayed provisioning jobs
+  // compose the same workload even if the workspace setting or allowlist later
+  // changes.
+  string runtime_image = 8;
 }

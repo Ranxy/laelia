@@ -214,8 +214,14 @@ type ProvisioningStatus struct {
 	PendingAt      int64             `protobuf:"varint,5,opt,name=pending_at,json=pendingAt,proto3" json:"pending_at,omitempty"`
 	ProvisionedAt  int64             `protobuf:"varint,6,opt,name=provisioned_at,json=provisionedAt,proto3" json:"provisioned_at,omitempty"`
 	FailedAt       int64             `protobuf:"varint,7,opt,name=failed_at,json=failedAt,proto3" json:"failed_at,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// RuntimeImage is the machine-specific runtime image provided at
+	// ProvisionMachine time (custom image). Empty = the workspace default from
+	// ProvisioningSetting.runtime_image. Persisted so replayed provisioning jobs
+	// compose the same workload even if the workspace setting or allowlist later
+	// changes.
+	RuntimeImage  string `protobuf:"bytes,8,opt,name=runtime_image,json=runtimeImage,proto3" json:"runtime_image,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProvisioningStatus) Reset() {
@@ -297,6 +303,13 @@ func (x *ProvisioningStatus) GetFailedAt() int64 {
 	return 0
 }
 
+func (x *ProvisioningStatus) GetRuntimeImage() string {
+	if x != nil {
+		return x.RuntimeImage
+	}
+	return ""
+}
+
 var File_store_provisioner_proto protoreflect.FileDescriptor
 
 const file_store_provisioner_proto_rawDesc = "" +
@@ -310,7 +323,7 @@ const file_store_provisioner_proto_rawDesc = "" +
 	"\fauto_upgrade\x18\x05 \x01(\bR\vautoUpgrade\x12#\n" +
 	"\rconfig_digest\x18\x06 \x01(\tR\fconfigDigest\x12\x1f\n" +
 	"\vretain_data\x18\a \x01(\bR\n" +
-	"retainData\"\x8b\x03\n" +
+	"retainData\"\xb0\x03\n" +
 	"\x12ProvisioningStatus\x125\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x1f.laelia.store.ProvisioningPhaseR\x05phase\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12#\n" +
@@ -319,7 +332,8 @@ const file_store_provisioner_proto_rawDesc = "" +
 	"\n" +
 	"pending_at\x18\x05 \x01(\x03R\tpendingAt\x12%\n" +
 	"\x0eprovisioned_at\x18\x06 \x01(\x03R\rprovisionedAt\x12\x1b\n" +
-	"\tfailed_at\x18\a \x01(\x03R\bfailedAt\x1aA\n" +
+	"\tfailed_at\x18\a \x01(\x03R\bfailedAt\x12#\n" +
+	"\rruntime_image\x18\b \x01(\tR\fruntimeImage\x1aA\n" +
 	"\x13WorkloadLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*\x86\x02\n" +

@@ -333,6 +333,15 @@ export declare type GetWorkspaceInfoResponse = Message<"laelia.v1.GetWorkspaceIn
    * @generated from field: bool disallow_user_create_machine = 6;
    */
   disallowUserCreateMachine: boolean;
+
+  /**
+   * Whether users may provide a custom runtime image when provisioning a
+   * machine through a provisioner. Not a secret: the create-machine page uses
+   * it to hide the custom-image field; the backend still enforces the switch.
+   *
+   * @generated from field: bool allow_custom_images = 7;
+   */
+  allowCustomImages: boolean;
 };
 
 /**
