@@ -174,13 +174,68 @@ helm install laelia-manager charts/manager \
   --set pg.url='postgresql://laelia:<password>@<db-host>:5432/laelia'
 ```
 
-chart 会创建 Deployment、Service 以及承载 `LAELIA_PG_URL` 的 Secret。Manager 默认在 8181 端口提供纯 HTTP 服务；TLS 请自行配置 ingress/反向代理（见 §5），仅当位于可信代理之后时才启用 `--trust-proxy`：
+chart 会创建 Deployment、Service 以及承载 `LAELIA_PG_URL` 的 Secret。Manager 默认在 8181 端口提供纯 HTTP 服务；TLS 既可以通过 chart 的可选 Ingress（见下文）实现，也可以自行配置反向代理（见 §5）：
 
 ```bash
 helm upgrade laelia-manager charts/manager --namespace <ns> \
   --set 'extraEnv[0].name=LAELIA_ALLOWED_ORIGINS' \
-  --set 'extraEnv[0].value=https://laelia.example.com' \
-  --set trustProxy=true
+  --set 'extraEnv[0].value=https://laelia.example.com'
+```
+
+`--trust-proxy`（见 §5）在 chart 的 Ingress 启用期间会自动开启；当 Manager 位于你自建的可信代理之后时，请显式设置 `trustProxy=true`，或用 `trustProxy=false` 强制关闭。
+
+#### 可选 Ingress
+
+设置 `ingress.enabled=true` 后，chart 会为 Manager 创建 `Ingress`。Web UI、API 以及 `/machine/*` 安装端点都在同一个 8181 端口上，因此一条全匹配路径即可。自带网关的部署保持默认（禁用）即可：
+
+| Value | 用途 |
+| --- | --- |
+| `ingress.enabled` | 创建 Ingress（默认 `false`），同时自动启用 `--trust-proxy`（见上文）。 |
+| `ingress.className` | 目标控制器的 IngressClass（`nginx`、`traefik` 等）；留空则由集群默认控制器接管。 |
+| `ingress.annotations` | 控制器自由注解；参见下方调优示例。 |
+| `ingress.hosts` | 主机与路径；每个 host 至少需要一个 `path`（`pathType` 默认 `Prefix`）。 |
+| `ingress.tls` | TLS 段（`secretName` + `hosts`）。 |
+| `service.annotations` | 打在 chart 创建的 Service 上的注解——Traefik 等控制器的按 Service 选项放在这里。 |
+
+```bash
+helm upgrade laelia-manager charts/manager --namespace <ns> \
+  --set ingress.enabled=true \
+  --set ingress.className=nginx \
+  --set 'ingress.hosts[0].host=laelia.example.com' \
+  --set 'ingress.hosts[0].paths[0].path=/' \
+  --set ingress.tls[0].secretName=laelia-tls \
+  --set 'ingress.tls[0].hosts[0]=laelia.example.com'
+```
+
+> **machine 流量经 ingress 需要 HTTP/2。** machine 与 provisioner 的通道是双向 ConnectRPC 流，要求 HTTP/2 端到端。若 machine 流量要经过 Ingress，控制器必须能把 HTTP/2 转发到明文后端（h2c upstream）；浏览器 UI/API 流量没有此要求：
+>
+> | 控制器 | h2c upstream | 用法 |
+> | --- | --- | --- |
+> | Traefik | 支持 | 通过 `service.annotations` 给 chart 的 Service 打上 `traefik.ingress.kubernetes.io/service.serversscheme: h2c` |
+> | Envoy Gateway、Istio、Contour | 支持 | 原生支持 h2c upstream |
+> | ingress-nginx | 不支持 | `backend-protocol` 没有 H2C，`proxy-http-version` 最高 1.1——请用其他保留 HTTP/2 的方式（如 L4/TCP 或 TLS 透传）把 Manager 暴露给 machine |
+>
+> nginx 本体自 1.29.4 起支持 HTTP/2 upstream（`proxy_http_version 2`），但 ingress-nginx 尚未暴露该能力；请以所用控制器的文档为准。
+
+若使用 nginx ingress 仅服务浏览器流量，请加上调优注解——长超时保持命令输出流不断开、关闭缓冲、body size 覆盖 100 MiB 上传限制：
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "110m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+  hosts:
+    - host: laelia.example.com
+      paths:
+        - path: /
+  tls:
+    - secretName: laelia-tls
+      hosts:
+        - laelia.example.com
 ```
 
 与 Docker 镜像一致，首个注册用户成为工作区管理员。该 chart 是可选方案：上述 Docker/二进制部署方式仍是受支持的非集群安装方式。
@@ -237,7 +292,7 @@ machine 只发起出站连接；无需发布任何端口。请将 `$LAELIA_HOME`
 
 如果本地状态丢失，machine 会重新执行设备码流程并注册一台全新 machine（旧 machine 记录仍保留在 Manager 上，处于离线状态）。如果要重新认证已有 machine，请保留 `$LAELIA_HOME`；如果其登录已被吊销，请在宿主机上再次运行 `laelia-machine --manager <url> setup`，并由 machine 的所有者或工作区管理员批准。
 
-machine 与 Manager 之间的通道是双向的，并且需要 HTTP/2。当 Manager 位于反向代理之后时，代理必须转发 HTTP/2（见下文）；否则请将 `--manager` 直接指向 Manager，例如共享 Docker 网络中的 `http://laelia-manager:8181`。
+machine 与 Manager 之间的通道是双向的，并且需要 HTTP/2。当 Manager 位于反向代理之后时，代理必须转发 HTTP/2（见下文）；否则请将 `--manager` 直接指向 Manager，例如共享 Docker 网络中的 `http://laelia-manager:8181`。在 Kubernetes 上使用 chart 的 Ingress 时，哪些控制器支持转发 HTTP/2 见 §3b。
 
 ### 停止 machine
 

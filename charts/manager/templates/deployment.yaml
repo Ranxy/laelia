@@ -1,3 +1,10 @@
+{{- /* --trust-proxy: an explicit true/false wins; unset (null) follows the
+chart's ingress — enabling the ingress means the manager sits behind the
+trusted proxy it creates. */}}
+{{- $trustProxy := .Values.trustProxy }}
+{{- if kindIs "invalid" $trustProxy }}
+{{- $trustProxy = .Values.ingress.enabled }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -21,7 +28,7 @@ spec:
           args:
             - --port
             - {{ .Values.service.port | quote }}
-            {{- if .Values.trustProxy }}
+            {{- if $trustProxy }}
             - --trust-proxy
             {{- end }}
           env:

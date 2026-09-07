@@ -222,15 +222,83 @@ helm install laelia-manager charts/manager \
 ```
 
 The chart creates a Deployment, Service, and a Secret carrying
-`LAELIA_PG_URL`. The manager serves plain HTTP on 8181; wire up your own
-ingress/reverse proxy for TLS (see §5), enabling `--trust-proxy` only behind
-a trusted one:
+`LAELIA_PG_URL`. The manager serves plain HTTP on 8181; for TLS, either
+enable the chart's optional Ingress (below) or wire up your own reverse
+proxy (see §5):
 
 ```bash
 helm upgrade laelia-manager charts/manager --namespace <ns> \
   --set 'extraEnv[0].name=LAELIA_ALLOWED_ORIGINS' \
-  --set 'extraEnv[0].value=https://laelia.example.com' \
-  --set trustProxy=true
+  --set 'extraEnv[0].value=https://laelia.example.com'
+```
+
+`--trust-proxy` (see §5) is enabled automatically while the chart's Ingress
+is enabled; set `trustProxy=true` explicitly when the manager sits behind
+your own trusted proxy, or `trustProxy=false` to force it off.
+
+#### Optional Ingress
+
+Set `ingress.enabled=true` and the chart creates an `Ingress` for the
+manager. The web UI, the API, and the `/machine/*` install endpoints all live
+on the one 8181 port, so a single catch-all path is enough. Deployments that
+bring their own gateway keep it disabled (the default):
+
+| Value | Purpose |
+| --- | --- |
+| `ingress.enabled` | Create the Ingress (default `false`). Also enables `--trust-proxy` (see above). |
+| `ingress.className` | IngressClass of the target controller (`nginx`, `traefik`, ...). Empty lets the cluster's default controller claim the Ingress. |
+| `ingress.annotations` | Free-form controller annotations; see the tuning example below. |
+| `ingress.hosts` | Hosts and paths; each host needs at least one `path` (`pathType` defaults to `Prefix`). |
+| `ingress.tls` | TLS sections (`secretName` + `hosts`). |
+| `service.annotations` | Annotations on the chart's Service — controllers such as Traefik keep per-service options there. |
+
+```bash
+helm upgrade laelia-manager charts/manager --namespace <ns> \
+  --set ingress.enabled=true \
+  --set ingress.className=nginx \
+  --set 'ingress.hosts[0].host=laelia.example.com' \
+  --set 'ingress.hosts[0].paths[0].path=/' \
+  --set ingress.tls[0].secretName=laelia-tls \
+  --set 'ingress.tls[0].hosts[0]=laelia.example.com'
+```
+
+> **Machines need HTTP/2 through the ingress.** Machine and provisioner
+> channels are bidirectional ConnectRPC streams and require HTTP/2
+> end-to-end, so if machine traffic goes through the Ingress, the controller
+> must forward HTTP/2 to the plain-HTTP backend (h2c upstream). Browser
+> UI/API traffic has no such requirement:
+>
+> | Controller | h2c upstream | How |
+> | --- | --- | --- |
+> | Traefik | yes | annotate the chart's Service with `traefik.ingress.kubernetes.io/service.serversscheme: h2c` (via `service.annotations`) |
+> | Envoy Gateway, Istio, Contour | yes | h2c upstreams supported natively |
+> | ingress-nginx | no | `backend-protocol` has no H2C and `proxy-http-version` caps at 1.1 — expose the manager to machines another way that preserves HTTP/2 (e.g. L4/TCP or TLS passthrough) |
+>
+> nginx core itself gained HTTP/2 upstream support (`proxy_http_version 2`)
+> in 1.29.4, but ingress-nginx does not expose it yet; check your
+> controller's docs.
+
+For an nginx ingress serving browser traffic, add the tuning annotations —
+long timeouts keep command output streams open, buffering must be off, and
+the body size covers the 100 MiB upload limit:
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "110m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+  hosts:
+    - host: laelia.example.com
+      paths:
+        - path: /
+  tls:
+    - secretName: laelia-tls
+      hosts:
+        - laelia.example.com
 ```
 
 As with the Docker image, the first user to sign up becomes the workspace
@@ -317,7 +385,8 @@ and approve with the machine's owner or a workspace admin.
 Machine-manager channels are bidirectional and require HTTP/2. When the manager
 is behind a reverse proxy, the proxy must forward HTTP/2 (see below); otherwise
 point `--manager` directly at the manager, for example
-`http://laelia-manager:8181` on a shared Docker network.
+`http://laelia-manager:8181` on a shared Docker network. On Kubernetes with
+the chart's Ingress, see §3b for which controllers forward HTTP/2.
 
 ### Stop the machine
 

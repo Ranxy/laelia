@@ -17,9 +17,11 @@ pg:
   # connection URL. When set, `pg.url` is ignored.
   existingSecret: ""
 
-# trust-proxy flag: enable only when a trusted reverse proxy (ingress/gateway)
-# overwrites X-Forwarded-For / X-Real-IP. See docs/deploy.md §1d.
-trustProxy: false
+# trust-proxy flag. Unset (null): enabled automatically when the chart's
+# ingress is enabled — the ingress is then the trusted reverse proxy that
+# overwrites X-Forwarded-For / X-Real-IP. Set true/false to force it on or off
+# explicitly (e.g. behind your own reverse proxy). See docs/deploy.md §5.
+trustProxy: null
 
 # Extra environment variables, e.g.:
 #   - name: LAELIA_ALLOWED_ORIGINS
@@ -31,6 +33,34 @@ extraEnv: []
 service:
   type: ClusterIP
   port: 8181
+  # Annotations on the Service — used by controllers whose per-service options
+  # live on the Service itself, e.g. Traefik's h2c upstream scheme for machine
+  # traffic (see docs/deploy.md §3b):
+  #   traefik.ingress.kubernetes.io/service.serversscheme: h2c
+  annotations: {}
+
+# Optional Ingress for the manager. The web UI, the API, and the /machine/*
+# install endpoints all live on the one service port, so a single catch-all
+# path is enough. Disabled by default: deployments that bring their own
+# gateway keep it off. See docs/deploy.md §3b — machine traffic requires an
+# ingress controller that forwards HTTP/2 upstream.
+ingress:
+  enabled: false
+  # IngressClass of the target controller (nginx, traefik, alb, ...). Empty
+  # means the cluster's default controller claims the Ingress.
+  className: ""
+  # Free-form controller annotations (timeouts, body size, h2c scheme, ...).
+  # Recommended values per controller: docs/deploy.md §3b.
+  annotations: {}
+  hosts:
+    - host: laelia.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: laelia-tls
+  #    hosts:
+  #      - laelia.local
 
 resources: {}
   # requests:
