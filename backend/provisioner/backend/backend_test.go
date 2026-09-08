@@ -12,7 +12,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/provisioner/backend"
 
-	// Registers the "docker" backend stub.
+	// Registers the "docker" backend.
 	_ "github.com/Ranxy/laelia/backend/provisioner/backend/docker"
 )
 
@@ -26,13 +26,14 @@ func TestRegistryUnknownBackend(t *testing.T) {
 	require.Contains(t, err.Error(), "docker", "the error lists the known backends")
 }
 
-func TestRegistryDockerStubFailsWithSentinel(t *testing.T) {
-	require.Contains(t, backend.Known(), "docker", "the imported stub must be registered")
+func TestRegistryDockerConstructsHermetically(t *testing.T) {
+	require.Contains(t, backend.Known(), "docker", "the imported docker backend must be registered")
+	// The docker factory builds without touching a daemon (the first contact
+	// is Start's fail-fast Ping), so construction is hermetic.
 	be, err := backend.New("docker", backend.Config{})
-	require.Error(t, err)
-	require.Nil(t, be)
-	require.True(t, errors.Is(err, backend.ErrUnsupportedBackend),
-		"the docker stub reports ErrUnsupportedBackend until it is implemented")
+	require.NoError(t, err)
+	require.NotNil(t, be)
+	require.Equal(t, "docker", be.Name())
 }
 
 func TestWorkloadName(t *testing.T) {

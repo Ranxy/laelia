@@ -138,10 +138,12 @@ func TestApplyProvisionProgress(t *testing.T) {
 // TestKnownProvisionerBackends locks the ProvisionMachine backend gate: only
 // implemented backends may provision; the registry itself is permissive.
 func TestKnownProvisionerBackends(t *testing.T) {
-	if !knownProvisionerBackends["kubernetes"] {
-		t.Error("kubernetes must be a known backend")
+	for _, known := range []string{"kubernetes", "docker"} {
+		if !knownProvisionerBackends[known] {
+			t.Errorf("backend %q must be known", known)
+		}
 	}
-	for _, unknown := range []string{"", "docker", "k8s", "Kubernetes"} {
+	for _, unknown := range []string{"", "k8s", "Kubernetes", "vm"} {
 		if knownProvisionerBackends[unknown] {
 			t.Errorf("backend %q must not be known", unknown)
 		}

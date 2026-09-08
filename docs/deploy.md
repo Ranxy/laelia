@@ -688,17 +688,17 @@ kubectl delete crd laeliamachines.laelia.sh   # Helm does not manage CRDs
 ```yaml
 manager_url: https://laelia.example.com   # or --manager flag
 token: llprov_...                          # one-time token; --token flag or LAELIA_PROVISIONER_TOKEN env
-backend: kubernetes                        # workload backend (kubernetes today)
-namespace: laelia-machines                 # where machine workloads land
+backend: kubernetes                        # workload backend (kubernetes or docker)
+namespace: laelia-machines                 # where machine workloads land (kubernetes only)
 # Optional:
 manager_url_override: http://laelia-manager.laelia-machines.svc:8181
                                            # pods connect here instead of manager_url (egress-restricted clusters)
-retain_data: false                         # keep machine data PVCs on delete (StatefulSet Retain)
+retain_data: false                         # keep machine data volumes on delete (PVC / docker volume)
 auto_upgrade: false                        # manager auto-triggers upgrades for this provisioner's machines
-storage: { size: 10Gi, storage_class: "" } # PVC size/class per machine (storage_class defaults to the cluster default)
+storage: { size: 10Gi, storage_class: "" } # PVC size/class per machine (kubernetes only; docker named volumes have no sizing)
 resources:
-  requests: { cpu: "1", memory: "2Gi" }
-  limits: { memory: "4Gi" }
+  requests: { cpu: "1", memory: "2Gi" }    # cpu/memory defaults for machine workloads (both backends)
+  limits: { memory: "4Gi" }                # docker uses limits, falling back to requests
 param_bounds:                              # optional bounds for user-settable machine parameters
   cpu:    { min: "250m",  max: "8"     }   # (design: provisioner-machine-params-design.md); an omitted
   memory: { min: "512Mi", max: "32Gi" }    # side is unbounded; users may override these values
@@ -710,6 +710,9 @@ extra_env:                                 # passthrough env on the machine cont
 Machine parameters (§8.3a): the values above are defaults users may override
 per machine at create time; `resources`/`storage` stay the fallback for
 machines whose user leaves a field empty.
+
+A complete annotated example to copy and fill in:
+`backend/provisioner/provisioner.example.yaml`.
 
 `--allow-http` is required when `manager_url` is plain HTTP (dev only).
 
@@ -737,13 +740,14 @@ upgrades it in place afterwards. Reference image:
 git, curl, jq, ripgrep, codex CLI; non-root uid 1001). Any image satisfying the
 contract works:
 
-- POSIX `sh`, `curl`, `gzip`, `sha256sum` (the init container's bootstrap script)
-- an entrypoint that execs `$LAELIA_MACHINE_BIN` (default `/data/bin/laelia-machine`)
-  with `LAELIA_HOME=/data/laelia`, honoring `LAELIA_MANAGER_URL` (+ auto
-  `--allow-http` for `http://`), `LAELIA_PROVISIONED=true` → `--provisioned
-  --no-browser --foreground`, and `CODEX_HOME` (default
-  `/data/laelia/codex`, on the PVC)
-- runs as a non-root uid
+- POSIX `sh`, `curl`, `gzip`, `sha256sum` (the bootstrap stage)
+- **no laelia-specific entrypoint required**: the provisioner injects the
+  machine startup itself (the kubernetes pod command / the docker container
+  command map the environment to CLI flags and exec `$LAELIA_MACHINE_BIN`);
+  the image's own ENTRYPOINT is ignored
+- runs as a non-root uid whose data volume is writable — ship a `/data`
+  directory owned by that user (docker initializes named volumes from the
+  image's mount-point ownership; kubernetes does the same job with `fsGroup`)
 
 ### 8.6 What the provisioner creates per machine
 
@@ -754,6 +758,65 @@ StatefulSet with `volumeClaimTemplates: [data]` and the amd64 nodeSelector, and
 the data PVC. Deleting the machine in the UI deletes the CR; the finalizer
 removes the Secret and (unless `retain_data: true`) the data PVC. `kubectl get
 laeliamachines -n laelia-machines` is the operator's fleet view.
+
+### 8.7 Install the provisioner (docker backend)
+
+The docker backend drives one Docker Engine daemon (a local socket or a remote
+daemon via the standard docker environment: `DOCKER_HOST`, `DOCKER_TLS_VERIFY`,
+`DOCKER_CERT_PATH`) and runs one container plus one named data volume per
+machine. Run it on or next to a docker host:
+
+```bash
+# As a plain binary next to the config file (the spec journal — used to
+# rebuild containers removed out-of-band — is written beside the config):
+scripts/build_laelia_provisioner.sh                # -> build/laelia-provisioner
+./build/laelia-provisioner run --config provisioner.yaml
+
+# Or as a container (mount the socket and a persistent state dir):
+docker run -d --name laelia-provisioner \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /var/lib/laelia-provisioner:/state \
+  -v ./provisioner.yaml:/etc/laelia/provisioner.yaml:ro \
+  laelia/provisioner:local run --config /etc/laelia/provisioner.yaml
+```
+
+Config sample (`backend: docker`; `namespace` and `storage` are unused by this
+backend; a copy-annotated template lives at
+`backend/provisioner/provisioner.example.yaml`):
+
+```yaml
+manager_url: https://laelia.example.com
+token: llprov_...
+backend: docker
+retain_data: false                         # keep the machine's data volume on delete
+resources:
+  limits: { cpu: "2", memory: "4Gi" }      # docker --cpus/--memory defaults
+param_bounds:
+  cpu:    { min: "100m", max: "8"     }
+  memory: { min: "256Mi", max: "32Gi" }
+```
+
+Per machine the backend creates the named volume `laelia-machine-<uuid-prefix>-data`
+(whole LAELIA_HOME world, mounted at `/data`) and the container
+`laelia-machine-<uuid-prefix>` from the workspace runtime image with restart
+policy `unless-stopped`. The container runs the bootstrap script and then the
+image's own entrypoint — any image satisfying §8.5 works, whatever its
+entrypoint is named. `docker ps --filter
+label=app.kubernetes.io/managed-by=laelia-provisioner` is the fleet view.
+
+Notes:
+
+- **Security**: socket access is root-equivalent on that docker host — run the
+  provisioner with the same care as any docker management plane component.
+- **Image contract (docker addendum)**: the runtime image must ship a `/data`
+  directory owned by its container user (the reference image does); docker
+  initializes an empty named volume from the image's mount-point ownership, so
+  the non-root bootstrap can write it — the job k8s does with `fsGroup`.
+- **Self-healing**: the spec journal beside the config file lets the
+  provisioner rebuild a container someone removed with `docker rm` (as long as
+  the data volume survived); keep the state dir persistent when containerized.
+- The machine's refresh token never appears in env or inspect metadata: it is
+  copied into the created container and lives on the data volume.
 
 ## Troubleshooting
 

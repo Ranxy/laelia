@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -119,7 +120,36 @@ func (c *Config) backendConfig() backend.Config {
 		Storage:     c.Storage,
 		ExtraEnv:    c.ExtraEnv,
 		ParamBounds: bounds,
+		StatePath:   statePath(),
 	}
+}
+
+// statePath is where backends that keep local state (the docker backend's
+// spec journal) persist it: alongside the config file when one is used, else
+// under the XDG state home. Excluded from the config digest — it is
+// infrastructure plumbing, not backend-affecting behavior.
+func statePath() string {
+	if flags.config != "" {
+		return filepath.Join(filepath.Dir(flags.config), "docker-specs.json")
+	}
+	dir, err := userStateDir()
+	if err != nil || dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, "laelia-provisioner", "docker-specs.json")
+}
+
+// userStateDir resolves the XDG state home ($XDG_STATE_HOME, else
+// ~/.local/state); the stdlib has no os.UserStateDir.
+func userStateDir() (string, error) {
+	if dir := os.Getenv("XDG_STATE_HOME"); dir != "" {
+		return dir, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return "", err
+	}
+	return filepath.Join(home, ".local", "state"), nil
 }
 
 // Digest is the short hash of the backend-affecting configuration, reported

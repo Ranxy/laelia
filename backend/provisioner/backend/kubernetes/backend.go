@@ -8,14 +8,12 @@ package kubernetes
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"maps"
 	"os"
 	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -199,7 +197,7 @@ func (b *Backend) Start(ctx context.Context, ch chan<- backend.Event) error {
 // replayed job after a dropped event still lands the manager on the truth.
 func (b *Backend) Provision(ctx context.Context, spec backend.MachineSpec, refreshToken string) error {
 	ns := b.namespace
-	name := workloadStem(spec.MachineID)
+	name := backend.WorkloadStem(spec.MachineID)
 
 	cr := &laeliav1.LaeliaMachine{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns}}
 	resources := resourcesFor(b.cfg.Resources)
@@ -239,7 +237,7 @@ func (b *Backend) Provision(ctx context.Context, spec backend.MachineSpec, refre
 		secret.Labels = secretLabels(spec)
 		secret.Type = corev1.SecretTypeOpaque
 		secret.Data = map[string][]byte{
-			"machine.json": machineStateJSON(spec, refreshToken),
+			"machine.json": backend.MachineStateJSON(spec, refreshToken),
 			"bootstrap.sh": []byte(spec.BootstrapScript),
 		}
 		return controllerutil.SetControllerReference(cr, secret, b.mgr.GetScheme())
@@ -282,7 +280,7 @@ func (b *Backend) Provision(ctx context.Context, spec backend.MachineSpec, refre
 // manager replays teardown jobs until the workload reports gone.
 func (b *Backend) Deprovision(ctx context.Context, machineID string, keepData bool) error {
 	ns := b.namespace
-	name := workloadStem(machineID)
+	name := backend.WorkloadStem(machineID)
 
 	cr := &laeliav1.LaeliaMachine{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns}}
 	err := b.mgr.GetAPIReader().Get(ctx, client.ObjectKey{Namespace: ns, Name: name}, cr)
@@ -434,36 +432,8 @@ func (b *Backend) emit(e backend.Event) {
 	}
 }
 
-// machineStateJSON renders the pod's machine.json — exactly the agent's
-// state.State shape ({manager_url, machine_id, refresh_token, hostname,
-// created_at}): with a valid state file the pod's setup skips the device
-// flow entirely. mirrored here to keep the provisioner decoupled from the
-// agent's internal packages.
-func machineStateJSON(spec backend.MachineSpec, refreshToken string) []byte {
-	// The state fields are stable; marshaling cannot fail on strings.
-	data, _ := json.Marshal(struct {
-		ManagerURL   string    `json:"manager_url"`
-		MachineID    string    `json:"machine_id"`
-		RefreshToken string    `json:"refresh_token"`
-		Hostname     string    `json:"hostname"`
-		CreatedAt    time.Time `json:"created_at"`
-	}{
-		ManagerURL:   spec.ManagerURL,
-		MachineID:    spec.MachineID,
-		RefreshToken: refreshToken,
-		Hostname:     workloadStem(spec.MachineID),
-		CreatedAt:    time.Now(),
-	})
-	return data
-}
-
-// workloadStem is the object-name stem shared with the manager:
-// "laelia-machine-<machine uuid first segment>" (backend.WorkloadName minus
-// its namespace prefix).
-func workloadStem(machineID string) string {
-	_, name, _ := strings.Cut(backend.WorkloadName("", machineID), "/")
-	return name
-}
+// machineStateJSON was moved to the shared backend package (it seeds the
+// credential file for every backend that carries one).
 
 // resourcesFor converts the provisioner-level requests/limits passthrough.
 func resourcesFor(res backend.Resources) *corev1.ResourceRequirements {
@@ -567,7 +537,7 @@ func crLabels(spec backend.MachineSpec) map[string]string {
 	labels := map[string]string{
 		laeliav1.ManagedByLabel:   laeliav1.ManagedByValue,
 		laeliav1.AppNameLabel:     laeliav1.AppNameValue,
-		laeliav1.MachineNameLabel: workloadStem(spec.MachineID),
+		laeliav1.MachineNameLabel: backend.WorkloadStem(spec.MachineID),
 	}
 	maps.Copy(labels, spec.Labels)
 	return labels
@@ -578,7 +548,7 @@ func secretLabels(spec backend.MachineSpec) map[string]string {
 	return map[string]string{
 		laeliav1.ManagedByLabel:   laeliav1.ManagedByValue,
 		laeliav1.AppNameLabel:     laeliav1.AppNameValue,
-		laeliav1.MachineNameLabel: workloadStem(spec.MachineID),
+		laeliav1.MachineNameLabel: backend.WorkloadStem(spec.MachineID),
 	}
 }
 

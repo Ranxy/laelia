@@ -28,8 +28,8 @@ func TestRegisteredAsKubernetes(t *testing.T) {
 }
 
 func TestWorkloadStem(t *testing.T) {
-	assert.Equal(t, "laelia-machine-a1b2c3d4", workloadStem("a1b2c3d4-e5f6-7890-abcd-ef0123456789"))
-	assert.Equal(t, "laelia-machine-abc123", workloadStem("abc123"))
+	assert.Equal(t, "laelia-machine-a1b2c3d4", backend.WorkloadStem("a1b2c3d4-e5f6-7890-abcd-ef0123456789"))
+	assert.Equal(t, "laelia-machine-abc123", backend.WorkloadStem("abc123"))
 }
 
 func TestMachineStateJSONShape(t *testing.T) {
@@ -38,7 +38,7 @@ func TestMachineStateJSONShape(t *testing.T) {
 		ManagerURL: "http://manager:8181",
 	}
 	now := time.Now()
-	data := machineStateJSON(spec, "llmach_token")
+	data := backend.MachineStateJSON(spec, "llmach_token")
 	var st struct {
 		ManagerURL   string    `json:"manager_url"`
 		MachineID    string    `json:"machine_id"`

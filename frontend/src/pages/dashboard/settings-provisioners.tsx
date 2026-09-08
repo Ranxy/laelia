@@ -57,9 +57,9 @@ import { useHasPermission } from "@/stores/permissions";
 import type { MachineSummary } from "@/types/proto-es/v1/machine_pb";
 import type { Provisioner } from "@/types/proto-es/v1/provisioner_pb";
 
-// BACKEND_OPTIONS lists the registry's backend types: kubernetes is the only
-// implemented backend today; the docker stub shows disabled with a hint
-// (design §9 — new backend types plug in without manager changes).
+// BACKEND_OPTIONS lists the registry's backend types: kubernetes and docker
+// are the implemented backends; a future backend type shows disabled with a
+// hint (design §9 — new backend types plug in without manager changes).
 const BACKEND_OPTIONS = [
   {
     value: "kubernetes",
@@ -69,7 +69,7 @@ const BACKEND_OPTIONS = [
   {
     value: "docker",
     labelKey: "settings.provisioners.backend-docker",
-    disabled: true,
+    disabled: false,
   },
 ];
 

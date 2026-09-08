@@ -35,6 +35,7 @@ import (
 // fast until the backend is implemented on the provisioner side (design §9).
 var knownProvisionerBackends = map[string]bool{
 	"kubernetes": true,
+	"docker":     true,
 }
 
 // defaultBinaryTarget is the machine binary target provisioned pods install

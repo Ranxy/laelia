@@ -515,20 +515,26 @@ kubectl delete crd laeliamachines.laelia.sh   # Helm 不管理 CRD 生命周期
 ```yaml
 manager_url: https://laelia.example.com   # 或 --manager 参数
 token: llprov_...                          # 一次性 token；--token 参数或 LAELIA_PROVISIONER_TOKEN 环境变量
-backend: kubernetes                        # 工作负载后端（当前为 kubernetes）
-namespace: laelia-machines                 # 机器工作负载落地的 namespace
+backend: kubernetes                        # 工作负载后端（kubernetes 或 docker）
+namespace: laelia-machines                 # 机器工作负载落地的 namespace（仅 kubernetes）
 # 可选项：
 manager_url_override: http://laelia-manager.laelia-machines.svc:8181
                                            # pod 改用该地址连接 Manager（集群出口受限时）
-retain_data: false                         # 删除时保留机器数据 PVC（StatefulSet Retain）
+retain_data: false                         # 删除时保留机器数据卷（PVC / docker 卷）
 auto_upgrade: false                        # Manager 自动为该 provisioner 的机器触发升级
-storage: { size: 10Gi, storage_class: "" } # 每台机器的 PVC 大小/存储类（storage_class 缺省为集群默认）
+storage: { size: 10Gi, storage_class: "" } # 每台机器的 PVC 大小/存储类（仅 kubernetes；docker 命名卷无容量概念）
 resources:
-  requests: { cpu: "1", memory: "2Gi" }
-  limits: { memory: "4Gi" }
+  requests: { cpu: "1", memory: "2Gi" }    # 机器工作负载的 cpu/memory 默认值（两种后端通用）
+  limits: { memory: "4Gi" }                # docker 使用 limits，缺省时回退到 requests
+param_bounds:                              # 用户可设参数的可选边界
+  cpu:    { min: "250m",  max: "8"     }   # （设计见 provisioner-machine-params-design.md）；某一侧
+  memory: { min: "512Mi", max: "32Gi" }    # 省略即不设限；用户创建机器时可覆盖这些默认值
+  disk:   { min: "1Gi",   max: "500Gi" }   # 仅 kubernetes（docker 卷无容量概念）
 extra_env:                                 # 透传到机器容器的环境变量
   LAELIA_INSECURE: "true"                  # Manager 使用自签名 https 证书时
 ```
+
+一份可直接复制、带完整注释的示例文件：`backend/provisioner/provisioner.example.yaml`。
 
 `manager_url` 为纯 HTTP 时需要 `--allow-http`（仅开发用）。
 
@@ -550,13 +556,54 @@ provisioner 的 Role 为 namespace 级；无需 cluster-admin，也没有任何�
 
 运行时镜像提供 agent 运行环境；它**不得**包含 laelia machine 二进制——pod 启动时从 Manager 把二进制下载到 PVC，之后的升级在原地完成。参考镜像：`scripts/docker/Dockerfile.machine-runtime`（node、python、build-essential、git、curl、jq、ripgrep、codex CLI；非 root uid 1001）。任何满足以下契约的镜像均可使用：
 
-- POSIX `sh`、`curl`、`gzip`、`sha256sum`（init 容器的引导脚本）
-- entrypoint 以 exec 方式启动 `$LAELIA_MACHINE_BIN`（默认 `/data/bin/laelia-machine`），并设置 `LAELIA_HOME=/data/laelia`，正确处理 `LAELIA_MANAGER_URL`（`http://` 自动追加 `--allow-http`）、`LAELIA_PROVISIONED=true` → `--provisioned --no-browser --foreground`，以及 `CODEX_HOME`（默认 `/data/laelia/codex`，位于 PVC 上）
-- 以非 root uid 运行
+- POSIX `sh`、`curl`、`gzip`、`sha256sum`（引导阶段）
+- **无需任何 laelia 专用入口**：provisioner 自己注入 machine 启动（kubernetes pod command / docker 容器 command 负责环境变量→CLI 参数映射并 exec `$LAELIA_MACHINE_BIN`），镜像自身的 ENTRYPOINT 会被忽略
+- 以非 root uid 运行，且该用户对数据卷可写——镜像自带属主正确的 `/data` 目录（docker 用镜像挂载点属主初始化命名卷；kubernetes 由 `fsGroup` 完成同样工作）
 
 ### 8.6 provisioner 为每台机器创建的对象
 
 全部位于所配置的 namespace 中，属主为 `LaeliaMachine` CR `laelia-machine-<machine-uuid-prefix>`：引导 Secret（机器的凭据——CR 上绝不携带 token）、headless Service、带 `volumeClaimTemplates: [data]` 和 amd64 nodeSelector 的单副本 StatefulSet，以及数据 PVC。在 UI 中删除机器会删除 CR；finalizer 会移除 Secret，并（除非 `retain_data: true`）删除数据 PVC。`kubectl get laeliamachines -n laelia-machines` 是集群管理员的机队视图。
+
+### 8.7 安装 provisioner（docker 后端）
+
+docker 后端驱动一个 Docker Engine daemon（本地 socket，或通过标准 docker 环境变量 `DOCKER_HOST`、`DOCKER_TLS_VERIFY`、`DOCKER_CERT_PATH` 指定的远程 daemon），每台机器创建一个容器加一个命名数据卷。把 provisioner 跑在 docker 宿主机上或其旁边：
+
+```bash
+# 作为普通二进制，与配置文件放在一起（spec 日志——用于重建被带外删除的容器——
+# 写在配置文件同目录）：
+scripts/build_laelia_provisioner.sh                # -> build/laelia-provisioner
+./build/laelia-provisioner run --config provisioner.yaml
+
+# 或以容器方式运行（挂载 socket 和持久化状态目录）：
+docker run -d --name laelia-provisioner \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /var/lib/laelia-provisioner:/state \
+  -v ./provisioner.yaml:/etc/laelia/provisioner.yaml:ro \
+  laelia/provisioner:local run --config /etc/laelia/provisioner.yaml
+```
+
+配置示例（`backend: docker`；`namespace` 与 `storage` 该后端不使用。可直接复制的带注释模板见 `backend/provisioner/provisioner.example.yaml`）：
+
+```yaml
+manager_url: https://laelia.example.com
+token: llprov_...
+backend: docker
+retain_data: false                         # 删除时保留机器的数据卷
+resources:
+  limits: { cpu: "2", memory: "4Gi" }      # docker --cpus/--memory 默认值
+param_bounds:
+  cpu:    { min: "100m", max: "8"     }
+  memory: { min: "256Mi", max: "32Gi" }
+```
+
+每台机器创建：命名数据卷 `laelia-machine-<machine-uuid-prefix>-data`（整个 LAELIA_HOME 世界，挂载在 `/data`），以及来自工作区 runtime 镜像、重启策略为 `unless-stopped` 的容器 `laelia-machine-<machine-uuid-prefix>`。容器先运行引导脚本，再启动镜像自身的入口——任何满足 §8.5 契约的镜像均可使用，不要求入口的命名。`docker ps --filter label=app.kubernetes.io/managed-by=laelia-provisioner` 是机队视图。
+
+注意事项：
+
+- **安全**：socket 访问等价于该 docker 宿主机上的 root 权限——请像对待任何 docker 管理面组件一样谨慎运行 provisioner。
+- **镜像契约（docker 补充）**：runtime 镜像必须自带属主为容器用户的 `/data` 目录（参考镜像已满足）；docker 会用镜像挂载点的属主初始化空的命名卷，非 root 的引导进程才能写入——这是 k8s 侧由 `fsGroup` 完成的工作。
+- **自愈**：配置文件同目录的 spec 日志让 provisioner 能重建被 `docker rm` 误删的容器（前提是数据卷还在）；容器化运行时请持久化状态目录。
+- 机器的 refresh token 不会出现在 env 或 inspect 元数据中：它在容器创建时被复制进去，最终保存在数据卷上。
 
 ## 故障排查
 

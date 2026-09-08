@@ -1,0 +1,49 @@
+# laelia-provisioner example configuration.
+#
+# Copy this file, fill in the three required fields, keep the section for
+# your backend, and hand it to the provisioner: `laelia-provisioner run
+# --config provisioner.yaml`. The one-time token can also come from the
+# LAELIA_PROVISIONER_TOKEN environment variable.
+# Field reference: docs/deploy.md §8.3 (中文: docs/deploy_zh.md §8.3).
+
+# ---- required ----
+manager_url: https://laelia.example.com   # the manager this provisioner connects to
+token: llprov_...                         # the one-time provisioner token from Settings → Provisioners
+backend: kubernetes                       # kubernetes | docker
+
+# ---- kubernetes backend (remove when using docker) ----
+namespace: laelia-machines                # where machine workloads land
+manager_url_override: http://laelia-manager.laelia-machines.svc:8181
+                                          # pods connect here instead of manager_url (egress-restricted clusters)
+storage: { size: 10Gi, storage_class: "" }# data PVC per machine; storage_class empty = cluster default
+# disk: { min: "1Gi", max: "500Gi" }      # bounds for the user-settable disk parameter (PVC size)
+
+# ---- docker backend (remove when using kubernetes) ----
+# The daemon endpoint comes from the standard docker environment (the local
+# socket, or DOCKER_HOST / DOCKER_TLS_VERIFY / DOCKER_CERT_PATH) — nothing to
+# configure here. docker ignores namespace and storage: named data volumes
+# have no sizing. A docker config reduces to:
+#
+# docker-variant-begin
+#   manager_url: https://laelia.example.com
+#   token: llprov_...
+#   backend: docker
+#   retain_data: false
+#   resources:
+#     limits: { cpu: "2", memory: "4Gi" }   # --cpus / --memory defaults (limits, else requests)
+#   param_bounds:
+#     cpu:    { min: "100m",  max: "8"     }
+#     memory: { min: "256Mi", max: "32Gi" }
+# docker-variant-end
+
+# ---- common optional ----
+retain_data: false                        # keep machine data volumes when a machine is deleted
+auto_upgrade: false                       # the manager auto-upgrades this provisioner's machines
+resources:                                # defaults users may override per machine at create time
+  requests: { cpu: "1", memory: "2Gi" }
+  limits:   { cpu: "2", memory: "4Gi" }
+param_bounds:                             # bounds for user-settable parameters (omitted side = unbounded)
+  cpu:    { min: "250m",  max: "8"     }
+  memory: { min: "512Mi", max: "32Gi" }
+extra_env:                                # extra env passed into machine workloads
+  LAELIA_INSECURE: "true"                 # for https managers with a self-signed certificate

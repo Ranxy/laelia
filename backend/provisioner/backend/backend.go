@@ -8,10 +8,12 @@ package backend
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -89,6 +91,11 @@ type Config struct {
 	Storage     Storage
 	ExtraEnv    map[string]string
 	ParamBounds map[string]ParamBounds
+	// StatePath is where a backend may persist its own local state (the
+	// docker backend's spec journal). Derived from the config file location;
+	// backends that need no local state ignore it, and an empty value lets
+	// the backend fall back to its platform default.
+	StatePath string
 }
 
 // Backend provisions machine workloads in one virtualization stack. All
@@ -172,4 +179,72 @@ func Known() []string {
 func WorkloadName(namespace, machineID string) string {
 	first, _, _ := strings.Cut(machineID, "-")
 	return fmt.Sprintf("%s/laelia-machine-%s", namespace, first)
+}
+
+// WorkloadStem is the object-name stem shared by the backends: the
+// WorkloadName without its namespace prefix — the kubernetes object name and
+// the docker container/volume name are both built from it.
+func WorkloadStem(machineID string) string {
+	_, name, _ := strings.Cut(WorkloadName("", machineID), "/")
+	return name
+}
+
+// MachineRunScript is the workload's main-container startup: it maps the
+// environment to CLI flags and execs the machine binary the bootstrap stage
+// downloaded onto the data volume. It is injected as the container command by
+// every backend (the kubernetes pod spec and the docker container alike), so
+// the runtime image needs no laelia-specific entrypoint — any image
+// satisfying the bootstrap contract works. Mirrors
+// scripts/docker/machine-runtime-entrypoint.sh; keep the two in sync.
+const MachineRunScript = `#!/bin/sh
+set -eu
+BIN="${LAELIA_MACHINE_BIN:-/data/bin/laelia-machine}"
+if [ ! -x "$BIN" ]; then
+  echo "machine-runtime: $BIN is missing or not executable; the init container must run the bootstrap script before this entrypoint" >&2
+  exit 1
+fi
+set -- setup --no-browser --foreground
+if [ "${LAELIA_PROVISIONED:-false}" = "true" ]; then
+  set -- "$@" --provisioned
+fi
+if [ -n "${LAELIA_MANAGER_URL:-}" ]; then
+  set -- "$@" --manager "$LAELIA_MANAGER_URL"
+  case "$LAELIA_MANAGER_URL" in
+    http://*) set -- "$@" --allow-http ;;
+  esac
+fi
+if [ "${LAELIA_INSECURE:-false}" = "true" ]; then
+  set -- "$@" --insecure
+fi
+if [ "${LAELIA_DEBUG:-false}" = "true" ]; then
+  set -- "$@" --debug
+fi
+if [ -n "${LAELIA_CODEX_HOME:-}" ]; then
+  export CODEX_HOME="$LAELIA_CODEX_HOME"
+fi
+exec "$BIN" "$@"
+`
+
+// MachineStateJSON renders the workload's machine.json — exactly the agent's
+// state.State shape ({manager_url, machine_id, refresh_token, hostname,
+// created_at}): with a valid state file the machine's setup skips the device
+// flow entirely. Shared by every backend that seeds a credential file;
+// mirrored here to keep the backends decoupled from the agent's internal
+// packages.
+func MachineStateJSON(spec MachineSpec, refreshToken string) []byte {
+	// The state fields are stable; marshaling cannot fail on strings.
+	data, _ := json.Marshal(struct {
+		ManagerURL   string    `json:"manager_url"`
+		MachineID    string    `json:"machine_id"`
+		RefreshToken string    `json:"refresh_token"`
+		Hostname     string    `json:"hostname"`
+		CreatedAt    time.Time `json:"created_at"`
+	}{
+		ManagerURL:   spec.ManagerURL,
+		MachineID:    spec.MachineID,
+		RefreshToken: refreshToken,
+		Hostname:     WorkloadStem(spec.MachineID),
+		CreatedAt:    time.Now(),
+	})
+	return data
 }
