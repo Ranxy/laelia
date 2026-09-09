@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
@@ -31,6 +32,17 @@ const (
 	// surfaces via the receive pump and triggers a full reconnect independently.
 	beginSessionRetryWait = 2 * time.Second
 )
+
+// beginSessionResponseTimeout bounds how long the drain loop waits for the
+// manager's BeginSessionResponse. The manager handles BeginSession
+// synchronously on the stream, so a reply is normally immediate; a timeout
+// means the manager failed to reply (e.g. a DB hiccup: it logs the failure and
+// never sends a response) — without this bound the drain loop would wait on
+// beginRespCh forever and the agent would never run again. The drain loop
+// retries with backoff; any command the timed-out attempt minted manager-side
+// is reaped by that agent's next BeginSession or the stale-command reaper.
+// Var (not const) so tests can shorten the wait.
+var beginSessionResponseTimeout = 30 * time.Second
 
 type mergedText struct {
 	builder    strings.Builder
@@ -143,8 +155,17 @@ func (c *commandStream) drainLoop(ctx context.Context, stream streamSender, done
 
 // beginSession sends a BeginSession message and waits for the manager's reply.
 // Returns a non-idle response with a command_id to run, or idle=true when no
-// channel has updates.
+// channel has updates. The wait is bounded: a manager that received the
+// request but never replies must not wedge the drain loop forever.
 func (c *commandStream) beginSession(ctx context.Context, stream streamSender, doneCh <-chan struct{}) (*v1pb.BeginSessionResponse, error) {
+	// Discard any BeginSessionResponse queued by a previous attempt that gave
+	// up waiting: the manager replies in stream order, so whatever is still
+	// buffered here predates this send and would anchor this session to an
+	// already-reaped command.
+	select {
+	case <-c.beginRespCh:
+	default:
+	}
 	if err := stream.Send(&v1pb.AgentStreamMessage{
 		Message: &v1pb.AgentStreamMessage_BeginSession{
 			BeginSession: &v1pb.BeginSession{},
@@ -160,6 +181,8 @@ func (c *commandStream) beginSession(ctx context.Context, stream streamSender, d
 		return nil, io.EOF
 	case <-ctx.Done():
 		return nil, ctx.Err()
+	case <-time.After(beginSessionResponseTimeout):
+		return nil, errors.New("timed out waiting for BeginSession response")
 	}
 }
 
@@ -319,13 +342,20 @@ func (c *commandStream) runCommand(
 			return
 		}
 		runtime.Cancel()
-		_ = executor.ClearLocalState(c.machineID, c.agentID)
-		_ = sendCommandResult(stream, &v1pb.CommandResult{
+		// Send the failure result BEFORE touching the local state: when the
+		// stream is dead the send fails, and the surviving CommandID is what
+		// the reconnecting AgentReady.lastCommandId carries so the manager can
+		// reap the orphaned RUNNING command. Clearing first would destroy that
+		// key and leave the command RUNNING forever (the manager's reconnect
+		// reap and its 60s grace timer are both keyed off it).
+		if err := sendCommandResult(stream, &v1pb.CommandResult{
 			CommandId:    commandID,
 			ExitCode:     -1,
 			ErrorMessage: "agent stream send failure",
 			LastSeqNo:    state.LastSeqSent,
-		})
+		}); err == nil {
+			_ = executor.ClearLocalState(c.machineID, c.agentID)
+		}
 	}()
 
 	runtime.Start()
@@ -385,11 +415,14 @@ func (c *commandStream) runCommand(
 				FinalSummary: result.FinalSummary,
 				Result:       result.Result,
 			}); err != nil {
+				// Keep the local state: the reconnecting AgentReady.lastCommandId
+				// must carry this command so the manager reaps the orphaned
+				// RUNNING row instead of losing it.
 				slog.Error("failed to send command result", "commandID", commandID, "error", err)
 			} else {
 				slog.Info("command result sent", "commandID", commandID, "exitCode", result.ExitCode)
+				_ = executor.ClearLocalState(c.machineID, c.agentID)
 			}
-			_ = executor.ClearLocalState(c.machineID, c.agentID)
 			return &result
 
 		case <-observer.watchdogCh:

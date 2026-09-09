@@ -277,6 +277,19 @@ helm upgrade laelia-manager charts/manager --namespace <ns> \
 > nginx core itself gained HTTP/2 upstream support (`proxy_http_version 2`)
 > in 1.29.4, but ingress-nginx does not expose it yet; check your
 > controller's docs.
+>
+> **Traefik: disable the entrypoint read timeout.** The machine and
+> provisioner channels are streams that stay open for the machine's lifetime,
+> so the entrypoint fronting the manager must not time out reading them.
+> Traefik v2.11+/v3 defaults `respondingTimeouts.readTimeout` to 60s; set it
+> to 0 (no timeout):
+>
+> ```
+> --entrypoints.<name>.respondingTimeouts.readTimeout=0
+> ```
+>
+> A large-but-finite value only postpones the cutoff — the streams are meant
+> to stay open for days.
 
 For an nginx ingress serving browser traffic, add the tuning annotations —
 long timeouts keep command output streams open, buffering must be off, and

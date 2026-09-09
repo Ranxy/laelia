@@ -641,6 +641,68 @@ func (s *Store) ListPendingCommandsByAgent(ctx context.Context, agentID int) ([]
 	return commands, nil
 }
 
+// failRunningCommandsForAgentSQL reaps every RUNNING command of one agent in
+// one statement. The agent's drain loop is strictly serial, so any RUNNING
+// command that exists at BeginSession time belongs to a turn that can no
+// longer report a result (the machine abandons a turn when its stream dies and
+// loses the last-command state the reconnect reap keys off). Scoping to
+// status=2 keeps the reap a no-op for commands that finished concurrently.
+const failRunningCommandsForAgentSQL = `
+	UPDATE command SET status = $1, completed_at = $2, error_message = $3
+	WHERE agent_id = $4 AND status = $5
+	RETURNING id
+`
+
+// FailRunningCommandsForAgent marks every RUNNING command of an agent FAILED
+// and returns the reaped command ids so the caller can close their live
+// watchers. Called on BeginSession, before the new session command is created.
+func (s *Store) FailRunningCommandsForAgent(ctx context.Context, agentID int, completedAt time.Time, errorMsg string) ([]uuid.UUID, error) {
+	rows, err := s.GetDB().QueryContext(ctx, failRunningCommandsForAgentSQL,
+		CommandStatusFailed, completedAt, errorMsg, agentID, CommandStatusRunning)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to reap running commands for agent")
+	}
+	defer rows.Close()
+
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan reaped command id")
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate reaped command ids")
+	}
+	return ids, nil
+}
+
+// failStaleRunningCommandSQL reaps ONE running command. The status predicate
+// is the reap guard: a result that landed between the reaper's list and this
+// update (status COMPLETED/FAILED) is never overwritten by the reaper.
+const failStaleRunningCommandSQL = `
+	UPDATE command SET status = $1, completed_at = $2, error_message = $3
+	WHERE id = $4 AND status = $5
+	RETURNING id
+`
+
+// FailStaleRunningCommand marks a single RUNNING command FAILED. It reports
+// whether the row was still RUNNING (and therefore reaped) so the caller can
+// skip bookkeeping for commands that finished concurrently.
+func (s *Store) FailStaleRunningCommand(ctx context.Context, commandID uuid.UUID, completedAt time.Time, errorMsg string) (bool, error) {
+	var id uuid.UUID
+	err := s.GetDB().QueryRowContext(ctx, failStaleRunningCommandSQL,
+		CommandStatusFailed, completedAt, errorMsg, commandID, CommandStatusRunning).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to reap stale running command")
+	}
+	return true, nil
+}
+
 // RunningCommandInfo holds the minimal data needed to derive agent execution
 // status for a conversation activity feed. AgentID is the internal integer ID;
 // CommandID is the UUID of the running command; EventType and Summary come from

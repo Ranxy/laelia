@@ -39,6 +39,10 @@ func configureV1Routers(
 	cmdDispatcher *dispatcher.Dispatcher,
 ) (*apiv1.AuditInterceptor, error) {
 	cmdDispatcher.StartPingMonitor()
+	// Stale RUNNING-command reaper: belt-and-suspenders cleanup for commands
+	// whose result can never arrive (stream death mid-turn followed by a
+	// reconnect that cancels the grace timer, a failed result write, ...).
+	cmdDispatcher.StartStaleCommandReaper()
 	// Provisioner auto-upgrade loop: scans every few minutes for machines of
 	// auto_upgrade provisioners that lag the embedded machine build. Bounded to
 	// the server's context so shutdown joins it.

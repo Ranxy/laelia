@@ -216,6 +216,16 @@ helm upgrade laelia-manager charts/manager --namespace <ns> \
 > | ingress-nginx | 不支持 | `backend-protocol` 没有 H2C，`proxy-http-version` 最高 1.1——请用其他保留 HTTP/2 的方式（如 L4/TCP 或 TLS 透传）把 Manager 暴露给 machine |
 >
 > nginx 本体自 1.29.4 起支持 HTTP/2 upstream（`proxy_http_version 2`），但 ingress-nginx 尚未暴露该能力；请以所用控制器的文档为准。
+>
+> **Traefik：关闭 entrypoint 读超时。** machine/provisioner 通道是常驻长连接流，
+> 转发 manager 流量的 entrypoint 不能对请求读取计时。Traefik v2.11+/v3 默认
+> `respondingTimeouts.readTimeout` 为 60s，请将其设为 0（不超时）：
+>
+> ```
+> --entrypoints.<name>.respondingTimeouts.readTimeout=0
+> ```
+>
+> 较大的有限值只会推迟断开——这些流需要持续存活数天。
 
 若使用 nginx ingress 仅服务浏览器流量，请加上调优注解——长超时保持命令输出流不断开、关闭缓冲、body size 覆盖 100 MiB 上传限制：
 

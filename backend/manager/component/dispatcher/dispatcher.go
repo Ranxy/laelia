@@ -612,12 +612,20 @@ func (d *Dispatcher) CurrentCommandID(agentID int) string {
 }
 
 // HandleBeginSession serves an agent's request to start a new autonomous
-// processing session. The manager checks the agent's durable per-channel
+// processing session. The manager first reaps any RUNNING command the agent
+// still owns (the drain loop is serial per agent, so at BeginSession time a
+// leftover RUNNING row can no longer receive a result — e.g. a stream death
+// mid-turn whose reconnect cancelled the grace timer before the machine's
+// cleared state could be reported), then checks the agent's durable per-channel
 // cursors: if no conversation has room_version beyond the cursor, it replies
 // idle=true and the agent stays idle. Otherwise it creates a RUNNING command
 // (the session's execution/event anchor, linked to a conversation later via
 // AckProcessedVersion) and replies with its command_id.
 func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb.BeginSessionResponse, error) {
+	// Exactly one live RUNNING command per agent: reap leftovers before the
+	// new session command is created.
+	d.reapAgentRunningCommands(ctx, agentID)
+
 	hasUpdates, err := d.store.HasUpdates(ctx, agentID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to check channel updates")
