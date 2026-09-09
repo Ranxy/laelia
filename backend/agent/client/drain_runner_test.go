@@ -2,6 +2,8 @@ package client
 
 import (
 	"context"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,17 +14,30 @@ import (
 )
 
 // scriptedStreamSender is a streamSender whose Send runs a test-supplied
-// function. It lets tests fail specific message kinds (e.g. only the Result)
-// to drive runCommand's failure paths without a real connection.
+// function and records every message. It lets tests fail specific message
+// kinds (e.g. only the Result) to drive runCommand's failure paths without a
+// real connection.
 type scriptedStreamSender struct {
-	onSend func(msg *v1pb.AgentStreamMessage) error
+	mu       sync.Mutex
+	messages []*v1pb.AgentStreamMessage
+	onSend   func(msg *v1pb.AgentStreamMessage) error
 }
 
 func (s *scriptedStreamSender) Send(msg *v1pb.AgentStreamMessage) error {
+	s.mu.Lock()
+	s.messages = append(s.messages, msg)
+	s.mu.Unlock()
 	if s.onSend == nil {
 		return nil
 	}
 	return s.onSend(msg)
+}
+
+// Sent returns a snapshot of the messages sent through this sender.
+func (s *scriptedStreamSender) Sent() []*v1pb.AgentStreamMessage {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]*v1pb.AgentStreamMessage(nil), s.messages...)
 }
 
 // TestBeginSessionDiscardsStaleReplyAndConsumesFreshReply guards the drain
@@ -160,6 +175,120 @@ func TestRunCommandClearsLocalStateAfterDeliveredResult(t *testing.T) {
 	state, err := executor.LoadLocalState("reap-m", "reap-c")
 	require.NoError(t, err)
 	require.Nil(t, state, "a delivered result clears the local state")
+}
+
+// TestRunCommandResumesInterruptedTurnSeqs guards the resume path: when the
+// persisted local state carries the same command id, the seq counters continue
+// (nothing already stored is re-sent — the manager dedups on
+// command_id+seq_no) and the resume is marked in the command event stream.
+func TestRunCommandResumesInterruptedTurnSeqs(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	require.NoError(t, executor.SaveLocalState("resume-m", "resume-a", &executor.LocalState{
+		CommandID:        "cmd-resume",
+		ExecutorKind:     "ACP",
+		Status:           "running",
+		StartedAt:        time.Now().UnixMilli(),
+		LastSeqSent:      5,
+		LastEventSeqSent: 7,
+	}))
+
+	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
+		r.eventCh <- executor.Event{
+			Type:    v1pb.CommandEventType_TOOL_CALL_STARTED,
+			Summary: "step",
+			ToolCallStarted: &v1pb.ToolCallStartedPayload{
+				Title:      "step",
+				ToolCallId: "tc-1",
+			},
+		}
+		close(r.outputCh)
+		close(r.eventCh)
+		r.resultCh <- executor.Result{ExitCode: 0, FinalSummary: "done"}
+		close(r.resultCh)
+		close(r.doneCh)
+	})
+	sender := &scriptedStreamSender{}
+
+	cs := &commandStream{machineID: "resume-m", agentID: "resume-a"}
+	result := cs.runCommand(context.Background(), runtime, sender, executor.Request{CommandID: "cmd-resume"}, &executor.ContextState{})
+	require.NotNil(t, result)
+
+	var lifecycleSeq, warningSeq, toolSeq int32
+	for _, m := range sender.Sent() {
+		ev := m.GetEvent()
+		if ev == nil {
+			continue
+		}
+		switch ev.Type {
+		case v1pb.CommandEventType_LIFECYCLE:
+			lifecycleSeq = ev.SeqNo
+		case v1pb.CommandEventType_WARNING:
+			warningSeq = ev.SeqNo
+		case v1pb.CommandEventType_TOOL_CALL_STARTED:
+			toolSeq = ev.SeqNo
+		default:
+		}
+	}
+	require.Equal(t, int32(8), lifecycleSeq, "the resumed turn continues the interrupted turn's event seq")
+	require.Equal(t, int32(9), warningSeq, "the resume is marked in the command event stream")
+	require.Equal(t, int32(10), toolSeq, "turn events continue after the resume marker")
+	require.Equal(t, strings.TrimSpace(resumeTurnNotice), strings.TrimSpace(warningSummary(t, sender.Sent())))
+
+	state, err := executor.LoadLocalState("resume-m", "resume-a")
+	require.NoError(t, err)
+	require.Nil(t, state, "a delivered result clears the local state")
+}
+
+// TestRunCommandFreshStateForDifferentCommand guards the seq reset: a persisted
+// state for a DIFFERENT command (e.g. a stale file after a machine restart)
+// must not leak its seq counters into the fresh turn.
+func TestRunCommandFreshStateForDifferentCommand(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	require.NoError(t, executor.SaveLocalState("resume-m", "resume-b", &executor.LocalState{
+		CommandID:        "cmd-stale",
+		LastSeqSent:      99,
+		LastEventSeqSent: 99,
+	}))
+
+	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
+		close(r.outputCh)
+		close(r.eventCh)
+		r.resultCh <- executor.Result{ExitCode: 0, FinalSummary: "done"}
+		close(r.resultCh)
+		close(r.doneCh)
+	})
+	sender := &scriptedStreamSender{}
+
+	cs := &commandStream{machineID: "resume-m", agentID: "resume-b"}
+	result := cs.runCommand(context.Background(), runtime, sender, executor.Request{CommandID: "cmd-fresh"}, &executor.ContextState{})
+	require.NotNil(t, result)
+
+	for _, m := range sender.Sent() {
+		if ev := m.GetEvent(); ev != nil && ev.Type == v1pb.CommandEventType_LIFECYCLE {
+			require.Equal(t, int32(1), ev.SeqNo, "a fresh turn starts at seq 1")
+		}
+		if ev := m.GetEvent(); ev != nil && ev.Type == v1pb.CommandEventType_WARNING {
+			t.Fatal("a fresh turn must not carry the resume warning")
+		}
+	}
+}
+
+// TestApplyResumeTurnNotice guards the resume prompt injection.
+func TestApplyResumeTurnNotice(t *testing.T) {
+	require.Equal(t, "batch", applyResumeTurnNotice("batch", false))
+	require.Equal(t, resumeTurnNotice, applyResumeTurnNotice("", true))
+	require.Equal(t, resumeTurnNotice+"\n\nbatch", applyResumeTurnNotice("batch", true))
+}
+
+func warningSummary(t *testing.T, msgs []*v1pb.AgentStreamMessage) string {
+	t.Helper()
+	for _, m := range msgs {
+		if ev := m.GetEvent(); ev != nil && ev.Type == v1pb.CommandEventType_WARNING {
+			return ev.GetWarning().GetMessage()
+		}
+	}
+	t.Fatal("no resume warning event found")
+	return ""
 }
 
 func newTestDrainCommandStream() *commandStream {

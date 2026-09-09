@@ -433,14 +433,6 @@ func TestWatcherDrop(t *testing.T) {
 	require.False(t, log, "third drop should not log")
 }
 
-func TestAgentSessionClearCurrentCommand(t *testing.T) {
-	sess := &AgentSession{agentID: 1, currentCmdID: "cmd-1"}
-	sess.ClearCurrentCommand("other")
-	require.Equal(t, "cmd-1", sess.currentCmdID)
-	sess.ClearCurrentCommand("cmd-1")
-	require.Empty(t, sess.currentCmdID)
-}
-
 func TestHandleMachinePing(t *testing.T) {
 	d := New(nil)
 	defer d.Stop()

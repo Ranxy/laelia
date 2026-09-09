@@ -100,16 +100,6 @@ func (s *AgentSession) Send(msg *v1pb.ManagerStreamMessage) error {
 	return s.deliver(msg)
 }
 
-// ClearCurrentCommand clears the session's current command id when it matches
-// the given id. Used during reconnect cleanup to drop a stale in-flight command.
-func (s *AgentSession) ClearCurrentCommand(commandID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.currentCmdID == commandID {
-		s.currentCmdID = ""
-	}
-}
-
 // Dispatcher routes control messages to connected agents/machines and fans
 // out live command output/events. It must be constructed via New; the zero
 // value is not usable because the registry, bus, and activity aggregator are
@@ -612,19 +602,52 @@ func (d *Dispatcher) CurrentCommandID(agentID int) string {
 }
 
 // HandleBeginSession serves an agent's request to start a new autonomous
-// processing session. The manager first reaps any RUNNING command the agent
-// still owns (the drain loop is serial per agent, so at BeginSession time a
-// leftover RUNNING row can no longer receive a result — e.g. a stream death
-// mid-turn whose reconnect cancelled the grace timer before the machine's
-// cleared state could be reported), then checks the agent's durable per-channel
-// cursors: if no conversation has room_version beyond the cursor, it replies
-// idle=true and the agent stays idle. Otherwise it creates a RUNNING command
-// (the session's execution/event anchor, linked to a conversation later via
-// AckProcessedVersion) and replies with its command_id.
+// processing session. A leftover RUNNING command is an interrupted turn: the
+// drain loop is strictly serial per agent, so BeginSession only arrives
+// between turns, and a RUNNING row at that point means the previous turn's
+// stream died mid-flight (the machine keeps the command id in its local
+// state). The manager resumes it under the SAME command id instead of failing
+// it — a proxy that bounds request read time (e.g. Traefik's default 60s)
+// then costs the agent one in-flight step per interruption instead of the
+// whole command. With no leftover, the manager checks the agent's durable
+// per-channel cursors: if no conversation has room_version beyond the cursor,
+// it replies idle=true and the agent stays idle; otherwise it creates a
+// RUNNING command (the session's execution/event anchor, linked to a
+// conversation later via AckProcessedVersion) and replies with its command_id.
 func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb.BeginSessionResponse, error) {
-	// Exactly one live RUNNING command per agent: reap leftovers before the
-	// new session command is created.
-	d.reapAgentRunningCommands(ctx, agentID)
+	runningStatus := int32(v1pb.CommandStatus_RUNNING)
+	running, err := d.store.ListCommands(ctx, &store.FindCommandMessage{AgentID: &agentID, Status: &runningStatus})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list running commands")
+	}
+	if len(running) > 0 {
+		agent, err := d.store.GetAgent(ctx, agentID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get agent")
+		}
+		if agent == nil {
+			return nil, errors.New("agent not found")
+		}
+		if resume := pickResumeCommand(agent, running); resume != nil {
+			for _, cmd := range running {
+				if cmd.ID != resume.ID {
+					d.reapCommand(ctx, cmd)
+				}
+			}
+			if sess, ok := d.registry.getAgent(agentID); ok {
+				sess.mu.Lock()
+				sess.currentCmdID = resume.ID.String()
+				sess.mu.Unlock()
+			}
+			slog.Info("agent session resumed", "commandID", resume.ID, "agentID", agentID)
+			return d.sessionResponse(ctx, agent, resume.ID.String())
+		}
+		// A stopped or runtime-incapable agent cannot resume the interrupted
+		// turn: reap the leftovers so they do not outlive this BeginSession.
+		for _, cmd := range running {
+			d.reapCommand(ctx, cmd)
+		}
+	}
 
 	hasUpdates, err := d.store.HasUpdates(ctx, agentID)
 	if err != nil {
@@ -668,7 +691,6 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create session command")
 	}
-	cmd.AgentResourceID = agent.ResourceID
 
 	now := time.Now()
 	if err := d.store.UpdateCommandStatus(ctx, cmd.ID, int32(v1pb.CommandStatus_RUNNING), &now, nil, nil, nil, ""); err != nil {
@@ -684,6 +706,13 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 
 	slog.Info("agent session begun", "commandID", cmd.ID, "agentID", agentID)
 
+	return d.sessionResponse(ctx, agent, cmd.ID.String())
+}
+
+// sessionResponse builds the BeginSessionResponse shared by the fresh-session
+// and resume paths: agent identity, owner, team, and prompt-version context.
+func (d *Dispatcher) sessionResponse(ctx context.Context, agent *store.AgentMessage, commandID string) (*v1pb.BeginSessionResponse, error) {
+	agentID := agent.ID
 	// Resolve the owner display name (empty for legacy agents with no owner) so
 	// the agent client can inject it into the init/re-anchor prompt's Ownership &
 	// Safety section. Sourced fresh each session so an ownership transfer takes
@@ -723,7 +752,7 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 	}
 
 	return &v1pb.BeginSessionResponse{
-		CommandId:           cmd.ID.String(),
+		CommandId:           commandID,
 		AgentDisplayName:    agent.Name,
 		OwnerDisplayName:    ownerDisplayName,
 		Team:                teamCtx,

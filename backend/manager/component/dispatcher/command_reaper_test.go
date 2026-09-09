@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	models "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -66,4 +67,25 @@ func TestShouldReapCommand(t *testing.T) {
 		sess.mu.Unlock()
 		require.True(t, d.shouldReapCommand(cmd, time.Now()), "a session tracking another command must reap the orphan")
 	})
+}
+
+// TestPickResumeCommand locks in the BeginSession resume decision: only an
+// enabled, drain-capable agent continues an interrupted turn, and the resume
+// target is the newest RUNNING row.
+func TestPickResumeCommand(t *testing.T) {
+	capable := func() *store.AgentMessage {
+		return &store.AgentMessage{Enabled: true, Info: &models.AgentInfo{
+			Capability: &models.AgentCapability{SupportsPi: true},
+		}}
+	}
+	disabled := &store.AgentMessage{Enabled: false, Info: &models.AgentInfo{
+		Capability: &models.AgentCapability{SupportsPi: true},
+	}}
+	incapable := &store.AgentMessage{Enabled: true, Info: &models.AgentInfo{}}
+	running := []*store.CommandMessage{{ID: uuid.New()}, {ID: uuid.New()}}
+
+	require.Equal(t, running[0], pickResumeCommand(capable(), running), "the newest RUNNING row is the resume target")
+	require.Nil(t, pickResumeCommand(disabled, running), "a stopped agent cannot resume an interrupted turn")
+	require.Nil(t, pickResumeCommand(incapable, running), "an agent with no drain runtime cannot resume")
+	require.Nil(t, pickResumeCommand(nil, running))
 }

@@ -4,10 +4,8 @@ import (
 	"context"
 	"io"
 	"log/slog"
-	"time"
 
 	"connectrpc.com/connect"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/common"
@@ -81,7 +79,7 @@ func (s *AgentStreamService) AgentChannel(
 	// old stream ends, do not destroy the new (live) session.
 	defer s.dispatcher.UnregisterAgentIf(agent.ID, sess)
 
-	s.handleAgentReady(ctx, agent, sess, ready.AgentReady)
+	s.handleAgentReady(ctx, agent)
 
 	for {
 		msg, err := stream.Receive()
@@ -96,7 +94,7 @@ func (s *AgentStreamService) AgentChannel(
 		switch m := msg.Message.(type) {
 		case *v1pb.AgentStreamMessage_AgentReady:
 			// A reconnecting runner re-announces; re-run the ready bookkeeping.
-			s.handleAgentReady(ctx, agent, sess, m.AgentReady)
+			s.handleAgentReady(ctx, agent)
 
 		case *v1pb.AgentStreamMessage_BeginSession:
 			resp, beginErr := s.dispatcher.HandleBeginSession(ctx, agent.ID)
@@ -185,39 +183,21 @@ func (s *AgentStreamService) resolveAgentForMachine(ctx context.Context, machine
 	return agent, nil
 }
 
+// handleAgentReady records the reconnecting runner and kicks its drain loop.
+// It deliberately does NOT reap the agent's in-flight RUNNING command here:
+// the command is resumed (or reaped) at the next BeginSession —
+// HandleBeginSession returns the leftover command id so an interrupted turn
+// continues instead of failing (see dispatcher.pickResumeCommand). Reaping
+// here would race the resume: the machine reconnects seconds after a stream
+// death and immediately BeginSessions its interrupted command.
 func (s *AgentStreamService) handleAgentReady(
 	ctx context.Context,
 	agent *store.AgentMessage,
-	sess *dispatcher.AgentSession,
-	ready *v1pb.AgentReady,
 ) {
-	if ready.LastCommandId != "" {
-		cmdID, parseErr := uuid.Parse(ready.LastCommandId)
-		if parseErr != nil {
-			// A malformed last_command_id (corrupted/tampered on-disk state on
-			// the machine) must not crash the handler — it just means there is
-			// no in-flight command to reap.
-			slog.Warn("ignoring malformed last_command_id from agent", "last_command_id", ready.LastCommandId, "error", parseErr)
-		} else {
-			cmd, err := s.store.GetCommandByName(ctx, formatCommandName(agent.ResourceID, cmdID))
-			if err == nil && cmd != nil {
-				// An in-flight (RUNNING) command from before the disconnect is not
-				// resumed — the agent's drain loop starts a fresh session — so mark
-				// it FAILED here rather than leaving it stale.
-				if cmd.Status == int32(v1pb.CommandStatus_RUNNING) {
-					now := time.Now()
-					if err := s.store.UpdateCommandStatus(ctx, cmd.ID, int32(v1pb.CommandStatus_FAILED), nil, &now, nil, nil, "agent disconnected during execution"); err != nil {
-						slog.Error("failed to mark in-flight command failed on reconnect", "commandID", ready.LastCommandId, "error", err)
-					}
-					sess.ClearCurrentCommand(ready.LastCommandId)
-				}
-			}
-		}
-	}
-
 	// Kick the agent's drain loop so it discovers any messages missed while
-	// offline. The wake is best-effort: the durable per-channel cursor is the
-	// source of truth, so a missed wake just means the loop is idle until the
-	// next BeginSession. The agent client also self-kicks after AgentReady.
+	// offline (and resumes an interrupted command, if any). The wake is
+	// best-effort: the durable per-channel cursor is the source of truth, so a
+	// missed wake just means the loop is idle until the next BeginSession. The
+	// agent client also self-kicks after AgentReady.
 	s.dispatcher.NotifyWake(ctx, agent.ID)
 }

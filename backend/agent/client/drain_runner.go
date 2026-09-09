@@ -33,6 +33,25 @@ const (
 	beginSessionRetryWait = 2 * time.Second
 )
 
+// resumeTurnNotice is prepended to the turn prompt when a drain session
+// resumes a command whose previous turn was cut off mid-flight (a stream
+// death under a proxy that bounds request read time). The agent's LLM session
+// state survives the interruption, so the notice tells it to continue rather
+// than restart.
+const resumeTurnNotice = "[Laelia system notice: the previous turn of this command was interrupted by a connection drop; this command is resumed in place. Check what already completed (files, posted messages, task status) and continue from where you stopped — do not repeat finished steps.]"
+
+// applyResumeTurnNotice prepends the resume notice when the turn continues an
+// interrupted command.
+func applyResumeTurnNotice(turnPrompt string, resumed bool) string {
+	if !resumed {
+		return turnPrompt
+	}
+	if strings.TrimSpace(turnPrompt) == "" {
+		return resumeTurnNotice
+	}
+	return resumeTurnNotice + "\n\n" + turnPrompt
+}
+
 // beginSessionResponseTimeout bounds how long the drain loop waits for the
 // manager's BeginSessionResponse. The manager handles BeginSession
 // synchronously on the stream, so a reply is normally immediate; a timeout
@@ -228,6 +247,7 @@ func (c *commandStream) runSession(ctx context.Context, stream streamSender, com
 			turnPrompt = batch
 		}
 	}
+	turnPrompt = applyResumeTurnNotice(turnPrompt, c.isResumedTurn(commandID))
 	turnPrompt = appendContextWarning(turnPrompt, ctxState)
 
 	// Consume a manager-pushed prompt release notice that could not be steered
@@ -314,6 +334,34 @@ func (c *commandStream) runSession(ctx context.Context, stream streamSender, com
 	c.persistContextState(ctxState, result)
 }
 
+// loadOrInitLocalState returns the turn's local state. A persisted state for
+// the SAME command means this turn resumes an interrupted one: the seq
+// counters continue so the manager's (command_id, seq_no) dedup keys line up
+// and nothing already stored is re-sent. A missing state, or one for a
+// different command, starts fresh.
+func (c *commandStream) loadOrInitLocalState(commandID string) (*executor.LocalState, bool) {
+	if prev, err := executor.LoadLocalState(c.machineID, c.agentID); err == nil && prev != nil && prev.CommandID == commandID {
+		prev.Status = "running"
+		return prev, true
+	}
+	return &executor.LocalState{
+		CommandID:    commandID,
+		ExecutorKind: "ACP",
+		Status:       "running",
+		StartedAt:    time.Now().UnixMilli(),
+	}, false
+}
+
+// isResumedTurn reports whether this turn continues an interrupted command:
+// the persisted local state carries the same command id, which the manager
+// only returns from BeginSession when it resumed the leftover RUNNING row.
+func (c *commandStream) isResumedTurn(commandID string) bool {
+	if prev, err := executor.LoadLocalState(c.machineID, c.agentID); err == nil && prev != nil {
+		return prev.CommandID == commandID
+	}
+	return false
+}
+
 func (c *commandStream) runCommand(
 	ctx context.Context,
 	runtime executor.Runtime,
@@ -322,14 +370,7 @@ func (c *commandStream) runCommand(
 	ctxState *executor.ContextState,
 ) *executor.Result {
 	commandID := req.CommandID
-	state := &executor.LocalState{
-		CommandID:        commandID,
-		ExecutorKind:     "ACP",
-		Status:           "running",
-		StartedAt:        time.Now().UnixMilli(),
-		LastSeqSent:      0,
-		LastEventSeqSent: 0,
-	}
+	state, resumed := c.loadOrInitLocalState(commandID)
 	if err := executor.SaveLocalState(c.machineID, c.agentID, state); err != nil {
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 	}
@@ -344,10 +385,10 @@ func (c *commandStream) runCommand(
 		runtime.Cancel()
 		// Send the failure result BEFORE touching the local state: when the
 		// stream is dead the send fails, and the surviving CommandID is what
-		// the reconnecting AgentReady.lastCommandId carries so the manager can
-		// reap the orphaned RUNNING command. Clearing first would destroy that
-		// key and leave the command RUNNING forever (the manager's reconnect
-		// reap and its 60s grace timer are both keyed off it).
+		// lets the manager RESUME this command at the next BeginSession (the
+		// drain loop is serial, so a leftover RUNNING row can only be this
+		// interrupted turn). Clearing first would destroy the resume key and
+		// fail the whole command at the next session.
 		if err := sendCommandResult(stream, &v1pb.CommandResult{
 			CommandId:    commandID,
 			ExitCode:     -1,
@@ -371,6 +412,21 @@ func (c *commandStream) runCommand(
 	}); err != nil {
 		slog.Error("failed to send command start event", "commandID", commandID, "error", err)
 		return nil
+	}
+	if resumed {
+		// Mark the resume in the command's event stream so the UI and the
+		// transcript show the interruption instead of a silent gap. The seq
+		// counters continued from the interrupted turn, so nothing already
+		// stored is re-sent (the manager dedups on command_id+seq_no).
+		if err := sendCommandEvent(stream, commandID, &executor.Event{
+			SeqNo:   nextEventSeq(state),
+			Type:    v1pb.CommandEventType_WARNING,
+			Summary: "connection lost mid-turn; command resumed",
+			Warning: &v1pb.WarningPayload{Message: resumeTurnNotice},
+		}); err != nil {
+			slog.Error("failed to send resume warning event", "commandID", commandID, "error", err)
+			return nil
+		}
 	}
 	if err := executor.SaveLocalState(c.machineID, c.agentID, state); err != nil {
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)

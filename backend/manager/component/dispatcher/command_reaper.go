@@ -108,21 +108,37 @@ func (d *Dispatcher) shouldReapCommand(cmd *store.CommandMessage, now time.Time)
 	return true
 }
 
-// reapAgentRunningCommands marks every RUNNING command of an agent FAILED and
-// closes their live watchers. Called from HandleBeginSession: BeginSession
-// only arrives between turns (the drain loop is serial per agent), so any
-// RUNNING command at that moment belongs to a turn whose result can never
-// arrive — reaping it here keeps the agent at exactly one live RUNNING
-// command regardless of how its previous stream died.
-func (d *Dispatcher) reapAgentRunningCommands(ctx context.Context, agentID int) {
-	reaped, err := d.store.FailRunningCommandsForAgent(ctx, agentID, time.Now(), beginSessionReapReason)
+// pickResumeCommand decides whether a leftover RUNNING command should be
+// resumed at BeginSession time. Only an enabled, drain-capable agent can
+// continue an interrupted turn (a stopped agent processes no sessions; an
+// agent with no ACP/pi runtime has no executor to run one), and the resume
+// target is the newest RUNNING row. Everything else is reaped by the caller.
+func pickResumeCommand(agent *store.AgentMessage, running []*store.CommandMessage) *store.CommandMessage {
+	if agent == nil || !agent.Enabled {
+		return nil
+	}
+	capability := agent.Info.GetCapability()
+	if capability == nil || (!capability.GetSupportsAcp() && !capability.GetSupportsPi()) {
+		return nil
+	}
+	if len(running) == 0 {
+		return nil
+	}
+	return running[0]
+}
+
+// reapCommand marks one RUNNING command FAILED (status-guarded, so a result
+// that landed concurrently is never overwritten) and closes its live watchers.
+func (d *Dispatcher) reapCommand(ctx context.Context, cmd *store.CommandMessage) {
+	reaped, err := d.store.FailStaleRunningCommand(ctx, cmd.ID, time.Now(), beginSessionReapReason)
 	if err != nil {
-		slog.Error("failed to reap running commands on begin session", "agentID", agentID, "error", err)
+		slog.Error("failed to reap running command", "commandID", cmd.ID, "agentID", cmd.AgentID, "error", err)
 		return
 	}
-	for _, id := range reaped {
-		slog.Warn("reaped stale running command on begin session", "commandID", id, "agentID", agentID)
-		d.closeWatchers(id.String())
-		d.closeEventWatchers(id.String())
+	if !reaped {
+		return
 	}
+	slog.Warn("reaped running command on begin session", "commandID", cmd.ID, "agentID", cmd.AgentID)
+	d.closeWatchers(cmd.ID.String())
+	d.closeEventWatchers(cmd.ID.String())
 }
