@@ -460,6 +460,14 @@ func (u *Uploader) uploadCycle(ctx context.Context) {
 		return
 	}
 	u.recordSuccess()
+	// Rejected entries are poison: the manager refused them and the fold below
+	// drops them for good (never retransmitted), so leave a local trace. A
+	// silent drop here is how a whole stream kind can vanish with no signal.
+	for _, r := range resp.GetRejected() {
+		slog.Warn("outbox upload: entry rejected by the manager; dropping",
+			"dir", u.ob.Dir(), "commandID", r.GetCommandId(),
+			"kind", r.GetKind().String(), "seq", r.GetSeqNo(), "reason", r.GetReason())
+	}
 	u.fold(records, resp)
 	u.updateGauges(u.readFromLocked())
 	u.ob.EnforceCap()

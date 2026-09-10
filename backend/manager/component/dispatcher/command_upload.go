@@ -181,7 +181,17 @@ func convertUploadEntry(we *v1pb.UploadCommandDataEntry) (*store.CommandUploadEn
 		if p == nil {
 			return nil, "progress payload missing"
 		}
-		if p.GetType() < v1pb.CommandOutput_STDOUT || p.GetType() > v1pb.CommandOutput_SYSTEM {
+		// Every defined stream type is storable. The check must not use an
+		// upper bound below ASSISTANT: the ACP/thread runtimes emit their
+		// assistant text as ASSISTANT, and rejecting it here poison-drops the
+		// record (the uploader never retransmits a rejected seq), silently
+		// erasing those rows from command_output.
+		switch p.GetType() {
+		case v1pb.CommandOutput_STDOUT,
+			v1pb.CommandOutput_STDERR,
+			v1pb.CommandOutput_SYSTEM,
+			v1pb.CommandOutput_ASSISTANT:
+		default:
 			return nil, "unknown progress stream type"
 		}
 		se.StreamType = int32(p.GetType())
