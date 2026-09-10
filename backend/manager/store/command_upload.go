@@ -74,15 +74,20 @@ type CommandUploadRejection struct {
 // and the session registry exactly once.
 type CommandUploadTerminal struct {
 	CommandID uuid.UUID
+	AgentID   int
 	Status    int32
 }
 
 // CommandUploadBatchResult is ApplyCommandUploadBatch's outcome: watermarks,
-// explicit rejections, and the terminal transitions that were applied.
+// explicit rejections, terminal transitions, and the rows that were actually
+// inserted (dedup-skipped retransmissions are omitted so the caller does not
+// re-broadcast records its watchers already saw).
 type CommandUploadBatchResult struct {
-	Acks      []*CommandUploadAck
-	Rejected  []*CommandUploadRejection
-	Terminals []*CommandUploadTerminal
+	Acks            []*CommandUploadAck
+	Rejected        []*CommandUploadRejection
+	Terminals       []*CommandUploadTerminal
+	InsertedOutputs []*CommandOutputMessage
+	InsertedEvents  []*CommandEventMessage
 }
 
 // uploadOwnershipSQL loads the ownership + status state of every command in a
@@ -90,7 +95,7 @@ type CommandUploadBatchResult struct {
 // foreign command produces an explicit per-entry rejection instead of
 // silently vanishing.
 const uploadOwnershipSQL = `
-	SELECT c.id, COALESCE(c.machine_id, 0), c.status
+	SELECT c.id, COALESCE(c.machine_id, 0), c.status, c.agent_id
 	FROM command c
 	WHERE c.id = ANY($1::uuid[])
 `
@@ -160,12 +165,13 @@ func (s *Store) ApplyCommandUploadBatch(
 	type cmdState struct {
 		machineID int
 		status    int32
+		agentID   int
 	}
 	states := make(map[uuid.UUID]cmdState, len(ids))
 	for rows.Next() {
 		var id uuid.UUID
 		var st cmdState
-		if err := rows.Scan(&id, &st.machineID, &st.status); err != nil {
+		if err := rows.Scan(&id, &st.machineID, &st.status, &st.agentID); err != nil {
 			return nil, errors.Wrap(err, "failed to scan command ownership row")
 		}
 		states[id] = st
@@ -223,13 +229,19 @@ func (s *Store) ApplyCommandUploadBatch(
 
 		switch e.Kind {
 		case UploadKindProgress:
-			if _, err := tx.ExecContext(ctx, uploadAppendOutputSQL,
-				e.CommandID, e.SeqNo, e.StreamType, e.Content, ts); err != nil {
+			out, err := tx.ExecContext(ctx, uploadAppendOutputSQL,
+				e.CommandID, e.SeqNo, e.StreamType, e.Content, ts)
+			if err != nil {
 				return nil, errors.Wrapf(err, "failed to append command output in upload batch (command %s seq %d)", e.CommandID, e.SeqNo)
 			}
 			w := wm(e.CommandID)
 			if e.SeqNo > w.progress {
 				w.progress = e.SeqNo
+			}
+			if n, _ := out.RowsAffected(); n > 0 {
+				res.InsertedOutputs = append(res.InsertedOutputs, &CommandOutputMessage{
+					CommandID: e.CommandID, SeqNo: e.SeqNo, StreamType: e.StreamType, Content: e.Content, CreatedAt: ts,
+				})
 			}
 
 		case UploadKindEvent:
@@ -237,8 +249,9 @@ func (s *Store) ApplyCommandUploadBatch(
 			if payload == "" {
 				payload = "{}"
 			}
-			if _, err := tx.ExecContext(ctx, uploadAppendEventSQL,
-				e.CommandID, e.SeqNo, e.EventType, e.Summary, payload); err != nil {
+			ev, err := tx.ExecContext(ctx, uploadAppendEventSQL,
+				e.CommandID, e.SeqNo, e.EventType, e.Summary, payload)
+			if err != nil {
 				return nil, errors.Wrapf(err, "failed to append command event in upload batch (command %s seq %d)", e.CommandID, e.SeqNo)
 			}
 			if e.HasTokenUsage {
@@ -255,6 +268,12 @@ func (s *Store) ApplyCommandUploadBatch(
 			}
 			if e.SeqNo > w.ack {
 				w.ack = e.SeqNo
+			}
+			if n, _ := ev.RowsAffected(); n > 0 {
+				res.InsertedEvents = append(res.InsertedEvents, &CommandEventMessage{
+					CommandID: e.CommandID, SeqNo: e.SeqNo, EventType: e.EventType,
+					Summary: e.Summary, PayloadJSON: payload, CreatedAt: ts,
+				})
 			}
 
 		case UploadKindResult:
@@ -282,7 +301,9 @@ func (s *Store) ApplyCommandUploadBatch(
 			// pending/running when this batch loaded transitions here. A
 			// retransmitted result finds the row terminal and stays a no-op.
 			if st.status == CommandStatusPending || st.status == CommandStatusRunning {
-				res.Terminals = append(res.Terminals, &CommandUploadTerminal{CommandID: e.CommandID, Status: status})
+				res.Terminals = append(res.Terminals, &CommandUploadTerminal{
+					CommandID: e.CommandID, AgentID: st.agentID, Status: status,
+				})
 			}
 
 		default:
@@ -310,10 +331,6 @@ func (s *Store) ApplyCommandUploadBatch(
 	}
 	return res, nil
 }
-
-// eventTypeTokenUsage mirrors v1.CommandEventType_TOKEN_USAGE (15) without
-// importing the generated package into the store layer.
-const eventTypeTokenUsage int32 = 15
 
 // recordCommandTokenUsageTx is RecordCommandTokenUsage bound to an open
 // transaction so the denormalized aggregate lands atomically with the batch.

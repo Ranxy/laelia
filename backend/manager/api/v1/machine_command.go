@@ -34,6 +34,31 @@ func NewMachineStreamService(s *store.Store, d *dispatcher.Dispatcher) *MachineS
 	return &MachineStreamService{store: s, dispatcher: d}
 }
 
+// UploadCommandData is the machine→manager command data plane: progress /
+// events / results no longer travel the per-agent bidi stream but arrive in
+// idempotent unary batches from the machine's uploader. The machine must be
+// ONLINE (same gate as MachineChannel: a force-disconnected machine must
+// re-ConnectMachine first); per-entry ownership is checked against the
+// command's machine binding inside the dispatcher's store transaction.
+func (s *MachineStreamService) UploadCommandData(
+	ctx context.Context,
+	req *connect.Request[v1pb.UploadCommandDataRequest],
+) (*connect.Response[v1pb.UploadCommandDataResponse], error) {
+	machine, ok := GetMachineFromContext(ctx)
+	if !ok || machine == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	if machine.Status == nil || machine.Status.GetState() != storepb.MachineStatus_ONLINE {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("machine %s is not online", machine.ResourceID))
+	}
+
+	resp, err := s.dispatcher.ApplyCommandUpload(ctx, machine.ID, req.Msg.GetEntries())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to apply command upload batch"))
+	}
+	return connect.NewResponse(resp), nil
+}
+
 func (s *MachineStreamService) MachineChannel(
 	ctx context.Context,
 	stream *connect.BidiStream[v1pb.MachineStreamMessage, v1pb.ManagerMachineStreamMessage],
