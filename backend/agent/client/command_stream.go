@@ -12,44 +12,27 @@ import (
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
 
-// streamSender abstracts the agent bidi stream for send serialization.
-// connect-go's Send is not safe to call concurrently, and the workspace reply
-// goroutines send alongside the ping ticker and the drain loop, so mainLoop
-// wraps the raw stream in serializedSender.
-type streamSender interface {
-	Send(*v1pb.AgentStreamMessage) error
-}
-
-// serializedSender serializes Send calls on the underlying stream.
-type serializedSender struct {
-	mu     sync.Mutex
-	stream streamSender
-}
-
-func (s *serializedSender) Send(msg *v1pb.AgentStreamMessage) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.stream.Send(msg)
-}
-
-// commandStream owns one agent's AgentChannel lifecycle and the in-flight
-// drain-turn bookkeeping shared by the connector, drain runner, and message
-// router. The connection loop lives in stream_connector.go, the drain/execution
-// orchestration in drain_runner.go, context tracking in context_observer.go,
-// and manager-message dispatch in message_router.go.
+// commandStream owns one agent's drain-turn bookkeeping: the wake signal, the
+// in-flight runtime, the cancel-reason override, and the durable report sink.
+// There is no per-agent stream anymore — command data uploads and the
+// BeginSession pull are unary RPCs on MachineStreamService, and per-agent
+// control interactions arrive on the machine's MachineChannel (routed by the
+// machine client's receive pump in machine_control.go). The drain/execution
+// orchestration lives in drain_runner.go, context tracking in
+// context_observer.go.
 type commandStream struct {
-	client       v1connect.AgentStreamServiceClient
+	client       v1connect.MachineStreamServiceClient
 	managerURL   string
 	backoff      *ExponentialBackoff
 	getToken     func() string
-	getSessID    func() string
 	getAcpConfig func() *executor.ACPConfig
 	socketPath   string
 	sessionToken string
 	binaryDir    string
-	// agentName is the agent's full resource name (agents/{agent}), carried
-	// in-stream as AgentReady.agent_name so the manager can bind this AgentChannel
-	// to the agent. It is NOT used as LAELIA_AGENT — that is the bare agentID.
+	// agentName is the agent's full resource name (agents/{agent}); it names
+	// the agent on every manager interaction (the unary BeginSession request
+	// and the prompt release notice ack). It is NOT used as LAELIA_AGENT —
+	// that is the bare agentID.
 	agentName string
 	// agentID is the agent's bare handle (the agents/{handle} tail, e.g.
 	// "rei-agent-1"). It keys the per-agent working dir and local state file
@@ -71,23 +54,26 @@ type commandStream struct {
 	uploader *outbox.Uploader
 	ob       *outbox.Outbox
 
+	// sendMachine sends one message on the machine's current MachineChannel
+	// control stream (nil while disconnected; best-effort). The runner binds
+	// it to the machine's send path, so runner-side replies (the prompt
+	// release notice ack) reach the manager without holding a per-connection
+	// handle.
+	sendMachine func(*v1pb.MachineStreamMessage) error
+
+	// currentCommandID is the id of the turn currently executing (set at
+	// runSession, cleared at its end). The machine-level control router uses
+	// it to scope a cancel/steer interaction: a queued cancel for an older
+	// command must not kill a turn that already moved on.
+	currentCommandIDMu sync.Mutex
+	currentCommandID   string
+
 	// drain loop coordination. wakeCh is buffered(1): a wake while one is
 	// already pending is coalesced, and it lives for the whole commandStream
-	// (never reset on reconnect) so the long-lived drain loop never holds a
-	// dead channel. The current AgentChannel connection is swapped atomically
-	// (see agentConn): the drain loop and the live connection's receive pump
-	// rendezvous through it.
+	// (never reset on reconnect).
 	wakeCh            chan struct{}
 	currentExecutor   executor.Runtime
 	currentExecutorMu sync.Mutex
-
-	// conn is the current AgentChannel connection; nil while disconnected.
-	// Only the connector writes it (once per connection); the drain loop reads
-	// snapshots. connReady is signaled (coalesced) on every swap so a drain
-	// loop waiting for a connection re-checks.
-	connMu    sync.Mutex
-	conn      *agentConn
-	connReady chan struct{}
 
 	// inFlightDone is non-nil while a drain turn is executing and is closed by
 	// endInFlight when the turn ends. CancelInFlight snapshots it so a caller
@@ -115,7 +101,8 @@ type commandStream struct {
 	// pendingPromptNotice is a manager-pushed prompt release notice that could
 	// not be steered into the in-flight turn. It is consumed by the next
 	// runSession (prepended to the turn) and acked. Guarded by promptNoticeMu
-	// because the receive pump writes it and the drain loop reads it.
+	// because the control-stream receive pump writes it and the drain loop
+	// reads it.
 	promptNoticeMu      sync.Mutex
 	pendingPromptNotice *v1pb.PromptReleaseNotice
 	// steeredPromptVersion records the prompt_version of a notice that was
@@ -163,7 +150,7 @@ func (c *commandStream) takeSteeredPromptVersion() string {
 
 func newCommandStream(httpClient *http.Client, managerURL, socketPath, sessionToken, binaryDir, agentName, agentID, machineID string) *commandStream {
 	c := &commandStream{
-		client:       v1connect.NewAgentStreamServiceClient(httpClient, managerURL),
+		client:       v1connect.NewMachineStreamServiceClient(httpClient, managerURL),
 		managerURL:   managerURL,
 		backoff:      NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
 		socketPath:   socketPath,
@@ -173,7 +160,6 @@ func newCommandStream(httpClient *http.Client, managerURL, socketPath, sessionTo
 		agentID:      agentID,
 		machineID:    machineID,
 		wakeCh:       make(chan struct{}, 1),
-		connReady:    make(chan struct{}, 1),
 	}
 	c.newSessionRuntime = c.buildRuntime
 	return c
@@ -189,59 +175,18 @@ func (c *commandStream) wake() {
 	}
 }
 
-// agentConn is one live AgentChannel connection. The long-lived drain loop and
-// the current connection's receive pump rendezvous through it: per-connection
-// state (send serialization, the BeginSession reply channel, the death signal)
-// is bound to the connection, so a stale reply can never leak into the next
-// connection and a dead stream can never be reused. A reconnect replaces the
-// whole object; the in-flight turn (runner-owned) is untouched.
-type agentConn struct {
-	// sender serializes sends on this stream (connect-go's Send is not safe
-	// for concurrent use).
-	sender streamSender
-	// done is closed when this connection ends (stream death or runner stop).
-	done chan struct{}
-	// beginResps carries this connection's BeginSession replies. Per-connection
-	// so a reply that outlives its connection is unreachable from the next one.
-	beginResps chan *v1pb.BeginSessionResponse
+// setCurrentCommand records the turn now executing ("" clears it).
+func (c *commandStream) setCurrentCommand(commandID string) {
+	c.currentCommandIDMu.Lock()
+	c.currentCommandID = commandID
+	c.currentCommandIDMu.Unlock()
 }
 
-// dead reports whether the connection has ended.
-func (a *agentConn) dead() bool {
-	select {
-	case <-a.done:
-		return true
-	default:
-		return false
-	}
-}
-
-// setConn installs the current connection and signals the drain loop.
-func (c *commandStream) setConn(conn *agentConn) {
-	c.connMu.Lock()
-	c.conn = conn
-	c.connMu.Unlock()
-	select {
-	case c.connReady <- struct{}{}:
-	default:
-	}
-}
-
-// currentConn snapshots the current connection; nil while disconnected.
-func (c *commandStream) currentConn() *agentConn {
-	c.connMu.Lock()
-	defer c.connMu.Unlock()
-	return c.conn
-}
-
-// clearConn drops the current connection only if it is still the one the
-// connector opened (a newer connection must not be clobbered).
-func (c *commandStream) clearConn(conn *agentConn) {
-	c.connMu.Lock()
-	if c.conn == conn {
-		c.conn = nil
-	}
-	c.connMu.Unlock()
+// currentCommand returns the id of the turn currently executing, or "".
+func (c *commandStream) currentCommand() string {
+	c.currentCommandIDMu.Lock()
+	defer c.currentCommandIDMu.Unlock()
+	return c.currentCommandID
 }
 
 func (c *commandStream) setCurrentExecutor(ex executor.Runtime) {
@@ -266,8 +211,8 @@ func (c *commandStream) beginInFlight() {
 	c.inFlightMu.Unlock()
 	c.isExecuting.Store(true)
 	// Clear any cancel reason left over from a prior turn that ended via a path
-	// which never consumed takeCancelReason (ctx.Done / send-error early
-	// returns), so a stale reason cannot mislabel THIS turn's result.
+	// which never consumed takeCancelReason (ctx.Done early returns), so a
+	// stale reason cannot mislabel THIS turn's result.
 	c.setCancelReason("")
 }
 

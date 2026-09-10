@@ -2130,40 +2130,6 @@ service CommandService {
   }
 }
 
-service AgentStreamService {
-  rpc AgentChannel(stream AgentStreamMessage) returns (stream ManagerStreamMessage);
-}
-
-message AgentStreamMessage {
-  oneof message {
-    AgentReady agent_ready = 1;
-    BeginSession begin_session = 2;
-    CommandProgress progress = 5;
-    CommandResult result = 6;
-    CommandEvent event = 7;
-    Ping ping = 8;
-    ProvidersDiscovered providers_discovered = 9; // response to ManagerStreamMessage.discover_providers
-    WorkspaceListResponse workspace_list_response = 10; // response to ManagerStreamMessage.workspace_list_request
-    WorkspaceReadResponse workspace_read_response = 11; // response to ManagerStreamMessage.workspace_read_request
-    PromptReleaseNoticeAck prompt_release_notice_ack = 12; // ack that a prompt release notice was injected
-  }
-}
-
-message ManagerStreamMessage {
-  oneof message {
-    NewMessagesAvailable new_messages = 4;
-    BeginSessionResponse begin_session_response = 8;
-    CancelMessage cancel = 5;
-    Pong pong = 6;
-    // 7 was permission_decision; permissions are now auto-granted.
-    DiscoverProviders discover_providers = 9; // ask the agent daemon to re-probe installed LLM agent providers
-    WorkspaceListRequest workspace_list_request = 10; // ask the agent daemon to list one level of its workspace
-    WorkspaceReadRequest workspace_read_request = 11; // ask the agent daemon to read a workspace file
-    SteerMessage steer = 12; // inject a follow-up message into the in-flight turn
-    PromptReleaseNotice prompt_release_notice = 13; // push a system-prompt release notice to the agent
-  }
-}
-
 // PromptReleaseNotice tells an agent that its system prompt has changed. The
 // manager pushes it when persona/team/owner changes (dynamic) or when the
 // machine's bundled static prompt is out of date. The agent injects it into the
@@ -2183,17 +2149,6 @@ message PromptReleaseNoticeAck {
   // ack travels on the machine control stream, where one stream serves every
   // hosted agent.
   string agent_name = 3;
-}
-
-message AgentReady {
-  string session_id = 1;
-  string last_command_id = 2;
-  int32 last_ack_seq = 3;
-  int32 last_event_seq = 4;
-  // agent_name declares which agent (agents/{agent}) this AgentChannel runs. The
-  // manager validates the authenticated machine owns this agent. Set by the
-  // machine app's per-agent runner; required on the first message.
-  string agent_name = 5;
 }
 
 // DiscoverProviders asks the machine app to re-probe its host for installed
@@ -2382,12 +2337,9 @@ message NewMessagesAvailable {
   string thread_root_message_id = 3;
 }
 
-// BeginSession is sent by an agent over its AgentChannel to ask the Manager to
-// start a new autonomous processing session. It is retired with the
-// AgentChannel: the drain loop now pulls work through the unary BeginSession
-// RPC on MachineStreamService (see v1/machine.proto).
-message BeginSession {}
-
+// BeginSessionResponse carries the drain loop's next unit of work: the command
+// to run, or idle=true when no conversation has updates beyond the agent's
+// durable cursor.
 message BeginSessionResponse {
   string command_id = 1;
   bool idle = 2;

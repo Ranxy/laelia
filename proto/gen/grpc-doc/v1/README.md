@@ -172,14 +172,11 @@
     - [AddReactionRequest](#laelia-v1-AddReactionRequest)
     - [AddReactionResponse](#laelia-v1-AddReactionResponse)
     - [AgentActivity](#laelia-v1-AgentActivity)
-    - [AgentReady](#laelia-v1-AgentReady)
-    - [AgentStreamMessage](#laelia-v1-AgentStreamMessage)
     - [ArchiveChannelRequest](#laelia-v1-ArchiveChannelRequest)
     - [ArchiveChannelResponse](#laelia-v1-ArchiveChannelResponse)
     - [AssignTaskRequest](#laelia-v1-AssignTaskRequest)
     - [AssignTaskResponse](#laelia-v1-AssignTaskResponse)
     - [Attachment](#laelia-v1-Attachment)
-    - [BeginSession](#laelia-v1-BeginSession)
     - [BeginSessionResponse](#laelia-v1-BeginSessionResponse)
     - [CancelCommandRequest](#laelia-v1-CancelCommandRequest)
     - [CancelMessage](#laelia-v1-CancelMessage)
@@ -280,7 +277,6 @@
     - [ListThreadParticipantsResponse](#laelia-v1-ListThreadParticipantsResponse)
     - [ListThreadUpdatesRequest](#laelia-v1-ListThreadUpdatesRequest)
     - [ListThreadUpdatesResponse](#laelia-v1-ListThreadUpdatesResponse)
-    - [ManagerStreamMessage](#laelia-v1-ManagerStreamMessage)
     - [MarkActivityDoneRequest](#laelia-v1-MarkActivityDoneRequest)
     - [MarkActivityDoneResponse](#laelia-v1-MarkActivityDoneResponse)
     - [MarkConversationReadRequest](#laelia-v1-MarkConversationReadRequest)
@@ -354,7 +350,6 @@
     - [SenderType](#laelia-v1-SenderType)
     - [TaskStatus](#laelia-v1-TaskStatus)
   
-    - [AgentStreamService](#laelia-v1-AgentStreamService)
     - [CommandService](#laelia-v1-CommandService)
   
 - [v1/device.proto](#v1_device-proto)
@@ -3159,49 +3154,6 @@ never generates conversation activity.
 
 
 
-<a name="laelia-v1-AgentReady"></a>
-
-### AgentReady
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| session_id | [string](#string) |  |  |
-| last_command_id | [string](#string) |  |  |
-| last_ack_seq | [int32](#int32) |  |  |
-| last_event_seq | [int32](#int32) |  |  |
-| agent_name | [string](#string) |  | agent_name declares which agent (agents/{agent}) this AgentChannel runs. The manager validates the authenticated machine owns this agent. Set by the machine app&#39;s per-agent runner; required on the first message. |
-
-
-
-
-
-
-<a name="laelia-v1-AgentStreamMessage"></a>
-
-### AgentStreamMessage
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| agent_ready | [AgentReady](#laelia-v1-AgentReady) |  |  |
-| begin_session | [BeginSession](#laelia-v1-BeginSession) |  |  |
-| progress | [CommandProgress](#laelia-v1-CommandProgress) |  |  |
-| result | [CommandResult](#laelia-v1-CommandResult) |  |  |
-| event | [CommandEvent](#laelia-v1-CommandEvent) |  |  |
-| ping | [Ping](#laelia-v1-Ping) |  |  |
-| providers_discovered | [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered) |  | response to ManagerStreamMessage.discover_providers |
-| workspace_list_response | [WorkspaceListResponse](#laelia-v1-WorkspaceListResponse) |  | response to ManagerStreamMessage.workspace_list_request |
-| workspace_read_response | [WorkspaceReadResponse](#laelia-v1-WorkspaceReadResponse) |  | response to ManagerStreamMessage.workspace_read_request |
-| prompt_release_notice_ack | [PromptReleaseNoticeAck](#laelia-v1-PromptReleaseNoticeAck) |  | ack that a prompt release notice was injected |
-
-
-
-
-
-
 <a name="laelia-v1-ArchiveChannelRequest"></a>
 
 ### ArchiveChannelRequest
@@ -3294,23 +3246,12 @@ source of truth) and left empty for ordinary whole-file attachments.
 
 
 
-<a name="laelia-v1-BeginSession"></a>
-
-### BeginSession
-BeginSession is sent by an agent over its AgentChannel to ask the Manager to
-start a new autonomous processing session. It is retired with the
-AgentChannel: the drain loop now pulls work through the unary BeginSession
-RPC on MachineStreamService (see v1/machine.proto).
-
-
-
-
-
-
 <a name="laelia-v1-BeginSessionResponse"></a>
 
 ### BeginSessionResponse
-
+BeginSessionResponse carries the drain loop&#39;s next unit of work: the command
+to run, or idle=true when no conversation has updates beyond the agent&#39;s
+durable cursor.
 
 
 | Field | Type | Label | Description |
@@ -5060,31 +5001,6 @@ the drain loop, before acking the conversation cursor.
 
 
 
-<a name="laelia-v1-ManagerStreamMessage"></a>
-
-### ManagerStreamMessage
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| new_messages | [NewMessagesAvailable](#laelia-v1-NewMessagesAvailable) |  |  |
-| begin_session_response | [BeginSessionResponse](#laelia-v1-BeginSessionResponse) |  |  |
-| cancel | [CancelMessage](#laelia-v1-CancelMessage) |  |  |
-| pong | [Pong](#laelia-v1-Pong) |  |  |
-| discover_providers | [DiscoverProviders](#laelia-v1-DiscoverProviders) |  | 7 was permission_decision; permissions are now auto-granted.
-
-ask the agent daemon to re-probe installed LLM agent providers |
-| workspace_list_request | [WorkspaceListRequest](#laelia-v1-WorkspaceListRequest) |  | ask the agent daemon to list one level of its workspace |
-| workspace_read_request | [WorkspaceReadRequest](#laelia-v1-WorkspaceReadRequest) |  | ask the agent daemon to read a workspace file |
-| steer | [SteerMessage](#laelia-v1-SteerMessage) |  | inject a follow-up message into the in-flight turn |
-| prompt_release_notice | [PromptReleaseNotice](#laelia-v1-PromptReleaseNotice) |  | push a system-prompt release notice to the agent |
-
-
-
-
-
-
 <a name="laelia-v1-MarkActivityDoneRequest"></a>
 
 ### MarkActivityDoneRequest
@@ -6370,16 +6286,6 @@ enums cannot share value names), matching SenderType/CommandStatus.
  
 
 
-<a name="laelia-v1-AgentStreamService"></a>
-
-### AgentStreamService
-
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| AgentChannel | [AgentStreamMessage](#laelia-v1-AgentStreamMessage) stream | [ManagerStreamMessage](#laelia-v1-ManagerStreamMessage) stream |  |
-
-
 <a name="laelia-v1-CommandService"></a>
 
 ### CommandService
@@ -7640,7 +7546,7 @@ BeginSessionRequest names the agent whose drain loop is pulling work.
 | ----- | ---- | ----- | ----------- |
 | session_id | [string](#string) |  |  |
 | initial_status | [MachineStatus](#laelia-v1-MachineStatus) |  |  |
-| assigned_agents | [AgentAssignment](#laelia-v1-AgentAssignment) | repeated | The full set of agents this machine must host. The machine app opens one AgentChannel per entry immediately after connect (and on every reconnect). |
+| assigned_agents | [AgentAssignment](#laelia-v1-AgentAssignment) | repeated | The full set of agents this machine must host. The machine app starts a runner per entry immediately after connect (and on every reconnect). |
 
 
 
@@ -8671,8 +8577,9 @@ user runs once on a host) and serves the machine-side authentication RPCs
 the machine app calls to connect. A machine authenticates through the
 device-code flow (DeviceService): the manager mints its refresh token at
 approval time and the machine reconnects with access tokens issued by
-RefreshMachineToken. Each machine hosts one or more agents, each running its
-own AgentChannel over the machine&#39;s access token.
+RefreshMachineToken. Each machine hosts one or more agents, each driven by a
+runner over the machine&#39;s access token; command data travels over unary RPCs
+on MachineStreamService, not per-agent streams.
 
 ========== Management APIs (IAM auth, admin only) ==========
 
@@ -8690,7 +8597,7 @@ own AgentChannel over the machine&#39;s access token.
 | RefreshMachineModels | [RefreshMachineModelsRequest](#laelia-v1-RefreshMachineModelsRequest) | [RefreshMachineModelsResponse](#laelia-v1-RefreshMachineModelsResponse) | Probe one provider&#39;s models on this machine using the given (draft) ACP config&#39;s custom_env — the add-agent form uses it so a model picker reflects a custom env (e.g. CODEX_HOME) before the agent exists. Returns the freshly probed model list for that provider; NOT persisted (session-only). Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit; no permission annotation so the creator short-circuit can run. |
 | UpgradeMachine | [UpgradeMachineRequest](#laelia-v1-UpgradeMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | UpgradeMachine asks an online machine to upgrade itself: the manager sends an UpgradeRequest over the machine control stream and the machine&#39;s supervisor process downloads the new binary from the manager, installs it, and restarts. Progress is reported through Machine.upgrade_status. |
 | ListMachineWorkspaces | [ListMachineWorkspacesRequest](#laelia-v1-ListMachineWorkspacesRequest) | [ListMachineWorkspacesResponse](#laelia-v1-ListMachineWorkspacesResponse) | ListMachineWorkspaces summarizes every per-agent workspace directory on a machine (~/.laelia/&lt;machineID&gt;/). Workspace content is sensitive: authorized in the handler for the machine&#39;s creator or a workspace admin (isMachineAdmin, matching Machine.can_manage); no permission annotation. |
-| ConnectMachine | [ConnectMachineRequest](#laelia-v1-ConnectMachineRequest) | [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse) | Machine initial connection using a registration token. Returns access &#43; refresh tokens, the machine session id, and the full list of agents the machine must host (so the machine app can open an AgentChannel for each). |
+| ConnectMachine | [ConnectMachineRequest](#laelia-v1-ConnectMachineRequest) | [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse) | Machine initial connection using a registration token. Returns access &#43; refresh tokens, the machine session id, and the full list of agents the machine must host (so the machine app can start a runner for each). |
 | MachineHeartbeat | [MachineHeartbeatRequest](#laelia-v1-MachineHeartbeatRequest) | [MachineHeartbeatResponse](#laelia-v1-MachineHeartbeatResponse) |  |
 | MachineDisconnect | [MachineDisconnectRequest](#laelia-v1-MachineDisconnectRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 | RefreshMachineToken | [RefreshMachineTokenRequest](#laelia-v1-RefreshMachineTokenRequest) | [RefreshMachineTokenResponse](#laelia-v1-RefreshMachineTokenResponse) |  |
@@ -8699,11 +8606,11 @@ own AgentChannel over the machine&#39;s access token.
 <a name="laelia-v1-MachineStreamService"></a>
 
 ### MachineStreamService
-MachineStreamService is the machine-level control channel. It is separate
-from the per-agent AgentStreamService.AgentChannel data plane: the
-MachineChannel carries agent assignment (add/remove/config-update), provider
-discovery, and liveness ping/pong, while each agent&#39;s drain loop runs over
-its own AgentChannel.
+MachineStreamService is the machine-level control and data channel: agent
+assignment (add/remove/config-update), provider discovery and workspace
+requests, per-agent control interactions, liveness ping/pong, the drain
+loop&#39;s unary BeginSession pull, and the machine&#39;s command-data uploads all
+share this one service. The per-agent stream is retired.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|

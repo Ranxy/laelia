@@ -1434,8 +1434,8 @@ type ConnectMachineResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	InitialStatus *MachineStatus         `protobuf:"bytes,2,opt,name=initial_status,json=initialStatus,proto3" json:"initial_status,omitempty"`
-	// The full set of agents this machine must host. The machine app opens one
-	// AgentChannel per entry immediately after connect (and on every reconnect).
+	// The full set of agents this machine must host. The machine app starts a
+	// runner per entry immediately after connect (and on every reconnect).
 	AssignedAgents []*AgentAssignment `protobuf:"bytes,3,rep,name=assigned_agents,json=assignedAgents,proto3" json:"assigned_agents,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache

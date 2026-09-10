@@ -559,8 +559,8 @@ export declare type ConnectMachineResponse = Message<"laelia.v1.ConnectMachineRe
   initialStatus?: MachineStatus | undefined;
 
   /**
-   * The full set of agents this machine must host. The machine app opens one
-   * AgentChannel per entry immediately after connect (and on every reconnect).
+   * The full set of agents this machine must host. The machine app starts a
+   * runner per entry immediately after connect (and on every reconnect).
    *
    * @generated from field: repeated laelia.v1.AgentAssignment assigned_agents = 3;
    */
@@ -1969,8 +1969,9 @@ export declare const ProvisioningPhaseSchema: GenEnum<ProvisioningPhase>;
  * the machine app calls to connect. A machine authenticates through the
  * device-code flow (DeviceService): the manager mints its refresh token at
  * approval time and the machine reconnects with access tokens issued by
- * RefreshMachineToken. Each machine hosts one or more agents, each running its
- * own AgentChannel over the machine's access token.
+ * RefreshMachineToken. Each machine hosts one or more agents, each driven by a
+ * runner over the machine's access token; command data travels over unary RPCs
+ * on MachineStreamService, not per-agent streams.
  *
  * ========== Management APIs (IAM auth, admin only) ==========
  *
@@ -2130,7 +2131,7 @@ export declare const MachineService: GenService<{
   /**
    * Machine initial connection using a registration token. Returns access +
    * refresh tokens, the machine session id, and the full list of agents the
-   * machine must host (so the machine app can open an AgentChannel for each).
+   * machine must host (so the machine app can start a runner for each).
    *
    * @generated from rpc laelia.v1.MachineService.ConnectMachine
    */
@@ -2166,11 +2167,11 @@ export declare const MachineService: GenService<{
 }>;
 
 /**
- * MachineStreamService is the machine-level control channel. It is separate
- * from the per-agent AgentStreamService.AgentChannel data plane: the
- * MachineChannel carries agent assignment (add/remove/config-update), provider
- * discovery, and liveness ping/pong, while each agent's drain loop runs over
- * its own AgentChannel.
+ * MachineStreamService is the machine-level control and data channel: agent
+ * assignment (add/remove/config-update), provider discovery and workspace
+ * requests, per-agent control interactions, liveness ping/pong, the drain
+ * loop's unary BeginSession pull, and the machine's command-data uploads all
+ * share this one service. The per-agent stream is retired.
  *
  * @generated from service laelia.v1.MachineStreamService
  */

@@ -2,11 +2,11 @@ package client
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"strings"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -25,42 +25,10 @@ const (
 	minSessionGap = 1 * time.Second
 )
 
-// beginSessionRetryWait is the backoff after a transient BeginSession failure
-// (e.g. a manager-side DB hiccup returning Internal). The pending messages
-// that triggered the wake are still queued server-side and the manager will
-// not re-wake, so the drain loop must retry BeginSession proactively rather
-// than wait for the next wake. Var (not const) so tests can shorten the wait.
-var beginSessionRetryWait = 2 * time.Second
-
-// resumeTurnNotice is prepended to the turn prompt when a drain session
-// resumes a command whose previous turn was cut off mid-flight (a stream
-// death under a proxy that bounds request read time). The agent's LLM session
-// state survives the interruption, so the notice tells it to continue rather
-// than restart.
-const resumeTurnNotice = "[Laelia system notice: the previous turn of this command was interrupted by a connection drop; this command is resumed in place. Check what already completed (files, posted messages, task status) and continue from where you stopped — do not repeat finished steps.]"
-
-// applyResumeTurnNotice prepends the resume notice when the turn continues an
-// interrupted command.
-func applyResumeTurnNotice(turnPrompt string, resumed bool) string {
-	if !resumed {
-		return turnPrompt
-	}
-	if strings.TrimSpace(turnPrompt) == "" {
-		return resumeTurnNotice
-	}
-	return resumeTurnNotice + "\n\n" + turnPrompt
-}
-
-// beginSessionResponseTimeout bounds how long the drain loop waits for the
-// manager's BeginSessionResponse. The manager handles BeginSession
-// synchronously on the stream, so a reply is normally immediate; a timeout
-// means the manager failed to reply (e.g. a DB hiccup: it logs the failure and
-// never sends a response) — without this bound the drain loop would wait on
-// beginRespCh forever and the agent would never run again. The drain loop
-// retries with backoff; any command the timed-out attempt minted manager-side
-// is reaped by that agent's next BeginSession or the stale-command reaper.
-// Var (not const) so tests can shorten the wait.
-var beginSessionResponseTimeout = 30 * time.Second
+// beginSessionTimeout bounds the unary BeginSession RPC. The manager handles
+// it synchronously (cursor checks + mint); a timeout means the manager is
+// wedged and the drain loop backs off.
+const beginSessionTimeout = 30 * time.Second
 
 type mergedText struct {
 	builder    strings.Builder
@@ -105,12 +73,14 @@ func (m *mergedText) flush(sink turnSink, commandID string, state *executor.Loca
 }
 
 // drainLoop is the agent-first autonomous engine, living on the runner's
-// long-lived ctx (not the stream's): it waits for a wake, then repeatedly
-// opens a session (BeginSession) on the CURRENT connection and runs it until
-// the manager reports no channel has updates (idle). A dead stream only makes
-// it wait for the next connection; a running turn is never interrupted by a
-// reconnect (phase 2).
+// long-lived ctx: it waits for a wake, then repeatedly pulls work through the
+// unary BeginSession RPC and runs each session until the manager reports no
+// channel has updates (idle). A dead manager only backs the pull off; a
+// running turn is never interrupted by a reconnect.
 func (c *commandStream) drainLoop(ctx context.Context) {
+	if c.backoff == nil {
+		c.backoff = NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait)
+	}
 	var lastSessionStart time.Time
 	for {
 	START:
@@ -139,83 +109,52 @@ func (c *commandStream) drainLoop(ctx context.Context) {
 				}
 			}
 
-			conn := c.currentConn()
-			if conn == nil {
-				// No live connection: the connector is (re)connecting. It kicks
-				// a wake on connect, so missed-offline work is still discovered
-				// by the next BeginSession.
-				select {
-				case <-ctx.Done():
-					return
-				case <-c.connReady:
-				}
-				continue
-			}
-
-			resp, err := c.beginSession(ctx, conn)
+			resp, err := c.beginSession(ctx)
 			if err != nil {
 				if ctx.Err() != nil {
 					return
 				}
-				if conn.dead() {
-					// The connection died: re-fetch (nil until reconnected).
-					continue
-				}
-				// Do NOT exit the drain loop: a transient BeginSession error
-				// (e.g. a manager-side DB hiccup) would otherwise deafen the
-				// agent until the whole machine reconnects. The wake that
-				// started this pass already fired and won't re-fire, so back off
-				// and retry BeginSession proactively.
+				// Do NOT exit the drain loop: a transient BeginSession failure
+				// (manager restart, DB hiccup, control stream down) would
+				// otherwise deafen the agent until the whole machine
+				// reconnects. Back off and retry proactively — the wake that
+				// started this pass already fired and won't re-fire.
 				slog.Warn("drain loop: begin session failed, backing off before retry", "error", err)
-				select {
-				case <-time.After(beginSessionRetryWait):
-				case <-ctx.Done():
+				if werr := c.backoff.Wait(ctx); werr != nil {
 					return
 				}
 				continue
 			}
+			c.backoff.Reset()
 			if resp.Idle {
 				goto START
 			}
 
 			lastSessionStart = time.Now()
-			c.runSession(ctx, conn, resp.CommandId, resp.AgentDisplayName, resp.OwnerDisplayName, resp.Team, resp.PromptVersion, resp.PromptReleaseNotice)
+			c.runSession(ctx, resp.CommandId, resp.AgentDisplayName, resp.OwnerDisplayName, resp.Team, resp.PromptVersion, resp.PromptReleaseNotice)
 		}
 	}
 }
 
-// beginSession sends a BeginSession message on the current connection and
-// waits for the manager's reply. Returns a non-idle response with a
-// command_id to run, or idle=true when no channel has updates. The wait is
-// bounded: a manager that received the request but never replies must not
-// wedge the drain loop forever.
-func (*commandStream) beginSession(ctx context.Context, conn *agentConn) (*v1pb.BeginSessionResponse, error) {
-	// Discard any BeginSessionResponse queued by a previous attempt that gave
-	// up waiting: the manager replies in stream order, so whatever is still
-	// buffered here predates this send and would anchor this session to an
-	// already-reaped command.
-	select {
-	case <-conn.beginResps:
-	default:
+// beginSession pulls the drain loop's next unit of work through the unary
+// BeginSession RPC on MachineStreamService (the per-agent stream is retired).
+// agent_name binds the pull to this agent; the reply carries the command to
+// run, or idle=true when no conversation has updates beyond the agent's
+// durable cursor.
+func (c *commandStream) beginSession(ctx context.Context) (*v1pb.BeginSessionResponse, error) {
+	token := c.getToken()
+	if token == "" {
+		return nil, errors.New("no machine access token for begin session")
 	}
-	if err := conn.sender.Send(&v1pb.AgentStreamMessage{
-		Message: &v1pb.AgentStreamMessage_BeginSession{
-			BeginSession: &v1pb.BeginSession{},
-		},
-	}); err != nil {
+	callCtx, cancel := context.WithTimeout(ctx, beginSessionTimeout)
+	defer cancel()
+	req := connect.NewRequest(&v1pb.BeginSessionRequest{AgentName: c.agentName})
+	req.Header().Set("Authorization", "Bearer "+token)
+	resp, err := c.client.BeginSession(callCtx, req)
+	if err != nil {
 		return nil, err
 	}
-
-	select {
-	case resp := <-conn.beginResps:
-		return resp, nil
-	case <-conn.done:
-		return nil, io.EOF
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-time.After(beginSessionResponseTimeout):
-		return nil, errors.New("timed out waiting for BeginSession response")
-	}
+	return resp.Msg, nil
 }
 
 // runSession executes one drain session: it starts with the turn-start
@@ -225,7 +164,10 @@ func (*commandStream) beginSession(ctx context.Context, conn *agentConn) (*v1pb.
 // The agent itself decides which channel to process and how, by shelling out
 // to the `laelia-machine` CLI over the local daemon. Blocking: returns when
 // the session finishes.
-func (c *commandStream) runSession(ctx context.Context, conn *agentConn, commandID string, agentDisplayName, ownerDisplayName string, team *v1pb.TeamContext, promptVersion string, promptNotice *v1pb.PromptReleaseNotice) {
+func (c *commandStream) runSession(ctx context.Context, commandID string, agentDisplayName, ownerDisplayName string, team *v1pb.TeamContext, promptVersion string, promptNotice *v1pb.PromptReleaseNotice) {
+	c.setCurrentCommand(commandID)
+	defer c.setCurrentCommand("")
+
 	// Turn-start barrier (§3.4). No-op without an uploader (turn-loop tests).
 	if err := c.waitTurnClear(ctx, commandID); err != nil {
 		if ctx.Err() == nil {
@@ -270,7 +212,6 @@ func (c *commandStream) runSession(ctx context.Context, conn *agentConn, command
 			turnPrompt = batch
 		}
 	}
-	turnPrompt = applyResumeTurnNotice(turnPrompt, c.isResumedTurn(commandID))
 	turnPrompt = appendContextWarning(turnPrompt, ctxState)
 
 	// Consume a manager-pushed prompt release notice that could not be steered
@@ -297,7 +238,7 @@ func (c *commandStream) runSession(ctx context.Context, conn *agentConn, command
 				turnPrompt = msg + "\n\n" + turnPrompt
 			}
 		}
-		_ = sendPromptReleaseNoticeAck(conn.sender, notice)
+		c.ackPromptNotice(notice)
 	}
 
 	// A notice successfully steered into the previous in-flight turn is already
@@ -357,32 +298,36 @@ func (c *commandStream) runSession(ctx context.Context, conn *agentConn, command
 	c.persistContextState(ctxState, result)
 }
 
-// loadOrInitLocalState returns the turn's local state. A persisted state for
-// the SAME command means this turn resumes an interrupted one: the seq
-// counters continue so the manager's (command_id, seq_no) dedup keys line up
-// and nothing already stored is re-sent. A missing state, or one for a
-// different command, starts fresh.
-func (c *commandStream) loadOrInitLocalState(commandID string) (*executor.LocalState, bool) {
-	if prev, err := executor.LoadLocalState(c.machineID, c.agentID); err == nil && prev != nil && prev.CommandID == commandID {
-		prev.Status = "running"
-		return prev, true
+// ackPromptNotice reports to the manager (over the machine control stream)
+// that a prompt release notice was injected into this turn, so it stops
+// re-pushing it. Best-effort: a machine that is offline re-sends the notice on
+// the next BeginSession.
+func (c *commandStream) ackPromptNotice(notice *v1pb.PromptReleaseNotice) {
+	if c.sendMachine == nil || notice == nil {
+		return
 	}
+	_ = c.sendMachine(&v1pb.MachineStreamMessage{
+		Message: &v1pb.MachineStreamMessage_PromptReleaseNoticeAck{
+			PromptReleaseNoticeAck: &v1pb.PromptReleaseNoticeAck{
+				AgentName:     c.agentName,
+				NoticeKey:     notice.GetNoticeKey(),
+				PromptVersion: notice.GetPromptVersion(),
+			},
+		},
+	})
+}
+
+// initLocalState starts a turn's local state fresh: both seq counters (progress
+// and events) count per-turn from 1. Seq spaces are scoped per command, and the
+// manager only ever hands out a fresh command id (a leftover RUNNING row is
+// never resumed), so there is nothing to continue from an interrupted turn.
+func (*commandStream) initLocalState(commandID string) *executor.LocalState {
 	return &executor.LocalState{
 		CommandID:    commandID,
 		ExecutorKind: "ACP",
 		Status:       "running",
 		StartedAt:    time.Now().UnixMilli(),
-	}, false
-}
-
-// isResumedTurn reports whether this turn continues an interrupted command:
-// the persisted local state carries the same command id, which the manager
-// only returns from BeginSession when it resumed the leftover RUNNING row.
-func (c *commandStream) isResumedTurn(commandID string) bool {
-	if prev, err := executor.LoadLocalState(c.machineID, c.agentID); err == nil && prev != nil {
-		return prev.CommandID == commandID
 	}
-	return false
 }
 
 // runCommand executes one turn: it records every progress chunk, event, and
@@ -392,9 +337,9 @@ func (c *commandStream) isResumedTurn(commandID string) bool {
 // log rejects it. The turn ends when its terminal is durably recorded — the
 // uploader owns delivery.
 //
-// A turn interrupted by ctx (the runner/stream going away) records no
-// terminal: the manager keeps the command RUNNING and the next BeginSession
-// resumes it, with the persisted local state continuing the seq counters.
+// A turn interrupted by ctx (the runner or machine going away) records no
+// terminal: the manager keeps the command RUNNING until the reaper closes it
+// (machine lost past the grace) or a late turn result re-grades it.
 func (c *commandStream) runCommand(
 	ctx context.Context,
 	runtime executor.Runtime,
@@ -403,7 +348,7 @@ func (c *commandStream) runCommand(
 	ctxState *executor.ContextState,
 ) *executor.Result {
 	commandID := req.CommandID
-	state, resumed := c.loadOrInitLocalState(commandID)
+	state := c.initLocalState(commandID)
 	if err := executor.SaveLocalState(c.machineID, c.agentID, state); err != nil {
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 	}
@@ -412,8 +357,7 @@ func (c *commandStream) runCommand(
 
 	// terminalDelivered reports that the terminal record reached the manager's
 	// path (durable in the outbox, or bypass-delivered): the local state can
-	// then be cleared, because the manager no longer treats the command as an
-	// interrupted turn to resume.
+	// then be cleared.
 	terminalDelivered := false
 	// pendingResult holds the runtime's real terminal when the record-append
 	// failed, so the deferred bypass delivers the real outcome instead of a
@@ -425,8 +369,9 @@ func (c *commandStream) runCommand(
 		}
 		runtime.Cancel()
 		if ctx.Err() != nil {
-			// Interrupted turn: no terminal, and the local state keeps the
-			// command id + seq counters as the resume key.
+			// Interrupted turn: no terminal. The per-command seq spaces make
+			// the leftover records harmless (a later turn for the same command
+			// id cannot exist — the manager only mints fresh ids).
 			return
 		}
 		result := pendingResult
@@ -443,9 +388,8 @@ func (c *commandStream) runCommand(
 	}()
 
 	runtime.Start()
-	startSeq := nextEventSeq(state)
 	if err := sink.appendEvent(commandID, &executor.Event{
-		SeqNo:   startSeq,
+		SeqNo:   nextEventSeq(state),
 		Type:    v1pb.CommandEventType_LIFECYCLE,
 		Summary: "command started",
 		Lifecycle: &v1pb.LifecyclePayload{
@@ -455,21 +399,6 @@ func (c *commandStream) runCommand(
 	}); err != nil {
 		slog.Error("failed to append command start event", "commandID", commandID, "error", err)
 		return nil
-	}
-	if resumed {
-		// Mark the resume in the command's event stream so the UI and the
-		// transcript show the interruption instead of a silent gap. The seq
-		// counters continued from the interrupted turn, so nothing already
-		// stored is re-sent (the manager dedups on command_id+seq_no).
-		if err := sink.appendEvent(commandID, &executor.Event{
-			SeqNo:   nextEventSeq(state),
-			Type:    v1pb.CommandEventType_WARNING,
-			Summary: "connection lost mid-turn; command resumed",
-			Warning: &v1pb.WarningPayload{Message: resumeTurnNotice},
-		}); err != nil {
-			slog.Error("failed to append resume warning event", "commandID", commandID, "error", err)
-			return nil
-		}
 	}
 	if err := executor.SaveLocalState(c.machineID, c.agentID, state); err != nil {
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
@@ -515,8 +444,9 @@ func (c *commandStream) runCommand(
 			}
 			if !c.deliverTerminal(ctx, resultPayload) {
 				slog.Error("failed to record command result", "commandID", commandID)
-				// The bypass failed too: the local state keeps the resume key
-				// so the leftover RUNNING row still resolves.
+				// The bypass failed too: the local state keeps the turn's
+				// record of what happened, but there is no resume — the
+				// manager's reaper owns the RUNNING row.
 				pendingResult = resultPayload
 				return &result
 			}

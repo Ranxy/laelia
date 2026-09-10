@@ -24,8 +24,6 @@ const _ = connect.IsAtLeastVersion1_13_0
 const (
 	// CommandServiceName is the fully-qualified name of the CommandService service.
 	CommandServiceName = "laelia.v1.CommandService"
-	// AgentStreamServiceName is the fully-qualified name of the AgentStreamService service.
-	AgentStreamServiceName = "laelia.v1.AgentStreamService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -240,9 +238,6 @@ const (
 	// CommandServiceMarkActivityDoneProcedure is the fully-qualified name of the CommandService's
 	// MarkActivityDone RPC.
 	CommandServiceMarkActivityDoneProcedure = "/laelia.v1.CommandService/MarkActivityDone"
-	// AgentStreamServiceAgentChannelProcedure is the fully-qualified name of the AgentStreamService's
-	// AgentChannel RPC.
-	AgentStreamServiceAgentChannelProcedure = "/laelia.v1.AgentStreamService/AgentChannel"
 )
 
 // CommandServiceClient is a client for the laelia.v1.CommandService service.
@@ -2315,74 +2310,4 @@ func (UnimplementedCommandServiceHandler) ListActivities(context.Context, *conne
 
 func (UnimplementedCommandServiceHandler) MarkActivityDone(context.Context, *connect.Request[v1.MarkActivityDoneRequest]) (*connect.Response[v1.MarkActivityDoneResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.MarkActivityDone is not implemented"))
-}
-
-// AgentStreamServiceClient is a client for the laelia.v1.AgentStreamService service.
-type AgentStreamServiceClient interface {
-	AgentChannel(context.Context) *connect.BidiStreamForClient[v1.AgentStreamMessage, v1.ManagerStreamMessage]
-}
-
-// NewAgentStreamServiceClient constructs a client for the laelia.v1.AgentStreamService service. By
-// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
-// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
-// connect.WithGRPC() or connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewAgentStreamServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) AgentStreamServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	agentStreamServiceMethods := v1.File_v1_command_proto.Services().ByName("AgentStreamService").Methods()
-	return &agentStreamServiceClient{
-		agentChannel: connect.NewClient[v1.AgentStreamMessage, v1.ManagerStreamMessage](
-			httpClient,
-			baseURL+AgentStreamServiceAgentChannelProcedure,
-			connect.WithSchema(agentStreamServiceMethods.ByName("AgentChannel")),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// agentStreamServiceClient implements AgentStreamServiceClient.
-type agentStreamServiceClient struct {
-	agentChannel *connect.Client[v1.AgentStreamMessage, v1.ManagerStreamMessage]
-}
-
-// AgentChannel calls laelia.v1.AgentStreamService.AgentChannel.
-func (c *agentStreamServiceClient) AgentChannel(ctx context.Context) *connect.BidiStreamForClient[v1.AgentStreamMessage, v1.ManagerStreamMessage] {
-	return c.agentChannel.CallBidiStream(ctx)
-}
-
-// AgentStreamServiceHandler is an implementation of the laelia.v1.AgentStreamService service.
-type AgentStreamServiceHandler interface {
-	AgentChannel(context.Context, *connect.BidiStream[v1.AgentStreamMessage, v1.ManagerStreamMessage]) error
-}
-
-// NewAgentStreamServiceHandler builds an HTTP handler from the service implementation. It returns
-// the path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewAgentStreamServiceHandler(svc AgentStreamServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	agentStreamServiceMethods := v1.File_v1_command_proto.Services().ByName("AgentStreamService").Methods()
-	agentStreamServiceAgentChannelHandler := connect.NewBidiStreamHandler(
-		AgentStreamServiceAgentChannelProcedure,
-		svc.AgentChannel,
-		connect.WithSchema(agentStreamServiceMethods.ByName("AgentChannel")),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/laelia.v1.AgentStreamService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case AgentStreamServiceAgentChannelProcedure:
-			agentStreamServiceAgentChannelHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
-}
-
-// UnimplementedAgentStreamServiceHandler returns CodeUnimplemented from all methods.
-type UnimplementedAgentStreamServiceHandler struct{}
-
-func (UnimplementedAgentStreamServiceHandler) AgentChannel(context.Context, *connect.BidiStream[v1.AgentStreamMessage, v1.ManagerStreamMessage]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentStreamService.AgentChannel is not implemented"))
 }

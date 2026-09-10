@@ -1,8 +1,9 @@
 // Package client hosts the machine app's manager-facing client. A machine
 // authenticates via the device-code flow (laelia-machine setup), which mints
 // its refresh token; the client then hosts many agents: it holds one
-// MachineChannel control stream for roster changes + provider discovery, and
-// opens one AgentChannel per assigned agent for that agent's drain loop. All
+// MachineChannel for roster changes, provider discovery, per-agent control
+// interactions, and workspace requests, while command data uploads and the
+// drain loop's work pull travel over unary RPCs on MachineStreamService. All
 // agents share the machine's access token and a single local daemon socket;
 // the daemon routes each CLI call to the agent named in LAELIA_AGENT.
 package client
@@ -105,11 +106,18 @@ type MachineClient struct {
 	runners   map[string]*agentRunner
 
 	// streamSendMu serializes sends on the MachineChannel bidi stream. The
-	// ping loop, the graceful-disconnect notice, and the DiscoverProviders
-	// reply (sent from the receive pump's goroutine) all call stream.Send;
-	// connect's bidi client is not safe for concurrent Send, so they go
-	// through sendStream.
+	// ping loop, the graceful-disconnect notice, the DiscoverProviders reply
+	// (sent from the receive pump's goroutine), and runner replies routed
+	// through sendOnControlStream all call stream.Send; connect's bidi client
+	// is not safe for concurrent Send, so they go through sendStream.
 	streamSendMu sync.Mutex
+
+	// controlSend is the current MachineChannel send function, installed by
+	// runControlStream for the lifetime of one connection and cleared on its
+	// end. Runner-side replies (the prompt release notice ack) send through
+	// sendOnControlStream without holding a per-connection handle.
+	controlSendMu sync.Mutex
+	controlSend   func(*v1pb.MachineStreamMessage) error
 }
 
 type ExponentialBackoff struct {
@@ -154,10 +162,9 @@ func New(managerURL, machineID, refreshToken string, insecure bool, allowHTTP bo
 
 	httpClient := &http.Client{Timeout: defaultConnectTimeout}
 
-	// Separate HTTP client for the bidi streams (MachineChannel + each
-	// AgentChannel): no global timeout (the streams are long-lived), but
-	// explicit HTTP/2 support so gRPC bidi works through proxies and TLS
-	// terminators.
+	// Separate HTTP client for the bidi stream (MachineChannel): no global
+	// timeout (the stream is long-lived), but explicit HTTP/2 support so gRPC
+	// bidi works through proxies and TLS terminators.
 	streamClient := &http.Client{}
 
 	if strings.HasPrefix(managerURL, "https://") {
@@ -533,9 +540,9 @@ func (c *MachineClient) Run(ctx context.Context) error {
 				slog.Warn("machine control stream died while heartbeat healthy, reconnecting", "error", err)
 				ticker.Stop()
 				ctrlCancel()
-				// The runners outlive connections (phase 2): each runner
-				// re-establishes its own AgentChannel, and a running turn is
-				// never interrupted by a machine-level reconnect.
+				// The runners outlive connections (phase 2): a running turn is
+				// never interrupted by a machine-level reconnect — command data
+				// and the work pull are unary RPCs with their own retry.
 				c.markDisconnected()
 				c.disconnectWithTimeout()
 				if err := c.backoff.Wait(ctx); err != nil {

@@ -232,7 +232,7 @@ func TestRunSessionReanchorInjectionAndPersistence(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, nil, "drain-1", "TestAgent", "", nil, "", nil)
+		cs.runSession(ctx, "drain-1", "TestAgent", "", nil, "", nil)
 		close(done)
 	}()
 	select {
@@ -277,7 +277,7 @@ func TestRunSessionOwnerChangeForcesReanchor(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, nil, "drain-1", "TestAgent", "New Owner", nil, "", nil)
+		cs.runSession(ctx, "drain-1", "TestAgent", "New Owner", nil, "", nil)
 		close(done)
 	}()
 	select {
@@ -315,7 +315,7 @@ func TestRunSessionInitializesContextStateForFreshAgent(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, nil, "drain-1", "FreshAgent", "", nil, "", nil)
+		cs.runSession(ctx, "drain-1", "FreshAgent", "", nil, "", nil)
 		close(done)
 	}()
 	select {

@@ -19,7 +19,7 @@ import (
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
-// agentRunner owns one agent's AgentChannel drain loop. A machine hosts one
+// agentRunner owns one agent's drain loop. A machine hosts one
 // runner per assigned agent; the runner is spawned on AgentAssignment (or on
 // connect from the assigned_agents list) and torn down on RemoveAgent. The
 // runner's runtime config is hot-reloadable via AgentConfigUpdate /
@@ -258,12 +258,14 @@ func (r *agentRunner) stopThreadSession() {
 	}
 }
 
-// start starts the runner's three long-lived loops — the uploader (command
-// data reporting), the drain loop (turn execution), and the AgentChannel
-// connect loop (control-plane link) — all bound to the runner's lifetime, not
-// to any single stream. It returns immediately; the runner's lifetime ends
-// when all loops exit (ctx cancelled). Safe to call only once per runner;
-// stop cancels and waits.
+// start starts the runner's two long-lived loops — the uploader (command data
+// reporting over the unary UploadCommandData RPC) and the drain loop (turn
+// execution, pulling work through the unary BeginSession RPC) — both bound to
+// the runner's lifetime, not to any single stream. Control-plane interactions
+// arrive on the machine's MachineChannel (routed by machine_control.go), so
+// there is no per-agent stream to reconnect. It returns immediately; the
+// runner's lifetime ends when all loops exit (ctx cancelled). Safe to call
+// only once per runner; stop cancels and waits.
 func (r *agentRunner) start(ctx context.Context) {
 	streamCtx, cancel := context.WithCancel(ctx)
 	r.cancel = cancel
@@ -284,12 +286,12 @@ func (r *agentRunner) start(ctx context.Context) {
 		defer r.machine.mu.RUnlock()
 		return r.machine.accessToken
 	}
-	cs.getSessID = func() string { return "" } // no per-agent session; AgentReady carries agent_name only
 	cs.getAcpConfig = r.currentConfig
 	cs.newSessionRuntime = r.buildRuntimeForAgent
 	cs.buildTurnBatch = func(ctx context.Context) (string, error) {
 		return chattools.BuildTurnBatch(ctx, r.daemon.BatchDeps(r.agentID))
 	}
+	cs.sendMachine = r.machine.sendOnControlStream
 	r.wireOutbox(cs)
 
 	r.mu.Lock()
@@ -298,9 +300,9 @@ func (r *agentRunner) start(ctx context.Context) {
 
 	go func() {
 		defer close(r.done)
-		// The lifecycle matrix (phase 2): the drain loop and the uploader are
-		// permanent (runner lifetime); the AgentChannel is re-established by
-		// the connector, and a stream death never touches a running turn.
+		// The lifecycle matrix (phase 2/3): the drain loop and the uploader
+		// are permanent (runner lifetime); command data and the work pull are
+		// unary RPCs, so a dead control stream never touches a running turn.
 		var wg sync.WaitGroup
 		wg.Go(func() {
 			cs.uploader.Run(streamCtx)
@@ -308,12 +310,9 @@ func (r *agentRunner) start(ctx context.Context) {
 		wg.Go(func() {
 			cs.drainLoop(streamCtx)
 		})
-		wg.Go(func() {
-			cs.connectLoop(streamCtx)
-		})
 		wg.Wait()
 	}()
-	slog.Info("opened AgentChannel for agent", "agent", r.agentName, "displayName", r.displayName)
+	slog.Info("started agent runner", "agent", r.agentName, "displayName", r.displayName)
 }
 
 // wireOutbox opens the agent's durable outbox and its uploader. The outbox
@@ -376,8 +375,8 @@ func (r *agentRunner) coordinateInFlightTurn() {
 // coldRestart force-cold-restarts this agent's LLM session: it cancels any
 // in-flight turn, clears the persisted session state files (acp-session.json /
 // pi-session.json), and restarts the long-lived runtime so the next turn
-// starts from a fresh cold start (re-sends the init prompt). The runner and
-// AgentChannel stay alive; only the LLM conversation context is dropped.
+// starts from a fresh cold start (re-sends the init prompt). The runner stays
+// alive; only the LLM conversation context is dropped.
 func (r *agentRunner) coldRestart() {
 	// 1. Cancel any in-flight turn and wait (bounded) so the restart never
 	// races the dying turn's session access.
@@ -629,7 +628,9 @@ func (c *MachineClient) spawnAssignedAgents(ctx context.Context, assignments []*
 
 // spawnOrUpdate is the single entry point for "the manager wants this agent
 // hosted with this assignment": it creates a runner if none exists, otherwise
-// hot-reloads the existing runner's config + display name.
+// hot-reloads the existing runner's config + display name. Either path kicks
+// the runner's drain loop, so a fresh spawn (or a reconnect's roster
+// reconcile) discovers pending work immediately.
 func (c *MachineClient) spawnOrUpdate(ctx context.Context, a *v1pb.AgentAssignment) {
 	if a == nil || a.GetAgentName() == "" {
 		return
@@ -641,6 +642,9 @@ func (c *MachineClient) spawnOrUpdate(ctx context.Context, a *v1pb.AgentAssignme
 		c.runnersMu.Unlock()
 		existing.displayName = a.GetAgentDisplayName()
 		existing.applyAssignment(a)
+		if cs := existing.currentCommandStream(); cs != nil {
+			cs.wake()
+		}
 		slog.Info("hot-reloaded agent assignment", "agent", a.GetAgentName())
 		return
 	}

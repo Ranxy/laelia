@@ -155,7 +155,7 @@ type MachineServiceClient interface {
 	ListMachineWorkspaces(context.Context, *connect.Request[v1.ListMachineWorkspacesRequest]) (*connect.Response[v1.ListMachineWorkspacesResponse], error)
 	// Machine initial connection using a registration token. Returns access +
 	// refresh tokens, the machine session id, and the full list of agents the
-	// machine must host (so the machine app can open an AgentChannel for each).
+	// machine must host (so the machine app can start a runner for each).
 	ConnectMachine(context.Context, *connect.Request[v1.ConnectMachineRequest]) (*connect.Response[v1.ConnectMachineResponse], error)
 	MachineHeartbeat(context.Context, *connect.Request[v1.MachineHeartbeatRequest]) (*connect.Response[v1.MachineHeartbeatResponse], error)
 	MachineDisconnect(context.Context, *connect.Request[v1.MachineDisconnectRequest]) (*connect.Response[emptypb.Empty], error)
@@ -432,7 +432,7 @@ type MachineServiceHandler interface {
 	ListMachineWorkspaces(context.Context, *connect.Request[v1.ListMachineWorkspacesRequest]) (*connect.Response[v1.ListMachineWorkspacesResponse], error)
 	// Machine initial connection using a registration token. Returns access +
 	// refresh tokens, the machine session id, and the full list of agents the
-	// machine must host (so the machine app can open an AgentChannel for each).
+	// machine must host (so the machine app can start a runner for each).
 	ConnectMachine(context.Context, *connect.Request[v1.ConnectMachineRequest]) (*connect.Response[v1.ConnectMachineResponse], error)
 	MachineHeartbeat(context.Context, *connect.Request[v1.MachineHeartbeatRequest]) (*connect.Response[v1.MachineHeartbeatResponse], error)
 	MachineDisconnect(context.Context, *connect.Request[v1.MachineDisconnectRequest]) (*connect.Response[emptypb.Empty], error)
