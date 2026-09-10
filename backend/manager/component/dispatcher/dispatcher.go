@@ -19,42 +19,19 @@ import (
 )
 
 const (
-	gracePeriod    = 60 * time.Second
 	graceDBTimeout = 10 * time.Second
 	watcherBufSize = 256
 )
-
-type SendFunc func(*v1pb.ManagerStreamMessage) error
 
 // MachineSendFunc is the raw send function for a machine's MachineChannel
 // control stream (manager→machine direction).
 type MachineSendFunc func(*v1pb.ManagerMachineStreamMessage) error
 
-type AgentSession struct {
-	agentID         int
-	agentResourceID string
-	// machineID is the id of the machine this agent's AgentChannel belongs to.
-	// Set at RegisterAgent; 0 for legacy/unbound agents. Used by UnregisterMachine
-	// to invalidate every agent session owned by a disconnecting machine.
-	machineID    int
-	currentCmdID string
-	// send is the raw bidi-stream send function. It is nil once the session is
-	// invalidated (agent disconnected or replaced). Stored in an atomic pointer
-	// so RegisterAgent/UnregisterAgent (writers) and deliver (reader) never race
-	// on the field — previously `send` was written under sess.mu and read under
-	// sendMu, a data race on the same field.
-	send        atomic.Pointer[SendFunc]
-	sendMu      sync.Mutex // serializes concurrent sends on the same bidi stream
-	lastPingAt  time.Time
-	connectedAt time.Time
-	mu          sync.Mutex // guards currentCmdID, lastPingAt, connectedAt
-}
-
 // MachineSession is the manager-side handle on a connected machine's
-// MachineChannel control stream. Mirrors AgentSession: the machine app
-// authenticates once and holds this stream for its lifetime; per-agent
-// AgentChannels register separately (keyed by agentID) but carry the machineID
-// so a machine disconnect invalidates all of them.
+// MachineChannel control stream. The machine app authenticates once and holds
+// this stream for its lifetime; command data flows over the unary
+// UploadCommandData RPC and agent control interactions are routed through this
+// stream, so no per-agent session is registered.
 type MachineSession struct {
 	machineID         int
 	machineResourceID string
@@ -80,26 +57,6 @@ func (s *MachineSession) Send(msg *v1pb.ManagerMachineStreamMessage) error {
 	return s.deliver(msg)
 }
 
-// deliver sends msg to the agent, serializing concurrent sends on the stream
-// and returning an error if the session has been invalidated. All outbound
-// messages route through this single path so the underlying stream send is
-// never called concurrently (gRPC bidi sends are not safe for concurrent use).
-func (s *AgentSession) deliver(msg *v1pb.ManagerStreamMessage) error {
-	s.sendMu.Lock()
-	defer s.sendMu.Unlock()
-	fn := s.send.Load()
-	if fn == nil {
-		return errors.New("agent session invalidated")
-	}
-	return (*fn)(msg)
-}
-
-// Send sends a message to the agent over its bidi stream. It is safe for
-// concurrent use (e.g. from the Phase 2 held-action re-prompt path).
-func (s *AgentSession) Send(msg *v1pb.ManagerStreamMessage) error {
-	return s.deliver(msg)
-}
-
 // Dispatcher routes control messages to connected agents/machines and fans
 // out live command output/events. It must be constructed via New; the zero
 // value is not usable because the registry, bus, and activity aggregator are
@@ -115,35 +72,34 @@ type Dispatcher struct {
 	pingTimeout  time.Duration
 
 	// lifecycleCtx is the parent context for the ping monitor and the
-	// grace-period goroutines. Stop cancels it and waits on wg, so shutdown
-	// joins every dispatcher-spawned goroutine instead of leaving the ping
-	// ticker running for the process lifetime.
+	// background goroutines (upload terminal cleanup). Stop cancels it and
+	// waits on wg, so shutdown joins every dispatcher-spawned goroutine instead
+	// of leaving the ping ticker running for the process lifetime.
 	lifecycleCtx    context.Context
 	lifecycleCancel context.CancelFunc
 	wg              sync.WaitGroup
 	// wgMu serializes wg.Add against wg.Wait. Stop may call Wait while a
-	// stream teardown is concurrently arming a grace goroutine; guarding both
-	// operations avoids the WaitGroup "Add concurrent with Wait" misuse.
+	// terminal broadcast is concurrently arming a watcher-close goroutine;
+	// guarding both operations avoids the WaitGroup "Add concurrent with
+	// Wait" misuse.
 	wgMu sync.Mutex
 
-	// grace tracks in-flight grace-period timers keyed by agent then command,
-	// so a reconnect can cancel a pending "mark FAILED" timer for that agent
-	// (the reconnect path reaps stale commands itself). Without this, a
-	// reconnect racing the 60s timer could mark a command FAILED out from
-	// under the new session.
-	graceMu sync.Mutex
-	grace   map[int]map[string]context.CancelFunc
+	// tracker records each agent's current in-flight drain command id. The
+	// per-agent session registry is retired; this map is what survives of it —
+	// it powers the conversation activity feed's "working on" link. Set at
+	// BeginSession (mint) and cleared when the terminal result is acked.
+	tracker commandTracker
 
 	// pendingDiscovers correlates DiscoverProviders request/response round trips
-	// over the bidi command stream. Used by the unary RefreshAgentProviders RPC
-	// to do a request/response round trip over the bidi command stream.
+	// over the machine control stream. Used by the unary RefreshAgentProviders RPC
+	// to do a request/response round trip over the machine control stream.
 	pendingDiscovers *pendingReplies[*v1pb.ProvidersDiscovered]
 	// pendingModels correlates DiscoverModels request/response round trips over
 	// the machine control stream to their waiting unary RefreshAgentModels calls.
 	pendingModels *pendingReplies[*v1pb.ModelsDiscovered]
 
 	// pendingWorkspace* correlate the workspace request/response round trips
-	// over the per-agent and machine control bidi streams to their waiting
+	// over the machine control stream to their waiting
 	// unary RPCs (ListAgentWorkspace / ReadAgentWorkspaceFile /
 	// ListMachineWorkspaces).
 	pendingWorkspaceLists *pendingReplies[*v1pb.WorkspaceListResponse]
@@ -166,7 +122,6 @@ func New(s *store.Store) *Dispatcher {
 		bus:                   newCommandBus(),
 		pingInterval:          15 * time.Second,
 		pingTimeout:           45 * time.Second,
-		grace:                 make(map[int]map[string]context.CancelFunc),
 		pendingDiscovers:      newPendingReplies[*v1pb.ProvidersDiscovered](),
 		pendingModels:         newPendingReplies[*v1pb.ModelsDiscovered](),
 		pendingWorkspaceLists: newPendingReplies[*v1pb.WorkspaceListResponse](),
@@ -176,7 +131,7 @@ func New(s *store.Store) *Dispatcher {
 		lifecycleCtx:          ctx,
 		lifecycleCancel:       cancel,
 	}
-	d.activity = &activityAggregator{store: s, registry: registry}
+	d.activity = &activityAggregator{store: s, dispatcher: d}
 	return d
 }
 
@@ -187,26 +142,41 @@ func (d *Dispatcher) sendToMachine(machineID int, msg *v1pb.ManagerMachineStream
 	return d.registry.sendToMachine(machineID, msg)
 }
 
-// SendPromptReleaseNotice pushes a system-prompt release notice to a connected
-// agent's AgentChannel so it can inject the change into the current or next
-// turn. Best-effort: if the agent is offline the notice is recovered on the
+// SendPromptReleaseNotice pushes a system-prompt release notice to an agent's
+// machine control stream so it can inject the change into the current or next
+// turn. Best-effort: if the machine is offline the notice is recovered on the
 // next BeginSession via the prompt_version comparison.
 func (d *Dispatcher) SendPromptReleaseNotice(agentID int, notice *v1pb.PromptReleaseNotice) error {
 	if notice == nil {
 		return nil
 	}
-	sess, ok := d.registry.getAgent(agentID)
-	if !ok {
-		return errors.New("agent is not connected")
+	agent, err := d.resolveAgent(agentID)
+	if err != nil {
+		return err
 	}
-	return d.sendToMachine(sess.machineID, &v1pb.ManagerMachineStreamMessage{
-		Message: &v1pb.ManagerMachineStreamMessage_AgentControl{
-			AgentControl: &v1pb.AgentControlRequest{
-				AgentName: common.FormatAgentUID(sess.agentResourceID),
-				Control:   &v1pb.AgentControlRequest_PromptNotice{PromptNotice: notice},
-			},
-		},
+	return d.sendAgentControl(agent, &v1pb.AgentControlRequest{
+		Control: &v1pb.AgentControlRequest_PromptNotice{PromptNotice: notice},
 	})
+}
+
+// resolveAgent loads one live (non-deleted, machine-bound) agent for control
+// routing. The per-agent session registry is retired, so the store is the
+// source of the agent→machine binding.
+func (d *Dispatcher) resolveAgent(agentID int) (*store.AgentMessage, error) {
+	if d.store == nil {
+		return nil, errors.New("agent is not connected")
+	}
+	agent, err := d.store.GetAgent(d.lifecycleCtx, agentID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load agent")
+	}
+	if agent == nil || agent.Deleted {
+		return nil, errors.Errorf("agent %d not found", agentID)
+	}
+	if agent.MachineID == 0 {
+		return nil, errors.New("agent is not bound to a machine")
+	}
+	return agent, nil
 }
 
 // HandlePromptReleaseNoticeAck records that an agent saw a prompt release
@@ -298,7 +268,7 @@ func (d *Dispatcher) PushPromptReleaseNoticeToMachine(ctx context.Context, machi
 }
 
 // SendAgentAssignment pushes a new agent assignment to the machine so it opens
-// an AgentChannel for that agent. Best-effort: if the machine is offline the
+// a runner for that agent. Best-effort: if the machine is offline the
 // agent is picked up from the assigned_agents list on the next ConnectMachine.
 func (d *Dispatcher) SendAgentAssignment(machineID int, assignment *v1pb.AgentAssignment) error {
 	return d.sendToMachine(machineID, &v1pb.ManagerMachineStreamMessage{
@@ -390,9 +360,9 @@ func (d *Dispatcher) CancelPendingDiscover(requestID string) {
 }
 
 // CompletePendingDiscover delivers a ProvidersDiscovered reply to the waiting
-// caller and removes the pending entry. Called from the bidi receive loop when
-// the agent replies. Unknown request ids (late replies, already-cancelled
-// callers) are dropped silently.
+// caller and removes the pending entry. Called from the MachineChannel
+// receive loop when the agent replies. Unknown request ids (late replies,
+// already-cancelled callers) are dropped silently.
 func (d *Dispatcher) CompletePendingDiscover(msg *v1pb.ProvidersDiscovered) {
 	if msg == nil {
 		return
@@ -430,7 +400,7 @@ func (d *Dispatcher) CancelPendingModels(requestID string) {
 }
 
 // CompletePendingModels delivers a ModelsDiscovered reply to the waiting caller
-// and removes the pending entry. Called from the machine bidi receive loop.
+// and removes the pending entry. Called from the MachineChannel receive loop.
 // Unknown request ids (late replies, already-cancelled callers) are dropped.
 func (d *Dispatcher) CompletePendingModels(msg *v1pb.ModelsDiscovered) {
 	if msg == nil {
@@ -485,40 +455,54 @@ func (d *Dispatcher) SendDiscoverProviders(agentID int, requestID string) error 
 	return d.SendDiscoverProvidersToMachine(agent.MachineID, requestID)
 }
 
-// SendWorkspaceListRequest asks the agent daemon to list one directory level of
-// its workspace. The reply resolves a pending entry registered via
+// SendWorkspaceListRequest asks the agent's machine to list one directory level
+// of the agent's workspace. The reply resolves a pending entry registered via
 // RegisterPendingWorkspaceList.
 func (d *Dispatcher) SendWorkspaceListRequest(agentID int, requestID, dirPath string, includeHidden bool) error {
-	sess, ok := d.registry.getAgent(agentID)
-	if !ok {
-		return errors.New("agent is not connected")
+	agent, err := d.resolveAgent(agentID)
+	if err != nil {
+		return err
 	}
-	return d.sendToMachine(sess.machineID, &v1pb.ManagerMachineStreamMessage{
+	return d.sendWorkspaceListRequestTo(agent, requestID, dirPath, includeHidden)
+}
+
+// sendWorkspaceListRequestTo routes one workspace listing request to the
+// agent's machine. Split from SendWorkspaceListRequest so the routing shape
+// (agent_name on the machine stream) is unit-testable without a store.
+func (d *Dispatcher) sendWorkspaceListRequestTo(agent *store.AgentMessage, requestID, dirPath string, includeHidden bool) error {
+	return d.sendToMachine(agent.MachineID, &v1pb.ManagerMachineStreamMessage{
 		Message: &v1pb.ManagerMachineStreamMessage_WorkspaceListRequest{
 			WorkspaceListRequest: &v1pb.WorkspaceListRequest{
 				RequestId:     requestID,
 				DirPath:       dirPath,
 				IncludeHidden: includeHidden,
-				AgentName:     common.FormatAgentUID(sess.agentResourceID),
+				AgentName:     common.FormatAgentUID(agent.ResourceID),
 			},
 		},
 	})
 }
 
-// SendWorkspaceReadRequest asks the agent daemon to read one workspace file for
-// preview. The reply resolves a pending entry registered via
+// SendWorkspaceReadRequest asks the agent's machine to read one workspace file
+// for preview. The reply resolves a pending entry registered via
 // RegisterPendingWorkspaceRead.
 func (d *Dispatcher) SendWorkspaceReadRequest(agentID int, requestID, path string) error {
-	sess, ok := d.registry.getAgent(agentID)
-	if !ok {
-		return errors.New("agent is not connected")
+	agent, err := d.resolveAgent(agentID)
+	if err != nil {
+		return err
 	}
-	return d.sendToMachine(sess.machineID, &v1pb.ManagerMachineStreamMessage{
+	return d.sendWorkspaceReadRequestTo(agent, requestID, path)
+}
+
+// sendWorkspaceReadRequestTo routes one workspace file read to the agent's
+// machine. Split from SendWorkspaceReadRequest for the same reason as its list
+// counterpart.
+func (d *Dispatcher) sendWorkspaceReadRequestTo(agent *store.AgentMessage, requestID, path string) error {
+	return d.sendToMachine(agent.MachineID, &v1pb.ManagerMachineStreamMessage{
 		Message: &v1pb.ManagerMachineStreamMessage_WorkspaceReadRequest{
 			WorkspaceReadRequest: &v1pb.WorkspaceReadRequest{
 				RequestId: requestID,
 				Path:      path,
-				AgentName: common.FormatAgentUID(sess.agentResourceID),
+				AgentName: common.FormatAgentUID(agent.ResourceID),
 			},
 		},
 	})
@@ -536,7 +520,7 @@ func (d *Dispatcher) SendMachineWorkspaceScan(machineID int, requestID string) e
 }
 
 // RegisterPendingWorkspaceList creates a response channel for an in-flight
-// ListAgentWorkspace round trip over the agent's bidi stream.
+// ListAgentWorkspace round trip over the machine control stream.
 func (d *Dispatcher) RegisterPendingWorkspaceList(requestID string) chan *v1pb.WorkspaceListResponse {
 	return d.pendingWorkspaceLists.register(requestID)
 }
@@ -548,7 +532,7 @@ func (d *Dispatcher) CancelPendingWorkspaceList(requestID string) {
 }
 
 // CompletePendingWorkspaceList delivers a WorkspaceListResponse to the waiting
-// ListAgentWorkspace caller. Called from the AgentChannel receive loop.
+// ListAgentWorkspace caller. Called from the MachineChannel receive loop.
 func (d *Dispatcher) CompletePendingWorkspaceList(msg *v1pb.WorkspaceListResponse) {
 	if msg == nil {
 		return
@@ -557,7 +541,7 @@ func (d *Dispatcher) CompletePendingWorkspaceList(msg *v1pb.WorkspaceListRespons
 }
 
 // RegisterPendingWorkspaceRead creates a response channel for an in-flight
-// ReadAgentWorkspaceFile round trip over the agent's bidi stream.
+// ReadAgentWorkspaceFile round trip over the machine control stream.
 func (d *Dispatcher) RegisterPendingWorkspaceRead(requestID string) chan *v1pb.WorkspaceReadResponse {
 	return d.pendingWorkspaceReads.register(requestID)
 }
@@ -569,7 +553,7 @@ func (d *Dispatcher) CancelPendingWorkspaceRead(requestID string) {
 }
 
 // CompletePendingWorkspaceRead delivers a WorkspaceReadResponse to the waiting
-// ReadAgentWorkspaceFile caller. Called from the AgentChannel receive loop.
+// ReadAgentWorkspaceFile caller. Called from the MachineChannel receive loop.
 func (d *Dispatcher) CompletePendingWorkspaceRead(msg *v1pb.WorkspaceReadResponse) {
 	if msg == nil {
 		return
@@ -607,63 +591,25 @@ func (d *Dispatcher) CompletePendingMachineWorkspaceScan(msg *v1pb.MachineWorksp
 // the link is filled in when the agent reads a channel (commits to working on
 // it) — see CommandService.ListConversationMessages.
 func (d *Dispatcher) CurrentCommandID(agentID int) string {
-	sess, ok := d.registry.getAgent(agentID)
-	if !ok {
-		return ""
-	}
-	sess.mu.Lock()
-	defer sess.mu.Unlock()
-	return sess.currentCmdID
+	return d.tracker.get(agentID)
 }
 
 // HandleBeginSession serves an agent's request to start a new autonomous
-// processing session. A leftover RUNNING command is an interrupted turn: the
-// drain loop is strictly serial per agent, so BeginSession only arrives
-// between turns, and a RUNNING row at that point means the previous turn's
-// stream died mid-flight (the machine keeps the command id in its local
-// state). The manager resumes it under the SAME command id instead of failing
-// it — a proxy that bounds request read time (e.g. Traefik's default 60s)
-// then costs the agent one in-flight step per interruption instead of the
-// whole command. With no leftover, the manager checks the agent's durable
-// per-channel cursors: if no conversation has room_version beyond the cursor,
-// it replies idle=true and the agent stays idle; otherwise it creates a
-// RUNNING command (the session's execution/event anchor, linked to a
-// conversation later via AckProcessedVersion) and replies with its command_id.
+// processing session — the drain loop's pull of its next unit of work. If no
+// conversation has room_version beyond the agent's durable cursor (and no
+// reminder is due) the reply is idle=true and the agent stays idle; otherwise
+// a RUNNING command is minted (the session's execution/event anchor, linked to
+// a conversation later via AckProcessedVersion) and its id is returned.
+//
+// A leftover RUNNING command is deliberately NOT resumed, reaped, or rejected
+// here (design §3.6 rule 5): the per-agent outbox barrier guarantees the
+// previous turn's records — including its terminal — are uploaded and acked
+// before this pull arrives, so a RUNNING row at this point belongs to another
+// machine (cross-machine reassignment) or to a machine that has not finished
+// uploading its terminal. Minting proceeds normally; the stale-command reaper
+// closes a truly lost command after the machine-loss grace and the
+// late-result regrade rules keep both paths consistent.
 func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb.BeginSessionResponse, error) {
-	runningStatus := int32(v1pb.CommandStatus_RUNNING)
-	running, err := d.store.ListCommands(ctx, &store.FindCommandMessage{AgentID: &agentID, Status: &runningStatus})
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to list running commands")
-	}
-	if len(running) > 0 {
-		agent, err := d.store.GetAgent(ctx, agentID)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get agent")
-		}
-		if agent == nil {
-			return nil, errors.New("agent not found")
-		}
-		if resume := pickResumeCommand(agent, running); resume != nil {
-			for _, cmd := range running {
-				if cmd.ID != resume.ID {
-					d.reapCommand(ctx, cmd)
-				}
-			}
-			if sess, ok := d.registry.getAgent(agentID); ok {
-				sess.mu.Lock()
-				sess.currentCmdID = resume.ID.String()
-				sess.mu.Unlock()
-			}
-			slog.Info("agent session resumed", "commandID", resume.ID, "agentID", agentID)
-			return d.sessionResponse(ctx, agent, resume.ID.String())
-		}
-		// A stopped or runtime-incapable agent cannot resume the interrupted
-		// turn: reap the leftovers so they do not outlive this BeginSession.
-		for _, cmd := range running {
-			d.reapCommand(ctx, cmd)
-		}
-	}
-
 	hasUpdates, err := d.store.HasUpdates(ctx, agentID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to check channel updates")
@@ -712,12 +658,7 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 		slog.Error("failed to mark session command RUNNING", "commandID", cmd.ID, "error", err)
 	}
 
-	sess, ok := d.registry.getAgent(agentID)
-	if ok {
-		sess.mu.Lock()
-		sess.currentCmdID = cmd.ID.String()
-		sess.mu.Unlock()
-	}
+	d.tracker.set(agentID, cmd.ID.String())
 
 	slog.Info("agent session begun", "commandID", cmd.ID, "agentID", agentID)
 
@@ -813,31 +754,12 @@ func buildPromptVersion(ownerDisplayName string, team *v1pb.TeamContext, agent *
 	return static + "." + dynamic
 }
 
-// agentStopped reports whether the agent has been stopped (StopAgent). A
-// stopped agent is still connectable but must not process session messages;
-// the notification methods skip delivery so it never begins a session.
-func (d *Dispatcher) agentStopped(ctx context.Context, agentID int) bool {
-	if d.store == nil {
-		return false
-	}
-	agent, err := d.store.GetAgent(ctx, agentID)
-	return err != nil || agent == nil || !agent.Enabled
-}
-
-// NotifyNewMessages pushes a NewMessagesAvailable hint to a connected agent so
-// it knows the conversation has advanced (e.g. another participant posted).
-// Phase 1 primarily calls this after assistant replies so multi-agent channels
-// can be informed; the action-less agent-autonomy gate arrives in Phase 2.
+// NotifyNewMessages pushes a NewMessagesAvailable hint to an agent whose
+// machine is connected, so it knows the conversation has advanced (e.g.
+// another participant posted). Best-effort: a dropped wake is recovered by the
+// next BeginSession's cursor comparison.
 func (d *Dispatcher) NotifyNewMessages(ctx context.Context, agentID int, conversationID string, version int64) {
-	// A stopped agent must not be woken to process messages.
-	if d.agentStopped(ctx, agentID) {
-		return
-	}
-	sess, ok := d.registry.getAgent(agentID)
-	if !ok {
-		return
-	}
-	d.notifyAgent(sess, &v1pb.AgentControlRequest{
+	d.notifyAgent(ctx, agentID, &v1pb.AgentControlRequest{
 		Control: &v1pb.AgentControlRequest_Wake{
 			Wake: &v1pb.NewMessagesAvailable{
 				ConversationIds: []string{conversationID},
@@ -848,35 +770,44 @@ func (d *Dispatcher) NotifyNewMessages(ctx context.Context, agentID int, convers
 }
 
 // notifyAgent pushes one per-agent control interaction through the agent's
-// machine control stream. Best-effort: a failed send only logs (a dropped wake
-// is recovered by the next BeginSession's cursor comparison, a dropped notice
-// by the prompt-version comparison). The request's agent_name is filled here.
-func (d *Dispatcher) notifyAgent(sess *AgentSession, req *v1pb.AgentControlRequest) {
-	req.AgentName = common.FormatAgentUID(sess.agentResourceID)
-	msg := &v1pb.ManagerMachineStreamMessage{
+// machine control stream. Silent skips for anything that cannot receive it: a
+// stopped/deleted agent must not be woken, and an offline machine's wake is
+// recovered by the next BeginSession's cursor comparison (a notice by the
+// prompt-version comparison).
+func (d *Dispatcher) notifyAgent(ctx context.Context, agentID int, req *v1pb.AgentControlRequest) {
+	if d.store == nil {
+		return
+	}
+	agent, err := d.store.GetAgent(ctx, agentID)
+	if err != nil || agent == nil || agent.Deleted || agent.MachineID == 0 || !agent.Enabled {
+		return
+	}
+	if !d.IsMachineConnected(agent.MachineID) {
+		return
+	}
+	if err := d.sendAgentControl(agent, req); err != nil {
+		slog.Warn("failed to deliver agent control push", "agentID", agentID, "error", err)
+	}
+}
+
+// sendAgentControl routes one agent control interaction to the agent's
+// machine control stream, filling in the agent name the machine-side router
+// dispatches on. The machine must be connected; the store resolves the
+// agent→machine binding (the per-agent session registry is retired).
+func (d *Dispatcher) sendAgentControl(agent *store.AgentMessage, req *v1pb.AgentControlRequest) error {
+	req.AgentName = common.FormatAgentUID(agent.ResourceID)
+	return d.sendToMachine(agent.MachineID, &v1pb.ManagerMachineStreamMessage{
 		Message: &v1pb.ManagerMachineStreamMessage_AgentControl{AgentControl: req},
-	}
-	if err := d.sendToMachine(sess.machineID, msg); err != nil {
-		slog.Warn("failed to deliver agent control push", "agentID", sess.agentID, "error", err)
-	}
+	})
 }
 
 // NotifyWake sends an empty NewMessagesAvailable to a connected agent as a
 // best-effort "check for work" tick. The agent's drain loop responds by calling
 // BeginSession, which authoritatively checks the per-channel cursors; the wake
-// itself carries no payload. Used on reconnect and (via NotifyNewMessages) when
-// any message lands in a conversation the agent is a member of.
+// itself carries no payload. Used (via NotifyNewMessages) when any message
+// lands in a conversation the agent is a member of.
 func (d *Dispatcher) NotifyWake(ctx context.Context, agentID int) {
-	// A stopped agent must not be woken to check for work.
-	if d.agentStopped(ctx, agentID) {
-		return
-	}
-	sess, ok := d.registry.getAgent(agentID)
-	if !ok {
-		return
-	}
-
-	d.notifyAgent(sess, &v1pb.AgentControlRequest{
+	d.notifyAgent(ctx, agentID, &v1pb.AgentControlRequest{
 		Control: &v1pb.AgentControlRequest_Wake{Wake: &v1pb.NewMessagesAvailable{}},
 	})
 }
@@ -887,16 +818,7 @@ func (d *Dispatcher) NotifyWake(ctx context.Context, agentID int) {
 // agent's durable cursor (advanced via ListThreadUpdates + AckProcessedVersion)
 // is the source of truth, so a missed wake is recovered on reconnect.
 func (d *Dispatcher) NotifyThreadMention(ctx context.Context, agentID int, conversationID string, version int64, threadRootMessageID string) {
-	// A stopped agent must not be woken to process a thread mention.
-	if d.agentStopped(ctx, agentID) {
-		return
-	}
-	sess, ok := d.registry.getAgent(agentID)
-	if !ok {
-		return
-	}
-
-	d.notifyAgent(sess, &v1pb.AgentControlRequest{
+	d.notifyAgent(ctx, agentID, &v1pb.AgentControlRequest{
 		Control: &v1pb.AgentControlRequest_Wake{
 			Wake: &v1pb.NewMessagesAvailable{
 				ConversationIds:     []string{conversationID},

@@ -23,6 +23,16 @@ const (
 	CommandStatusTimeout   int32 = 6
 )
 
+// Command failure kinds explain why a command is FAILED (empty otherwise).
+// machine_unreachable rows are re-gradable: the reap was the manager's
+// machine-loss timeout guess, and a late terminal from the machine can
+// re-grade the command (design §3.6 rule 2). agent_failed rows carry the
+// machine's own verdict and are never re-graded.
+const (
+	CommandFailureKindMachineUnreachable = "machine_unreachable"
+	CommandFailureKindAgentFailed        = "agent_failed"
+)
+
 type CommandMessage struct {
 	ID              uuid.UUID
 	AgentID         int
@@ -549,22 +559,6 @@ func (s *Store) GetCommandEvents(ctx context.Context, cmdID uuid.UUID, afterSeq 
 	return events, nil
 }
 
-func (s *Store) GetNextPendingCommand(ctx context.Context, agentID int) (*CommandMessage, error) {
-	query := `SELECT
-		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.allow_diff, c.status,
-		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
-		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
-		c.conversation_id, COALESCE(p.name, ''), a.resource_id
-	FROM command c
-	JOIN agent a ON a.id = c.agent_id
-	JOIN principal p ON p.id = c.principal_id
-	WHERE c.agent_id = $1 AND c.status = 1
-	ORDER BY c.created_at ASC
-	LIMIT 1`
-
-	return scanCommand(s.GetDB().QueryRowContext(ctx, query, agentID))
-}
-
 func (s *Store) GetRunningCommand(ctx context.Context, agentID int) (*CommandMessage, error) {
 	query := `SELECT
 		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.allow_diff, c.status,
@@ -641,22 +635,23 @@ func (s *Store) ListPendingCommandsByAgent(ctx context.Context, agentID int) ([]
 	return commands, nil
 }
 
-// failStaleRunningCommandSQL reaps ONE running command. The status predicate
-// is the reap guard: a result that landed between the reaper's list and this
-// update (status COMPLETED/FAILED) can never be overwritten by the reaper.
-const failStaleRunningCommandSQL = `
-	UPDATE command SET status = $1, completed_at = $2, error_message = $3
-	WHERE id = $4 AND status = $5
+// reapRunningCommandSQL reaps ONE running command. The status predicate is the
+// reap guard: a result that landed between the reaper's list and this update
+// (status COMPLETED/FAILED) can never be overwritten by the reaper.
+const reapRunningCommandSQL = `
+	UPDATE command SET status = $1, completed_at = $2, error_message = $3, failure_kind = $4
+	WHERE id = $5 AND status = $6
 	RETURNING id
 `
 
-// FailStaleRunningCommand marks a single RUNNING command FAILED. It reports
-// whether the row was still RUNNING (and therefore reaped) so the caller can
-// skip bookkeeping for commands that finished concurrently.
-func (s *Store) FailStaleRunningCommand(ctx context.Context, commandID uuid.UUID, completedAt time.Time, errorMsg string) (bool, error) {
+// ReapRunningCommand marks a single RUNNING command FAILED with the given
+// failure kind. It reports whether the row was still RUNNING (and therefore
+// reaped) so the caller can skip bookkeeping for commands that finished
+// concurrently.
+func (s *Store) ReapRunningCommand(ctx context.Context, commandID uuid.UUID, completedAt time.Time, errorMsg, failureKind string) (bool, error) {
 	var id uuid.UUID
-	err := s.GetDB().QueryRowContext(ctx, failStaleRunningCommandSQL,
-		CommandStatusFailed, completedAt, errorMsg, commandID, CommandStatusRunning).Scan(&id)
+	err := s.GetDB().QueryRowContext(ctx, reapRunningCommandSQL,
+		CommandStatusFailed, completedAt, errorMsg, failureKind, commandID, CommandStatusRunning).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
@@ -725,4 +720,48 @@ func (s *Store) GetRunningCommandsForConversation(ctx context.Context, agentIDs 
 		return nil, errors.Wrapf(err, "failed to iterate running commands")
 	}
 	return result, nil
+}
+
+// CancelledCommand is one command CancelRunningCommandsForMachine flipped to
+// CANCELED: the id identifies the row, AgentID feeds the pending-control
+// queue.
+type CancelledCommand struct {
+	ID      uuid.UUID
+	AgentID int
+}
+
+// cancelRunningForMachineSQL force-cancels a machine's in-flight commands
+// (PENDING/RUNNING only — terminal and already-cancelled rows are untouched).
+const cancelRunningForMachineSQL = `
+	UPDATE command
+	SET status = $1
+	WHERE COALESCE(machine_id, 0) = $2 AND status IN ($3, $4)
+	RETURNING id, agent_id
+`
+
+// CancelRunningCommandsForMachine marks every in-flight command of a machine
+// CANCELED and returns the flipped rows. Used by ForceDisconnectMachine
+// (design §五 decision ⑦): the CANCELED anchor makes any late terminal
+// non-regressing, and the returned rows are enqueued as cancel interactions so
+// the machine's still-running turns are stopped at its next connect.
+func (s *Store) CancelRunningCommandsForMachine(ctx context.Context, machineID int) ([]*CancelledCommand, error) {
+	rows, err := s.GetDB().QueryContext(ctx, cancelRunningForMachineSQL,
+		CommandStatusCancelled, machineID, CommandStatusPending, CommandStatusRunning)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to cancel running commands for machine")
+	}
+	defer rows.Close()
+
+	var out []*CancelledCommand
+	for rows.Next() {
+		cc := &CancelledCommand{}
+		if err := rows.Scan(&cc.ID, &cc.AgentID); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan cancelled command row")
+		}
+		out = append(out, cc)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate cancelled command rows")
+	}
+	return out, nil
 }

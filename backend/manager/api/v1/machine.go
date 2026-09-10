@@ -43,7 +43,7 @@ const machineRefreshRotateWindow = 10 * 24 * time.Hour
 // stay connected. A machine authenticates through the device-code flow
 // (DeviceService): the manager mints its refresh token at approval time and
 // the machine reconnects with access tokens issued by RefreshMachineToken.
-// Each machine hosts one or more agents, each running its own AgentChannel
+// Each machine hosts one or more agents, each running its own runner
 // over the machine's access token.
 type MachineService struct {
 	v1connect.UnimplementedMachineServiceHandler
@@ -446,8 +446,9 @@ func (s *MachineService) TransferMachineOwnership(ctx context.Context, req *conn
 // machine).
 
 // ForceDisconnectMachine terminates all machine sessions, marks the machine
-// OFFLINE, and tears down the dispatcher's machine + agent sessions (failing
-// in-flight commands after the 60s grace).
+// OFFLINE, tears down its MachineChannel, and anchors every in-flight command
+// CANCELED (with a queued cancel so its still-running turns stop at the
+// machine's next connect — see decision ⑦ of the command resilience design).
 func (s *MachineService) ForceDisconnectMachine(ctx context.Context, req *connect.Request[v1pb.ForceDisconnectMachineRequest]) (*connect.Response[emptypb.Empty], error) {
 	resourceID, err := common.GetMachineResourceID(req.Msg.Name)
 	if err != nil {
@@ -483,6 +484,21 @@ func (s *MachineService) ForceDisconnectMachine(ctx context.Context, req *connec
 		Status: &storepb.MachineStatus{State: storepb.MachineStatus_OFFLINE},
 	}); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update machine status, error: %v", err))
+	}
+
+	// Decision ⑦: with turns decoupled from the stream, dropping the stream no
+	// longer ends them — and a late terminal could re-grade an admin-forced
+	// failure back to success. Anchor every in-flight command CANCELED
+	// immediately (rule 3: never re-graded) and queue a cancel interaction so
+	// the machine's still-running turns are stopped at its next connect.
+	cancelled, err := s.store.CancelRunningCommandsForMachine(ctx, machine.ID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to cancel in-flight commands, error: %v", err))
+	}
+	if s.dispatcher != nil && len(cancelled) > 0 {
+		if err := s.dispatcher.QueueCancelCommands(ctx, machine.ID, cancelled); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to queue cancel for in-flight commands"))
+		}
 	}
 
 	if s.dispatcher != nil {

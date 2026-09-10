@@ -1,16 +1,13 @@
 package dispatcher
 
 import (
-	"context"
 	"database/sql"
-	"fmt"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -233,20 +230,6 @@ func TestMarshalEventPayload_NilForUnknown(t *testing.T) {
 	}
 }
 
-func TestFormatResultMessage(t *testing.T) {
-	result := formatResultMessage(&v1pb.CommandResult{
-		ErrorMessage: "something went wrong",
-	})
-	if result != "something went wrong" {
-		t.Errorf("expected error message, got %s", result)
-	}
-
-	empty := formatResultMessage(&v1pb.CommandResult{})
-	if empty != "" {
-		t.Errorf("expected empty, got %s", empty)
-	}
-}
-
 // Ensure store.ChatMessage SenderType constants match the proto enum values.
 func TestSenderTypeConstants(t *testing.T) {
 	if store.SenderTypeUser != 1 {
@@ -371,127 +354,82 @@ func TestConvertChatMessageToV1_TimestampProto(t *testing.T) {
 
 // TestCurrentCommandID locks the getter used to link a session's running command
 // to the conversation the agent is working on (so the channel status bar shows
-// live activity). It returns the session's current command id, or "" when the
-// agent has no session or no in-flight command.
+// live activity). It returns the tracker's current command id, or "" when the
+// agent has no in-flight command.
 func TestCurrentCommandID(t *testing.T) {
-	d := &Dispatcher{registry: &sessionRegistry{sessions: map[int]*AgentSession{}}}
+	d := &Dispatcher{}
 
-	// No session at all.
+	// No entry at all.
 	if got := d.CurrentCommandID(7); got != "" {
 		t.Errorf("expected empty for unknown agent, got %q", got)
 	}
 
-	// Session present, no in-flight command.
-	d.registry.sessions[7] = &AgentSession{agentID: 7}
-	if got := d.CurrentCommandID(7); got != "" {
-		t.Errorf("expected empty when no command set, got %q", got)
-	}
-
-	// Session with a running command.
+	// Set, then read back.
 	cmd := uuid.New().String()
-	d.registry.sessions[7].currentCmdID = cmd
+	d.tracker.set(7, cmd)
 	if got := d.CurrentCommandID(7); got != cmd {
 		t.Errorf("expected %q, got %q", cmd, got)
 	}
+
+	// clear only drops the exact command that finished: a mint racing a late
+	// terminal is not wiped.
+	d.tracker.clear(7, uuid.New().String())
+	if got := d.CurrentCommandID(7); got != cmd {
+		t.Errorf("expected %q to survive a mismatched clear, got %q", cmd, got)
+	}
+	d.tracker.clear(7, cmd)
+	if got := d.CurrentCommandID(7); got != "" {
+		t.Errorf("expected empty after clear, got %q", got)
+	}
 }
 
-// ---- T11: concurrency, lifecycle, grace period ----
+// ---- concurrency, lifecycle ----
 
-func noopSend(_ *v1pb.ManagerStreamMessage) error { return nil }
+func noopMachineSend(_ *v1pb.ManagerMachineStreamMessage) error { return nil }
 
-// TestDispatcher_Send_NoDataRace hammers concurrent Register/Unregister/Send/
-// NotifyNewMessages/NotifyWake on a shared dispatcher. Run with -race: the
-// previous `send` field was written under sess.mu and read under sendMu (a
-// race on the same field); the atomic.Pointer + single deliver path makes it
-// race-free.
+// TestDispatcher_Send_NoDataRace hammers concurrent RegisterMachine/
+// UnregisterMachine/Send on a shared dispatcher. Run with -race: the send
+// function lives in an atomic.Pointer, and every outbound message routes
+// through the single deliver path, so writers (register/unregister/replace)
+// and readers (deliver) never race on the field.
 func TestDispatcher_Send_NoDataRace(_ *testing.T) {
 	d := New(nil)
 	defer d.Stop()
 
-	const agents = 8
+	const machines = 8
 	const iters = 100
 	var wg sync.WaitGroup
-	for i := 0; i < agents; i++ {
-		agentID := i + 1
-		resourceID := fmt.Sprintf("agents/a%d", agentID)
+	for i := 0; i < machines; i++ {
+		machineID := i + 1
 		wg.Go(func() {
 			for j := 0; j < iters; j++ {
-				sess := d.RegisterAgent(context.Background(), agentID, 0, resourceID, noopSend)
-
+				sess := d.RegisterMachine(machineID, "machines/m", noopMachineSend)
 				var swg sync.WaitGroup
 				for k := 0; k < 4; k++ {
 					swg.Go(func() {
-						_ = sess.Send(&v1pb.ManagerStreamMessage{})
-						d.NotifyWake(context.Background(), agentID)
-						d.NotifyNewMessages(context.Background(), agentID, uuid.NewString(), 1)
+						_ = sess.Send(&v1pb.ManagerMachineStreamMessage{})
+						d.tracker.set(machineID, uuid.NewString())
+						d.CurrentCommandID(machineID)
 					})
 				}
 				swg.Wait()
-				d.UnregisterAgent(agentID)
+				d.UnregisterMachine(machineID)
 			}
 		})
 	}
 	wg.Wait()
 }
 
-// TestDispatcher_GracePeriodCanceledOnReconnect verifies a reconnect cancels a
-// pending grace-period timer for the agent's in-flight command. The grace
-// goroutine (60s timer) must exit promptly via ctx cancellation rather than
-// sleeping the full period; d.wg.Wait() returning quickly proves it. If the
-// cancel did not propagate, wg.Wait would block for 60s and the test times out.
-func TestDispatcher_GracePeriodCanceledOnReconnect(t *testing.T) {
-	d := New(nil)
-	defer d.Stop()
-
-	sess := d.RegisterAgent(context.Background(), 1, 0, "agents/a1", noopSend)
-	cmd := uuid.NewString()
-	sess.mu.Lock()
-	sess.currentCmdID = cmd
-	sess.mu.Unlock()
-
-	d.UnregisterAgent(1) // arms the grace timer for cmd
-
-	d.graceMu.Lock()
-	hasGrace := len(d.grace[1]) > 0
-	d.graceMu.Unlock()
-	require.True(t, hasGrace, "grace timer should be armed after unregister")
-
-	// Reconnect: RegisterAgent cancels the pending grace for this agent.
-	d.RegisterAgent(context.Background(), 1, 0, "agents/a1", noopSend)
-
-	waited := make(chan struct{})
-	go func() {
-		d.wg.Wait() // joins the cancelled grace goroutine
-		close(waited)
-	}()
-	select {
-	case <-waited:
-	case <-time.After(3 * time.Second):
-		t.Fatal("grace goroutine was not cancelled by reconnect (wg.Wait blocked)")
-	}
-
-	d.graceMu.Lock()
-	empty := len(d.grace[1]) == 0
-	d.graceMu.Unlock()
-	require.True(t, empty, "grace entry should be cleared after reconnect cancelled it")
-}
-
-// TestDispatcher_ShutdownJoinsGoroutines starts the ping monitor and arms
-// several grace timers, then asserts Stop returns within a timeout — i.e. the
-// lifecycle context cancels the ping ticker and every grace goroutine and the
-// WaitGroup joins them. Previously the ping goroutine had no context/join.
+// TestDispatcher_ShutdownJoinsGoroutines starts the ping monitor, then asserts
+// Stop returns within a timeout — i.e. the lifecycle context cancels the ping
+// ticker and the WaitGroup joins it. Previously the ping goroutine had no
+// context/join.
 func TestDispatcher_ShutdownJoinsGoroutines(t *testing.T) {
 	d := New(nil)
 	d.StartPingMonitor()
 
 	for i := 0; i < 4; i++ {
-		agentID := i + 1
-		resourceID := fmt.Sprintf("agents/a%d", agentID)
-		sess := d.RegisterAgent(context.Background(), agentID, 0, resourceID, noopSend)
-		sess.mu.Lock()
-		sess.currentCmdID = uuid.NewString()
-		sess.mu.Unlock()
-		d.UnregisterAgent(agentID) // arms grace
+		d.RegisterMachine(i+1, "machines/m", noopMachineSend)
 	}
 
 	done := make(chan struct{})
@@ -502,7 +440,7 @@ func TestDispatcher_ShutdownJoinsGoroutines(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(3 * time.Second):
-		t.Fatal("Stop did not join ping monitor + grace goroutines within 3s")
+		t.Fatal("Stop did not join the ping monitor within 3s")
 	}
 }
 

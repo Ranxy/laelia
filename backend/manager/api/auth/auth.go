@@ -609,7 +609,7 @@ type agentClaimsMessage struct {
 
 // machineClaimsMessage mirrors agentClaimsMessage for machine tokens. A machine
 // authenticates once with its access token; per-agent identity is declared
-// in-stream (AgentChannel's AgentReady.agent_name), validated against
+// per-RPC (BeginSession's agent binding), validated against
 // agent.machine_id.
 type machineClaimsMessage struct {
 	Name         string `json:"name"`

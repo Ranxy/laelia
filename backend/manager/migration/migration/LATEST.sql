@@ -357,6 +357,11 @@ CREATE TABLE command (
     allow_diff BOOLEAN NOT NULL DEFAULT FALSE,
     -- status: 1=PENDING, 2=RUNNING, 3=COMPLETED, 4=FAILED, 5=CANCELLED, 6=TIMEOUT
     status SMALLINT NOT NULL DEFAULT 1,
+    -- Why the command failed (empty unless FAILED): machine_unreachable means
+    -- the manager reaped it after the machine was lost past the disconnect
+    -- grace (re-gradable by a late terminal); agent_failed means the machine
+    -- reported the failure itself.
+    failure_kind TEXT,
     exit_code INTEGER,
     duration_ms BIGINT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

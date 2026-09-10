@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
+	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
 func TestPendingReplies_Cancel(t *testing.T) {
@@ -147,18 +148,19 @@ func TestDispatcher_AgentSendMethods(t *testing.T) {
 
 	var mu sync.Mutex
 	received := make([]*v1pb.ManagerMachineStreamMessage, 0)
-	// Per-agent pushes travel on the agent's machine control stream: register
-	// both sessions so the agent → machine routing resolves.
 	d.RegisterMachine(1, "machines/m1", func(msg *v1pb.ManagerMachineStreamMessage) error {
 		mu.Lock()
 		received = append(received, msg)
 		mu.Unlock()
 		return nil
 	})
-	d.RegisterAgent(context.Background(), 2, 1, "a2", noopSend)
+	// The per-agent session registry is retired: the agent→machine binding is
+	// resolved from the store, so the routing half is exercised directly with
+	// a loaded agent.
+	agent := &store.AgentMessage{ID: 2, MachineID: 1, ResourceID: "a2"}
 
-	require.NoError(t, d.SendWorkspaceListRequest(2, "req-list", "/tmp", true))
-	require.NoError(t, d.SendWorkspaceReadRequest(2, "req-read", "/tmp/a.txt"))
+	require.NoError(t, d.sendWorkspaceListRequestTo(agent, "req-list", "/tmp", true))
+	require.NoError(t, d.sendWorkspaceReadRequestTo(agent, "req-read", "/tmp/a.txt"))
 
 	mu.Lock()
 	require.Len(t, received, 2)
@@ -236,176 +238,14 @@ func TestDispatcher_SessionLifecycle(t *testing.T) {
 	d := New(nil)
 	defer d.Stop()
 
-	require.False(t, d.IsAgentConnected(1))
 	require.False(t, d.IsMachineConnected(1))
 
-	d.RegisterAgent(context.Background(), 1, 10, "a1", noopSend)
 	d.RegisterMachine(1, "machines/m1", func(*v1pb.ManagerMachineStreamMessage) error { return nil })
 
-	require.True(t, d.IsAgentConnected(1))
 	require.True(t, d.IsMachineConnected(1))
 
-	d.UnregisterAgent(1)
 	d.UnregisterMachine(1)
-	require.False(t, d.IsAgentConnected(1))
 	require.False(t, d.IsMachineConnected(1))
-}
-
-func TestDispatcher_UnregisterMachineDetachesAgents(t *testing.T) {
-	d := New(nil)
-	defer d.Stop()
-
-	d.RegisterAgent(context.Background(), 1, 10, "a1", noopSend)
-	d.RegisterAgent(context.Background(), 2, 10, "agents/a2", noopSend)
-	d.RegisterMachine(10, "machines/m10", func(*v1pb.ManagerMachineStreamMessage) error { return nil })
-
-	require.True(t, d.IsAgentConnected(1))
-	require.True(t, d.IsAgentConnected(2))
-
-	d.UnregisterMachine(10)
-
-	require.False(t, d.IsAgentConnected(1))
-	require.False(t, d.IsAgentConnected(2))
-	require.False(t, d.IsMachineConnected(10))
-}
-
-func TestDispatcher_NotifyNewMessages(t *testing.T) {
-	d := New(nil)
-	defer d.Stop()
-
-	var mu sync.Mutex
-	var got *v1pb.ManagerMachineStreamMessage
-	d.RegisterMachine(1, "machines/m1", func(msg *v1pb.ManagerMachineStreamMessage) error {
-		mu.Lock()
-		got = msg
-		mu.Unlock()
-		return nil
-	})
-	d.RegisterAgent(context.Background(), 1, 1, "a1", noopSend)
-
-	d.NotifyNewMessages(context.Background(), 1, "conversations/c1", 7)
-
-	mu.Lock()
-	require.NotNil(t, got)
-	ac, ok := got.Message.(*v1pb.ManagerMachineStreamMessage_AgentControl)
-	require.True(t, ok, "wakes travel on the machine control stream")
-	require.Equal(t, "agents/a1", ac.AgentControl.GetAgentName())
-	require.Equal(t, []string{"conversations/c1"}, ac.AgentControl.GetWake().GetConversationIds())
-	require.Equal(t, []int64{7}, ac.AgentControl.GetWake().GetVersions())
-	mu.Unlock()
-}
-
-func TestDispatcher_NotifyWake(t *testing.T) {
-	d := New(nil)
-	defer d.Stop()
-
-	var mu sync.Mutex
-	var got *v1pb.ManagerMachineStreamMessage
-	d.RegisterMachine(1, "machines/m1", func(msg *v1pb.ManagerMachineStreamMessage) error {
-		mu.Lock()
-		got = msg
-		mu.Unlock()
-		return nil
-	})
-	d.RegisterAgent(context.Background(), 1, 1, "a1", noopSend)
-
-	d.NotifyWake(context.Background(), 1)
-
-	mu.Lock()
-	require.NotNil(t, got)
-	ac, ok := got.Message.(*v1pb.ManagerMachineStreamMessage_AgentControl)
-	require.True(t, ok)
-	require.Empty(t, ac.AgentControl.GetWake().GetConversationIds())
-	mu.Unlock()
-}
-
-func TestDispatcher_NotifyThreadMention(t *testing.T) {
-	d := New(nil)
-	defer d.Stop()
-
-	var mu sync.Mutex
-	var got *v1pb.ManagerMachineStreamMessage
-	d.RegisterMachine(1, "machines/m1", func(msg *v1pb.ManagerMachineStreamMessage) error {
-		mu.Lock()
-		got = msg
-		mu.Unlock()
-		return nil
-	})
-	d.RegisterAgent(context.Background(), 1, 1, "a1", noopSend)
-
-	d.NotifyThreadMention(context.Background(), 1, "conversations/c1", 9, "thread-1")
-
-	mu.Lock()
-	require.NotNil(t, got)
-	ac, ok := got.Message.(*v1pb.ManagerMachineStreamMessage_AgentControl)
-	require.True(t, ok)
-	require.Equal(t, "thread-1", ac.AgentControl.GetWake().GetThreadRootMessageId())
-	mu.Unlock()
-}
-
-func TestDispatcher_CancelCommand(t *testing.T) {
-	d := New(nil)
-	defer d.Stop()
-	cmdID1 := uuid.NewString()
-
-	var mu sync.Mutex
-	var got *v1pb.ManagerMachineStreamMessage
-	d.RegisterMachine(1, "machines/m1", func(msg *v1pb.ManagerMachineStreamMessage) error {
-		mu.Lock()
-		got = msg
-		mu.Unlock()
-		return nil
-	})
-	d.RegisterAgent(context.Background(), 1, 1, "a1", noopSend)
-
-	require.NoError(t, d.CancelCommand(context.Background(), 1, cmdID1))
-	mu.Lock()
-	require.NotNil(t, got)
-	ac, ok := got.Message.(*v1pb.ManagerMachineStreamMessage_AgentControl)
-	require.True(t, ok, "the cancel travels on the machine control stream")
-	require.Equal(t, "agents/a1", ac.AgentControl.GetAgentName())
-	require.Equal(t, cmdID1, ac.AgentControl.GetCancel().GetCommandId())
-	mu.Unlock()
-}
-
-func TestDispatcher_SteerCommand(t *testing.T) {
-	d := New(nil)
-	defer d.Stop()
-	cmdID1 := uuid.NewString()
-
-	var mu sync.Mutex
-	var got *v1pb.ManagerMachineStreamMessage
-	d.RegisterMachine(1, "machines/m1", func(msg *v1pb.ManagerMachineStreamMessage) error {
-		mu.Lock()
-		got = msg
-		mu.Unlock()
-		return nil
-	})
-	d.RegisterAgent(context.Background(), 1, 1, "a1", noopSend)
-
-	queued, err := d.SteerCommand(context.Background(), 1, cmdID1, "continue")
-	require.NoError(t, err)
-	require.False(t, queued, "a connected machine delivers the steer immediately")
-	mu.Lock()
-	require.NotNil(t, got)
-	ac, ok := got.Message.(*v1pb.ManagerMachineStreamMessage_AgentControl)
-	require.True(t, ok)
-	require.Equal(t, cmdID1, ac.AgentControl.GetSteer().GetCommandId())
-	require.Equal(t, "continue", ac.AgentControl.GetSteer().GetText())
-	mu.Unlock()
-}
-
-func TestDispatcher_UnregisterAgentIfDoesNotDeleteReplacement(t *testing.T) {
-	d := New(nil)
-	defer d.Stop()
-
-	old := d.RegisterAgent(context.Background(), 1, 0, "a1", noopSend)
-	replacement := d.RegisterAgent(context.Background(), 1, 0, "a1", noopSend)
-
-	d.UnregisterAgentIf(1, old)
-
-	require.True(t, d.IsAgentConnected(1), "old session teardown must not remove the replacement")
-	require.Same(t, replacement, d.registry.sessions[1])
 }
 
 func TestDispatcher_UnregisterMachineIfDoesNotDeleteReplacement(t *testing.T) {
@@ -421,19 +261,89 @@ func TestDispatcher_UnregisterMachineIfDoesNotDeleteReplacement(t *testing.T) {
 	require.Same(t, replacement, d.registry.machines[1])
 }
 
-func TestDispatcher_SendAfterUnregisterReturnsError(t *testing.T) {
+// agentControlRouting exercises the per-agent control push shape against a
+// registered machine session (the routing half; the agent→machine binding is
+// resolved from the store in production). Returns the delivered control
+// request with the agent_name already filled.
+func agentControlRouting(t *testing.T, push func(d *Dispatcher, agent *store.AgentMessage) error) *v1pb.AgentControlRequest {
+	t.Helper()
 	d := New(nil)
 	defer d.Stop()
 
-	d.RegisterAgent(context.Background(), 1, 0, "a1", noopSend)
-	d.UnregisterAgent(1)
+	var mu sync.Mutex
+	var got *v1pb.ManagerMachineStreamMessage
+	d.RegisterMachine(1, "machines/m1", func(msg *v1pb.ManagerMachineStreamMessage) error {
+		mu.Lock()
+		got = msg
+		mu.Unlock()
+		return nil
+	})
+	agent := &store.AgentMessage{ID: 1, MachineID: 1, ResourceID: "a1"}
+	require.NoError(t, push(d, agent))
+	mu.Lock()
+	defer mu.Unlock()
+	ac, ok := got.Message.(*v1pb.ManagerMachineStreamMessage_AgentControl)
+	require.True(t, ok, "agent control interactions travel on the machine control stream")
+	require.Equal(t, "agents/a1", ac.AgentControl.GetAgentName())
+	return ac.AgentControl
+}
 
-	require.Error(t, d.SendDiscoverProviders(1, "req"))
+func TestDispatcher_NotifyShapes(t *testing.T) {
+	// NewMessagesAvailable wake with payload.
+	ac := agentControlRouting(t, func(d *Dispatcher, agent *store.AgentMessage) error {
+		return d.sendAgentControl(agent, &v1pb.AgentControlRequest{
+			Control: &v1pb.AgentControlRequest_Wake{
+				Wake: &v1pb.NewMessagesAvailable{
+					ConversationIds: []string{"conversations/c1"},
+					Versions:        []int64{7},
+				},
+			},
+		})
+	})
+	require.Equal(t, []string{"conversations/c1"}, ac.GetWake().GetConversationIds())
+	require.Equal(t, []int64{7}, ac.GetWake().GetVersions())
 
-	d.RegisterMachine(1, "machines/m1", func(*v1pb.ManagerMachineStreamMessage) error { return nil })
-	d.UnregisterMachine(1)
+	// Empty wake (the NotifyWake "check for work" tick).
+	ac = agentControlRouting(t, func(d *Dispatcher, agent *store.AgentMessage) error {
+		return d.sendAgentControl(agent, &v1pb.AgentControlRequest{
+			Control: &v1pb.AgentControlRequest_Wake{Wake: &v1pb.NewMessagesAvailable{}},
+		})
+	})
+	require.Empty(t, ac.GetWake().GetConversationIds())
 
-	require.Error(t, d.SendAgentAssignment(1, &v1pb.AgentAssignment{}))
+	// Thread mention carries the thread root id.
+	ac = agentControlRouting(t, func(d *Dispatcher, agent *store.AgentMessage) error {
+		return d.sendAgentControl(agent, &v1pb.AgentControlRequest{
+			Control: &v1pb.AgentControlRequest_Wake{
+				Wake: &v1pb.NewMessagesAvailable{ThreadRootMessageId: "thread-1"},
+			},
+		})
+	})
+	require.Equal(t, "thread-1", ac.GetWake().GetThreadRootMessageId())
+}
+
+func TestDispatcher_CancelCommandShape(t *testing.T) {
+	cmdID := uuid.NewString()
+	ac := agentControlRouting(t, func(d *Dispatcher, agent *store.AgentMessage) error {
+		return d.sendAgentControl(agent, agentControlRequest(store.ControlKindCancel, mustParseUUID(t, cmdID), ""))
+	})
+	require.Equal(t, cmdID, ac.GetCancel().GetCommandId())
+}
+
+func TestDispatcher_SteerCommandShape(t *testing.T) {
+	cmdID := uuid.NewString()
+	ac := agentControlRouting(t, func(d *Dispatcher, agent *store.AgentMessage) error {
+		return d.sendAgentControl(agent, agentControlRequest(store.ControlKindSteer, mustParseUUID(t, cmdID), "continue"))
+	})
+	require.Equal(t, cmdID, ac.GetSteer().GetCommandId())
+	require.Equal(t, "continue", ac.GetSteer().GetText())
+}
+
+func mustParseUUID(t *testing.T, s string) uuid.UUID {
+	t.Helper()
+	id, err := uuid.Parse(s)
+	require.NoError(t, err)
+	return id
 }
 
 func TestDispatcher_MachineUpgradeStatus(t *testing.T) {

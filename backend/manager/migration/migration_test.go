@@ -268,3 +268,17 @@ func TestAgentPendingControlTablePresent(t *testing.T) {
 		}
 	}
 }
+
+// TestCommandFailureKindColumnPresent locks in the command.failure_kind column
+// backing the late-result regrade rules (design §3.6 rule 2): a FAILED row
+// records whether the failure was the manager's machine-loss reap
+// (machine_unreachable, re-gradable) or the machine's own verdict
+// (agent_failed). The incremental ALTER lives in the 0032 migration; this
+// guard pins the fresh-install shape.
+func TestCommandFailureKindColumnPresent(t *testing.T) {
+	sql := latestSQL(t)
+
+	if !strings.Contains(sql, "failure_kind TEXT") {
+		t.Fatal("migration missing command.failure_kind declaration")
+	}
+}

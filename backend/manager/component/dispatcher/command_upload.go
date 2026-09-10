@@ -81,23 +81,26 @@ func (d *Dispatcher) ApplyCommandUpload(
 
 	// Terminal cleanup, mirroring the stream-era HandleResult: clear the
 	// agent's in-flight command mark and close the command's watchers (after a
-	// short delay so the final broadcast drains).
+	// short delay so the final broadcast drains). Re-grades get the same
+	// cleanup plus a broadcast of the manager-generated SYSTEM explanation
+	// event so live watchers see why the command flipped to completed.
 	for _, t := range res.Terminals {
 		d.clearCurrentCommand(t.AgentID, t.CommandID.String())
-		d.wgMu.Lock()
-		d.wg.Add(1)
-		d.wgMu.Unlock()
-		go func(commandID string) {
-			defer d.wg.Done()
-			select {
-			case <-d.lifecycleCtx.Done():
-				return
-			case <-time.After(100 * time.Millisecond):
-				d.closeWatchers(commandID)
-				d.closeEventWatchers(commandID)
-			}
-		}(t.CommandID.String())
+		d.scheduleWatcherClose(t.CommandID.String())
 		slog.Info("command terminal applied from upload batch", "commandID", t.CommandID, "status", t.Status)
+	}
+	for _, rg := range res.Regrades {
+		d.clearCurrentCommand(rg.AgentID, rg.CommandID.String())
+		if rg.Event != nil {
+			d.broadcastEvent(rg.Event.CommandID.String(), &v1pb.CommandEvent{
+				CommandId: rg.Event.CommandID.String(),
+				SeqNo:     rg.Event.SeqNo,
+				Type:      v1pb.CommandEventType(rg.Event.EventType),
+				Summary:   rg.Event.Summary,
+			})
+		}
+		d.scheduleWatcherClose(rg.CommandID.String())
+		slog.Info("command re-graded completed from a late result", "commandID", rg.CommandID)
 	}
 
 	resp := &v1pb.UploadCommandDataResponse{}
@@ -124,15 +127,26 @@ func (d *Dispatcher) ApplyCommandUpload(
 // clearCurrentCommand clears the agent's in-flight command mark if it still
 // points at the command that just finished.
 func (d *Dispatcher) clearCurrentCommand(agentID int, commandID string) {
-	sess, ok := d.registry.getAgent(agentID)
-	if !ok {
-		return
-	}
-	sess.mu.Lock()
-	if sess.currentCmdID == commandID {
-		sess.currentCmdID = ""
-	}
-	sess.mu.Unlock()
+	d.tracker.clear(agentID, commandID)
+}
+
+// scheduleWatcherClose closes a command's live watchers after a short delay so
+// the final broadcast drains. Tracked on the dispatcher's WaitGroup so Stop
+// joins it.
+func (d *Dispatcher) scheduleWatcherClose(commandID string) {
+	d.wgMu.Lock()
+	d.wg.Add(1)
+	d.wgMu.Unlock()
+	go func() {
+		defer d.wg.Done()
+		select {
+		case <-d.lifecycleCtx.Done():
+			return
+		case <-time.After(100 * time.Millisecond):
+			d.closeWatchers(commandID)
+			d.closeEventWatchers(commandID)
+		}
+	}()
 }
 
 // convertUploadEntry validates one wire entry into its neutral store form and
@@ -171,7 +185,12 @@ func convertUploadEntry(we *v1pb.UploadCommandDataEntry) (*store.CommandUploadEn
 
 	case v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_EVENT:
 		ev := we.GetEvent()
-		if ev == nil || ev.GetPayload() == nil {
+		if ev == nil {
+			return nil, "event payload missing"
+		}
+		// SYSTEM events carry no typed payload (they are plain notices); any
+		// other kind must have one so the ledger can render it.
+		if ev.GetPayload() == nil && ev.GetType() != v1pb.CommandEventType_SYSTEM {
 			return nil, "unknown event payload"
 		}
 		payloadJSON, err := marshalEventPayload(ev)

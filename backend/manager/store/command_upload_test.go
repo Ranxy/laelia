@@ -25,9 +25,10 @@ func TestUploadAppendEventSQL(t *testing.T) {
 // TestUploadTerminalSQL locks the terminal status guard: only a PENDING or
 // RUNNING command may transition to COMPLETED/FAILED from an upload batch. A
 // late result must never overwrite the user's CANCELLED state or the reaper's
-// FAILED state (the cancelled/failed state is the irreversible anchor).
+// FAILED state (the cancelled/failed state is the irreversible anchor; the
+// re-grade path re-checks the machine_unreachable provenance separately).
 func TestUploadTerminalSQL(t *testing.T) {
-	if !strings.Contains(uploadTerminalSQL, "AND status IN ($7, $8)") {
+	if !strings.Contains(uploadTerminalSQL, "AND status IN ($8, $9)") {
 		t.Fatal("terminal upload must be status-guarded so a late result cannot overwrite CANCELLED/FAILED")
 	}
 }

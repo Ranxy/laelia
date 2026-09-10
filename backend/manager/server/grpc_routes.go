@@ -39,9 +39,11 @@ func configureV1Routers(
 	cmdDispatcher *dispatcher.Dispatcher,
 ) (*apiv1.AuditInterceptor, error) {
 	cmdDispatcher.StartPingMonitor()
-	// Stale RUNNING-command reaper: belt-and-suspenders cleanup for commands
-	// whose result can never arrive (stream death mid-turn followed by a
-	// reconnect that cancels the grace timer, a failed result write, ...).
+	// Stale RUNNING-command reaper: closes commands whose machine is lost
+	// (dual signal: MachineChannel unregistered AND persisted heartbeat
+	// expired, held past the disconnect grace) so their result can never
+	// arrive. Reaped rows carry failure_kind=machine_unreachable so a late
+	// terminal can re-grade them.
 	cmdDispatcher.StartStaleCommandReaper()
 	// Provisioner auto-upgrade loop: scans every few minutes for machines of
 	// auto_upgrade provisioners that lag the embedded machine build. Bounded to
@@ -74,7 +76,6 @@ func configureV1Routers(
 	// survives restarts and any later multi-instance deployment.
 	presenceService := apiv1.NewPresenceService(stores)
 	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager, iamManager, hub)
-	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)
 	machineService := apiv1.NewMachineService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager)
 	deviceService := apiv1.NewDeviceService(deviceStore, stores, secret, profile, iamManager)
 	machineStreamService := apiv1.NewMachineStreamService(stores, cmdDispatcher)
@@ -161,8 +162,6 @@ func configureV1Routers(
 	connectHandlers[commandPath] = commandHandler
 	presencePath, presenceHandler := v1connect.NewPresenceServiceHandler(presenceService, handlerOpts)
 	connectHandlers[presencePath] = presenceHandler
-	agentCmdPath, agentCmdHandler := v1connect.NewAgentStreamServiceHandler(agentCommandService, handlerOpts)
-	connectHandlers[agentCmdPath] = agentCmdHandler
 	machinePath, machineHandler := v1connect.NewMachineServiceHandler(machineService, handlerOpts)
 	connectHandlers[machinePath] = machineHandler
 	devicePath, deviceHandler := v1connect.NewDeviceServiceHandler(deviceService, handlerOpts)
@@ -208,7 +207,6 @@ func configureV1Routers(
 			v1connect.AgentServiceName,
 			v1connect.CommandServiceName,
 			v1connect.PresenceServiceName,
-			v1connect.AgentStreamServiceName,
 			v1connect.MachineServiceName,
 			v1connect.DeviceServiceName,
 			v1connect.MachineStreamServiceName,

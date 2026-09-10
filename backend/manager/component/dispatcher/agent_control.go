@@ -29,21 +29,11 @@ func (d *Dispatcher) deliverAgentControl(
 	commandID uuid.UUID,
 	text string,
 ) (queued bool, err error) {
-	// Connected fast path: the live agent session carries the machine binding.
-	if sess, ok := d.registry.getAgent(agentID); ok {
-		req := agentControlRequest(common.FormatAgentUID(sess.agentResourceID), kind, commandID, text)
-		if err := d.sendToMachine(sess.machineID, &v1pb.ManagerMachineStreamMessage{
-			Message: &v1pb.ManagerMachineStreamMessage_AgentControl{AgentControl: req},
-		}); err == nil {
-			return false, nil
-		}
-		// The send raced a disconnect: fall through to the queue.
-	}
-	// Offline: resolve the binding from the store and enqueue for delivery at
-	// the machine's next (re)connect.
 	if d.store == nil {
 		return false, errors.New("agent is not connected")
 	}
+	// The agent→machine binding comes from the store: the per-agent session
+	// registry is retired, so there is no live handle to shortcut through.
 	agent, err := d.store.GetAgent(ctx, agentID)
 	if err != nil {
 		return false, errors.Wrap(err, "failed to load agent for control delivery")
@@ -54,6 +44,11 @@ func (d *Dispatcher) deliverAgentControl(
 	if agent.MachineID == 0 {
 		return false, errors.New("agent is not bound to a machine")
 	}
+	if err := d.sendAgentControl(agent, agentControlRequest(kind, commandID, text)); err == nil {
+		return false, nil
+	}
+	// Offline (or the send raced a disconnect): enqueue for delivery at the
+	// machine's next (re)connect.
 	if _, eErr := d.store.EnqueueAgentControl(ctx, &store.AgentPendingControlMessage{
 		MachineID: agent.MachineID,
 		AgentID:   agentID,
@@ -67,8 +62,11 @@ func (d *Dispatcher) deliverAgentControl(
 }
 
 // agentControlRequest builds the wire control request for one interaction.
-func agentControlRequest(agentName string, kind store.ControlKind, commandID uuid.UUID, text string) *v1pb.AgentControlRequest {
-	req := &v1pb.AgentControlRequest{AgentName: agentName}
+// The agent_name is filled by sendAgentControl.
+func agentControlRequest(kind store.ControlKind, commandID uuid.UUID, text string) *v1pb.AgentControlRequest {
+	// The agent_name is filled by sendAgentControl (the machine-side router
+	// dispatches on it).
+	req := &v1pb.AgentControlRequest{}
 	switch kind {
 	case store.ControlKindCancel:
 		req.Control = &v1pb.AgentControlRequest_Cancel{
@@ -115,6 +113,24 @@ func (d *Dispatcher) CancelCommand(ctx context.Context, agentID int, commandID s
 	}
 	_, err = d.deliverAgentControl(ctx, agentID, store.ControlKindCancel, commandUUID, "")
 	return err
+}
+
+// QueueCancelCommands enqueues a cancel interaction for each just-cancelled
+// command of a machine without attempting delivery. Used by
+// ForceDisconnectMachine: the machine is being torn down by construction, so
+// there is no stream to race — the rows surface when the machine reconnects.
+func (d *Dispatcher) QueueCancelCommands(ctx context.Context, machineID int, cancelled []*store.CancelledCommand) error {
+	for _, cc := range cancelled {
+		if _, err := d.store.EnqueueAgentControl(ctx, &store.AgentPendingControlMessage{
+			MachineID: machineID,
+			AgentID:   cc.AgentID,
+			Kind:      string(store.ControlKindCancel),
+			CommandID: cc.ID,
+		}); err != nil {
+			return errors.Wrapf(err, "failed to enqueue cancel for command %s", cc.ID)
+		}
+	}
+	return nil
 }
 
 // SteerCommand delivers the steer to the agent's machine, or queues it for
@@ -190,10 +206,7 @@ func (d *Dispatcher) DispatchPendingAgentControl(machineID int) {
 		if err != nil {
 			continue
 		}
-		req := agentControlRequest(common.FormatAgentUID(agent.ResourceID), store.ControlKind(row.Kind), commandUUID, row.Text)
-		if err := d.sendToMachine(machineID, &v1pb.ManagerMachineStreamMessage{
-			Message: &v1pb.ManagerMachineStreamMessage_AgentControl{AgentControl: req},
-		}); err != nil {
+		if err := d.sendAgentControl(agent, agentControlRequest(store.ControlKind(row.Kind), commandUUID, row.Text)); err != nil {
 			slog.Warn("pending control delivery failed; keeping the row", "commandID", row.CommandID, "kind", row.Kind, "error", err)
 			continue
 		}

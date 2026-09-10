@@ -299,21 +299,6 @@ func (s *AgentService) AgentHeartbeat(ctx context.Context, req *connect.Request[
 		}
 	}
 
-	if s.dispatcher != nil && !s.dispatcher.IsAgentConnected(agent.ID) {
-		pending, err := s.store.GetNextPendingCommand(ctx, agent.ID)
-		if err != nil {
-			slog.Warn("failed to check pending commands during heartbeat", "error", err)
-		} else if pending != nil {
-			resp.CommandStreamRequired = true
-			resp.PendingCommandHint = &v1pb.PendingCommandHint{
-				CommandId:      pending.ID.String(),
-				Command:        pending.Command,
-				WorkingDir:     pending.WorkingDir,
-				TimeoutSeconds: pending.TimeoutSeconds,
-			}
-		}
-	}
-
 	return connect.NewResponse(resp), nil
 }
 
@@ -421,21 +406,14 @@ func (s *AgentService) authenticateBootstrapToken(tokenStr string) (*bootstrapAu
 	return &bootstrapAuthResult{agent: agent, tokenFamily: tokenFamily, tokenID: storedToken.ID}, nil
 }
 
-// agentReachable reports whether an agent should present as online. Under the
-// machine-hosts-many model the machine — not the agent — heartbeats, so an
-// agent's liveness is NOT derived from a per-agent heartbeat timestamp
-// (which is no longer written and would always read as offline). An agent is
-// online when its own runner has a live AgentChannel (the precise signal) OR
-// the machine it is bound to is connected (the machine app hosts the agent and
-// will pick it up over its MachineChannel). The second clause matches the
-// product model — "a connected machine's agents are online" — and covers the
-// brief window before a freshly created agent's runner opens its stream, so
-// the agent is online the moment it is created on a connected machine. Both
-// go false when the machine disconnects (UnregisterMachine detaches every
-// owned agent session), so the agent reports offline with its machine.
-func agentReachable(d *dispatcher.Dispatcher, agentID, machineID int) bool {
+// agentReachable reports whether an agent should present as online. The
+// per-agent stream is retired: an agent is online exactly when the machine it
+// is bound to has a live MachineChannel — the machine hosts the agent and
+// picks it up as soon as it connects, so the agent is online the moment it is
+// created on a connected machine and offline the moment the machine is.
+func agentReachable(d *dispatcher.Dispatcher, _, machineID int) bool {
 	if d == nil {
 		return false
 	}
-	return d.IsAgentConnected(agentID) || d.IsMachineConnected(machineID)
+	return d.IsMachineConnected(machineID)
 }

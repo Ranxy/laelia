@@ -16,14 +16,15 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
-// MachineStreamService implements MachineStreamService.MachineChannel: the
-// machine-level control plane. A machine authenticates once (machine access
-// token, resolved by the auth interceptor into MachineContextKey) and holds
-// this single bidi stream for the lifetime of its connection. Over it the
-// manager pushes agent-roster changes (AgentAssignment / RemoveAgent /
-// AgentConfigUpdate / ReloadAgentAssignment) and provider-discovery requests;
-// the machine reports readiness, pings, discovery results, and graceful
-// disconnect. The per-agent data plane runs on each agent's own AgentChannel.
+// MachineStreamService implements MachineStreamService: the machine-level
+// control and data plane. A machine authenticates once (machine access token,
+// resolved by the auth interceptor into MachineContextKey). Over MachineChannel
+// the manager pushes agent-roster changes (AgentAssignment / RemoveAgent /
+// AgentConfigUpdate / ReloadAgentAssignment), provider-discovery and workspace
+// requests, and per-agent control interactions; the machine reports readiness,
+// pings, discovery results, and graceful disconnect. Command data flows over
+// the unary UploadCommandData RPC and the drain loop pulls work through the
+// unary BeginSession RPC — the per-agent bidi stream is retired.
 type MachineStreamService struct {
 	v1connect.UnimplementedMachineStreamServiceHandler
 	store      *store.Store
@@ -55,6 +56,32 @@ func (s *MachineStreamService) UploadCommandData(
 	resp, err := s.dispatcher.ApplyCommandUpload(ctx, machine.ID, req.Msg.GetEntries())
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to apply command upload batch"))
+	}
+	return connect.NewResponse(resp), nil
+}
+
+// BeginSession is the agent drain loop's unary pull of its next unit of work
+// (retired AgentChannel.BeginSession). agent_name binds the request to an
+// agent the authenticated machine hosts; the reply carries the command to run
+// or idle=true.
+func (s *MachineStreamService) BeginSession(
+	ctx context.Context,
+	req *connect.Request[v1pb.BeginSessionRequest],
+) (*connect.Response[v1pb.BeginSessionResponse], error) {
+	machine, ok := GetMachineFromContext(ctx)
+	if !ok || machine == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	if machine.Status == nil || machine.Status.GetState() != storepb.MachineStatus_ONLINE {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("machine %s is not online", machine.ResourceID))
+	}
+	agentID, err := s.dispatcher.ResolveAgentByName(machine.ID, req.Msg.GetAgentName())
+	if err != nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, err)
+	}
+	resp, err := s.dispatcher.HandleBeginSession(ctx, agentID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to handle begin session"))
 	}
 	return connect.NewResponse(resp), nil
 }

@@ -8,56 +8,26 @@ import (
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
-// sessionRegistry owns the live agent/machine session maps and their locking.
-// It is extracted from Dispatcher so connection lifecycle can be tested and
-// evolved independently from command pub/sub and pending replies.
+// sessionRegistry owns the live machine/provisioner session maps and their
+// locking. The per-agent AgentChannel registry is retired: agent identity is
+// bound per-RPC by ownership checks (BeginSession / UploadCommandData name the
+// agent and the machine must host it), so only machine-level streams remain.
 //
-// RegisterAgent/RegisterMachine still touch the fields directly (see
-// session_lifecycle.go): those paths need to invalidate the previous session,
-// cancel grace timers / reset upgrade state, and install the new session in a
-// single critical section, which the simple get/set helpers below cannot
+// RegisterMachine still touches the fields directly (see session_lifecycle.go):
+// that path needs to invalidate the previous session and install the new one in
+// a single critical section, which the simple get/set helpers below cannot
 // express without changing the locking order.
 type sessionRegistry struct {
 	mu           sync.RWMutex
-	sessions     map[int]*AgentSession
 	machines     map[int]*MachineSession
 	provisioners map[int]*ProvisionerSession
 }
 
 func newSessionRegistry() *sessionRegistry {
 	return &sessionRegistry{
-		sessions:     make(map[int]*AgentSession),
 		machines:     make(map[int]*MachineSession),
 		provisioners: make(map[int]*ProvisionerSession),
 	}
-}
-
-func (r *sessionRegistry) getAgent(agentID int) (*AgentSession, bool) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	sess, ok := r.sessions[agentID]
-	return sess, ok
-}
-
-func (r *sessionRegistry) deleteAgent(agentID int) (*AgentSession, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	sess, ok := r.sessions[agentID]
-	if ok {
-		delete(r.sessions, agentID)
-	}
-	return sess, ok
-}
-
-func (r *sessionRegistry) deleteAgentIf(agentID int, sess *AgentSession) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	current, ok := r.sessions[agentID]
-	if !ok || current != sess {
-		return false
-	}
-	delete(r.sessions, agentID)
-	return true
 }
 
 func (r *sessionRegistry) getMachine(machineID int) (*MachineSession, bool) {
@@ -67,54 +37,27 @@ func (r *sessionRegistry) getMachine(machineID int) (*MachineSession, bool) {
 	return sess, ok
 }
 
-// deleteMachineWithAgents removes the machine session and every agent session
-// owned by it in one critical section. ok is false when no machine session was
-// registered for machineID.
-func (r *sessionRegistry) deleteMachineWithAgents(machineID int) (machine *MachineSession, owned []*AgentSession, ok bool) {
+func (r *sessionRegistry) deleteMachine(machineID int) (*MachineSession, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	machine, ok = r.machines[machineID]
-	if !ok {
-		return nil, nil, false
+	sess, ok := r.machines[machineID]
+	if ok {
+		delete(r.machines, machineID)
 	}
-	delete(r.machines, machineID)
-	for _, sess := range r.sessions {
-		if sess.machineID == machineID {
-			owned = append(owned, sess)
-			delete(r.sessions, sess.agentID)
-		}
-	}
-	return machine, owned, true
+	return sess, ok
 }
 
-// deleteMachineIfWithAgents is deleteMachineWithAgents but only when sess is
-// still the registered machine session. It returns the detached agent sessions
-// and whether sess was the current session.
-func (r *sessionRegistry) deleteMachineIfWithAgents(machineID int, sess *MachineSession) (owned []*AgentSession, ok bool) {
+// deleteMachineIf removes the machine session only when sess is still the
+// registered one (a reconnect has replaced it otherwise).
+func (r *sessionRegistry) deleteMachineIf(machineID int, sess *MachineSession) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	current, ok := r.machines[machineID]
 	if !ok || current != sess {
-		return nil, false
+		return false
 	}
 	delete(r.machines, machineID)
-	for _, s := range r.sessions {
-		if s.machineID == machineID {
-			owned = append(owned, s)
-			delete(r.sessions, s.agentID)
-		}
-	}
-	return owned, true
-}
-
-func (r *sessionRegistry) snapshotAgents() []*AgentSession {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	out := make([]*AgentSession, 0, len(r.sessions))
-	for _, sess := range r.sessions {
-		out = append(out, sess)
-	}
-	return out
+	return true
 }
 
 func (r *sessionRegistry) snapshotMachines() []*MachineSession {

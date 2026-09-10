@@ -10,12 +10,12 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
-// activityAggregator computes per-agent conversation activity from the session
-// registry and the store. It is extracted from Dispatcher so this aggregation
-// can be tested and evolved independently.
+// activityAggregator computes per-agent conversation activity from the store
+// and the dispatcher's machine connectivity. It is extracted from Dispatcher so
+// this aggregation can be tested and evolved independently.
 type activityAggregator struct {
-	store    *store.Store
-	registry *sessionRegistry
+	store      *store.Store
+	dispatcher *Dispatcher
 }
 
 func (a *activityAggregator) FetchConversationActivity(ctx context.Context, conversationID string) ([]*v1pb.AgentActivity, error) {
@@ -34,6 +34,7 @@ func (a *activityAggregator) FetchConversationActivity(ctx context.Context, conv
 		resourceID string
 		name       string
 		id         int
+		machineID  int
 	}
 	var agents []agentEntry
 	var agentIDs []int
@@ -45,7 +46,7 @@ func (a *activityAggregator) FetchConversationActivity(ctx context.Context, conv
 		if agErr != nil || ag == nil {
 			continue
 		}
-		agents = append(agents, agentEntry{resourceID: ag.ResourceID, name: ag.Name, id: ag.ID})
+		agents = append(agents, agentEntry{resourceID: ag.ResourceID, name: ag.Name, id: ag.ID, machineID: ag.MachineID})
 		agentIDs = append(agentIDs, ag.ID)
 	}
 
@@ -59,7 +60,8 @@ func (a *activityAggregator) FetchConversationActivity(ctx context.Context, conv
 		runningByAgent[r.AgentID] = r
 	}
 
-	// Build activity entries.
+	// Build activity entries. An agent is online exactly when its machine's
+	// control stream is live (the per-agent stream is retired).
 	activities := make([]*v1pb.AgentActivity, 0, len(agents))
 	for _, ag := range agents {
 		act := &v1pb.AgentActivity{
@@ -68,8 +70,7 @@ func (a *activityAggregator) FetchConversationActivity(ctx context.Context, conv
 			Status:      "idle",
 		}
 
-		sess, connected := a.registry.getAgent(ag.id)
-		if !connected {
+		if a.dispatcher == nil || !a.dispatcher.IsMachineConnected(ag.machineID) {
 			act.Status = "offline"
 			activities = append(activities, act)
 			continue
@@ -106,12 +107,11 @@ func (a *activityAggregator) FetchConversationActivity(ctx context.Context, conv
 			act.Status = "starting"
 		}
 
-		// Suppress idle for active agents that might have a stale session.
-		sess.mu.Lock()
-		if sess.currentCmdID == "" {
+		// Suppress idle-looking rows for agents whose drain session has moved
+		// on (the tracker is the surviving session state).
+		if a.dispatcher.CurrentCommandID(ag.id) == "" {
 			act.Status = "idle"
 		}
-		sess.mu.Unlock()
 
 		activities = append(activities, act)
 	}

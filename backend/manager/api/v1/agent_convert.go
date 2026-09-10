@@ -373,7 +373,7 @@ func convertToV1AgentStatus(status *storepb.AgentStatus, deleted bool, connected
 
 // computeConnectionState derives an agent's connection state. Under the
 // machine-hosts-many model the machine heartbeats, not the agent, so liveness
-// is taken from `connected` (the agent's live AgentChannel in the dispatcher),
+// is taken from `connected` (the agent's machine's live MachineChannel in the dispatcher),
 // not from status.LastHeartbeatAt (which is no longer written and would always
 // read as offline). Deletion and being stopped (StopAgent, enabled=false) are
 // lifecycle states that take precedence over the live-stream signal and over

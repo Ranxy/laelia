@@ -164,7 +164,7 @@ func (s *CommandService) ListPeerAgents(ctx context.Context, _ *connect.Request[
 			// convertToV1AgentStatus(...).GetState() without allocating the
 			// wrapping AgentStatus + timestamp protos. a.Status is always
 			// non-nil (listAgentImpl assigns it), so the deref is safe. The
-			// connected flag is the agent's live AgentChannel in the dispatcher
+			// connected flag is the agent's machine's live MachineChannel in the dispatcher
 			// (the machine heartbeats, not the agent).
 			ConnectionState: computeConnectionState(a.Status, a.Deleted, agentReachable(s.dispatcher, a.ID, a.MachineID), a.Enabled),
 			Enabled:         a.Enabled,

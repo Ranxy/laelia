@@ -89,7 +89,7 @@ func (s *MachineService) ConnectMachine(ctx context.Context, req *connect.Reques
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to create machine session, error: %v", err))
 	}
 
-	// Resync the full agent roster: the machine app opens an AgentChannel for
+	// Resync the full agent roster: the machine app starts a runner for
 	// every agent bound to this machine, on first connect and every reconnect.
 	assigned, err := s.buildAssignedAgents(ctx, machine.ID)
 	if err != nil {
@@ -125,7 +125,7 @@ func (s *MachineService) ConnectMachine(ctx context.Context, req *connect.Reques
 }
 
 // buildAssignedAgents returns the AgentAssignment for every agent bound to the
-// machine, in the order the machine app should open their AgentChannels.
+// machine, in the order the machine app should start their runners.
 func (s *MachineService) buildAssignedAgents(ctx context.Context, machineID int) ([]*v1pb.AgentAssignment, error) {
 	agents, err := s.store.ListAgents(ctx, &store.FindAgentMessage{MachineID: &machineID})
 	if err != nil {

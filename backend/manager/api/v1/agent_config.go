@@ -209,7 +209,7 @@ func (s *AgentService) UpdateAgentMcpConfig(ctx context.Context, req *connect.Re
 // RefreshAgentProviders asks the agent daemon to re-probe its host for
 // installed LLM agent providers + models, then persists the fresh result into
 // agent.info.available_providers and returns it. Requires the agent to be
-// online (the probe runs on the agent's host, reached via the bidi stream).
+// online (the probe runs on the agent's host, reached via the machine control stream).
 func (s *AgentService) RefreshAgentProviders(ctx context.Context, req *connect.Request[v1pb.RefreshAgentProvidersRequest]) (*connect.Response[v1pb.RefreshAgentProvidersResponse], error) {
 	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
 	if err != nil {
@@ -226,8 +226,8 @@ func (s *AgentService) RefreshAgentProviders(ctx context.Context, req *connect.R
 	if !s.canEditAgent(ctx, user, agent) {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a holder of laelia.agents.edit can refresh this agent's providers"))
 	}
-	if !s.dispatcher.IsAgentConnected(agent.ID) {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent is not connected; cannot probe providers"))
+	if !s.dispatcher.IsMachineConnected(agent.MachineID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent's machine is not connected; cannot probe providers"))
 	}
 
 	requestID := uuid.NewString()
@@ -338,7 +338,7 @@ func (s *AgentService) RefreshAgentModels(ctx context.Context, req *connect.Requ
 // ListAgentWorkspace lists one directory level of an agent's workspace on its
 // host machine. Requires the caller to be the agent owner or a workspace admin
 // (canEditAgent), and the agent to be online: the listing runs on the agent's
-// host and is relayed over the bidi stream.
+// host and is relayed over the machine control stream.
 func (s *AgentService) ListAgentWorkspace(ctx context.Context, req *connect.Request[v1pb.ListAgentWorkspaceRequest]) (*connect.Response[v1pb.ListAgentWorkspaceResponse], error) {
 	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
 	if err != nil {
@@ -355,8 +355,8 @@ func (s *AgentService) ListAgentWorkspace(ctx context.Context, req *connect.Requ
 	if !s.canEditAgent(ctx, user, agent) {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("workspace access requires owner or admin permission"))
 	}
-	if !s.dispatcher.IsAgentConnected(agent.ID) {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent is not connected; cannot list workspace"))
+	if !s.dispatcher.IsMachineConnected(agent.MachineID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent's machine is not connected; cannot list workspace"))
 	}
 
 	requestID := uuid.NewString()
@@ -399,8 +399,8 @@ func (s *AgentService) ReadAgentWorkspaceFile(ctx context.Context, req *connect.
 	if !s.canEditAgent(ctx, user, agent) {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("workspace access requires owner or admin permission"))
 	}
-	if !s.dispatcher.IsAgentConnected(agent.ID) {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent is not connected; cannot read workspace file"))
+	if !s.dispatcher.IsMachineConnected(agent.MachineID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent's machine is not connected; cannot read workspace file"))
 	}
 
 	requestID := uuid.NewString()

@@ -166,13 +166,14 @@ func (s *Scheduler) scanRetry(ctx context.Context) {
 	}
 }
 
-// deliver attempts to wake the owning agent for a DUE reminder. If the agent is
-// connected, it is woken and the retry timer is cleared. If offline, the next
-// retry is scheduled at now + backoff[retryCount]; when retryCount exceeds the
-// backoff length the fire is missed (recurring reminders reschedule to the next
-// cron fire, one-shot reminders become terminal MISSED).
+// deliver attempts to wake the owning agent for a DUE reminder. If the agent's
+// machine is connected, the agent is woken and the retry timer is cleared. If
+// offline, the next retry is scheduled at now + backoff[retryCount]; when
+// retryCount exceeds the backoff length the fire is missed (recurring
+// reminders reschedule to the next cron fire, one-shot reminders become
+// terminal MISSED).
 func (s *Scheduler) deliver(ctx context.Context, r *store.Reminder, retryCount int32) {
-	if s.dispatcher.IsAgentConnected(r.AssigneeAgentID) {
+	if s.dispatcher.IsAgentOnline(ctx, r.AssigneeAgentID) {
 		if err := s.store.ClearRetry(ctx, r.MessageID); err != nil {
 			slog.Warn("scheduler: failed to clear reminder retry", "messageID", r.MessageID, "error", err)
 		}

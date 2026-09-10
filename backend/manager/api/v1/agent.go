@@ -77,7 +77,7 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 	// machine app hosts the agent's drain loop, so there is no per-agent process
 	// or token. CreateAgent therefore requires a machine parent and pushes an
 	// AgentAssignment to the owning machine's MachineChannel so the machine app
-	// opens an AgentChannel for the new agent immediately. If the machine is
+	// starts a runner for the new agent immediately. If the machine is
 	// offline the push is best-effort (logged, not queued): the next
 	// ConnectMachine resyncs the full roster from the DB.
 	if req.Msg.Agent.Machine == "" {
@@ -574,8 +574,8 @@ func (s *AgentService) RestartAgent(ctx context.Context, req *connect.Request[v1
 	if err != nil {
 		return nil, err
 	}
-	if s.dispatcher == nil || !s.dispatcher.IsAgentConnected(agent.ID) {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent is not connected; cannot cold restart"))
+	if s.dispatcher == nil || !s.dispatcher.IsMachineConnected(agent.MachineID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent's machine is not connected; cannot cold restart"))
 	}
 	if err := s.dispatcher.SendRestartAgent(agent.MachineID, common.FormatAgentUID(agent.ResourceID)); err != nil {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Wrap(err, "failed to request agent cold restart"))

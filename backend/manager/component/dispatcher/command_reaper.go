@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
@@ -12,17 +13,17 @@ const (
 	// staleCommandSweepInterval is how often the stale-command reaper scans
 	// RUNNING command rows.
 	staleCommandSweepInterval = 1 * time.Minute
-	// staleCommandReapAfter is how long a RUNNING command may exist without
-	// being its agent session's current in-flight command before the reaper
-	// marks it FAILED. During an active turn the command is current, so a
-	// legitimately long turn is never reaped no matter how silent it is.
-	staleCommandReapAfter = 10 * time.Minute
-	// beginSessionReapReason explains why a command was marked FAILED when the
-	// agent opened a new drain session over it.
-	beginSessionReapReason = "superseded by a newer agent session"
-	// staleReapReason explains the reaper's mark on a command that can no
-	// longer receive a result.
-	staleReapReason = "stale running command reaped (no result received)"
+	// reaperGrace is how long a machine must be lost — its MachineChannel
+	// unregistered AND its persisted heartbeat expired — before the reaper
+	// marks its RUNNING commands FAILED. Hard constraint: grace ≥ 2× the
+	// reconnect backoff ceiling, so a flapping-but-alive machine (e.g. a proxy
+	// killing long streams every 60s) never has its commands reaped while it
+	// cycles through reconnects.
+	reaperGrace = 10 * time.Minute
+	// machineUnreachableReapReason explains the reaper's mark on a command
+	// whose machine is gone: paired with failure_kind=machine_unreachable so a
+	// late terminal can re-grade it (design §3.6 rule 2).
+	machineUnreachableReapReason = "machine unreachable; command reaped after the disconnect grace"
 )
 
 // StartStaleCommandReaper launches the periodic RUNNING-command sweeper. It
@@ -49,12 +50,13 @@ func (d *Dispatcher) StartStaleCommandReaper() {
 }
 
 // sweepStaleCommands marks RUNNING commands that can no longer receive a
-// result as FAILED. The BeginSession reap (HandleBeginSession) covers the
-// reconnect path; this sweep covers what no client message can report: a
-// machine that never returns, a reconnected session that went idle before
-// calling BeginSession, and result/status updates that failed mid-write.
-// Every reaped row is a zombie: the machine clears its local last-command
-// state when it abandons a turn, so no reconnect can ever resolve it.
+// result as FAILED(machine_unreachable). A command's fate is bound to its
+// machine, not to a stream or a session: a turn survives stream death, so the
+// only signal that its result will never arrive is machine loss — the dual
+// signal (MachineChannel unregistered AND the persisted heartbeat expired)
+// held for longer than the grace period. Either signal alone is not enough:
+// the stream can drop for minutes while the machine keeps heartbeating, and
+// the heartbeat (or the registry) can lag a manager restart.
 func (d *Dispatcher) sweepStaleCommands() {
 	if d.store == nil {
 		return
@@ -69,79 +71,69 @@ func (d *Dispatcher) sweepStaleCommands() {
 		return
 	}
 
-	now := time.Now()
+	// Group the running commands by machine so each machine's liveness is
+	// checked once per sweep.
+	byMachine := make(map[int][]*store.CommandMessage)
 	for _, cmd := range cmds {
-		if !d.shouldReapCommand(cmd, now) {
+		byMachine[cmd.MachineID] = append(byMachine[cmd.MachineID], cmd)
+	}
+
+	now := time.Now()
+	for machineID, group := range byMachine {
+		if !d.machineLost(ctx, machineID, now) {
 			continue
 		}
-		reaped, err := d.store.FailStaleRunningCommand(ctx, cmd.ID, now, staleReapReason)
-		if err != nil {
-			slog.Error("stale command reaper: failed to reap command", "commandID", cmd.ID, "agentID", cmd.AgentID, "error", err)
-			continue
+		for _, cmd := range group {
+			reaped, err := d.store.ReapRunningCommand(ctx, cmd.ID, now,
+				machineUnreachableReapReason, store.CommandFailureKindMachineUnreachable)
+			if err != nil {
+				slog.Error("stale command reaper: failed to reap command", "commandID", cmd.ID, "agentID", cmd.AgentID, "error", err)
+				continue
+			}
+			if !reaped {
+				continue
+			}
+			slog.Warn("running command reaped after machine loss",
+				"commandID", cmd.ID, "agentID", cmd.AgentID, "machineID", machineID)
+			d.closeWatchers(cmd.ID.String())
+			d.closeEventWatchers(cmd.ID.String())
 		}
-		if !reaped {
-			continue
-		}
-		slog.Warn("stale running command reaped", "commandID", cmd.ID, "agentID", cmd.AgentID, "age", now.Sub(cmd.CreatedAt).Round(time.Second))
-		d.closeWatchers(cmd.ID.String())
-		d.closeEventWatchers(cmd.ID.String())
 	}
 }
 
-// shouldReapCommand reports whether a RUNNING command is a zombie row the
-// drain loop can no longer resolve. The drain loop is strictly serial per
-// agent: a command is alive only while the agent's session tracks it as the
-// current in-flight command and it has not outlived the reap threshold. An
-// empty currentCmdID covers the disconnected-session case, a session tracking
-// a different command covers the reconnect-then-idle path.
-func (d *Dispatcher) shouldReapCommand(cmd *store.CommandMessage, now time.Time) bool {
-	if now.Sub(cmd.CreatedAt) < staleCommandReapAfter {
+// machineLost reports whether a machine is unreachable per the dual signal:
+// its MachineChannel is not registered in this process AND its persisted
+// heartbeat (machine.status.last_heartbeat_at, refreshed by MachineHeartbeat
+// every 30s) expired more than the grace period ago. An unknown machine row
+// counts as lost. A machine with no binding (id 0) is never "lost" here —
+// commands without a machine binding cannot have an in-flight turn.
+func (d *Dispatcher) machineLost(ctx context.Context, machineID int, now time.Time) bool {
+	if machineID == 0 {
 		return false
 	}
-	if sess, ok := d.registry.getAgent(cmd.AgentID); ok {
-		sess.mu.Lock()
-		current := sess.currentCmdID
-		sess.mu.Unlock()
-		if current == cmd.ID.String() {
-			return false
-		}
+	if d.IsMachineConnected(machineID) {
+		return false
 	}
-	return true
-}
-
-// pickResumeCommand decides whether a leftover RUNNING command should be
-// resumed at BeginSession time. Only an enabled, drain-capable agent can
-// continue an interrupted turn (a stopped agent processes no sessions; an
-// agent with no ACP/pi runtime has no executor to run one), and the resume
-// target is the newest RUNNING row. Everything else is reaped by the caller.
-func pickResumeCommand(agent *store.AgentMessage, running []*store.CommandMessage) *store.CommandMessage {
-	if agent == nil || !agent.Enabled {
-		return nil
-	}
-	capability := agent.Info.GetCapability()
-	if capability == nil || (!capability.GetSupportsAcp() && !capability.GetSupportsPi()) {
-		return nil
-	}
-	if len(running) == 0 {
-		return nil
-	}
-	return running[0]
-}
-
-// reapCommand marks one RUNNING command FAILED (status-guarded, so a result
-// that landed concurrently is never overwritten) and closes its live watchers.
-func (d *Dispatcher) reapCommand(ctx context.Context, cmd *store.CommandMessage) {
-	reaped, err := d.store.FailStaleRunningCommand(ctx, cmd.ID, time.Now(), beginSessionReapReason)
+	machine, err := d.store.GetMachine(ctx, machineID)
 	if err != nil {
-		slog.Error("failed to reap running command", "commandID", cmd.ID, "agentID", cmd.AgentID, "error", err)
-		return
+		slog.Warn("stale command reaper: failed to load machine", "machineID", machineID, "error", err)
+		return false
 	}
-	if !reaped {
-		return
+	return machineLost(now, machine)
+}
+
+// machineLost is the pure dual-signal judgment over a loaded machine row: the
+// machine must be OFFLINE (deleted, missing status, or a non-ONLINE state) or
+// its heartbeat must be older than the grace period.
+func machineLost(now time.Time, machine *store.MachineMessage) bool {
+	if machine == nil || machine.Deleted {
+		return true
 	}
-	slog.Warn("reaped running command on begin session", "commandID", cmd.ID, "agentID", cmd.AgentID)
-	d.closeWatchers(cmd.ID.String())
-	d.closeEventWatchers(cmd.ID.String())
+	if machine.Status == nil {
+		return true
+	}
+	return machine.Status.GetState() != storepb.MachineStatus_ONLINE ||
+		now.Unix()-machine.Status.GetLastHeartbeatAt() >= int64(reaperGrace.Seconds())
 }
 
 // sweepExpiredPendingControl reclaims queued control interactions older than
