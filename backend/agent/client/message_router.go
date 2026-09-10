@@ -25,13 +25,13 @@ func newMessageRouter(c *commandStream) *messageRouter {
 	return &messageRouter{stream: c}
 }
 
-func (r *messageRouter) route(ctx context.Context, sender streamSender, msg *v1pb.ManagerStreamMessage, doneCh <-chan struct{}) {
+func (r *messageRouter) route(ctx context.Context, conn *agentConn, msg *v1pb.ManagerStreamMessage) {
 	switch m := msg.Message.(type) {
 	case *v1pb.ManagerStreamMessage_BeginSessionResponse:
 		resp := m.BeginSessionResponse
 		select {
-		case r.stream.beginRespCh <- resp:
-		case <-doneCh:
+		case conn.beginResps <- resp:
+		case <-conn.done:
 		}
 
 	case *v1pb.ManagerStreamMessage_NewMessages:
@@ -82,7 +82,7 @@ func (r *messageRouter) route(ctx context.Context, sender streamSender, msg *v1p
 			if s, ok := ex.(steerer); ok {
 				if err := s.Steer(notice.GetMessage()); err == nil {
 					r.stream.recordSteeredPromptVersion(notice.GetPromptVersion())
-					_ = sendPromptReleaseNoticeAck(sender, notice)
+					_ = sendPromptReleaseNoticeAck(conn.sender, notice)
 					break
 				}
 			}
@@ -95,10 +95,10 @@ func (r *messageRouter) route(ctx context.Context, sender streamSender, msg *v1p
 	case *v1pb.ManagerStreamMessage_WorkspaceListRequest:
 		// File reads run on their own goroutine: a slow disk must not
 		// block the receive pump (BeginSession / NewMessages / Cancel).
-		go r.stream.handleWorkspaceList(ctx, sender, m.WorkspaceListRequest)
+		go r.stream.handleWorkspaceList(ctx, conn.sender, m.WorkspaceListRequest)
 
 	case *v1pb.ManagerStreamMessage_WorkspaceReadRequest:
-		go r.stream.handleWorkspaceRead(ctx, sender, m.WorkspaceReadRequest)
+		go r.stream.handleWorkspaceRead(ctx, conn.sender, m.WorkspaceReadRequest)
 
 	default:
 		slog.Warn("unknown message type from manager")

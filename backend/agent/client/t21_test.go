@@ -15,23 +15,32 @@ import (
 // TestBeginSession_NoStaleResponseAcrossReconnect guards the T21 reset: a
 // BeginSessionResponse left over in beginRespCh from a previous connection
 // (the drain loop's ctx cancelled mid-begin) must not be consumed by the first
-// beginSession of the next connection. The reconnect path resets the channel,
-// so a fresh beginSession blocks waiting for a new response rather than
-// picking up the stale command.
+// beginSession of the next connection. Replies are bound to their connection
+// (agentConn.beginResps), so a fresh beginSession on the new connection blocks
+// waiting for a new response rather than picking up the stale command.
 func TestBeginSession_NoStaleResponseAcrossReconnect(t *testing.T) {
-	stream, _, cleanup := newTestCommandChannel(t)
-	defer cleanup()
-
 	cs := &commandStream{
-		beginRespCh: make(chan *v1pb.BeginSessionResponse, 1),
-		wakeCh:      make(chan struct{}, 1),
+		wakeCh:    make(chan struct{}, 1),
+		connReady: make(chan struct{}, 1),
 	}
 
-	// Simulate a stale response that the prior connection never consumed.
-	cs.beginRespCh <- &v1pb.BeginSessionResponse{CommandId: "STALE-CMD", Idle: false}
+	// The prior connection's pump delivered a reply nobody consumed.
+	oldConn := &agentConn{
+		sender:     &scriptedStreamSender{},
+		done:       make(chan struct{}),
+		beginResps: make(chan *v1pb.BeginSessionResponse, 1),
+	}
+	oldConn.beginResps <- &v1pb.BeginSessionResponse{CommandId: "STALE-CMD", Idle: false}
+	cs.setConn(oldConn)
 
-	// Reconnect resets the cross-connection channels, dropping the stale value.
-	cs.resetCrossConnectionState()
+	// Reconnect installs a fresh connection with its own reply channel; the
+	// stale value stays bound to the dead one.
+	fresh := &agentConn{
+		sender:     &scriptedStreamSender{},
+		done:       make(chan struct{}),
+		beginResps: make(chan *v1pb.BeginSessionResponse, 1),
+	}
+	cs.setConn(fresh)
 
 	// A fresh beginSession must block for a *new* response, not the stale one.
 	// Use a short ctx so the call returns promptly via ctx.Done rather than
@@ -42,7 +51,7 @@ func TestBeginSession_NoStaleResponseAcrossReconnect(t *testing.T) {
 	done := make(chan struct{})
 	var gotCmdID string
 	go func() {
-		resp, _ := cs.beginSession(ctx, stream, make(chan struct{}))
+		resp, _ := cs.beginSession(ctx, fresh)
 		if resp != nil {
 			gotCmdID = resp.CommandId
 		}

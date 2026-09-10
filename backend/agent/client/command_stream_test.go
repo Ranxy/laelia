@@ -377,37 +377,42 @@ func TestCommandStreamSendsTokenUsageEvent(t *testing.T) {
 // TestDrainLoopIdleResponseEndsPass verifies that when BeginSession replies
 // idle=true, the drain loop sends a BeginSession message, builds no runtime,
 // and ends the drain pass without running a session. The drain loop goroutine
-// itself stays alive to wait for the next wake (it only exits on ctx/doneCh),
-// so the test cancels ctx to stop it rather than expecting it to return on idle.
+// itself stays alive to wait for the next wake (it only exits on ctx), so the
+// test cancels ctx to stop it rather than expecting it to return on idle.
 func TestDrainLoopIdleResponseEndsPass(t *testing.T) {
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sender := &scriptedStreamSender{}
+	conn := &agentConn{
+		sender:     sender,
+		done:       make(chan struct{}),
+		beginResps: make(chan *v1pb.BeginSessionResponse, 1),
+	}
 
 	cs := &commandStream{
-		wakeCh:      make(chan struct{}, 1),
-		beginRespCh: make(chan *v1pb.BeginSessionResponse, 1),
+		wakeCh:    make(chan struct{}, 1),
+		connReady: make(chan struct{}, 1),
 		newSessionRuntime: func(_ executor.Request) (executor.Runtime, error) {
 			t.Fatal("runtime must not be built for an idle session")
 			return nil, nil
 		},
 	}
+	cs.setConn(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	doneCh := make(chan struct{})
 
+	doneCh := make(chan struct{})
 	go func() {
-		cs.drainLoop(ctx, stream, doneCh)
+		cs.drainLoop(ctx)
 		close(doneCh)
 	}()
 
 	cs.wake()
-	cs.beginRespCh <- &v1pb.BeginSessionResponse{Idle: true}
+	conn.beginResps <- &v1pb.BeginSessionResponse{Idle: true}
 
 	// The drain pass ends on idle: exactly one BeginSession is sent and no
 	// runtime is built (the newSessionRuntime closure would t.Fatal otherwise).
 	require.Eventually(t, func() bool {
-		return len(recorder.Messages()) >= 1
+		return len(sender.Sent()) >= 1
 	}, time.Second, 10*time.Millisecond, "drain loop did not send BeginSession on idle response")
 
 	// The loop keeps waiting for the next wake; cancel ctx to let it exit.
@@ -418,10 +423,84 @@ func TestDrainLoopIdleResponseEndsPass(t *testing.T) {
 		t.Fatal("drain loop did not exit on ctx cancel")
 	}
 
-	require.NoError(t, stream.CloseRequest())
-	msgs := recorder.Messages()
+	msgs := sender.Sent()
 	require.Len(t, msgs, 1, "drain loop should send exactly one BeginSession message")
 	require.NotNil(t, msgs[0].GetBeginSession())
+}
+
+// TestDrainLoopSurvivesDeadConnectionAndRunsOnReconnect locks the phase-2
+// lifecycle matrix: with no live connection the drain loop waits for the next
+// one instead of exiting, and once a connection is installed it runs the
+// session — a stream death never tears the loop down.
+func TestDrainLoopSurvivesDeadConnectionAndRunsOnReconnect(t *testing.T) {
+	oldTimeout := beginSessionResponseTimeout
+	beginSessionResponseTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { beginSessionResponseTimeout = oldTimeout })
+	oldRetry := beginSessionRetryWait
+	beginSessionRetryWait = 5 * time.Millisecond
+	t.Cleanup(func() { beginSessionRetryWait = oldRetry })
+
+	cs := &commandStream{
+		wakeCh:    make(chan struct{}, 1),
+		connReady: make(chan struct{}, 1),
+	}
+
+	turnStarted := make(chan struct{}, 1)
+	cs.newSessionRuntime = func(_ executor.Request) (executor.Runtime, error) {
+		turnStarted <- struct{}{}
+		runtime := newScriptedRuntime(func(r *scriptedRuntime) {
+			close(r.outputCh)
+			close(r.eventCh)
+			r.resultCh <- executor.Result{ExitCode: 0, FinalSummary: "done"}
+			close(r.resultCh)
+			close(r.doneCh)
+		})
+		return runtime, nil
+	}
+	cs.sink = newMemoryTurnSink()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	drainDone := make(chan struct{})
+	go func() {
+		cs.drainLoop(ctx)
+		close(drainDone)
+	}()
+
+	// Wake while disconnected: the loop must wait for a connection, not exit.
+	cs.wake()
+	select {
+	case <-turnStarted:
+		t.Fatal("the turn must not run without a connection")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	// A connection arrives: the loop proceeds and runs the turn. The manager
+	// replies to BeginSession with a command.
+	liveConn := newTestAgentConn()
+	liveConn.sender = &scriptedStreamSender{onSend: func(msg *v1pb.AgentStreamMessage) error {
+		if msg.GetBeginSession() != nil {
+			select {
+			case liveConn.beginResps <- &v1pb.BeginSessionResponse{CommandId: "reconnected-cmd"}:
+			default:
+			}
+		}
+		return nil
+	}}
+	cs.setConn(liveConn)
+
+	select {
+	case <-turnStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the drain loop never ran the session after the reconnect")
+	}
+
+	cancel()
+	select {
+	case <-drainDone:
+	case <-time.After(time.Second):
+		t.Fatal("drain loop did not exit on ctx cancel")
+	}
 }
 
 // TestRunSessionExecutesRuntime verifies that a non-idle session builds the
@@ -698,10 +777,9 @@ func TestBuildSteerNotice(t *testing.T) {
 func TestMessageRouterPromptReleaseNoticeQueuesWhenNotSteerable(t *testing.T) {
 	cs := &commandStream{}
 	router := newMessageRouter(cs)
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	conn := &agentConn{sender: &scriptedStreamSender{}, done: make(chan struct{}), beginResps: make(chan *v1pb.BeginSessionResponse, 1)}
 
-	router.route(context.Background(), stream, &v1pb.ManagerStreamMessage{
+	router.route(context.Background(), conn, &v1pb.ManagerStreamMessage{
 		Message: &v1pb.ManagerStreamMessage_PromptReleaseNotice{
 			PromptReleaseNotice: &v1pb.PromptReleaseNotice{
 				NoticeKey:     "k1",
@@ -709,14 +787,14 @@ func TestMessageRouterPromptReleaseNoticeQueuesWhenNotSteerable(t *testing.T) {
 				PromptVersion: "static1.dyn1",
 			},
 		},
-	}, make(chan struct{}))
+	})
 
 	notice := cs.takePendingPromptNotice()
 	require.NotNil(t, notice, "non-steerable runtime must queue the notice for the next turn")
 	assert.Equal(t, "k1", notice.GetNoticeKey())
 	assert.Equal(t, "static1.dyn1", notice.GetPromptVersion())
 	// The queued path does not ack immediately; runSession acks after injecting.
-	assert.Empty(t, recorder.Messages())
+	assert.Empty(t, conn.sender.(*scriptedStreamSender).Sent())
 }
 
 func TestSendPromptReleaseNoticeAck(t *testing.T) {

@@ -12,12 +12,11 @@ import (
 
 const cmdPingInterval = 15 * time.Second
 
-// Start runs one command-stream lifecycle (mainLoop) and returns its terminal
-// error. It deliberately does NOT retry internally: a dead bidi stream must
-// surface to the caller (Client.Run's heartbeat loop, the "death fuse") so the
-// whole agent connection is torn down and reconnected rather than the agent
-// going deaf while its heartbeat stays healthy. The caller owns reconnect
-// backoff.
+// Start runs one AgentChannel connection lifecycle (mainLoop) and returns its
+// terminal error. It deliberately does NOT retry internally: the runner's
+// connectLoop owns reconnection (phase 2 — a dead stream must not tear down
+// the runner or its in-flight turn), so a single lifecycle stays a simple,
+// testable unit.
 func (c *commandStream) Start(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
@@ -27,10 +26,30 @@ func (c *commandStream) Start(ctx context.Context) error {
 	return c.mainLoop(ctx)
 }
 
-// mainLoop owns the connection lifecycle: it opens the AgentChannel, sends
-// AgentReady, starts the receive pump (messageRouter) and the drain loop
-// (drainRunner), and keeps the link alive with pings until the stream dies or
-// the context is cancelled.
+// connectLoop owns the AgentChannel across streams: it opens one connection
+// lifecycle at a time and reconnects with backoff when the stream dies. The
+// drain loop and the uploader live OUTSIDE this loop (runner lifetime), so a
+// dead stream can never interrupt a running turn — a proxy that bounds request
+// read time costs the agent a reconnect, nothing more (phase 2).
+func (c *commandStream) connectLoop(ctx context.Context) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		if err := c.mainLoop(ctx); err != nil {
+			slog.Warn("agent channel died; reconnecting", "agent", c.agentID, "error", err)
+		}
+		if c.backoff.Wait(ctx) != nil {
+			return
+		}
+	}
+}
+
+// mainLoop owns one AgentChannel connection: it opens the stream, sends
+// AgentReady, installs the connection for the drain loop, starts the receive
+// pump (messageRouter), and keeps the link alive with pings until the stream
+// dies or the context is cancelled. The drain loop is NOT owned here: it
+// outlives connections.
 func (c *commandStream) mainLoop(ctx context.Context) error {
 	token := c.getToken()
 	if token == "" {
@@ -60,16 +79,18 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 		return err
 	}
 
-	// Reset any stale in-flight session bookkeeping from a previous connection.
-	// The previous connection's receive pump and drain loop have exited
-	// (doneCh close / drainCancel) before this point, so replacing the fields
-	// is safe.
-	c.resetCrossConnectionState()
-
 	// serializedSender guards Send: connect-go's Send is not safe to call
 	// concurrently, and the workspace reply goroutines send alongside the ping
 	// ticker and the drain loop.
-	sender := &serializedSender{stream: stream}
+	conn := &agentConn{
+		sender:     &serializedSender{stream: stream},
+		done:       make(chan struct{}),
+		beginResps: make(chan *v1pb.BeginSessionResponse, 1),
+	}
+	c.setConn(conn)
+	defer c.clearConn(conn)
+	defer close(conn.done)
+
 	router := newMessageRouter(c)
 
 	pingTicker := time.NewTicker(cmdPingInterval)
@@ -78,12 +99,8 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 	var pingSeq int64
 
 	errCh := make(chan error, 1)
-	doneCh := make(chan struct{})
-	defer close(doneCh)
 
-	// Receive pump: dispatches manager messages. BeginSessionResponse goes to
-	// the drain loop; NewMessages kicks the drain loop; Cancel acts on the
-	// in-flight session.
+	// Receive pump: dispatches manager messages on this connection.
 	go func() {
 		for {
 			msg, err := stream.Receive()
@@ -91,22 +108,14 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 				if err != io.EOF {
 					select {
 					case errCh <- err:
-					case <-doneCh:
+					case <-conn.done:
 					}
 				}
 				return
 			}
-			router.route(ctx, sender, msg, doneCh)
+			router.route(ctx, conn, msg)
 		}
 	}()
-
-	// Drain loop: the agent-first autonomous engine. On wake it opens sessions
-	// (BeginSession) and runs each until the manager reports idle. Wakes that
-	// arrive during a session are coalesced — the post-session BeginSession
-	// picks up anything new via the server-side cursor comparison.
-	drainCtx, drainCancel := context.WithCancel(ctx)
-	defer drainCancel()
-	go c.drainLoop(drainCtx, sender, doneCh)
 
 	// Kick the drain loop once on connect so missed-offline messages are
 	// discovered immediately (AgentReady already told the manager we're back).
@@ -116,7 +125,7 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-doneCh:
+		case <-conn.done:
 			return nil
 		case err := <-errCh:
 			return err
@@ -130,7 +139,7 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 					},
 				},
 			}
-			if err := sender.Send(ping); err != nil {
+			if err := conn.sender.Send(ping); err != nil {
 				return err
 			}
 		}

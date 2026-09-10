@@ -52,21 +52,22 @@ func TestBeginSessionDiscardsStaleReplyAndConsumesFreshReply(t *testing.T) {
 	defer func() { beginSessionResponseTimeout = old }()
 
 	c := newTestDrainCommandStream()
+	conn := newTestAgentConn()
 	stale := &v1pb.BeginSessionResponse{CommandId: "stale-command"}
-	c.beginRespCh <- stale
+	conn.beginResps <- stale
 
 	fresh := &v1pb.BeginSessionResponse{CommandId: "fresh-command"}
-	sender := &scriptedStreamSender{onSend: func(msg *v1pb.AgentStreamMessage) error {
+	conn.sender = &scriptedStreamSender{onSend: func(msg *v1pb.AgentStreamMessage) error {
 		if msg.GetBeginSession() != nil {
 			// The manager's reply races in after the send; the stale value
 			// must already be gone.
-			require.Empty(t, c.beginRespCh, "stale reply must be discarded before the send")
-			c.beginRespCh <- fresh
+			require.Empty(t, conn.beginResps, "stale reply must be discarded before the send")
+			conn.beginResps <- fresh
 		}
 		return nil
 	}}
 
-	resp, err := c.beginSession(context.Background(), sender, make(chan struct{}))
+	resp, err := c.beginSession(context.Background(), conn)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.Equal(t, "fresh-command", resp.CommandId)
@@ -75,7 +76,7 @@ func TestBeginSessionDiscardsStaleReplyAndConsumesFreshReply(t *testing.T) {
 // TestBeginSessionTimesOutWhenManagerNeverReplies guards the drain-loop wedge:
 // a manager that receives BeginSession but never replies (e.g. a DB hiccup on
 // its side: it logs and sends nothing) must surface as a bounded error so the
-// drain loop can back off and retry, instead of waiting on beginRespCh
+// drain loop can back off and retry, instead of waiting on the reply channel
 // forever.
 func TestBeginSessionTimesOutWhenManagerNeverReplies(t *testing.T) {
 	old := beginSessionResponseTimeout
@@ -83,13 +84,35 @@ func TestBeginSessionTimesOutWhenManagerNeverReplies(t *testing.T) {
 	defer func() { beginSessionResponseTimeout = old }()
 
 	c := newTestDrainCommandStream()
-	sender := &scriptedStreamSender{}
+	conn := newTestAgentConn()
 
 	start := time.Now()
-	_, err := c.beginSession(context.Background(), sender, make(chan struct{}))
+	_, err := c.beginSession(context.Background(), conn)
 	require.Error(t, err, "a silent manager must time out instead of wedging the drain loop")
 	require.Less(t, time.Since(start), 5*time.Second)
-	require.Empty(t, c.beginRespCh)
+	require.Empty(t, conn.beginResps)
+}
+
+// TestBeginSessionReplyIsBoundToItsConnection guards the per-connection reply
+// channel: a BeginSessionResponse delivered after its connection died (or by a
+// previous connection's pump) is unreachable from the next connection's
+// beginSession, so a session is never anchored to a stale command.
+func TestBeginSessionReplyIsBoundToItsConnection(t *testing.T) {
+	c := newTestDrainCommandStream()
+
+	oldConn := newTestAgentConn()
+	oldConn.beginResps <- &v1pb.BeginSessionResponse{CommandId: "STALE-CMD"}
+	c.setConn(oldConn)
+
+	// Reconnect: the new connection's replies land in its own channel.
+	newConn := newTestAgentConn()
+	c.setConn(newConn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Millisecond)
+	defer cancel()
+	resp, err := c.beginSession(ctx, newConn)
+	require.Error(t, err, "the new connection must wait for a NEW reply, not the stale one")
+	require.Nil(t, resp)
 }
 
 // TestRunCommandKeepsLocalStateWhenTerminalUndeliverable guards the resume
@@ -515,9 +538,18 @@ func warningSummary(t *testing.T, entries []*outbox.Entry) string {
 
 func newTestDrainCommandStream() *commandStream {
 	return &commandStream{
-		machineID:   "m",
-		agentID:     "a",
-		wakeCh:      make(chan struct{}, 1),
-		beginRespCh: make(chan *v1pb.BeginSessionResponse, 1),
+		machineID: "m",
+		agentID:   "a",
+		wakeCh:    make(chan struct{}, 1),
+		connReady: make(chan struct{}, 1),
+	}
+}
+
+// newTestAgentConn returns a connection whose sender records messages.
+func newTestAgentConn() *agentConn {
+	return &agentConn{
+		sender:     &scriptedStreamSender{},
+		done:       make(chan struct{}),
+		beginResps: make(chan *v1pb.BeginSessionResponse, 1),
 	}
 }

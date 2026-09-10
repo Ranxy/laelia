@@ -23,15 +23,14 @@ const (
 	// one. A session that finishes faster than this gap waits out the remainder
 	// before opening the next.
 	minSessionGap = 1 * time.Second
-
-	// beginSessionRetryWait is the backoff after a transient BeginSession
-	// failure (e.g. a manager-side DB hiccup returning Internal). The pending
-	// messages that triggered the wake are still queued server-side and the
-	// manager will not re-wake, so the drain loop must retry BeginSession
-	// proactively rather than wait for the next wake. A truly dead stream
-	// surfaces via the receive pump and triggers a full reconnect independently.
-	beginSessionRetryWait = 2 * time.Second
 )
+
+// beginSessionRetryWait is the backoff after a transient BeginSession failure
+// (e.g. a manager-side DB hiccup returning Internal). The pending messages
+// that triggered the wake are still queued server-side and the manager will
+// not re-wake, so the drain loop must retry BeginSession proactively rather
+// than wait for the next wake. Var (not const) so tests can shorten the wait.
+var beginSessionRetryWait = 2 * time.Second
 
 // resumeTurnNotice is prepended to the turn prompt when a drain session
 // resumes a command whose previous turn was cut off mid-flight (a stream
@@ -105,18 +104,18 @@ func (m *mergedText) flush(sink turnSink, commandID string, state *executor.Loca
 	return sink.appendEvent(commandID, &event)
 }
 
-// drainLoop is the agent-first autonomous engine. It waits for a wake, then
-// repeatedly opens a session (BeginSession) and runs it until the manager
-// reports no channel has updates (idle), at which point it waits for the next
-// wake. One session processes one channel; the outer loop opens the next.
-func (c *commandStream) drainLoop(ctx context.Context, stream streamSender, doneCh <-chan struct{}) {
+// drainLoop is the agent-first autonomous engine, living on the runner's
+// long-lived ctx (not the stream's): it waits for a wake, then repeatedly
+// opens a session (BeginSession) on the CURRENT connection and runs it until
+// the manager reports no channel has updates (idle). A dead stream only makes
+// it wait for the next connection; a running turn is never interrupted by a
+// reconnect (phase 2).
+func (c *commandStream) drainLoop(ctx context.Context) {
 	var lastSessionStart time.Time
 	for {
 	START:
 		select {
 		case <-ctx.Done():
-			return
-		case <-doneCh:
 			return
 		case <-c.wakeCh:
 		}
@@ -127,8 +126,6 @@ func (c *commandStream) drainLoop(ctx context.Context, stream streamSender, done
 			select {
 			case <-ctx.Done():
 				return
-			case <-doneCh:
-				return
 			default:
 			}
 
@@ -138,26 +135,41 @@ func (c *commandStream) drainLoop(ctx context.Context, stream streamSender, done
 					case <-time.After(minSessionGap - gap):
 					case <-ctx.Done():
 						return
-					case <-doneCh:
-						return
 					}
 				}
 			}
 
-			resp, err := c.beginSession(ctx, stream, doneCh)
+			conn := c.currentConn()
+			if conn == nil {
+				// No live connection: the connector is (re)connecting. It kicks
+				// a wake on connect, so missed-offline work is still discovered
+				// by the next BeginSession.
+				select {
+				case <-ctx.Done():
+					return
+				case <-c.connReady:
+				}
+				continue
+			}
+
+			resp, err := c.beginSession(ctx, conn)
 			if err != nil {
+				if ctx.Err() != nil {
+					return
+				}
+				if conn.dead() {
+					// The connection died: re-fetch (nil until reconnected).
+					continue
+				}
 				// Do NOT exit the drain loop: a transient BeginSession error
 				// (e.g. a manager-side DB hiccup) would otherwise deafen the
 				// agent until the whole machine reconnects. The wake that
 				// started this pass already fired and won't re-fire, so back off
-				// and retry BeginSession proactively. A dead stream is caught
-				// separately by the receive pump and drives a full reconnect.
+				// and retry BeginSession proactively.
 				slog.Warn("drain loop: begin session failed, backing off before retry", "error", err)
 				select {
 				case <-time.After(beginSessionRetryWait):
 				case <-ctx.Done():
-					return
-				case <-doneCh:
 					return
 				}
 				continue
@@ -167,25 +179,26 @@ func (c *commandStream) drainLoop(ctx context.Context, stream streamSender, done
 			}
 
 			lastSessionStart = time.Now()
-			c.runSession(ctx, stream, resp.CommandId, resp.AgentDisplayName, resp.OwnerDisplayName, resp.Team, resp.PromptVersion, resp.PromptReleaseNotice)
+			c.runSession(ctx, conn, resp.CommandId, resp.AgentDisplayName, resp.OwnerDisplayName, resp.Team, resp.PromptVersion, resp.PromptReleaseNotice)
 		}
 	}
 }
 
-// beginSession sends a BeginSession message and waits for the manager's reply.
-// Returns a non-idle response with a command_id to run, or idle=true when no
-// channel has updates. The wait is bounded: a manager that received the
-// request but never replies must not wedge the drain loop forever.
-func (c *commandStream) beginSession(ctx context.Context, stream streamSender, doneCh <-chan struct{}) (*v1pb.BeginSessionResponse, error) {
+// beginSession sends a BeginSession message on the current connection and
+// waits for the manager's reply. Returns a non-idle response with a
+// command_id to run, or idle=true when no channel has updates. The wait is
+// bounded: a manager that received the request but never replies must not
+// wedge the drain loop forever.
+func (*commandStream) beginSession(ctx context.Context, conn *agentConn) (*v1pb.BeginSessionResponse, error) {
 	// Discard any BeginSessionResponse queued by a previous attempt that gave
 	// up waiting: the manager replies in stream order, so whatever is still
 	// buffered here predates this send and would anchor this session to an
 	// already-reaped command.
 	select {
-	case <-c.beginRespCh:
+	case <-conn.beginResps:
 	default:
 	}
-	if err := stream.Send(&v1pb.AgentStreamMessage{
+	if err := conn.sender.Send(&v1pb.AgentStreamMessage{
 		Message: &v1pb.AgentStreamMessage_BeginSession{
 			BeginSession: &v1pb.BeginSession{},
 		},
@@ -194,9 +207,9 @@ func (c *commandStream) beginSession(ctx context.Context, stream streamSender, d
 	}
 
 	select {
-	case resp := <-c.beginRespCh:
+	case resp := <-conn.beginResps:
 		return resp, nil
-	case <-doneCh:
+	case <-conn.done:
 		return nil, io.EOF
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -212,7 +225,7 @@ func (c *commandStream) beginSession(ctx context.Context, stream streamSender, d
 // The agent itself decides which channel to process and how, by shelling out
 // to the `laelia-machine` CLI over the local daemon. Blocking: returns when
 // the session finishes.
-func (c *commandStream) runSession(ctx context.Context, stream streamSender, commandID string, agentDisplayName, ownerDisplayName string, team *v1pb.TeamContext, promptVersion string, promptNotice *v1pb.PromptReleaseNotice) {
+func (c *commandStream) runSession(ctx context.Context, conn *agentConn, commandID string, agentDisplayName, ownerDisplayName string, team *v1pb.TeamContext, promptVersion string, promptNotice *v1pb.PromptReleaseNotice) {
 	// Turn-start barrier (§3.4). No-op without an uploader (turn-loop tests).
 	if err := c.waitTurnClear(ctx, commandID); err != nil {
 		if ctx.Err() == nil {
@@ -284,7 +297,7 @@ func (c *commandStream) runSession(ctx context.Context, stream streamSender, com
 				turnPrompt = msg + "\n\n" + turnPrompt
 			}
 		}
-		_ = sendPromptReleaseNoticeAck(stream, notice)
+		_ = sendPromptReleaseNoticeAck(conn.sender, notice)
 	}
 
 	// A notice successfully steered into the previous in-flight turn is already

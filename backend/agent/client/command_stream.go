@@ -72,13 +72,22 @@ type commandStream struct {
 	ob       *outbox.Outbox
 
 	// drain loop coordination. wakeCh is buffered(1): a wake while one is
-	// already pending is coalesced. beginRespCh carries the manager's reply
-	// to a BeginSession. currentExecutor is the in-flight session runtime, set
-	// by the drain loop and read by the receive goroutine for Cancel.
+	// already pending is coalesced, and it lives for the whole commandStream
+	// (never reset on reconnect) so the long-lived drain loop never holds a
+	// dead channel. The current AgentChannel connection is swapped atomically
+	// (see agentConn): the drain loop and the live connection's receive pump
+	// rendezvous through it.
 	wakeCh            chan struct{}
-	beginRespCh       chan *v1pb.BeginSessionResponse
 	currentExecutor   executor.Runtime
 	currentExecutorMu sync.Mutex
+
+	// conn is the current AgentChannel connection; nil while disconnected.
+	// Only the connector writes it (once per connection); the drain loop reads
+	// snapshots. connReady is signaled (coalesced) on every swap so a drain
+	// loop waiting for a connection re-checks.
+	connMu    sync.Mutex
+	conn      *agentConn
+	connReady chan struct{}
 
 	// inFlightDone is non-nil while a drain turn is executing and is closed by
 	// endInFlight when the turn ends. CancelInFlight snapshots it so a caller
@@ -164,7 +173,7 @@ func newCommandStream(httpClient *http.Client, managerURL, socketPath, sessionTo
 		agentID:      agentID,
 		machineID:    machineID,
 		wakeCh:       make(chan struct{}, 1),
-		beginRespCh:  make(chan *v1pb.BeginSessionResponse, 1),
+		connReady:    make(chan struct{}, 1),
 	}
 	c.newSessionRuntime = c.buildRuntime
 	return c
@@ -180,17 +189,59 @@ func (c *commandStream) wake() {
 	}
 }
 
-// resetCrossConnectionState clears stale in-flight session bookkeeping left
-// over from a previous connection so a BeginSessionResponse that arrived but
-// was never consumed (the drain loop's ctx cancelled mid-begin) cannot persist
-// into the next connection and be consumed by its first beginSession. The
-// caller guarantees the prior connection's receive pump and drain loop have
-// exited, so replacing the channel fields is safe.
-func (c *commandStream) resetCrossConnectionState() {
-	c.setCurrentExecutor(nil)
-	c.endInFlight()
-	c.beginRespCh = make(chan *v1pb.BeginSessionResponse, 1)
-	c.wakeCh = make(chan struct{}, 1)
+// agentConn is one live AgentChannel connection. The long-lived drain loop and
+// the current connection's receive pump rendezvous through it: per-connection
+// state (send serialization, the BeginSession reply channel, the death signal)
+// is bound to the connection, so a stale reply can never leak into the next
+// connection and a dead stream can never be reused. A reconnect replaces the
+// whole object; the in-flight turn (runner-owned) is untouched.
+type agentConn struct {
+	// sender serializes sends on this stream (connect-go's Send is not safe
+	// for concurrent use).
+	sender streamSender
+	// done is closed when this connection ends (stream death or runner stop).
+	done chan struct{}
+	// beginResps carries this connection's BeginSession replies. Per-connection
+	// so a reply that outlives its connection is unreachable from the next one.
+	beginResps chan *v1pb.BeginSessionResponse
+}
+
+// dead reports whether the connection has ended.
+func (a *agentConn) dead() bool {
+	select {
+	case <-a.done:
+		return true
+	default:
+		return false
+	}
+}
+
+// setConn installs the current connection and signals the drain loop.
+func (c *commandStream) setConn(conn *agentConn) {
+	c.connMu.Lock()
+	c.conn = conn
+	c.connMu.Unlock()
+	select {
+	case c.connReady <- struct{}{}:
+	default:
+	}
+}
+
+// currentConn snapshots the current connection; nil while disconnected.
+func (c *commandStream) currentConn() *agentConn {
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	return c.conn
+}
+
+// clearConn drops the current connection only if it is still the one the
+// connector opened (a newer connection must not be clobbered).
+func (c *commandStream) clearConn(conn *agentConn) {
+	c.connMu.Lock()
+	if c.conn == conn {
+		c.conn = nil
+	}
+	c.connMu.Unlock()
 }
 
 func (c *commandStream) setCurrentExecutor(ex executor.Runtime) {
@@ -221,9 +272,8 @@ func (c *commandStream) beginInFlight() {
 }
 
 // endInFlight clears the in-flight mark and closes the inFlightDone channel so
-// any CancelInFlight waiter unblocks. Idempotent: a second call (e.g.
-// resetCrossConnectionState after the turn already ended) finds no done and is
-// a no-op.
+// any CancelInFlight waiter unblocks. Idempotent: a second call finds no done
+// and is a no-op.
 func (c *commandStream) endInFlight() {
 	c.isExecuting.Store(false)
 	c.inFlightMu.Lock()

@@ -258,10 +258,12 @@ func (r *agentRunner) stopThreadSession() {
 	}
 }
 
-// start opens the agent's AgentChannel and runs its drain loop in a background
-// goroutine. It returns immediately; the runner's lifetime ends when the
-// goroutine exits (ctx cancelled or the stream dies). Safe to call only once
-// per runner; stop cancels and waits.
+// start starts the runner's three long-lived loops — the uploader (command
+// data reporting), the drain loop (turn execution), and the AgentChannel
+// connect loop (control-plane link) — all bound to the runner's lifetime, not
+// to any single stream. It returns immediately; the runner's lifetime ends
+// when all loops exit (ctx cancelled). Safe to call only once per runner;
+// stop cancels and waits.
 func (r *agentRunner) start(ctx context.Context) {
 	streamCtx, cancel := context.WithCancel(ctx)
 	r.cancel = cancel
@@ -288,7 +290,7 @@ func (r *agentRunner) start(ctx context.Context) {
 	cs.buildTurnBatch = func(ctx context.Context) (string, error) {
 		return chattools.BuildTurnBatch(ctx, r.daemon.BatchDeps(r.agentID))
 	}
-	r.wireOutbox(streamCtx, cs)
+	r.wireOutbox(cs)
 
 	r.mu.Lock()
 	r.cs = cs
@@ -296,22 +298,33 @@ func (r *agentRunner) start(ctx context.Context) {
 
 	go func() {
 		defer close(r.done)
-		if err := cs.Start(streamCtx); err != nil {
-			slog.Warn("agent runner stream exited", "agent", r.agentName, "error", err)
-		}
+		// The lifecycle matrix (phase 2): the drain loop and the uploader are
+		// permanent (runner lifetime); the AgentChannel is re-established by
+		// the connector, and a stream death never touches a running turn.
+		var wg sync.WaitGroup
+		wg.Go(func() {
+			cs.uploader.Run(streamCtx)
+		})
+		wg.Go(func() {
+			cs.drainLoop(streamCtx)
+		})
+		wg.Go(func() {
+			cs.connectLoop(streamCtx)
+		})
+		wg.Wait()
 	}()
 	slog.Info("opened AgentChannel for agent", "agent", r.agentName, "displayName", r.displayName)
 }
 
 // wireOutbox opens the agent's durable outbox and its uploader. The outbox
 // lives on disk under the agent's data dir, so records survive runner and
-// machine restarts; the uploader runs on the runner's ctx (the hybrid phase
-// keeps the runner per-connection — phase 2 lifts it) and re-reads from the
+// machine restarts; the uploader runs on the runner's ctx (outliving
+// connections — a dead stream never stops reporting) and re-reads from the
 // log start after a restart: the manager's (command, seq) dedup makes the
 // replay idempotent. An open failure leaves the runner up but inert for
 // reporting: every turn fails fast with the §3.1 bypass unavailable, and the
 // manager's reaper closes the RUNNING rows.
-func (r *agentRunner) wireOutbox(ctx context.Context, cs *commandStream) {
+func (r *agentRunner) wireOutbox(cs *commandStream) {
 	ob, err := outbox.Open(outbox.AgentOutboxDir(home.Dir(), r.machine.machineID, r.agentID))
 	if err != nil {
 		slog.Error("failed to open agent outbox; turns cannot record until it recovers",
@@ -322,9 +335,6 @@ func (r *agentRunner) wireOutbox(ctx context.Context, cs *commandStream) {
 	cs.ob = ob
 	cs.sink = outboxSink{ob: ob}
 	cs.uploader = outbox.NewUploader(ob, r.machine.uploadCommandData(cs.getToken))
-	go func() {
-		cs.uploader.Run(ctx)
-	}()
 }
 
 func (r *agentRunner) currentCommandStream() *commandStream {
@@ -588,12 +598,32 @@ func (r *agentRunner) stop() {
 	slog.Info("tore down agent runner", "agent", r.agentName)
 }
 
-// spawnAssignedAgents opens a runner for every agent the manager assigned at
-// (re)connect. Idempotent: an agent that already has a live runner is
-// re-configured in place rather than double-spawned.
+// spawnAssignedAgents aligns the runner set with the roster the manager
+// assigned at (re)connect: it opens a runner for every assigned agent
+// (idempotent — a live runner is hot-reloaded in place) and stops the runners
+// of agents that disappeared from the roster, since the runner lifecycle is
+// assignment-driven.
 func (c *MachineClient) spawnAssignedAgents(ctx context.Context, assignments []*v1pb.AgentAssignment) {
+	assigned := make(map[string]bool, len(assignments))
 	for _, a := range assignments {
+		if a == nil || a.GetAgentName() == "" {
+			continue
+		}
+		assigned[bareAgentID(a.GetAgentName())] = true
 		c.spawnOrUpdate(ctx, a)
+	}
+	c.runnersMu.Lock()
+	var removed []*agentRunner
+	for id, r := range c.runners {
+		if !assigned[id] {
+			removed = append(removed, r)
+			delete(c.runners, id)
+		}
+	}
+	c.runnersMu.Unlock()
+	for _, r := range removed {
+		slog.Info("agent no longer assigned to this machine; stopping runner", "agent", r.agentName)
+		r.stop()
 	}
 }
 
@@ -657,8 +687,10 @@ func (c *MachineClient) coldRestartAgent(agentName string) {
 	r.coldRestart()
 }
 
-// teardownRunners stops every live runner. Called on disconnect / reconnect so
-// the next connect re-spawns the full roster from assigned_agents.
+// teardownRunners stops every live runner. Called on machine shutdown only:
+// since phase 2 the runner outlives connections (a dead stream never tears
+// down a runner), so disconnect paths keep the runners and the roster is
+// reconciled from the next connect's assignment list.
 func (c *MachineClient) teardownRunners() {
 	c.runnersMu.Lock()
 	runners := make([]*agentRunner, 0, len(c.runners))

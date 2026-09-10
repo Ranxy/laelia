@@ -533,7 +533,9 @@ func (c *MachineClient) Run(ctx context.Context) error {
 				slog.Warn("machine control stream died while heartbeat healthy, reconnecting", "error", err)
 				ticker.Stop()
 				ctrlCancel()
-				c.teardownRunners()
+				// The runners outlive connections (phase 2): each runner
+				// re-establishes its own AgentChannel, and a running turn is
+				// never interrupted by a machine-level reconnect.
 				c.markDisconnected()
 				c.disconnectWithTimeout()
 				if err := c.backoff.Wait(ctx); err != nil {
@@ -545,7 +547,6 @@ func (c *MachineClient) Run(ctx context.Context) error {
 					slog.Error("heartbeat failed", "error", err)
 					ticker.Stop()
 					ctrlCancel()
-					c.teardownRunners()
 					c.markDisconnected()
 					break heartbeatLoop
 				}
