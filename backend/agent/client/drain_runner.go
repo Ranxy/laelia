@@ -36,16 +36,22 @@ type mergedText struct {
 	started    bool
 }
 
+// append buffers text for streamType and reports whether the pending run must
+// be flushed *before* this text can be buffered — a stream-kind switch, or a
+// run already at the batch cap. The text is not consumed when it returns true:
+// the caller flushes and calls append again, so a chunk that trips the cap
+// lands in exactly one emitted TEXT_DELTA rather than being duplicated across
+// the flush boundary.
 func (m *mergedText) append(streamType v1pb.CommandOutput_StreamType, text string) bool {
+	if m.started && (streamType != m.streamType || m.builder.Len() >= mergedTextDeltaFlushBytes) {
+		return true
+	}
 	if !m.started {
 		m.started = true
 		m.streamType = streamType
 	}
-	if streamType != m.streamType {
-		return true
-	}
 	_, _ = m.builder.WriteString(text)
-	return m.builder.Len() >= mergedTextDeltaFlushBytes
+	return false
 }
 
 func (m *mergedText) flush(sink turnSink, commandID string, state *executor.LocalState) error {

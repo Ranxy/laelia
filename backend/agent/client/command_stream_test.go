@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -171,6 +172,40 @@ func TestDrainOutputSendsProgressAndSynthesizedEvent(t *testing.T) {
 	assert.Equal(t, int32(7), textDelta.SeqNo, "TEXT_DELTA seq must come from the live state counter")
 	assert.Equal(t, "STDERR", textDelta.GetTextDelta().GetStreamType())
 	assert.Equal(t, "remaining output", textDelta.GetTextDelta().GetContent())
+}
+
+// TestMergedTextFlushDoesNotDuplicateChunk guards the flush-boundary bug where
+// the chunk that pushed a run to the byte cap was written once before the
+// flush and then again by the caller's re-append, so its text appeared twice
+// across two TEXT_DELTA events.
+func TestMergedTextFlushDoesNotDuplicateChunk(t *testing.T) {
+	sink := newMemoryTurnSink()
+	state := &executor.LocalState{}
+	var merged mergedText
+
+	chunks := []string{
+		strings.Repeat("a", mergedTextDeltaFlushBytes/2),
+		strings.Repeat("b", mergedTextDeltaFlushBytes/2),
+		"tail",
+	}
+	for _, text := range chunks {
+		// Mirrors the drain loop: flush the closed run, then re-append the
+		// chunk that tripped the boundary into the fresh run.
+		if merged.append(v1pb.CommandOutput_STDOUT, text) {
+			require.NoError(t, merged.flush(sink, "cmd-merge", state))
+			require.False(t, merged.append(v1pb.CommandOutput_STDOUT, text))
+		}
+	}
+	require.NoError(t, merged.flush(sink, "cmd-merge", state))
+
+	var got strings.Builder
+	for _, e := range sink.Entries() {
+		if ev := e.GetEvent(); ev != nil {
+			_, _ = got.WriteString(ev.GetTextDelta().GetContent())
+		}
+	}
+	assert.Equal(t, strings.Join(chunks, ""), got.String(),
+		"a chunk must not be duplicated across a flush boundary")
 }
 
 type scriptedRuntime struct {
