@@ -50,8 +50,7 @@ func TestAppendContextWarning(t *testing.T) {
 
 func TestRunCommandEmitsInferredCompaction(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sink := newMemoryTurnSink()
 
 	ctxState := &executor.ContextState{
 		Usage: executor.ContextUsage{Size: 200000, Used: 180000},
@@ -78,7 +77,7 @@ func TestRunCommandEmitsInferredCompaction(t *testing.T) {
 	done := make(chan struct{})
 	var result *executor.Result
 	go func() {
-		result = (&commandStream{machineID: "m", agentID: "a"}).runCommand(ctx, runtime, stream, executor.Request{CommandID: "ctx-1"}, ctxState)
+		result = (&commandStream{machineID: "m", agentID: "a", sink: sink}).runCommand(ctx, runtime, sink, executor.Request{CommandID: "ctx-1"}, ctxState)
 		close(done)
 	}()
 	select {
@@ -89,8 +88,8 @@ func TestRunCommandEmitsInferredCompaction(t *testing.T) {
 
 	require.NotNil(t, result)
 	var inferredFinished bool
-	for _, m := range recorder.Messages() {
-		ev := m.GetEvent()
+	for _, e := range sink.Entries() {
+		ev := e.GetEvent()
 		if ev == nil || ev.Type != v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED {
 			continue
 		}
@@ -108,8 +107,7 @@ func TestRunCommandEmitsInferredCompaction(t *testing.T) {
 
 func TestRunCommandUsageDropDuringAgentChunkDoesNotInfer(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sink := newMemoryTurnSink()
 
 	ctxState := &executor.ContextState{
 		Usage: executor.ContextUsage{Size: 200000, Used: 180000},
@@ -140,7 +138,7 @@ func TestRunCommandUsageDropDuringAgentChunkDoesNotInfer(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		(&commandStream{machineID: "m", agentID: "a"}).runCommand(ctx, runtime, stream, executor.Request{CommandID: "ctx-2"}, ctxState)
+		(&commandStream{machineID: "m", agentID: "a", sink: sink}).runCommand(ctx, runtime, sink, executor.Request{CommandID: "ctx-2"}, ctxState)
 		close(done)
 	}()
 	select {
@@ -149,8 +147,8 @@ func TestRunCommandUsageDropDuringAgentChunkDoesNotInfer(t *testing.T) {
 		t.Fatal("runCommand did not complete")
 	}
 
-	for _, m := range recorder.Messages() {
-		ev := m.GetEvent()
+	for _, e := range sink.Entries() {
+		ev := e.GetEvent()
 		if ev != nil && ev.Type == v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED {
 			t.Fatal("usage drop during active agent message streaming must not infer compaction")
 		}
@@ -165,8 +163,7 @@ func TestRunCommandCompactionWatchdogWarns(t *testing.T) {
 	compactionStaleTimeout = 80 * time.Millisecond
 	defer func() { compactionStaleTimeout = old }()
 
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sink := newMemoryTurnSink()
 
 	ctxState := &executor.ContextState{}
 	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
@@ -189,7 +186,7 @@ func TestRunCommandCompactionWatchdogWarns(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		(&commandStream{machineID: "m", agentID: "a"}).runCommand(ctx, runtime, stream, executor.Request{CommandID: "ctx-3"}, ctxState)
+		(&commandStream{machineID: "m", agentID: "a", sink: sink}).runCommand(ctx, runtime, sink, executor.Request{CommandID: "ctx-3"}, ctxState)
 		close(done)
 	}()
 	select {
@@ -199,8 +196,8 @@ func TestRunCommandCompactionWatchdogWarns(t *testing.T) {
 	}
 
 	var sawStale bool
-	for _, m := range recorder.Messages() {
-		ev := m.GetEvent()
+	for _, e := range sink.Entries() {
+		ev := e.GetEvent()
 		if ev != nil && ev.Type == v1pb.CommandEventType_WARNING {
 			assert.Equal(t, "Context compaction still running; no finish event observed", ev.Summary)
 			sawStale = true
@@ -217,10 +214,7 @@ func TestRunSessionReanchorInjectionAndPersistence(t *testing.T) {
 		Fingerprint:   "fp",
 	}))
 
-	stream, _, cleanup := newTestCommandChannel(t)
-	defer cleanup()
-
-	cs := &commandStream{machineID: "m", agentID: "a"}
+	cs := &commandStream{machineID: "m", agentID: "a", sink: newMemoryTurnSink()}
 	var gotReq executor.Request
 	cs.newSessionRuntime = func(req executor.Request) (executor.Runtime, error) {
 		gotReq = req
@@ -238,7 +232,7 @@ func TestRunSessionReanchorInjectionAndPersistence(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "TestAgent", "", nil, "", nil)
+		cs.runSession(ctx, nil, "drain-1", "TestAgent", "", nil, "", nil)
 		close(done)
 	}()
 	select {
@@ -265,10 +259,7 @@ func TestRunSessionOwnerChangeForcesReanchor(t *testing.T) {
 		OwnerDisplayName: "Old Owner",
 	}))
 
-	stream, _, cleanup := newTestCommandChannel(t)
-	defer cleanup()
-
-	cs := &commandStream{machineID: "m", agentID: "a"}
+	cs := &commandStream{machineID: "m", agentID: "a", sink: newMemoryTurnSink()}
 	var gotReq executor.Request
 	cs.newSessionRuntime = func(req executor.Request) (executor.Runtime, error) {
 		gotReq = req
@@ -286,7 +277,7 @@ func TestRunSessionOwnerChangeForcesReanchor(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "TestAgent", "New Owner", nil, "", nil)
+		cs.runSession(ctx, nil, "drain-1", "TestAgent", "New Owner", nil, "", nil)
 		close(done)
 	}()
 	select {
@@ -308,10 +299,7 @@ func TestRunSessionOwnerChangeForcesReanchor(t *testing.T) {
 
 func TestRunSessionInitializesContextStateForFreshAgent(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	stream, _, cleanup := newTestCommandChannel(t)
-	defer cleanup()
-
-	cs := &commandStream{machineID: "m", agentID: "fresh"}
+	cs := &commandStream{machineID: "m", agentID: "fresh", sink: newMemoryTurnSink()}
 	cs.newSessionRuntime = func(_ executor.Request) (executor.Runtime, error) {
 		runtime := newScriptedRuntime(func(r *scriptedRuntime) {
 			close(r.outputCh)
@@ -327,7 +315,7 @@ func TestRunSessionInitializesContextStateForFreshAgent(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "FreshAgent", "", nil, "", nil)
+		cs.runSession(ctx, nil, "drain-1", "FreshAgent", "", nil, "", nil)
 		close(done)
 	}()
 	select {

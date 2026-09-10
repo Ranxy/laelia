@@ -7,16 +7,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/outbox"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
 // scriptedStreamSender is a streamSender whose Send runs a test-supplied
-// function and records every message. It lets tests fail specific message
-// kinds (e.g. only the Result) to drive runCommand's failure paths without a
-// real connection.
+// function and records every message. It lets control-plane tests (BeginSession
+// bookkeeping) script the stream without a real connection.
 type scriptedStreamSender struct {
 	mu       sync.Mutex
 	messages []*v1pb.AgentStreamMessage
@@ -90,11 +92,12 @@ func TestBeginSessionTimesOutWhenManagerNeverReplies(t *testing.T) {
 	require.Empty(t, c.beginRespCh)
 }
 
-// TestRunCommandKeepsLocalStateWhenResultSendFails guards the orphan-reap key:
-// when the result cannot be delivered (dead stream), the persisted local state
-// must keep the command id so the reconnecting AgentReady.lastCommandId leads
-// the manager to reap the orphaned RUNNING command.
-func TestRunCommandKeepsLocalStateWhenResultSendFails(t *testing.T) {
+// TestRunCommandKeepsLocalStateWhenTerminalUndeliverable guards the resume
+// key: when the terminal record cannot be recorded (the outbox rejects it and
+// the bypass fails), the persisted local state must keep the command id + seq
+// counters so the next BeginSession resumes the interrupted turn and the
+// manager's (command_id, seq_no) dedup keys line up.
+func TestRunCommandKeepsLocalStateWhenTerminalUndeliverable(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
@@ -104,33 +107,30 @@ func TestRunCommandKeepsLocalStateWhenResultSendFails(t *testing.T) {
 		close(r.resultCh)
 		close(r.doneCh)
 	})
-	sender := &scriptedStreamSender{onSend: func(msg *v1pb.AgentStreamMessage) error {
-		if msg.GetResult() != nil {
-			// The stream died right before the result.
+	sink := newMemoryTurnSink()
+	sink.onAppend = func(entry *outbox.Entry) error {
+		if entry.GetKind() == v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT {
+			// The WAL rejects the terminal; no uploader to bypass through.
 			return context.Canceled
 		}
 		return nil
-	}}
+	}
 
-	cs := &commandStream{machineID: "reap-m", agentID: "reap-a"}
-	// The runtime finished normally; only the delivery failed. The return
-	// value still carries the runtime's result — what matters for the reap key
-	// is the persisted state below.
-	result := cs.runCommand(context.Background(), runtime, sender, executor.Request{CommandID: "cmd-keep"}, &executor.ContextState{})
+	cs := &commandStream{machineID: "reap-m", agentID: "reap-a", sink: sink}
+	result := cs.runCommand(context.Background(), runtime, sink, executor.Request{CommandID: "cmd-keep"}, &executor.ContextState{})
 	require.NotNil(t, result)
 
 	state, err := executor.LoadLocalState("reap-m", "reap-a")
 	require.NoError(t, err)
-	require.NotNil(t, state, "the local state must survive a failed result send")
+	require.NotNil(t, state, "an undeliverable terminal keeps the local state as the resume key")
 	require.Equal(t, "cmd-keep", state.CommandID)
 }
 
-// TestRunCommandKeepsLocalStateOnStreamSendFailure guards the mid-turn death
-// path: any send failure ends the turn without a result, and the local state
-// must survive with the command id so the manager's reconnect reap can close
-// the RUNNING command (the pre-fix behavior cleared the state first and left
-// the command RUNNING forever).
-func TestRunCommandKeepsLocalStateOnStreamSendFailure(t *testing.T) {
+// TestRunCommandAbortsTurnOnRecordAppendFailure guards the mid-turn death
+// path: a record-append failure (WAL fault) ends the turn without the real
+// terminal, and the synthetic FAILED terminal goes out through the bypass —
+// the manager sees the turn's failure even though the WAL rejected the data.
+func TestRunCommandAbortsTurnOnRecordAppendFailure(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
@@ -139,24 +139,35 @@ func TestRunCommandKeepsLocalStateOnStreamSendFailure(t *testing.T) {
 		close(r.resultCh)
 		close(r.doneCh)
 	})
-	sender := &scriptedStreamSender{onSend: func(*v1pb.AgentStreamMessage) error {
-		return context.Canceled
-	}}
+	sink := newMemoryTurnSink()
+	sink.onAppend = func(entry *outbox.Entry) error {
+		if entry.GetKind() == v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_EVENT {
+			// The WAL rejects the start lifecycle event.
+			return context.Canceled
+		}
+		return nil
+	}
 
-	cs := &commandStream{machineID: "reap-m", agentID: "reap-b"}
-	result := cs.runCommand(context.Background(), runtime, sender, executor.Request{CommandID: "cmd-keep-failure"}, &executor.ContextState{})
+	cs := &commandStream{machineID: "reap-m", agentID: "reap-b", sink: sink}
+	result := cs.runCommand(context.Background(), runtime, sink, executor.Request{CommandID: "cmd-keep-failure"}, &executor.ContextState{})
 	require.Nil(t, result)
 
-	state, err := executor.LoadLocalState("reap-m", "reap-b")
-	require.NoError(t, err)
-	require.NotNil(t, state, "the local state must survive a mid-turn send failure")
-	require.Equal(t, "cmd-keep-failure", state.CommandID)
+	// The synthetic FAILED terminal was recorded once the turn aborted.
+	var failures []*v1pb.CommandResult
+	for _, e := range sink.Entries() {
+		if e.GetKind() == v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT {
+			failures = append(failures, e.GetResult())
+		}
+	}
+	require.Len(t, failures, 1)
+	require.Equal(t, int32(-1), failures[0].GetExitCode())
+	require.NotEmpty(t, failures[0].GetErrorMessage())
 }
 
-// TestRunCommandClearsLocalStateAfterDeliveredResult pins the happy path: a
-// delivered result clears the local state, so a later reconnect does not reap
-// a command the manager already completed.
-func TestRunCommandClearsLocalStateAfterDeliveredResult(t *testing.T) {
+// TestRunCommandBypassesTerminalWhenOutboxFaults locks the §3.1 terminal
+// bypass: when the WAL rejects the terminal, the real result goes out through
+// the uploader's bypass, and a delivered bypass clears the resume key.
+func TestRunCommandBypassesTerminalWhenOutboxFaults(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
@@ -166,15 +177,107 @@ func TestRunCommandClearsLocalStateAfterDeliveredResult(t *testing.T) {
 		close(r.resultCh)
 		close(r.doneCh)
 	})
-	sender := &scriptedStreamSender{}
+	sink := newMemoryTurnSink()
+	sink.onAppend = func(entry *outbox.Entry) error {
+		if entry.GetKind() == v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT {
+			return context.Canceled
+		}
+		return nil
+	}
+	transport := &fakeUploadTransport{}
 
-	cs := &commandStream{machineID: "reap-m", agentID: "reap-c"}
-	result := cs.runCommand(context.Background(), runtime, sender, executor.Request{CommandID: "cmd-clear"}, &executor.ContextState{})
+	ob, err := outbox.Open(t.TempDir() + "/outbox")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ob.Close() })
+
+	cs := &commandStream{
+		machineID: "reap-m",
+		agentID:   "reap-d",
+		sink:      sink,
+		uploader:  outbox.NewUploader(ob, transport.upload),
+	}
+	result := cs.runCommand(context.Background(), runtime, sink, executor.Request{CommandID: "cmd-bypass"}, &executor.ContextState{})
+	require.NotNil(t, result)
+
+	// The real terminal went out through the bypass, not a synthetic failure.
+	var bypassed []*v1pb.CommandResult
+	for _, e := range transport.allEntries() {
+		if e.GetKind() == v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT {
+			bypassed = append(bypassed, e.GetResult())
+		}
+	}
+	require.Len(t, bypassed, 1)
+	require.Equal(t, int32(0), bypassed[0].GetExitCode())
+	require.Equal(t, "done", bypassed[0].GetFinalSummary())
+
+	state, err := executor.LoadLocalState("reap-m", "reap-d")
+	require.NoError(t, err)
+	require.Nil(t, state, "a delivered terminal clears the resume key")
+}
+
+// TestRunCommandClearsLocalStateAfterRecordedResult pins the happy path: a
+// recorded terminal clears the local state, so a later reconnect does not reap
+// a command the manager already completed.
+func TestRunCommandClearsLocalStateAfterRecordedResult(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
+		close(r.outputCh)
+		close(r.eventCh)
+		r.resultCh <- executor.Result{ExitCode: 0, FinalSummary: "done"}
+		close(r.resultCh)
+		close(r.doneCh)
+	})
+	sink := newMemoryTurnSink()
+
+	cs := &commandStream{machineID: "reap-m", agentID: "reap-c", sink: sink}
+	result := cs.runCommand(context.Background(), runtime, sink, executor.Request{CommandID: "cmd-clear"}, &executor.ContextState{})
 	require.NotNil(t, result)
 
 	state, err := executor.LoadLocalState("reap-m", "reap-c")
 	require.NoError(t, err)
-	require.Nil(t, state, "a delivered result clears the local state")
+	require.Nil(t, state, "a recorded terminal clears the local state")
+}
+
+// TestRunCommandInterruptedTurnKeepsResumeKey locks the hybrid-phase resume
+// path: a turn whose ctx dies (runner/stream teardown) records no terminal,
+// and the local state survives so the next BeginSession resumes the command
+// with continued seq counters.
+func TestRunCommandInterruptedTurnKeepsResumeKey(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
+		<-r.Canceled() // hang until cancelled
+	})
+	sink := newMemoryTurnSink()
+
+	cs := &commandStream{machineID: "resume-m", agentID: "resume-c", sink: sink}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		cs.runCommand(ctx, runtime, sink, executor.Request{CommandID: "cmd-interrupted"}, &executor.ContextState{})
+		close(done)
+	}()
+	require.Eventually(t, func() bool {
+		return len(sink.Entries()) > 0
+	}, time.Second, 5*time.Millisecond, "the turn must record its start event before interruption")
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("runCommand did not return on ctx cancel")
+	}
+
+	// No terminal was recorded and the resume key survives.
+	for _, e := range sink.Entries() {
+		if e.GetKind() == v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT {
+			t.Fatal("an interrupted turn must not record a terminal")
+		}
+	}
+	state, err := executor.LoadLocalState("resume-m", "resume-c")
+	require.NoError(t, err)
+	require.NotNil(t, state, "the interrupted turn keeps the resume key")
+	require.Equal(t, "cmd-interrupted", state.CommandID)
 }
 
 // TestRunCommandResumesInterruptedTurnSeqs guards the resume path: when the
@@ -207,15 +310,15 @@ func TestRunCommandResumesInterruptedTurnSeqs(t *testing.T) {
 		close(r.resultCh)
 		close(r.doneCh)
 	})
-	sender := &scriptedStreamSender{}
+	sink := newMemoryTurnSink()
 
-	cs := &commandStream{machineID: "resume-m", agentID: "resume-a"}
-	result := cs.runCommand(context.Background(), runtime, sender, executor.Request{CommandID: "cmd-resume"}, &executor.ContextState{})
+	cs := &commandStream{machineID: "resume-m", agentID: "resume-a", sink: sink}
+	result := cs.runCommand(context.Background(), runtime, sink, executor.Request{CommandID: "cmd-resume"}, &executor.ContextState{})
 	require.NotNil(t, result)
 
 	var lifecycleSeq, warningSeq, toolSeq int32
-	for _, m := range sender.Sent() {
-		ev := m.GetEvent()
+	for _, e := range sink.Entries() {
+		ev := e.GetEvent()
 		if ev == nil {
 			continue
 		}
@@ -232,11 +335,11 @@ func TestRunCommandResumesInterruptedTurnSeqs(t *testing.T) {
 	require.Equal(t, int32(8), lifecycleSeq, "the resumed turn continues the interrupted turn's event seq")
 	require.Equal(t, int32(9), warningSeq, "the resume is marked in the command event stream")
 	require.Equal(t, int32(10), toolSeq, "turn events continue after the resume marker")
-	require.Equal(t, strings.TrimSpace(resumeTurnNotice), strings.TrimSpace(warningSummary(t, sender.Sent())))
+	require.Equal(t, strings.TrimSpace(resumeTurnNotice), strings.TrimSpace(warningSummary(t, sink.Entries())))
 
 	state, err := executor.LoadLocalState("resume-m", "resume-a")
 	require.NoError(t, err)
-	require.Nil(t, state, "a delivered result clears the local state")
+	require.Nil(t, state, "a recorded terminal clears the local state")
 }
 
 // TestRunCommandFreshStateForDifferentCommand guards the seq reset: a persisted
@@ -257,20 +360,139 @@ func TestRunCommandFreshStateForDifferentCommand(t *testing.T) {
 		close(r.resultCh)
 		close(r.doneCh)
 	})
-	sender := &scriptedStreamSender{}
+	sink := newMemoryTurnSink()
 
-	cs := &commandStream{machineID: "resume-m", agentID: "resume-b"}
-	result := cs.runCommand(context.Background(), runtime, sender, executor.Request{CommandID: "cmd-fresh"}, &executor.ContextState{})
+	cs := &commandStream{machineID: "resume-m", agentID: "resume-b", sink: sink}
+	result := cs.runCommand(context.Background(), runtime, sink, executor.Request{CommandID: "cmd-fresh"}, &executor.ContextState{})
 	require.NotNil(t, result)
 
-	for _, m := range sender.Sent() {
-		if ev := m.GetEvent(); ev != nil && ev.Type == v1pb.CommandEventType_LIFECYCLE {
+	for _, e := range sink.Entries() {
+		if ev := e.GetEvent(); ev != nil && ev.Type == v1pb.CommandEventType_LIFECYCLE {
 			require.Equal(t, int32(1), ev.SeqNo, "a fresh turn starts at seq 1")
 		}
-		if ev := m.GetEvent(); ev != nil && ev.Type == v1pb.CommandEventType_WARNING {
+		if ev := e.GetEvent(); ev != nil && ev.Type == v1pb.CommandEventType_WARNING {
 			t.Fatal("a fresh turn must not carry the resume warning")
 		}
 	}
+}
+
+// TestRunSessionBarrierBlocksUntilOtherCommandGroupDrains locks the turn-start
+// barrier wiring (§3.4): a turn must not run while the outbox still holds
+// another command's un-acked records; once the uploader drains them, the turn
+// proceeds.
+func TestRunSessionBarrierBlocksUntilOtherCommandGroupDrains(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	oldWindow := outbox.BatchWindow
+	outbox.BatchWindow = 5 * time.Millisecond
+	t.Cleanup(func() { outbox.BatchWindow = oldWindow })
+
+	ob, err := outbox.Open(t.TempDir() + "/outbox")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ob.Close() })
+
+	// Another command's complete group (with its terminal) is still queued.
+	require.NoError(t, ob.Append(outboxProgress("prev-cmd", 1)))
+	require.NoError(t, ob.Append(outboxResult("prev-cmd", 0)))
+
+	transport := &fakeUploadTransport{}
+	uploader := outbox.NewUploader(ob, transport.upload)
+	uploaderCtx, uploaderCancel := context.WithCancel(context.Background())
+	t.Cleanup(uploaderCancel)
+	go uploader.Run(uploaderCtx)
+
+	runtimeStarted := make(chan struct{}, 1)
+	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
+		runtimeStarted <- struct{}{}
+		close(r.outputCh)
+		close(r.eventCh)
+		r.resultCh <- executor.Result{ExitCode: 0, FinalSummary: "done"}
+		close(r.resultCh)
+		close(r.doneCh)
+	})
+	sink := newMemoryTurnSink()
+	cs := &commandStream{
+		sink:     sink,
+		uploader: uploader,
+		newSessionRuntime: func(_ executor.Request) (executor.Runtime, error) {
+			return runtime, nil
+		},
+	}
+
+	runCtx, runCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer runCancel()
+	go func() {
+		cs.runSession(runCtx, nil, "new-cmd", "TestAgent", "", nil, "", nil)
+	}()
+
+	select {
+	case <-runtimeStarted:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the turn never ran; the barrier did not release after the group drained")
+	}
+	require.NotEmpty(t, sink.Entries(), "the turn's records must land in the sink once it runs")
+}
+
+// TestRunSessionBarrierAbortsOnUndrainedGroup locks the barrier's ctx escape:
+// when the group cannot drain (a dead manager), the barrier releases on ctx
+// expiry and the turn is not run — the drain loop must not wedge on a blocked
+// outbox.
+func TestRunSessionBarrierAbortsOnUndrainedGroup(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	oldWindow := outbox.BatchWindow
+	outbox.BatchWindow = 5 * time.Millisecond
+	t.Cleanup(func() { outbox.BatchWindow = oldWindow })
+
+	ob, err := outbox.Open(t.TempDir() + "/outbox")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ob.Close() })
+	require.NoError(t, ob.Append(outboxProgress("prev-cmd", 1)))
+	require.NoError(t, ob.Append(outboxResult("prev-cmd", 0)))
+
+	transport := &fakeUploadTransport{err: errors.New("manager unreachable")}
+	uploader := outbox.NewUploader(ob, transport.upload)
+
+	runtimeStarted := make(chan struct{}, 1)
+	sink := newMemoryTurnSink()
+	cs := &commandStream{
+		sink:     sink,
+		uploader: uploader,
+		newSessionRuntime: func(_ executor.Request) (executor.Runtime, error) {
+			runtimeStarted <- struct{}{}
+			return nil, nil
+		},
+	}
+
+	runCtx, runCancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer runCancel()
+	cs.runSession(runCtx, nil, "new-cmd", "TestAgent", "", nil, "", nil)
+
+	select {
+	case <-runtimeStarted:
+		t.Fatal("the turn must not run while the outbox cannot drain")
+	case <-time.After(100 * time.Millisecond):
+	}
+	require.Empty(t, sink.Entries())
+}
+
+// outboxProgress builds a progress record for barrier tests.
+//
+// nolint:unused // used by barrier tests
+func outboxProgress(commandID string, seq int32) *outbox.Entry {
+	return progressEnvelope(commandID, executor.OutputChunk{
+		StreamType: v1pb.CommandOutput_STDOUT,
+		Content:    "x",
+		SeqNo:      seq,
+	})
+}
+
+// outboxResult builds a terminal record for barrier tests.
+//
+// nolint:unused // used by barrier tests
+func outboxResult(commandID string, exitCode int32) *outbox.Entry {
+	return resultEnvelope(&v1pb.CommandResult{
+		CommandId: commandID,
+		ExitCode:  exitCode,
+	})
 }
 
 // TestApplyResumeTurnNotice guards the resume prompt injection.
@@ -280,10 +502,10 @@ func TestApplyResumeTurnNotice(t *testing.T) {
 	require.Equal(t, resumeTurnNotice+"\n\nbatch", applyResumeTurnNotice("batch", true))
 }
 
-func warningSummary(t *testing.T, msgs []*v1pb.AgentStreamMessage) string {
+func warningSummary(t *testing.T, entries []*outbox.Entry) string {
 	t.Helper()
-	for _, m := range msgs {
-		if ev := m.GetEvent(); ev != nil && ev.Type == v1pb.CommandEventType_WARNING {
+	for _, e := range entries {
+		if ev := e.GetEvent(); ev != nil && ev.Type == v1pb.CommandEventType_WARNING {
 			return ev.GetWarning().GetMessage()
 		}
 	}

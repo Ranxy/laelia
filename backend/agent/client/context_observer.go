@@ -46,7 +46,7 @@ var compactionStaleTimeout = 5 * time.Minute
 // sequence counter as the pump.
 type contextObserver struct {
 	state      *executor.ContextState
-	stream     streamSender
+	sink       turnSink
 	commandID  string
 	localState *executor.LocalState
 
@@ -60,10 +60,10 @@ type contextObserver struct {
 	lastAgentChunkAt time.Time
 }
 
-func newContextObserver(state *executor.ContextState, stream streamSender, commandID string, localState *executor.LocalState) *contextObserver {
+func newContextObserver(state *executor.ContextState, sink turnSink, commandID string, localState *executor.LocalState) *contextObserver {
 	return &contextObserver{
 		state:      state,
-		stream:     stream,
+		sink:       sink,
 		commandID:  commandID,
 		localState: localState,
 		watchdogCh: make(chan struct{}, 1),
@@ -175,7 +175,7 @@ func (o *contextObserver) emitInferredCompaction() error {
 			Inferred: true,
 		},
 	}
-	return sendCommandEvent(o.stream, o.commandID, &event)
+	return o.sink.appendEvent(o.commandID, &event)
 }
 
 // onWatchdog surfaces the stale-compaction warning.
@@ -187,7 +187,7 @@ func (o *contextObserver) onWatchdog() error {
 		Summary: msg,
 		Warning: &v1pb.WarningPayload{Message: msg},
 	}
-	return sendCommandEvent(o.stream, o.commandID, &event)
+	return o.sink.appendEvent(o.commandID, &event)
 }
 
 // reanchorPrompt decides whether this turn carries the identity anchor and

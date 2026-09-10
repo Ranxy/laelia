@@ -51,6 +51,29 @@ func resultEntry(commandID string, exitCode int32) *Entry {
 	}
 }
 
+// eventEntry builds an event envelope for tests.
+//
+// nolint:unused // used by uploader tests
+func eventEntry(commandID string, seq int32) *Entry {
+	return &Entry{
+		CommandId:          commandID,
+		Kind:               v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_EVENT,
+		SeqNo:              seq,
+		AgentSideTimestamp: timestamppb.Now(),
+		Payload: &v1pb.UploadCommandDataEntry_Event{
+			Event: &v1pb.CommandEvent{
+				CommandId: commandID,
+				SeqNo:     seq,
+				Type:      v1pb.CommandEventType_LIFECYCLE,
+				Summary:   "command started",
+				Payload: &v1pb.CommandEvent_Lifecycle{
+					Lifecycle: &v1pb.LifecyclePayload{ExecutorKind: "ACP"},
+				},
+			},
+		},
+	}
+}
+
 // TestAppendReadRoundTrip locks the core durability property: records appended
 // (through the buffered write path and explicit flushes) survive in order and
 // unmarshal byte-identical.

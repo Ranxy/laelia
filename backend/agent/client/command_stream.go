@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/outbox"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
@@ -62,6 +63,13 @@ type commandStream struct {
 	// to the executor as Request.MachineID.
 	machineID   string
 	isExecuting atomic.Bool
+
+	// sink is the turn loop's report sink: the agent's durable outbox, and
+	// uploader drains it to the manager through UploadCommandData. All three
+	// are wired by the runner (nil in direct turn-loop tests).
+	sink     turnSink
+	uploader *outbox.Uploader
+	ob       *outbox.Outbox
 
 	// drain loop coordination. wakeCh is buffered(1): a wake while one is
 	// already pending is coalesced. beginRespCh carries the manager's reply

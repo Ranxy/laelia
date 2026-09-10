@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/outbox"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -24,8 +25,7 @@ func TestACPCommandStreamReadFile(t *testing.T) {
 	want := "LAELIA_CS_INTEGRATION_READ"
 	require.NoError(t, os.WriteFile(filepath.Join(workspace, "target.txt"), []byte(want), 0o644))
 
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sink := newMemoryTurnSink()
 
 	acpConfig := newOpencodeCSConfig(bin, workspace, false)
 	cs := &commandStream{getAcpConfig: func() *executor.ACPConfig { return acpConfig }}
@@ -45,7 +45,7 @@ func TestACPCommandStreamReadFile(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		cs.runCommand(ctx, runtime, stream, req, nil)
+		cs.runCommand(ctx, runtime, sink, req, nil)
 		close(done)
 	}()
 
@@ -56,19 +56,17 @@ func TestACPCommandStreamReadFile(t *testing.T) {
 		t.Fatal("timed out waiting for ACP command stream")
 	}
 
-	require.NoError(t, stream.CloseRequest())
-
 	state, stateErr := executor.LoadLocalState("", "")
 	require.NoError(t, stateErr)
 	assert.Nil(t, state, "local state should be cleared after completion")
 
-	msgs := recorder.Messages()
-	require.NotEmpty(t, msgs, "should have at least one message from ACP command stream")
+	entries := sink.Entries()
+	require.NotEmpty(t, entries, "should have at least one record from ACP command stream")
 
-	assertACPCSLifecycle(t, msgs)
-	assertACPCSProgressOutput(t, msgs)
-	assertACPCSReadFileResult(t, msgs, want)
-	assertACPCSEvents(t, msgs)
+	assertACPCSLifecycle(t, entries)
+	assertACPCSProgressOutput(t, entries)
+	assertACPCSReadFileResult(t, entries, want)
+	assertACPCSEvents(t, entries)
 }
 
 func TestACPCommandStreamWriteFile(t *testing.T) {
@@ -79,8 +77,7 @@ func TestACPCommandStreamWriteFile(t *testing.T) {
 	targetPath := filepath.Join(workspace, "note.txt")
 	require.NoError(t, os.WriteFile(targetPath, []byte("before"), 0o644))
 
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sink := newMemoryTurnSink()
 
 	acpConfig := newOpencodeCSConfig(bin, workspace, true)
 	cs := &commandStream{getAcpConfig: func() *executor.ACPConfig { return acpConfig }}
@@ -101,7 +98,7 @@ func TestACPCommandStreamWriteFile(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		cs.runCommand(ctx, runtime, stream, req, nil)
+		cs.runCommand(ctx, runtime, sink, req, nil)
 		close(done)
 	}()
 
@@ -112,18 +109,16 @@ func TestACPCommandStreamWriteFile(t *testing.T) {
 		t.Fatal("timed out waiting for ACP command stream")
 	}
 
-	require.NoError(t, stream.CloseRequest())
-
 	content, err := os.ReadFile(targetPath)
 	require.NoError(t, err)
 	assert.Equal(t, "LAELIA_CS_WRITE_OK", strings.TrimSpace(string(content)))
 
-	msgs := recorder.Messages()
-	require.NotEmpty(t, msgs)
-	assertACPCSLifecycle(t, msgs)
-	assertACPCSProgressOutput(t, msgs)
-	assertACPCSToolCalls(t, msgs)
-	assertACPCSEvents(t, msgs)
+	entries := sink.Entries()
+	require.NotEmpty(t, entries)
+	assertACPCSLifecycle(t, entries)
+	assertACPCSProgressOutput(t, entries)
+	assertACPCSToolCalls(t, entries)
+	assertACPCSEvents(t, entries)
 }
 
 func TestACPCommandStreamCancel(t *testing.T) {
@@ -132,8 +127,7 @@ func TestACPCommandStreamCancel(t *testing.T) {
 
 	workspace := t.TempDir()
 
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sink := newMemoryTurnSink()
 
 	acpConfig := newOpencodeCSConfig(bin, workspace, false)
 	cs := &commandStream{getAcpConfig: func() *executor.ACPConfig { return acpConfig }}
@@ -153,7 +147,7 @@ func TestACPCommandStreamCancel(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		cs.runCommand(ctx, runtime, stream, req, nil)
+		cs.runCommand(ctx, runtime, sink, req, nil)
 		close(done)
 	}()
 
@@ -166,19 +160,17 @@ func TestACPCommandStreamCancel(t *testing.T) {
 		t.Fatal("timed out waiting for cancelled ACP command stream")
 	}
 
-	require.NoError(t, stream.CloseRequest())
+	entries := sink.Entries()
+	require.NotEmpty(t, entries)
 
-	msgs := recorder.Messages()
-	require.NotEmpty(t, msgs)
-
-	result := findACPCSResult(msgs)
-	require.NotNil(t, result, "expected a CommandResult message")
+	result := findACPCSResult(entries)
+	require.NotNil(t, result, "expected a CommandResult record")
 	assert.NotZero(t, result.ExitCode, "cancelled ACP task should have non-zero exit code")
 }
 
-func assertACPCSLifecycle(t *testing.T, msgs []*v1pb.AgentStreamMessage) {
+func assertACPCSLifecycle(t *testing.T, entries []*outbox.Entry) {
 	t.Helper()
-	firstEvent := findACPCSEvent(msgs, v1pb.CommandEventType_LIFECYCLE)
+	firstEvent := findACPCSEvent(entries, v1pb.CommandEventType_LIFECYCLE)
 	require.NotNil(t, firstEvent, "first message should be a LIFECYCLE event")
 	assert.Equal(t, int32(1), firstEvent.SeqNo)
 	assert.Equal(t, "command started", firstEvent.Summary)
@@ -187,62 +179,62 @@ func assertACPCSLifecycle(t *testing.T, msgs []*v1pb.AgentStreamMessage) {
 	}
 }
 
-func assertACPCSProgressOutput(t *testing.T, msgs []*v1pb.AgentStreamMessage) {
+func assertACPCSProgressOutput(t *testing.T, entries []*outbox.Entry) {
 	t.Helper()
 	var hasProgress bool
-	for _, msg := range msgs {
-		if msg.GetProgress() != nil {
+	for _, entry := range entries {
+		if entry.GetProgress() != nil {
 			hasProgress = true
 			break
 		}
 	}
-	assert.True(t, hasProgress, "should have at least one CommandProgress message")
+	assert.True(t, hasProgress, "should have at least one progress record")
 }
 
-func assertACPCSReadFileResult(t *testing.T, msgs []*v1pb.AgentStreamMessage, want string) {
+func assertACPCSReadFileResult(t *testing.T, entries []*outbox.Entry, want string) {
 	t.Helper()
-	result := findACPCSResult(msgs)
-	require.NotNil(t, result, "expected a CommandResult message")
+	result := findACPCSResult(entries)
+	require.NotNil(t, result, "expected a CommandResult record")
 	assert.Equal(t, int32(0), result.ExitCode, "error_message=%q final_summary=%q", result.ErrorMessage, result.FinalSummary)
 	assert.Empty(t, result.ErrorMessage)
 
 	combined := result.FinalSummary
-	for _, msg := range msgs {
-		if event := msg.GetEvent(); event != nil && event.Type == v1pb.CommandEventType_TEXT_DELTA {
+	for _, entry := range entries {
+		if event := entry.GetEvent(); event != nil && event.Type == v1pb.CommandEventType_TEXT_DELTA {
 			combined += "\n" + event.Summary
 		}
 	}
 	assert.Contains(t, compactText(combined), want, "ACP output should contain the file content %q; got summary=%q", want, result.FinalSummary)
 }
 
-func assertACPCSToolCalls(t *testing.T, msgs []*v1pb.AgentStreamMessage) {
+func assertACPCSToolCalls(t *testing.T, entries []*outbox.Entry) {
 	t.Helper()
-	started := findACPCSEvent(msgs, v1pb.CommandEventType_TOOL_CALL_STARTED)
-	finished := findACPCSEvent(msgs, v1pb.CommandEventType_TOOL_CALL_FINISHED)
+	started := findACPCSEvent(entries, v1pb.CommandEventType_TOOL_CALL_STARTED)
+	finished := findACPCSEvent(entries, v1pb.CommandEventType_TOOL_CALL_FINISHED)
 	assert.True(t, started != nil || finished != nil, "should have at least one tool call event")
 }
 
-func assertACPCSEvents(t *testing.T, msgs []*v1pb.AgentStreamMessage) {
+func assertACPCSEvents(t *testing.T, entries []*outbox.Entry) {
 	t.Helper()
-	summary := findACPCSEvent(msgs, v1pb.CommandEventType_FINAL_SUMMARY)
+	summary := findACPCSEvent(entries, v1pb.CommandEventType_FINAL_SUMMARY)
 	assert.NotNil(t, summary, "should have a FINAL_SUMMARY event")
 
-	textDelta := findACPCSEvent(msgs, v1pb.CommandEventType_TEXT_DELTA)
+	textDelta := findACPCSEvent(entries, v1pb.CommandEventType_TEXT_DELTA)
 	assert.NotNil(t, textDelta, "should have at least one TEXT_DELTA event")
 }
 
-func findACPCSResult(msgs []*v1pb.AgentStreamMessage) *v1pb.CommandResult {
-	for _, msg := range msgs {
-		if r := msg.GetResult(); r != nil {
+func findACPCSResult(entries []*outbox.Entry) *v1pb.CommandResult {
+	for _, entry := range entries {
+		if r := entry.GetResult(); r != nil {
 			return r
 		}
 	}
 	return nil
 }
 
-func findACPCSEvent(msgs []*v1pb.AgentStreamMessage, wantType v1pb.CommandEventType) *v1pb.CommandEvent {
-	for _, msg := range msgs {
-		if e := msg.GetEvent(); e != nil && e.Type == wantType {
+func findACPCSEvent(entries []*outbox.Entry, wantType v1pb.CommandEventType) *v1pb.CommandEvent {
+	for _, entry := range entries {
+		if e := entry.GetEvent(); e != nil && e.Type == wantType {
 			return e
 		}
 	}

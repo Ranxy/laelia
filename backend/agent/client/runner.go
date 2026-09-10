@@ -13,6 +13,7 @@ import (
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/executor"
 	"github.com/Ranxy/laelia/backend/agent/home"
+	"github.com/Ranxy/laelia/backend/agent/outbox"
 	"github.com/Ranxy/laelia/backend/agent/pi"
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -287,6 +288,7 @@ func (r *agentRunner) start(ctx context.Context) {
 	cs.buildTurnBatch = func(ctx context.Context) (string, error) {
 		return chattools.BuildTurnBatch(ctx, r.daemon.BatchDeps(r.agentID))
 	}
+	r.wireOutbox(streamCtx, cs)
 
 	r.mu.Lock()
 	r.cs = cs
@@ -299,6 +301,30 @@ func (r *agentRunner) start(ctx context.Context) {
 		}
 	}()
 	slog.Info("opened AgentChannel for agent", "agent", r.agentName, "displayName", r.displayName)
+}
+
+// wireOutbox opens the agent's durable outbox and its uploader. The outbox
+// lives on disk under the agent's data dir, so records survive runner and
+// machine restarts; the uploader runs on the runner's ctx (the hybrid phase
+// keeps the runner per-connection — phase 2 lifts it) and re-reads from the
+// log start after a restart: the manager's (command, seq) dedup makes the
+// replay idempotent. An open failure leaves the runner up but inert for
+// reporting: every turn fails fast with the §3.1 bypass unavailable, and the
+// manager's reaper closes the RUNNING rows.
+func (r *agentRunner) wireOutbox(ctx context.Context, cs *commandStream) {
+	ob, err := outbox.Open(outbox.AgentOutboxDir(home.Dir(), r.machine.machineID, r.agentID))
+	if err != nil {
+		slog.Error("failed to open agent outbox; turns cannot record until it recovers",
+			"agent", r.agentName, "error", err)
+		cs.sink = outboxSink{}
+		return
+	}
+	cs.ob = ob
+	cs.sink = outboxSink{ob: ob}
+	cs.uploader = outbox.NewUploader(ob, r.machine.uploadCommandData(cs.getToken))
+	go func() {
+		cs.uploader.Run(ctx)
+	}()
 }
 
 func (r *agentRunner) currentCommandStream() *commandStream {
@@ -536,8 +562,8 @@ func (r *agentRunner) buildMcpServers(req executor.Request) []acp.McpServer {
 	}
 }
 
-// stop cancels the runner's drain loop, tears down any pi subprocess, and
-// waits for the loop to exit.
+// stop cancels the runner's drain loop, tears down any pi subprocess, closes
+// the agent's outbox, and waits for the loop to exit.
 func (r *agentRunner) stop() {
 	if r.cancel != nil {
 		r.cancel()
@@ -546,8 +572,17 @@ func (r *agentRunner) stop() {
 		<-r.done
 	}
 	r.mu.Lock()
+	cs := r.cs
 	r.cs = nil
 	r.mu.Unlock()
+	// Close the outbox after the runner's goroutine exits. The drain loop may
+	// still be unwinding; a late append gets ErrClosed and the turn's own
+	// failure path handles it, so the race is benign.
+	if cs != nil && cs.ob != nil {
+		if err := cs.ob.Close(); err != nil {
+			slog.Warn("failed to close agent outbox", "agent", r.agentName, "error", err)
+		}
+	}
 	r.stopPiSession()
 	r.stopThreadSession()
 	slog.Info("tore down agent runner", "agent", r.agentName)

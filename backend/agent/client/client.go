@@ -31,6 +31,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
+	"github.com/Ranxy/laelia/backend/agent/outbox"
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	"github.com/Ranxy/laelia/backend/agent/version"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -409,6 +410,28 @@ func (c *MachineClient) Hello(ctx context.Context) (*v1pb.HelloResponse, error) 
 		return nil, err
 	}
 	return resp.Msg, nil
+}
+
+// uploadCommandData returns the command-data uploader's transport: one
+// UploadCommandData call carrying the machine's access token. The token is
+// fetched per call so a rolling renewal is picked up without a rebind.
+func (c *MachineClient) uploadCommandData(getToken func() string) outbox.UploadFunc {
+	client := v1connect.NewMachineStreamServiceClient(c.httpClient, c.managerURL)
+	return func(ctx context.Context, entries []*outbox.Entry) (*v1pb.UploadCommandDataResponse, error) {
+		token := getToken()
+		if token == "" {
+			return nil, errors.New("no machine access token for command data upload")
+		}
+		callCtx, cancel := context.WithTimeout(ctx, uploadRPCTimeout)
+		defer cancel()
+		req := connect.NewRequest(&v1pb.UploadCommandDataRequest{Entries: entries})
+		req.Header().Set("Authorization", "Bearer "+token)
+		resp, err := client.UploadCommandData(callCtx, req)
+		if err != nil {
+			return nil, err
+		}
+		return resp.Msg, nil
+	}
 }
 
 func (c *MachineClient) State() ConnState {

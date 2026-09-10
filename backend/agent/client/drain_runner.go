@@ -81,7 +81,7 @@ func (m *mergedText) append(streamType v1pb.CommandOutput_StreamType, text strin
 	return m.builder.Len() >= mergedTextDeltaFlushBytes
 }
 
-func (m *mergedText) flush(stream streamSender, commandID string, state *executor.LocalState) error {
+func (m *mergedText) flush(sink turnSink, commandID string, state *executor.LocalState) error {
 	if !m.started {
 		return nil
 	}
@@ -102,7 +102,7 @@ func (m *mergedText) flush(stream streamSender, commandID string, state *executo
 			Content:    text,
 		},
 	}
-	return sendCommandEvent(stream, commandID, &event)
+	return sink.appendEvent(commandID, &event)
 }
 
 // drainLoop is the agent-first autonomous engine. It waits for a wake, then
@@ -205,12 +205,22 @@ func (c *commandStream) beginSession(ctx context.Context, stream streamSender, d
 	}
 }
 
-// runSession executes one drain session: it builds the agent-first runtime
-// (fixed prompt) and pumps progress/events/result over the bidi stream via
-// runCommand. The agent itself decides which channel to process and how, by
-// shelling out to the `laelia-machine` CLI over the local daemon. Blocking:
-// returns when the session finishes.
+// runSession executes one drain session: it starts with the turn-start
+// barrier (the outbox must hold no other command's records), then builds the
+// agent-first runtime (fixed prompt) and pumps progress/events/result into the
+// per-agent outbox via runCommand — the uploader drains them to the manager.
+// The agent itself decides which channel to process and how, by shelling out
+// to the `laelia-machine` CLI over the local daemon. Blocking: returns when
+// the session finishes.
 func (c *commandStream) runSession(ctx context.Context, stream streamSender, commandID string, agentDisplayName, ownerDisplayName string, team *v1pb.TeamContext, promptVersion string, promptNotice *v1pb.PromptReleaseNotice) {
+	// Turn-start barrier (§3.4). No-op without an uploader (turn-loop tests).
+	if err := c.waitTurnClear(ctx, commandID); err != nil {
+		if ctx.Err() == nil {
+			slog.Error("turn aborted at the outbox barrier", "commandID", commandID, "error", err)
+		}
+		return
+	}
+
 	// Per-agent context state drives re-anchor / usage-warning decisions for
 	// this turn and is updated from the events below. A load failure disables
 	// context tracking for the turn (never blocks work).
@@ -313,13 +323,13 @@ func (c *commandStream) runSession(ctx context.Context, stream streamSender, com
 	runtime, err := c.newSessionRuntime(req)
 	if err != nil {
 		slog.Error("failed to build drain session runtime", "commandID", commandID, "error", err)
-		if sendErr := sendCommandResult(stream, &v1pb.CommandResult{
+		if !c.deliverTerminal(ctx, &v1pb.CommandResult{
 			CommandId:    commandID,
 			ExitCode:     -1,
 			ErrorMessage: err.Error(),
 			LastSeqNo:    -1,
-		}); sendErr != nil {
-			slog.Error("failed to send drain session failure result", "commandID", commandID, "error", sendErr)
+		}) {
+			slog.Error("failed to deliver drain session failure result", "commandID", commandID)
 		}
 		c.persistContextState(ctxState, nil)
 		return
@@ -330,7 +340,7 @@ func (c *commandStream) runSession(ctx context.Context, stream streamSender, com
 	c.beginInFlight()
 	defer c.endInFlight()
 
-	result := c.runCommand(ctx, runtime, stream, req, ctxState)
+	result := c.runCommand(ctx, runtime, c.sink, req, ctxState)
 	c.persistContextState(ctxState, result)
 }
 
@@ -362,10 +372,20 @@ func (c *commandStream) isResumedTurn(commandID string) bool {
 	return false
 }
 
+// runCommand executes one turn: it records every progress chunk, event, and
+// the terminal into the agent's outbox (turnSink). The manager's stream never
+// carries command data; only record-append failures (a local WAL fault) can
+// abort the turn, and the terminal is delivered via the §3.1 bypass when the
+// log rejects it. The turn ends when its terminal is durably recorded — the
+// uploader owns delivery.
+//
+// A turn interrupted by ctx (the runner/stream going away) records no
+// terminal: the manager keeps the command RUNNING and the next BeginSession
+// resumes it, with the persisted local state continuing the seq counters.
 func (c *commandStream) runCommand(
 	ctx context.Context,
 	runtime executor.Runtime,
-	stream streamSender,
+	sink turnSink,
 	req executor.Request,
 	ctxState *executor.ContextState,
 ) *executor.Result {
@@ -374,34 +394,44 @@ func (c *commandStream) runCommand(
 	if err := executor.SaveLocalState(c.machineID, c.agentID, state); err != nil {
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 	}
-	observer := newContextObserver(ctxState, stream, commandID, state)
+	observer := newContextObserver(ctxState, sink, commandID, state)
 	defer observer.stopWatchdog()
 
-	resultSent := false
+	// terminalDelivered reports that the terminal record reached the manager's
+	// path (durable in the outbox, or bypass-delivered): the local state can
+	// then be cleared, because the manager no longer treats the command as an
+	// interrupted turn to resume.
+	terminalDelivered := false
+	// pendingResult holds the runtime's real terminal when the record-append
+	// failed, so the deferred bypass delivers the real outcome instead of a
+	// synthetic failure.
+	var pendingResult *v1pb.CommandResult
 	defer func() {
-		if resultSent {
+		if terminalDelivered {
 			return
 		}
 		runtime.Cancel()
-		// Send the failure result BEFORE touching the local state: when the
-		// stream is dead the send fails, and the surviving CommandID is what
-		// lets the manager RESUME this command at the next BeginSession (the
-		// drain loop is serial, so a leftover RUNNING row can only be this
-		// interrupted turn). Clearing first would destroy the resume key and
-		// fail the whole command at the next session.
-		if err := sendCommandResult(stream, &v1pb.CommandResult{
-			CommandId:    commandID,
-			ExitCode:     -1,
-			ErrorMessage: "agent stream send failure",
-			LastSeqNo:    state.LastSeqSent,
-		}); err == nil {
+		if ctx.Err() != nil {
+			// Interrupted turn: no terminal, and the local state keeps the
+			// command id + seq counters as the resume key.
+			return
+		}
+		result := pendingResult
+		if result == nil {
+			result = &v1pb.CommandResult{
+				CommandId:    commandID,
+				ExitCode:     -1,
+				ErrorMessage: "agent outbox write failure",
+			}
+		}
+		if c.deliverTerminal(ctx, result) {
 			_ = executor.ClearLocalState(c.machineID, c.agentID)
 		}
 	}()
 
 	runtime.Start()
 	startSeq := nextEventSeq(state)
-	if err := sendCommandEvent(stream, commandID, &executor.Event{
+	if err := sink.appendEvent(commandID, &executor.Event{
 		SeqNo:   startSeq,
 		Type:    v1pb.CommandEventType_LIFECYCLE,
 		Summary: "command started",
@@ -410,7 +440,7 @@ func (c *commandStream) runCommand(
 			Profile:      req.Profile,
 		},
 	}); err != nil {
-		slog.Error("failed to send command start event", "commandID", commandID, "error", err)
+		slog.Error("failed to append command start event", "commandID", commandID, "error", err)
 		return nil
 	}
 	if resumed {
@@ -418,13 +448,13 @@ func (c *commandStream) runCommand(
 		// transcript show the interruption instead of a silent gap. The seq
 		// counters continued from the interrupted turn, so nothing already
 		// stored is re-sent (the manager dedups on command_id+seq_no).
-		if err := sendCommandEvent(stream, commandID, &executor.Event{
+		if err := sink.appendEvent(commandID, &executor.Event{
 			SeqNo:   nextEventSeq(state),
 			Type:    v1pb.CommandEventType_WARNING,
 			Summary: "connection lost mid-turn; command resumed",
 			Warning: &v1pb.WarningPayload{Message: resumeTurnNotice},
 		}); err != nil {
-			slog.Error("failed to send resume warning event", "commandID", commandID, "error", err)
+			slog.Error("failed to append resume warning event", "commandID", commandID, "error", err)
 			return nil
 		}
 	}
@@ -440,14 +470,14 @@ func (c *commandStream) runCommand(
 			return nil
 
 		case <-runtime.Done():
-			_ = merged.flush(stream, commandID, state)
+			_ = merged.flush(sink, commandID, state)
 
-			// DrainOutput flushes any output/events the runtime produced while
-			// the consumer was busy sending the result, mutating state so
-			// LastSeqSent/LastEventSeqSent reflect exactly what was forwarded.
-			drainOutput(ctx, runtime, stream, commandID, state, &merged, observer)
+			// drainOutput records any output/events the runtime produced while
+			// the consumer was busy, mutating state so
+			// LastSeqSent/LastEventSeqSent reflect exactly what was recorded.
+			drainOutput(ctx, runtime, sink, commandID, state, &merged, observer)
 
-			_ = merged.flush(stream, commandID, state)
+			_ = merged.flush(sink, commandID, state)
 
 			result := <-runtime.ResultChannel()
 			result.LastSeqNo = state.LastSeqSent
@@ -461,8 +491,7 @@ func (c *commandStream) runCommand(
 			if reason := c.takeCancelReason(); reason != "" && result.ExitCode != 0 {
 				result.ErrorMessage = reason
 			}
-			resultSent = true
-			if err := sendCommandResult(stream, &v1pb.CommandResult{
+			resultPayload := &v1pb.CommandResult{
 				CommandId:    commandID,
 				ExitCode:     result.ExitCode,
 				DurationMs:   result.DurationMs,
@@ -470,20 +499,22 @@ func (c *commandStream) runCommand(
 				LastSeqNo:    result.LastSeqNo,
 				FinalSummary: result.FinalSummary,
 				Result:       result.Result,
-			}); err != nil {
-				// Keep the local state: the reconnecting AgentReady.lastCommandId
-				// must carry this command so the manager reaps the orphaned
-				// RUNNING row instead of losing it.
-				slog.Error("failed to send command result", "commandID", commandID, "error", err)
-			} else {
-				slog.Info("command result sent", "commandID", commandID, "exitCode", result.ExitCode)
-				_ = executor.ClearLocalState(c.machineID, c.agentID)
 			}
+			if !c.deliverTerminal(ctx, resultPayload) {
+				slog.Error("failed to record command result", "commandID", commandID)
+				// The bypass failed too: the local state keeps the resume key
+				// so the leftover RUNNING row still resolves.
+				pendingResult = resultPayload
+				return &result
+			}
+			terminalDelivered = true
+			slog.Info("command result recorded", "commandID", commandID, "exitCode", result.ExitCode)
+			_ = executor.ClearLocalState(c.machineID, c.agentID)
 			return &result
 
 		case <-observer.watchdogCh:
 			if err := observer.onWatchdog(); err != nil {
-				slog.Error("failed to send compaction watchdog warning", "commandID", commandID, "error", err)
+				slog.Error("failed to append compaction watchdog warning", "commandID", commandID, "error", err)
 				return nil
 			}
 
@@ -492,12 +523,12 @@ func (c *commandStream) runCommand(
 				continue
 			}
 			event.SeqNo = nextEventSeq(state)
-			if err := sendCommandEvent(stream, commandID, &event); err != nil {
-				slog.Error("failed to send command event", "commandID", commandID, "error", err)
+			if err := sink.appendEvent(commandID, &event); err != nil {
+				slog.Error("failed to append command event", "commandID", commandID, "error", err)
 				return nil
 			}
 			if err := observer.observe(&event); err != nil {
-				slog.Error("failed to send derived context event", "commandID", commandID, "error", err)
+				slog.Error("failed to append derived context event", "commandID", commandID, "error", err)
 				return nil
 			}
 			if err := executor.SaveLocalState(c.machineID, c.agentID, state); err != nil {
@@ -508,15 +539,15 @@ func (c *commandStream) runCommand(
 			if !ok {
 				continue
 			}
-			if err := sendCommandProgress(stream, commandID, chunk); err != nil {
-				slog.Error("failed to send command progress", "commandID", commandID, "error", err)
+			if err := sink.appendProgress(commandID, chunk); err != nil {
+				slog.Error("failed to append command progress", "commandID", commandID, "error", err)
 				return nil
 			}
 			state.LastSeqSent = maxSeq(state.LastSeqSent, chunk.SeqNo)
 
 			if merged.append(chunk.StreamType, chunk.Content) {
-				if err := merged.flush(stream, commandID, state); err != nil {
-					slog.Error("failed to send merged text delta", "commandID", commandID, "error", err)
+				if err := merged.flush(sink, commandID, state); err != nil {
+					slog.Error("failed to append merged text delta", "commandID", commandID, "error", err)
 					return nil
 				}
 				_ = merged.append(chunk.StreamType, chunk.Content)
@@ -528,9 +559,9 @@ func (c *commandStream) runCommand(
 	}
 }
 
-// drainOutput forwards any output chunks and events the runtime still has
+// drainOutput records any output chunks and events the runtime still has
 // buffered after Done() fired, mutating state so LastSeqSent/LastEventSeqSent
-// reflect exactly what was sent. It drains until both channels close (the
+// reflect exactly what was recorded. It drains until both channels close (the
 // runtime closes them in its deferred teardown), with ctx as a backstop so a
 // runtime that never closes cannot wedge the consumer. Previously it only
 // drained OutputChannel via a non-blocking `default` (dropping queued events
@@ -539,7 +570,7 @@ func (c *commandStream) runCommand(
 func drainOutput(
 	ctx context.Context,
 	runtime executor.Runtime,
-	stream streamSender,
+	sink turnSink,
 	commandID string,
 	state *executor.LocalState,
 	merged *mergedText,
@@ -549,21 +580,21 @@ func drainOutput(
 	for !outputClosed || !eventClosed {
 		select {
 		case <-ctx.Done():
-			_ = merged.flush(stream, commandID, state)
+			_ = merged.flush(sink, commandID, state)
 			return
 		case chunk, ok := <-runtime.OutputChannel():
 			if !ok {
 				outputClosed = true
 				continue
 			}
-			if err := sendCommandProgress(stream, commandID, chunk); err != nil {
-				slog.Error("failed to send command progress", "commandID", commandID, "error", err)
-				_ = merged.flush(stream, commandID, state)
+			if err := sink.appendProgress(commandID, chunk); err != nil {
+				slog.Error("failed to append command progress", "commandID", commandID, "error", err)
+				_ = merged.flush(sink, commandID, state)
 				return
 			}
 			state.LastSeqSent = maxSeq(state.LastSeqSent, chunk.SeqNo)
 			if merged.append(chunk.StreamType, chunk.Content) {
-				_ = merged.flush(stream, commandID, state)
+				_ = merged.flush(sink, commandID, state)
 				_ = merged.append(chunk.StreamType, chunk.Content)
 			}
 		case event, ok := <-runtime.EventChannel():
@@ -572,48 +603,31 @@ func drainOutput(
 				continue
 			}
 			event.SeqNo = nextEventSeq(state)
-			if err := sendCommandEvent(stream, commandID, &event); err != nil {
-				slog.Error("failed to send command event", "commandID", commandID, "error", err)
-				_ = merged.flush(stream, commandID, state)
+			if err := sink.appendEvent(commandID, &event); err != nil {
+				slog.Error("failed to append command event", "commandID", commandID, "error", err)
+				_ = merged.flush(sink, commandID, state)
 				return
 			}
 			if observer != nil {
 				if err := observer.observe(&event); err != nil {
-					slog.Error("failed to send derived context event", "commandID", commandID, "error", err)
-					_ = merged.flush(stream, commandID, state)
+					slog.Error("failed to append derived context event", "commandID", commandID, "error", err)
+					_ = merged.flush(sink, commandID, state)
 					return
 				}
 			}
 		}
 	}
-	_ = merged.flush(stream, commandID, state)
+	_ = merged.flush(sink, commandID, state)
 }
 
 func (c *commandStream) buildRuntime(req executor.Request) (executor.Runtime, error) {
 	return executor.NewACP(req, c.getAcpConfig())
 }
 
-func sendCommandProgress(stream streamSender, commandID string, chunk executor.OutputChunk) error {
-	// Carry the agent-side timestamp through so the manager can order and store
-	// it without adding its own arrival delay.
-	timestamp := chunk.Timestamp
-	if timestamp == nil {
-		timestamp = timestamppb.New(time.Now())
-	}
-	return stream.Send(&v1pb.AgentStreamMessage{
-		Message: &v1pb.AgentStreamMessage_Progress{
-			Progress: &v1pb.CommandProgress{
-				CommandId: commandID,
-				Type:      chunk.StreamType,
-				Content:   chunk.Content,
-				SeqNo:     chunk.SeqNo,
-				Timestamp: timestamp,
-			},
-		},
-	})
-}
-
-func sendCommandEvent(stream streamSender, commandID string, event *executor.Event) error {
+// commandEventOf maps an executor event onto the wire CommandEvent. It lives
+// next to the outbox envelopes: the payload shape is unchanged from the
+// stream-era mapping, so the manager's persistence and UI are unaffected.
+func commandEventOf(commandID string, event *executor.Event) *v1pb.CommandEvent {
 	ce := &v1pb.CommandEvent{
 		CommandId: commandID,
 		SeqNo:     event.SeqNo,
@@ -648,15 +662,5 @@ func sendCommandEvent(stream streamSender, commandID string, event *executor.Eve
 	default:
 	}
 
-	return stream.Send(&v1pb.AgentStreamMessage{
-		Message: &v1pb.AgentStreamMessage_Event{Event: ce},
-	})
-}
-
-func sendCommandResult(stream streamSender, result *v1pb.CommandResult) error {
-	return stream.Send(&v1pb.AgentStreamMessage{
-		Message: &v1pb.AgentStreamMessage_Result{
-			Result: result,
-		},
-	})
+	return ce
 }

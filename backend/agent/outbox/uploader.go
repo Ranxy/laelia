@@ -3,12 +3,22 @@ package outbox
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
+
+// max32 returns the larger of two int32 values.
+func max32(a, b int32) int32 {
+	if b > a {
+		return b
+	}
+	return a
+}
 
 // BatchWindow is the uploader's tick: how long newly appended records may
 // wait before upload. It bounds the UI-visible reporting delay (§3.2).
@@ -106,6 +116,125 @@ func (u *Uploader) WaitDrained(ctx context.Context) error {
 	}
 }
 
+// orphanGroup is one command whose records block the turn-start barrier and
+// whose turn died before reporting a terminal.
+type orphanGroup struct {
+	commandID       string
+	lastProgressSeq int32
+}
+
+// WaitClearFor is the turn-start barrier (§3.4): it blocks until the outbox
+// holds no records for any command other than commandID. A turn's records must
+// not share the log with another command's un-acked group — that is what lets
+// one acked terminal evict the whole log and keeps a rejected terminal's group
+// truncation from discarding another command's data. Records for commandID
+// itself may remain: a resumed turn continues its own interrupted tail.
+//
+// A blocking group without a terminal record is an orphan: its turn died
+// before reporting (machine crash, or a WAL fault that routed the terminal
+// through the bypass). result_acked would never arrive, so the barrier appends
+// the synthetic FAILED terminal and lets the group drain like any other. The
+// barrier only runs between turns (the drain loop is serial), so every
+// other-command group it sees belongs to a dead turn.
+//
+// The wait sends flush-now so an uploader sleeping in backoff retries
+// immediately, polls at the batch-window cadence, and watches ctx so a dead
+// connection releases the barrier (the caller aborts the turn).
+func (u *Uploader) WaitClearFor(ctx context.Context, commandID string) error {
+	for {
+		blocked, orphans, err := u.blockingFor(commandID)
+		if err != nil {
+			return err
+		}
+		if !blocked {
+			return nil
+		}
+		for _, o := range orphans {
+			slog.Warn("outbox holds an unterminated command group; synthesizing the terminal",
+				"dir", u.ob.Dir(), "commandID", o.commandID)
+			if aErr := u.ob.Append(syntheticTerminal(o)); aErr != nil {
+				return aErr
+			}
+		}
+		u.FlushNow()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-u.flushNow:
+		case <-time.After(BatchWindow):
+			// Re-check on the uploader's cadence; the uploader drains in
+			// parallel.
+		}
+	}
+}
+
+// blockingFor scans the log from its start and reports whether any record
+// belongs to a command other than commandID, plus the orphan groups among
+// them (no terminal record in the whole log). One shard suffices: the barrier
+// runs between turns, so the log holds at most one other command's records —
+// WAL order is append order, so they are always in the first shard when
+// present. A terminal beyond the shard makes the orphan detection false-
+// positive; the synthesized duplicate is a harmless no-op (the manager's
+// result_acked is idempotent).
+func (u *Uploader) blockingFor(commandID string) (blocked bool, orphans []orphanGroup, err error) {
+	records, err := u.ob.ReadRecords(ReadBatchMaxEntries, UploadMaxBytes, 0)
+	if err != nil {
+		return false, nil, err
+	}
+	type group struct {
+		hasTerminal bool
+		lastProgSeq int32
+	}
+	others := make(map[string]*group)
+	for _, r := range records {
+		e := r.Entry
+		if e == nil || e.GetCommandId() == commandID {
+			continue
+		}
+		blocked = true
+		g := others[e.GetCommandId()]
+		if g == nil {
+			g = &group{}
+			others[e.GetCommandId()] = g
+		}
+		switch e.GetKind() {
+		case v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT:
+			g.hasTerminal = true
+		case v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_PROGRESS:
+			g.lastProgSeq = max32(g.lastProgSeq, e.GetSeqNo())
+		default:
+		}
+	}
+	for id, g := range others {
+		if !g.hasTerminal {
+			orphans = append(orphans, orphanGroup{commandID: id, lastProgressSeq: g.lastProgSeq})
+		}
+	}
+	slices.SortFunc(orphans, func(a, b orphanGroup) int {
+		return strings.Compare(a.commandID, b.commandID)
+	})
+	return blocked, orphans, nil
+}
+
+// syntheticTerminal builds the FAILED result a barrier appends for an orphan
+// group (seq 1 in the unused result space; LastSeqNo covers the group's stored
+// progress so the manager's ack cursor stays complete).
+func syntheticTerminal(o orphanGroup) *Entry {
+	return &Entry{
+		CommandId: o.commandID,
+		Kind:      v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT,
+		SeqNo:     1,
+		Payload: &v1pb.UploadCommandDataEntry_Result{
+			Result: &v1pb.CommandResult{
+				CommandId:    o.commandID,
+				ExitCode:     -1,
+				LastSeqNo:    o.lastProgressSeq,
+				ErrorMessage: "agent stopped before the turn reported a result",
+			},
+		},
+	}
+}
+
 // Run drains the outbox until ctx is cancelled: on each cycle it flushes and
 // uploads one batch, folds the response's acks/rejections into an eviction
 // boundary, and enforces the retention cap. Failures back off exponentially;
@@ -168,16 +297,18 @@ func (u *Uploader) recordSuccess() {
 
 // BypassUpload is the terminal-state side path (§3.1): when the WAL cannot
 // persist and the turn must still report its failure, the synthetic terminal
-// is sent directly, bypassing the log. Best-effort: an unreachable manager
-// leaves the command to the reaper.
-func (u *Uploader) BypassUpload(ctx context.Context, entry *Entry) {
+// is sent directly, bypassing the log. The error reports delivery: a failed
+// bypass leaves the command to the manager's reaper.
+func (u *Uploader) BypassUpload(ctx context.Context, entry *Entry) error {
 	if entry == nil {
-		return
+		return nil
 	}
 	if _, err := u.upload(ctx, []*Entry{entry}); err != nil {
 		slog.Warn("terminal bypass upload failed; the manager's reaper owns the command",
 			"dir", u.ob.Dir(), "commandID", entry.GetCommandId(), "error", err)
+		return err
 	}
+	return nil
 }
 
 // uploadCycle reads the cursor's batch, uploads it, and folds the response

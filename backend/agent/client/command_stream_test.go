@@ -24,8 +24,7 @@ import (
 func TestCommandStreamRunCommandSendsProgressEventAndResult(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sink := newMemoryTurnSink()
 
 	resultPayload, err := structpb.NewStruct(map[string]any{"status": "ok"})
 	require.NoError(t, err)
@@ -63,7 +62,7 @@ func TestCommandStreamRunCommandSendsProgressEventAndResult(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		(&commandStream{}).runCommand(ctx, runtime, stream, req, nil)
+		(&commandStream{sink: sink}).runCommand(ctx, runtime, sink, req, nil)
 		close(done)
 	}()
 
@@ -73,45 +72,50 @@ func TestCommandStreamRunCommandSendsProgressEventAndResult(t *testing.T) {
 		t.Fatal("timed out waiting for runCommand")
 	}
 
-	require.NoError(t, stream.CloseRequest())
-
 	state, stateErr := executor.LoadLocalState("", "")
 	require.NoError(t, stateErr)
 	assert.Nil(t, state)
 
-	msgs := recorder.Messages()
-	require.Len(t, msgs, 5)
+	entries := sink.Entries()
+	require.Len(t, entries, 5)
 
-	lifecycle := msgs[0].GetEvent()
+	lifecycle := entries[0].GetEvent()
 	require.NotNil(t, lifecycle)
 	assert.Equal(t, int32(1), lifecycle.SeqNo)
 	assert.Equal(t, v1pb.CommandEventType_LIFECYCLE, lifecycle.Type)
 	assert.Equal(t, "command started", lifecycle.Summary)
 	assert.Equal(t, "ACP", lifecycle.GetLifecycle().GetExecutorKind())
 	assert.Equal(t, "opencode", lifecycle.GetLifecycle().GetProfile())
+	assert.Equal(t, v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_EVENT, entries[0].GetKind())
+	assert.Equal(t, "cmd-1", entries[0].GetCommandId())
 
-	progress := msgs[1].GetProgress()
+	progress := entries[1].GetProgress()
 	require.NotNil(t, progress)
+	assert.Equal(t, v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_PROGRESS, entries[1].GetKind())
+	assert.Equal(t, int32(7), entries[1].GetSeqNo())
 	assert.Equal(t, "cmd-1", progress.CommandId)
 	assert.Equal(t, v1pb.CommandOutput_STDOUT, progress.Type)
 	assert.Equal(t, "hello from runtime", progress.Content)
 	assert.Equal(t, int32(7), progress.SeqNo)
+	require.NotNil(t, entries[1].GetAgentSideTimestamp(), "progress carries the agent-side timestamp")
 
-	warning := msgs[2].GetEvent()
+	warning := entries[2].GetEvent()
 	require.NotNil(t, warning)
 	assert.Equal(t, v1pb.CommandEventType_WARNING, warning.Type)
 	assert.Equal(t, "tool warning", warning.Summary)
 	assert.Equal(t, "warn-1", warning.GetWarning().GetMessage())
 
-	textDelta := msgs[3].GetEvent()
+	textDelta := entries[3].GetEvent()
 	require.NotNil(t, textDelta)
 	assert.Equal(t, v1pb.CommandEventType_TEXT_DELTA, textDelta.Type)
 	assert.Equal(t, "hello from runtime", textDelta.Summary)
 	assert.Equal(t, "STDOUT", textDelta.GetTextDelta().GetStreamType())
 	assert.Equal(t, "hello from runtime", textDelta.GetTextDelta().GetContent())
 
-	result := msgs[4].GetResult()
+	result := entries[4].GetResult()
 	require.NotNil(t, result)
+	assert.Equal(t, v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT, entries[4].GetKind())
+	assert.Equal(t, int32(1), entries[4].GetSeqNo(), "terminal envelopes carry seq 1")
 	assert.Equal(t, "cmd-1", result.CommandId)
 	assert.Equal(t, int32(0), result.ExitCode)
 	assert.Equal(t, int64(321), result.DurationMs)
@@ -121,12 +125,10 @@ func TestCommandStreamRunCommandSendsProgressEventAndResult(t *testing.T) {
 
 	assert.Equal(t, int32(0), runtime.cancelCount.Load())
 	assert.Equal(t, int32(1), runtime.startInvoked.Load())
-	assert.True(t, recorder.closed.Load())
 }
 
 func TestDrainOutputSendsProgressAndSynthesizedEvent(t *testing.T) {
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sink := newMemoryTurnSink()
 
 	runtime := &scriptedRuntime{
 		outputCh: make(chan executor.OutputChunk, 1),
@@ -145,7 +147,7 @@ func TestDrainOutputSendsProgressAndSynthesizedEvent(t *testing.T) {
 	state := &executor.LocalState{LastSeqSent: 4, LastEventSeqSent: 6}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	drainOutput(ctx, runtime, stream, "cmd-2", state, &mergedText{}, nil)
+	drainOutput(ctx, runtime, sink, "cmd-2", state, &mergedText{}, nil)
 
 	assert.Equal(t, int32(9), state.LastSeqSent, "LastSeqSent must advance to the drained chunk")
 	// The synthesized TEXT_DELTA flush increments the event seq from 6 -> 7
@@ -153,26 +155,23 @@ func TestDrainOutputSendsProgressAndSynthesizedEvent(t *testing.T) {
 	// LocalState, leaving LastEventSeqSent stale at 6).
 	assert.Equal(t, int32(7), state.LastEventSeqSent, "LastEventSeqSent must advance past the flushed TEXT_DELTA")
 
-	require.NoError(t, stream.CloseRequest())
+	entries := sink.Entries()
+	require.Len(t, entries, 2)
 
-	msgs := recorder.Messages()
-	require.Len(t, msgs, 2)
-
-	progress := msgs[0].GetProgress()
+	progress := entries[0].GetProgress()
 	require.NotNil(t, progress)
 	assert.Equal(t, "cmd-2", progress.CommandId)
 	assert.Equal(t, v1pb.CommandOutput_STDERR, progress.Type)
 	assert.Equal(t, "remaining output", progress.Content)
 	assert.Equal(t, int32(9), progress.SeqNo)
 
-	textDelta := msgs[1].GetEvent()
+	textDelta := entries[1].GetEvent()
 	require.NotNil(t, textDelta)
 	assert.Equal(t, v1pb.CommandEventType_TEXT_DELTA, textDelta.Type)
 	assert.Equal(t, "remaining output", textDelta.Summary)
 	assert.Equal(t, int32(7), textDelta.SeqNo, "TEXT_DELTA seq must come from the live state counter")
 	assert.Equal(t, "STDERR", textDelta.GetTextDelta().GetStreamType())
 	assert.Equal(t, "remaining output", textDelta.GetTextDelta().GetContent())
-	assert.True(t, recorder.closed.Load())
 }
 
 type scriptedRuntime struct {
@@ -322,8 +321,7 @@ func setUnexportedField(t *testing.T, target any, fieldName string, value any) {
 func TestCommandStreamSendsTokenUsageEvent(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sink := newMemoryTurnSink()
 
 	runtime := newScriptedRuntime(func(runtime *scriptedRuntime) {
 		runtime.eventCh <- executor.Event{
@@ -350,7 +348,7 @@ func TestCommandStreamSendsTokenUsageEvent(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		(&commandStream{}).runCommand(ctx, runtime, stream, req, nil)
+		(&commandStream{sink: sink}).runCommand(ctx, runtime, sink, req, nil)
 		close(done)
 	}()
 
@@ -360,15 +358,13 @@ func TestCommandStreamSendsTokenUsageEvent(t *testing.T) {
 		t.Fatal("timed out waiting for runCommand")
 	}
 
-	require.NoError(t, stream.CloseRequest())
-
 	var tokenEvent *v1pb.CommandEvent
-	for _, m := range recorder.Messages() {
-		if ev := m.GetEvent(); ev != nil && ev.Type == v1pb.CommandEventType_TOKEN_USAGE {
+	for _, e := range sink.Entries() {
+		if ev := e.GetEvent(); ev != nil && ev.Type == v1pb.CommandEventType_TOKEN_USAGE {
 			tokenEvent = ev
 		}
 	}
-	require.NotNil(t, tokenEvent, "TOKEN_USAGE event must be streamed")
+	require.NotNil(t, tokenEvent, "TOKEN_USAGE event must be recorded")
 	usage := tokenEvent.GetTokenUsage()
 	require.NotNil(t, usage)
 	assert.Equal(t, int64(500), usage.InputTokens)
@@ -429,10 +425,9 @@ func TestDrainLoopIdleResponseEndsPass(t *testing.T) {
 }
 
 // TestRunSessionExecutesRuntime verifies that a non-idle session builds the
-// runtime and pumps lifecycle + result over the stream via runCommand.
+// runtime and pumps lifecycle + result into the outbox via runCommand.
 func TestRunSessionExecutesRuntime(t *testing.T) {
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sink := newMemoryTurnSink()
 
 	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
 		close(r.outputCh)
@@ -443,6 +438,7 @@ func TestRunSessionExecutesRuntime(t *testing.T) {
 	})
 
 	cs := &commandStream{
+		sink: sink,
 		newSessionRuntime: func(_ executor.Request) (executor.Runtime, error) {
 			return runtime, nil
 		},
@@ -453,7 +449,7 @@ func TestRunSessionExecutesRuntime(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "TestAgent", "", nil, "", nil)
+		cs.runSession(ctx, nil, "drain-1", "TestAgent", "", nil, "", nil)
 		close(done)
 	}()
 
@@ -464,16 +460,15 @@ func TestRunSessionExecutesRuntime(t *testing.T) {
 		t.Fatal("runSession did not complete")
 	}
 
-	require.NoError(t, stream.CloseRequest())
-	msgs := recorder.Messages()
-	require.NotEmpty(t, msgs)
+	entries := sink.Entries()
+	require.NotEmpty(t, entries)
 
-	lifecycle := msgs[0].GetEvent()
+	lifecycle := entries[0].GetEvent()
 	require.NotNil(t, lifecycle)
 	assert.Equal(t, v1pb.CommandEventType_LIFECYCLE, lifecycle.Type)
 	assert.Equal(t, "ACP", lifecycle.GetLifecycle().GetExecutorKind())
 
-	result := msgs[len(msgs)-1].GetResult()
+	result := entries[len(entries)-1].GetResult()
 	require.NotNil(t, result)
 	assert.Equal(t, "drain-1", result.CommandId)
 	assert.Equal(t, int32(0), result.ExitCode)
@@ -490,8 +485,7 @@ func TestRunSessionExecutesRuntime(t *testing.T) {
 // exercises the commandStream InFlight/CancelInFlight mechanism end-to-end
 // through the runner's coordinateInFlightTurn glue.
 func TestRunnerCoordinatesInFlightTurnOnReload(t *testing.T) {
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sink := newMemoryTurnSink()
 
 	// A runtime that blocks until cancelled, then finishes with a generic
 	// "context canceled" result — exactly what a pi/ACP executor reports when
@@ -506,6 +500,7 @@ func TestRunnerCoordinatesInFlightTurnOnReload(t *testing.T) {
 	})
 
 	cs := &commandStream{
+		sink: sink,
 		newSessionRuntime: func(_ executor.Request) (executor.Runtime, error) {
 			return runtime, nil
 		},
@@ -514,7 +509,7 @@ func TestRunnerCoordinatesInFlightTurnOnReload(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	go cs.runSession(ctx, stream, "drain-reload", "TestAgent", "", nil, "", nil)
+	go cs.runSession(ctx, nil, "drain-reload", "TestAgent", "", nil, "", nil)
 
 	// Wait until the turn is in flight before reloading.
 	require.Eventually(t, cs.InFlight, 2*time.Second, 5*time.Millisecond, "turn must become in flight")
@@ -531,10 +526,9 @@ func TestRunnerCoordinatesInFlightTurnOnReload(t *testing.T) {
 	assert.Less(t, elapsed, 2*time.Second, "coordination must end fast after cancel, not hang")
 	assert.False(t, cs.InFlight(), "turn must no longer be in flight after coordination")
 
-	require.NoError(t, stream.CloseRequest())
-	msgs := recorder.Messages()
-	require.NotEmpty(t, msgs)
-	result := msgs[len(msgs)-1].GetResult()
+	entries := sink.Entries()
+	require.NotEmpty(t, entries)
+	result := entries[len(entries)-1].GetResult()
 	require.NotNil(t, result, "expected a CommandResult carrying the reload reason")
 	assert.Equal(t, "drain-reload", result.CommandId)
 	assert.Equal(t, "config reloaded mid-turn", result.ErrorMessage, "manager must see the explicit reload reason, not a generic cancel")
@@ -550,8 +544,7 @@ func TestRunnerCoordinatesInFlightTurnOnReload(t *testing.T) {
 // failed (ExitCode != 0), which TestRunnerCoordinatesInFlightTurnOnReload covers.
 func TestRunCommand_DoesNotOverrideSuccessfulResultWithStaleCancelReason(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sink := newMemoryTurnSink()
 
 	// A turn that completes successfully.
 	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
@@ -562,7 +555,7 @@ func TestRunCommand_DoesNotOverrideSuccessfulResultWithStaleCancelReason(t *test
 		close(r.doneCh)
 	})
 
-	cs := &commandStream{}
+	cs := &commandStream{sink: sink}
 	// Simulate the reload racing in after the turn already succeeded: the reason
 	// is set but the turn's own result is a success.
 	cs.setCancelReason("config reloaded mid-turn")
@@ -571,7 +564,7 @@ func TestRunCommand_DoesNotOverrideSuccessfulResultWithStaleCancelReason(t *test
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runCommand(ctx, runtime, stream, executor.Request{CommandID: "cmd-ok"}, nil)
+		cs.runCommand(ctx, runtime, sink, executor.Request{CommandID: "cmd-ok"}, nil)
 		close(done)
 	}()
 	require.Eventually(t, func() bool {
@@ -583,8 +576,7 @@ func TestRunCommand_DoesNotOverrideSuccessfulResultWithStaleCancelReason(t *test
 		}
 	}, 5*time.Second, 10*time.Millisecond, "runCommand should finish")
 
-	require.NoError(t, stream.CloseRequest())
-	result := recorder.Messages()[len(recorder.Messages())-1].GetResult()
+	result := sink.Entries()[len(sink.Entries())-1].GetResult()
 	require.NotNil(t, result)
 	assert.Equal(t, int32(0), result.ExitCode, "turn succeeded")
 	assert.Empty(t, result.ErrorMessage, "a successful turn must not be mislabeled with the stale reload reason")
@@ -592,12 +584,11 @@ func TestRunCommand_DoesNotOverrideSuccessfulResultWithStaleCancelReason(t *test
 
 // TestDrainOutput_SequenceMonotonic guards the T15 drainOutput rewrite: with
 // both buffered output and buffered events pending after Done(), the drain
-// must forward all of them and leave state.LastEventSeqSent monotonically
+// must record all of them and leave state.LastEventSeqSent monotonically
 // ahead of its input (previously events were dropped and the seq counter was
 // written against a throwaway LocalState, rolling it back).
 func TestDrainOutput_SequenceMonotonic(t *testing.T) {
-	stream, recorder, cleanup := newTestCommandChannel(t)
-	defer cleanup()
+	sink := newMemoryTurnSink()
 
 	runtime := &scriptedRuntime{
 		outputCh: make(chan executor.OutputChunk, 4),
@@ -615,16 +606,15 @@ func TestDrainOutput_SequenceMonotonic(t *testing.T) {
 	state := &executor.LocalState{LastSeqSent: 4, LastEventSeqSent: 6}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	drainOutput(ctx, runtime, stream, "cmd-m", state, &mergedText{}, nil)
+	drainOutput(ctx, runtime, sink, "cmd-m", state, &mergedText{}, nil)
 
 	assert.Equal(t, int32(11), state.LastSeqSent, "LastSeqSent must be the max drained chunk seq")
 	// 2 forwarded events (7, 8) + 1 synthesized TEXT_DELTA flush (9) = 9, which
 	// is strictly greater than the input 6 (monotonic, no rollback).
 	assert.Equal(t, int32(9), state.LastEventSeqSent)
 
-	require.NoError(t, stream.CloseRequest())
-	// 2 progress + 2 warning events + 1 TEXT_DELTA = 5 messages.
-	assert.Len(t, recorder.Messages(), 5)
+	// 2 progress + 2 warning events + 1 TEXT_DELTA = 5 records.
+	assert.Len(t, sink.Entries(), 5)
 }
 
 // failingConn is a connect streaming conn whose Send always errors, simulating a

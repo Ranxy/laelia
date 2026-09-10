@@ -358,7 +358,9 @@ func TestUploaderBypassUpload(t *testing.T) {
 
 	fake := &fakeUploader{}
 	u := NewUploader(o, fake.upload)
-	u.BypassUpload(context.Background(), resultEntry("cmd-9", -1))
+	if err := u.BypassUpload(context.Background(), resultEntry("cmd-9", -1)); err != nil {
+		t.Fatalf("bypass: %v", err)
+	}
 	if fake.callCount() != 1 {
 		t.Fatalf("bypass must send the terminal directly, saw %d calls", fake.callCount())
 	}
@@ -366,7 +368,9 @@ func TestUploaderBypassUpload(t *testing.T) {
 	// A failing transport must not panic: the bypass is best-effort.
 	failing := &fakeUploader{failNext: 1}
 	u2 := NewUploader(o, failing.upload)
-	u2.BypassUpload(context.Background(), resultEntry("cmd-9", -1))
+	if err := u2.BypassUpload(context.Background(), resultEntry("cmd-9", -1)); err == nil {
+		t.Fatal("a failing bypass must report its error")
+	}
 }
 
 // TestWaitDrainedHonorsContext locks that the barrier cannot wedge past its
@@ -389,6 +393,128 @@ func TestWaitDrainedHonorsContext(t *testing.T) {
 	defer cancel()
 	if err := u.WaitDrained(ctx); err == nil {
 		t.Fatal("barrier must fail with ctx error when the manager never drains the queue")
+	}
+}
+
+// TestWaitClearForAllowsOwnCommandRecords locks the command-aware barrier: the
+// barrier only blocks on OTHER commands' records, so a resumed turn proceeds
+// while its own interrupted tail is still queued.
+func TestWaitClearForAllowsOwnCommand(t *testing.T) {
+	fastUploaderTunables(t)
+	o, err := Open(filepathJoinTemp(t))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer o.Close()
+
+	if err := o.Append(progressEntry("cmd-1", 1, "x")); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+
+	// A transport that never succeeds: nothing drains.
+	fake := &fakeUploader{failNext: 1 << 30}
+	u := NewUploader(o, fake.upload)
+
+	// Own-command records must not block (the resume path).
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	if err := u.WaitClearFor(ctx, "cmd-1"); err != nil {
+		t.Fatalf("own-command records must not block the barrier: %v", err)
+	}
+
+	// Another command's records block (released on drain).
+	if err := o.Append(progressEntry("cmd-2", 1, "x")); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel2()
+	if err := u.WaitClearFor(ctx2, "cmd-1"); err == nil {
+		t.Fatal("other-command records must block the barrier")
+	}
+}
+
+// TestWaitClearForSynthesizesOrphanTerminal locks the orphan guard: a group
+// whose turn died before reporting can never drain on its own (result_acked
+// never arrives), so the barrier synthesizes the FAILED terminal and the group
+// drains, releasing the barrier.
+func TestWaitClearForSynthesizesOrphanTerminal(t *testing.T) {
+	fastUploaderTunables(t)
+	o, err := Open(filepathJoinTemp(t))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer o.Close()
+
+	if err := o.Append(progressEntry("cmd-1", 3, "x")); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	if err := o.Append(eventEntry("cmd-1", 1)); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+
+	fake := &fakeUploader{}
+	u := NewUploader(o, fake.upload)
+	runUploader(t, u)
+
+	if err := u.WaitClearFor(context.Background(), "cmd-2"); err != nil {
+		t.Fatalf("barrier must release after the orphan terminal synthesizes: %v", err)
+	}
+	if empty, _ := o.Empty(); !empty {
+		t.Fatal("the orphan group must drain after the synthesized terminal")
+	}
+
+	// The synthesized terminal is a FAILED result covering the stored progress.
+	var synth *v1pb.CommandResult
+	for _, call := range fake.calls {
+		for _, e := range call {
+			if e.GetCommandId() == "cmd-1" && e.GetKind() == v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT {
+				synth = e.GetResult()
+			}
+		}
+	}
+	if synth == nil {
+		t.Fatal("barrier must append the synthetic terminal for the orphan group")
+	}
+	if synth.GetExitCode() != -1 {
+		t.Fatalf("synthetic terminal must be a failure, got exit %d", synth.GetExitCode())
+	}
+	if synth.GetLastSeqNo() != 3 {
+		t.Fatalf("synthetic terminal must cover the group's progress watermark, got %d", synth.GetLastSeqNo())
+	}
+	if synth.GetErrorMessage() == "" {
+		t.Fatal("synthetic terminal must carry an explanatory error message")
+	}
+}
+
+// TestWaitClearForSkipsOrphanForOwnCommand locks that the barrier never
+// synthesizes a terminal for the command about to run: the resumed turn's own
+// tail must stay intact for the continuation.
+func TestWaitClearForSkipsOrphanForOwnCommand(t *testing.T) {
+	fastUploaderTunables(t)
+	o, err := Open(filepathJoinTemp(t))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer o.Close()
+
+	if err := o.Append(progressEntry("cmd-1", 2, "x")); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+
+	fake := &fakeUploader{failNext: 1 << 30}
+	u := NewUploader(o, fake.upload)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	if err := u.WaitClearFor(ctx, "cmd-1"); err != nil {
+		t.Fatalf("own unterminated tail must pass the barrier: %v", err)
+	}
+	for _, call := range fake.calls {
+		for _, e := range call {
+			if e.GetKind() == v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT {
+				t.Fatal("the barrier must not synthesize a terminal for the command about to run")
+			}
+		}
 	}
 }
 
