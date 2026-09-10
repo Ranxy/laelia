@@ -24,6 +24,7 @@ import {
   Coins,
   FileDiff,
   Gauge,
+  Info,
   type LucideIcon,
   Minimize2,
   Play,
@@ -279,6 +280,13 @@ export const commandEventKind: Record<number, CommandEventKind> = {
     textClass: "text-info",
     icon: Coins,
     phase: "usage",
+  },
+  [CommandEventType.SYSTEM]: {
+    labelKey: "command.event-system",
+    tagClass: INFO_TAG,
+    textClass: "text-info",
+    icon: Info,
+    phase: "system",
   },
 };
 

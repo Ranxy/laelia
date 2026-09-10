@@ -90,7 +90,8 @@ function matchesFilter(
         row.phase === "usage" ||
         row.phase === "permission" ||
         row.phase === "steer" ||
-        row.phase === "retry"
+        row.phase === "retry" ||
+        row.phase === "system"
       );
     default:
       return true;

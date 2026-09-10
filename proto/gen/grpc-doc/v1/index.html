@@ -1862,6 +1862,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.AgentControlRequest"><span class="badge">M</span>AgentControlRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.BeginSessionRequest"><span class="badge">M</span>BeginSessionRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ConnectMachineRequest"><span class="badge">M</span>ConnectMachineRequest</a>
                 </li>
               
@@ -8845,7 +8853,7 @@ used to jump back to the section from a comment. </p></td>
         
       
         <h3 id="laelia.v1.BeginSession">BeginSession</h3>
-        <p>BeginSession is sent by an agent to ask the Manager to start a new</p><p>autonomous processing session. The Manager checks the agent's per-channel</p><p>cursors: if no conversation has room_version greater than the agent's cursor,</p><p>it replies BeginSessionResponse{idle=true} and the agent stays idle;</p><p>otherwise it creates a RUNNING command and replies with its command_id, which</p><p>the agent uses to anchor its execution events and link any posted replies.</p>
+        <p>BeginSession is sent by an agent over its AgentChannel to ask the Manager to</p><p>start a new autonomous processing session. It is retired with the</p><p>AgentChannel: the drain loop now pulls work through the unary BeginSession</p><p>RPC on MachineStreamService (see v1/machine.proto).</p>
 
         
 
@@ -10913,7 +10921,7 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
         
       
         <h3 id="laelia.v1.DiscoverProviders">DiscoverProviders</h3>
-        <p>DiscoverProviders asks the agent daemon to re-probe its host for installed</p><p>LLM agent providers and their models. The daemon replies with</p><p>AgentStreamMessage.providers_discovered.</p>
+        <p>DiscoverProviders asks the machine app to re-probe its host for installed</p><p>LLM agent providers and their models (one machine-scoped catalog serves</p><p>every hosted agent). The machine replies with providers_discovered on its</p><p>control stream.</p>
 
         
           <table class="field-table">
@@ -15074,7 +15082,7 @@ DONE closes the task (sets completed_at); moving out of DONE clears it. </p></td
         
       
         <h3 id="laelia.v1.WorkspaceListRequest">WorkspaceListRequest</h3>
-        <p>WorkspaceListRequest asks the agent daemon to list one directory level of an</p><p>agent's workspace (~/.laelia/<machineID>/<agentID>/ on the machine). Paths</p><p>are relative to the workspace root; an empty dir_path lists the root. The</p><p>daemon replies with AgentStreamMessage.workspace_list_response.</p>
+        <p>WorkspaceListRequest asks the agent daemon to list one directory level of an</p><p>agent's workspace (~/.laelia/<machineID>/<agentID>/ on the machine). Paths</p><p>are relative to the workspace root; an empty dir_path lists the root. The</p><p>daemon replies with workspace_list_response. agent_name routes the request</p><p>to the agent's runner when it travels on the machine control stream.</p>
 
         
           <table class="field-table">
@@ -15102,6 +15110,15 @@ DONE closes the task (sets completed_at); moving out of DONE clears it. </p></td
                   <td><a href="#bool">bool</a></td>
                   <td></td>
                   <td><p>show dotfiles (still filtered by the never-visible policy) </p></td>
+                </tr>
+              
+                <tr>
+                  <td>agent_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>agent_name is the agent (agents/{agent}) whose workspace is addressed;
+required on the machine control stream, where one stream serves every
+hosted agent. </p></td>
                 </tr>
               
             </tbody>
@@ -15143,7 +15160,7 @@ DONE closes the task (sets completed_at); moving out of DONE clears it. </p></td
         
       
         <h3 id="laelia.v1.WorkspaceReadRequest">WorkspaceReadRequest</h3>
-        <p>WorkspaceReadRequest asks the agent daemon to read a workspace file for</p><p>preview. Text and image content is returned inline (see</p><p>WorkspaceReadResponse); other binaries return metadata only. Sensitive files</p><p>(secret/credential/token patterns) are always rejected by the daemon.</p>
+        <p>WorkspaceReadRequest asks the agent daemon to read a workspace file for</p><p>preview. Text and image content is returned inline (see</p><p>WorkspaceReadResponse); other binaries return metadata only. Sensitive files</p><p>(secret/credential/token patterns) are always rejected by the daemon.</p><p>agent_name routes the request to the agent's runner on the machine control</p><p>stream.</p>
 
         
           <table class="field-table">
@@ -15164,6 +15181,13 @@ DONE closes the task (sets completed_at); moving out of DONE clears it. </p></td
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>relative to the workspace root </p></td>
+                </tr>
+              
+                <tr>
+                  <td>agent_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -15362,6 +15386,15 @@ produce no Activity row.</p></td>
                 <td>TOKEN_USAGE</td>
                 <td>15</td>
                 <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>SYSTEM</td>
+                <td>16</td>
+                <td><p>SYSTEM is a machine/manager-authored explanatory event outside the turn&#39;s
+own execution stream (e.g. the note explaining that a command was marked
+FAILED while the machine was unreachable and is being regraded from a late
+result). It carries its meaning in summary; no typed payload is required.</p></td>
               </tr>
             
           </tbody>
@@ -18644,6 +18677,84 @@ Permissions required: laelia.identityProviders.update</p></td>
 
         
       
+        <h3 id="laelia.v1.AgentControlRequest">AgentControlRequest</h3>
+        <p>AgentControlRequest carries one manager→agent control interaction on the</p><p>machine control stream. agent_name routes it to that agent's runner on the</p><p>machine; the oneof is the per-agent control payload.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>agent_name is the agent resource name (agents/{agent}) the control
+interaction targets; the machine validates it hosts this agent. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cancel</td>
+                  <td><a href="#laelia.v1.CancelMessage">CancelMessage</a></td>
+                  <td></td>
+                  <td><p>cancel stops the agent&#39;s in-flight turn. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>steer</td>
+                  <td><a href="#laelia.v1.SteerMessage">SteerMessage</a></td>
+                  <td></td>
+                  <td><p>steer injects a follow-up message into the in-flight turn. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>wake</td>
+                  <td><a href="#laelia.v1.NewMessagesAvailable">NewMessagesAvailable</a></td>
+                  <td></td>
+                  <td><p>wake kicks the agent&#39;s drain loop when new work may be available. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>prompt_notice</td>
+                  <td><a href="#laelia.v1.PromptReleaseNotice">PromptReleaseNotice</a></td>
+                  <td></td>
+                  <td><p>prompt_notice pushes a system-prompt release notice to the agent. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.BeginSessionRequest">BeginSessionRequest</h3>
+        <p>BeginSessionRequest names the agent whose drain loop is pulling work.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>agent_name is the agent resource name (agents/{agent}); the manager
+validates the authenticated machine owns this agent. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ConnectMachineRequest">ConnectMachineRequest</h3>
         <p></p>
 
@@ -19627,6 +19738,27 @@ to detect when a machine&#39;s bundled system prompt is out of date. </p></td>
                 </tr>
               
                 <tr>
+                  <td>workspace_list_response</td>
+                  <td><a href="#laelia.v1.WorkspaceListResponse">WorkspaceListResponse</a></td>
+                  <td></td>
+                  <td><p>response to ManagerMachineStreamMessage.workspace_list_request </p></td>
+                </tr>
+              
+                <tr>
+                  <td>workspace_read_response</td>
+                  <td><a href="#laelia.v1.WorkspaceReadResponse">WorkspaceReadResponse</a></td>
+                  <td></td>
+                  <td><p>response to ManagerMachineStreamMessage.workspace_read_request </p></td>
+                </tr>
+              
+                <tr>
+                  <td>prompt_release_notice_ack</td>
+                  <td><a href="#laelia.v1.PromptReleaseNoticeAck">PromptReleaseNoticeAck</a></td>
+                  <td></td>
+                  <td><p>ack that a prompt release notice was injected into a turn </p></td>
+                </tr>
+              
+                <tr>
                   <td>models_discovered</td>
                   <td><a href="#laelia.v1.ModelsDiscovered">ModelsDiscovered</a></td>
                   <td></td>
@@ -19938,6 +20070,27 @@ phase badge. Set only for provisioned machines. </p></td>
                   <td><a href="#laelia.v1.RestartAgent">RestartAgent</a></td>
                   <td></td>
                   <td><p>force cold restart of one agent </p></td>
+                </tr>
+              
+                <tr>
+                  <td>agent_control</td>
+                  <td><a href="#laelia.v1.AgentControlRequest">AgentControlRequest</a></td>
+                  <td></td>
+                  <td><p>per-agent control interaction (cancel/steer/wake/prompt notice) </p></td>
+                </tr>
+              
+                <tr>
+                  <td>workspace_list_request</td>
+                  <td><a href="#laelia.v1.WorkspaceListRequest">WorkspaceListRequest</a></td>
+                  <td></td>
+                  <td><p>list one level of a hosted agent&#39;s workspace </p></td>
+                </tr>
+              
+                <tr>
+                  <td>workspace_read_request</td>
+                  <td><a href="#laelia.v1.WorkspaceReadRequest">WorkspaceReadRequest</a></td>
+                  <td></td>
+                  <td><p>read one hosted agent&#39;s workspace file </p></td>
                 </tr>
               
             </tbody>
@@ -21177,6 +21330,16 @@ applied in a single transaction in order; the response carries per-(command,
 kind) persisted watermarks plus an explicit rejection list so the machine&#39;s
 uploader can evict settled records and drop poison entries. Idempotent:
 retransmission dedups on (command_id, seq_no) per kind.</p></td>
+              </tr>
+            
+              <tr>
+                <td>BeginSession</td>
+                <td><a href="#laelia.v1.BeginSessionRequest">BeginSessionRequest</a></td>
+                <td><a href="#laelia.v1.BeginSessionResponse">BeginSessionResponse</a></td>
+                <td><p>BeginSession is the agent drain loop&#39;s pull of its next unit of work
+(agent pull semantics, so it is unary rather than stream-bound). agent_name
+binds the request to an agent the authenticated machine hosts; the reply
+carries the command to run or idle.</p></td>
               </tr>
             
           </tbody>

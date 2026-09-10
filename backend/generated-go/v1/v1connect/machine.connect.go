@@ -90,6 +90,9 @@ const (
 	// MachineStreamServiceUploadCommandDataProcedure is the fully-qualified name of the
 	// MachineStreamService's UploadCommandData RPC.
 	MachineStreamServiceUploadCommandDataProcedure = "/laelia.v1.MachineStreamService/UploadCommandData"
+	// MachineStreamServiceBeginSessionProcedure is the fully-qualified name of the
+	// MachineStreamService's BeginSession RPC.
+	MachineStreamServiceBeginSessionProcedure = "/laelia.v1.MachineStreamService/BeginSession"
 )
 
 // MachineServiceClient is a client for the laelia.v1.MachineService service.
@@ -656,6 +659,11 @@ type MachineStreamServiceClient interface {
 	// uploader can evict settled records and drop poison entries. Idempotent:
 	// retransmission dedups on (command_id, seq_no) per kind.
 	UploadCommandData(context.Context, *connect.Request[v1.UploadCommandDataRequest]) (*connect.Response[v1.UploadCommandDataResponse], error)
+	// BeginSession is the agent drain loop's pull of its next unit of work
+	// (agent pull semantics, so it is unary rather than stream-bound). agent_name
+	// binds the request to an agent the authenticated machine hosts; the reply
+	// carries the command to run or idle.
+	BeginSession(context.Context, *connect.Request[v1.BeginSessionRequest]) (*connect.Response[v1.BeginSessionResponse], error)
 }
 
 // NewMachineStreamServiceClient constructs a client for the laelia.v1.MachineStreamService service.
@@ -681,6 +689,12 @@ func NewMachineStreamServiceClient(httpClient connect.HTTPClient, baseURL string
 			connect.WithSchema(machineStreamServiceMethods.ByName("UploadCommandData")),
 			connect.WithClientOptions(opts...),
 		),
+		beginSession: connect.NewClient[v1.BeginSessionRequest, v1.BeginSessionResponse](
+			httpClient,
+			baseURL+MachineStreamServiceBeginSessionProcedure,
+			connect.WithSchema(machineStreamServiceMethods.ByName("BeginSession")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -688,6 +702,7 @@ func NewMachineStreamServiceClient(httpClient connect.HTTPClient, baseURL string
 type machineStreamServiceClient struct {
 	machineChannel    *connect.Client[v1.MachineStreamMessage, v1.ManagerMachineStreamMessage]
 	uploadCommandData *connect.Client[v1.UploadCommandDataRequest, v1.UploadCommandDataResponse]
+	beginSession      *connect.Client[v1.BeginSessionRequest, v1.BeginSessionResponse]
 }
 
 // MachineChannel calls laelia.v1.MachineStreamService.MachineChannel.
@@ -700,6 +715,11 @@ func (c *machineStreamServiceClient) UploadCommandData(ctx context.Context, req 
 	return c.uploadCommandData.CallUnary(ctx, req)
 }
 
+// BeginSession calls laelia.v1.MachineStreamService.BeginSession.
+func (c *machineStreamServiceClient) BeginSession(ctx context.Context, req *connect.Request[v1.BeginSessionRequest]) (*connect.Response[v1.BeginSessionResponse], error) {
+	return c.beginSession.CallUnary(ctx, req)
+}
+
 // MachineStreamServiceHandler is an implementation of the laelia.v1.MachineStreamService service.
 type MachineStreamServiceHandler interface {
 	MachineChannel(context.Context, *connect.BidiStream[v1.MachineStreamMessage, v1.ManagerMachineStreamMessage]) error
@@ -710,6 +730,11 @@ type MachineStreamServiceHandler interface {
 	// uploader can evict settled records and drop poison entries. Idempotent:
 	// retransmission dedups on (command_id, seq_no) per kind.
 	UploadCommandData(context.Context, *connect.Request[v1.UploadCommandDataRequest]) (*connect.Response[v1.UploadCommandDataResponse], error)
+	// BeginSession is the agent drain loop's pull of its next unit of work
+	// (agent pull semantics, so it is unary rather than stream-bound). agent_name
+	// binds the request to an agent the authenticated machine hosts; the reply
+	// carries the command to run or idle.
+	BeginSession(context.Context, *connect.Request[v1.BeginSessionRequest]) (*connect.Response[v1.BeginSessionResponse], error)
 }
 
 // NewMachineStreamServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -731,12 +756,20 @@ func NewMachineStreamServiceHandler(svc MachineStreamServiceHandler, opts ...con
 		connect.WithSchema(machineStreamServiceMethods.ByName("UploadCommandData")),
 		connect.WithHandlerOptions(opts...),
 	)
+	machineStreamServiceBeginSessionHandler := connect.NewUnaryHandler(
+		MachineStreamServiceBeginSessionProcedure,
+		svc.BeginSession,
+		connect.WithSchema(machineStreamServiceMethods.ByName("BeginSession")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.MachineStreamService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case MachineStreamServiceMachineChannelProcedure:
 			machineStreamServiceMachineChannelHandler.ServeHTTP(w, r)
 		case MachineStreamServiceUploadCommandDataProcedure:
 			machineStreamServiceUploadCommandDataHandler.ServeHTTP(w, r)
+		case MachineStreamServiceBeginSessionProcedure:
+			machineStreamServiceBeginSessionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -752,4 +785,8 @@ func (UnimplementedMachineStreamServiceHandler) MachineChannel(context.Context, 
 
 func (UnimplementedMachineStreamServiceHandler) UploadCommandData(context.Context, *connect.Request[v1.UploadCommandDataRequest]) (*connect.Response[v1.UploadCommandDataResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineStreamService.UploadCommandData is not implemented"))
+}
+
+func (UnimplementedMachineStreamServiceHandler) BeginSession(context.Context, *connect.Request[v1.BeginSessionRequest]) (*connect.Response[v1.BeginSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineStreamService.BeginSession is not implemented"))
 }

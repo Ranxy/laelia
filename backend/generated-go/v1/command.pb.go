@@ -223,6 +223,11 @@ const (
 	CommandEventType_CONTEXT_COMPACTION_FINISHED    CommandEventType = 13
 	CommandEventType_CONTEXT_USAGE_UPDATE           CommandEventType = 14
 	CommandEventType_TOKEN_USAGE                    CommandEventType = 15
+	// SYSTEM is a machine/manager-authored explanatory event outside the turn's
+	// own execution stream (e.g. the note explaining that a command was marked
+	// FAILED while the machine was unreachable and is being regraded from a late
+	// result). It carries its meaning in summary; no typed payload is required.
+	CommandEventType_SYSTEM CommandEventType = 16
 )
 
 // Enum value maps for CommandEventType.
@@ -244,6 +249,7 @@ var (
 		13: "CONTEXT_COMPACTION_FINISHED",
 		14: "CONTEXT_USAGE_UPDATE",
 		15: "TOKEN_USAGE",
+		16: "SYSTEM",
 	}
 	CommandEventType_value = map[string]int32{
 		"COMMAND_EVENT_TYPE_UNSPECIFIED": 0,
@@ -262,6 +268,7 @@ var (
 		"CONTEXT_COMPACTION_FINISHED":    13,
 		"CONTEXT_USAGE_UPDATE":           14,
 		"TOKEN_USAGE":                    15,
+		"SYSTEM":                         16,
 	}
 )
 
@@ -10495,9 +10502,10 @@ func (x *AgentReady) GetAgentName() string {
 	return ""
 }
 
-// DiscoverProviders asks the agent daemon to re-probe its host for installed
-// LLM agent providers and their models. The daemon replies with
-// AgentStreamMessage.providers_discovered.
+// DiscoverProviders asks the machine app to re-probe its host for installed
+// LLM agent providers and their models (one machine-scoped catalog serves
+// every hosted agent). The machine replies with providers_discovered on its
+// control stream.
 type DiscoverProviders struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"` // correlation id for the pending unary RefreshAgentProviders call
@@ -10600,12 +10608,17 @@ func (x *ProvidersDiscovered) GetProviders() []*AgentProviderInfo {
 // WorkspaceListRequest asks the agent daemon to list one directory level of an
 // agent's workspace (~/.laelia/<machineID>/<agentID>/ on the machine). Paths
 // are relative to the workspace root; an empty dir_path lists the root. The
-// daemon replies with AgentStreamMessage.workspace_list_response.
+// daemon replies with workspace_list_response. agent_name routes the request
+// to the agent's runner when it travels on the machine control stream.
 type WorkspaceListRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`              // correlation id for the pending unary ListAgentWorkspace call
 	DirPath       string                 `protobuf:"bytes,2,opt,name=dir_path,json=dirPath,proto3" json:"dir_path,omitempty"`                    // relative to the workspace root; empty = root
 	IncludeHidden bool                   `protobuf:"varint,3,opt,name=include_hidden,json=includeHidden,proto3" json:"include_hidden,omitempty"` // show dotfiles (still filtered by the never-visible policy)
+	// agent_name is the agent (agents/{agent}) whose workspace is addressed;
+	// required on the machine control stream, where one stream serves every
+	// hosted agent.
+	AgentName     string `protobuf:"bytes,4,opt,name=agent_name,json=agentName,proto3" json:"agent_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -10659,6 +10672,13 @@ func (x *WorkspaceListRequest) GetIncludeHidden() bool {
 		return x.IncludeHidden
 	}
 	return false
+}
+
+func (x *WorkspaceListRequest) GetAgentName() string {
+	if x != nil {
+		return x.AgentName
+	}
+	return ""
 }
 
 // WorkspaceListResponse carries one directory level back to the manager.
@@ -10720,10 +10740,13 @@ func (x *WorkspaceListResponse) GetEntries() []*WorkspaceEntry {
 // preview. Text and image content is returned inline (see
 // WorkspaceReadResponse); other binaries return metadata only. Sensitive files
 // (secret/credential/token patterns) are always rejected by the daemon.
+// agent_name routes the request to the agent's runner on the machine control
+// stream.
 type WorkspaceReadRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"` // correlation id for the pending unary ReadAgentWorkspaceFile call
 	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`                            // relative to the workspace root
+	AgentName     string                 `protobuf:"bytes,3,opt,name=agent_name,json=agentName,proto3" json:"agent_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -10768,6 +10791,13 @@ func (x *WorkspaceReadRequest) GetRequestId() string {
 func (x *WorkspaceReadRequest) GetPath() string {
 	if x != nil {
 		return x.Path
+	}
+	return ""
+}
+
+func (x *WorkspaceReadRequest) GetAgentName() string {
+	if x != nil {
+		return x.AgentName
 	}
 	return ""
 }
@@ -11712,12 +11742,10 @@ func (x *NewMessagesAvailable) GetThreadRootMessageId() string {
 	return ""
 }
 
-// BeginSession is sent by an agent to ask the Manager to start a new
-// autonomous processing session. The Manager checks the agent's per-channel
-// cursors: if no conversation has room_version greater than the agent's cursor,
-// it replies BeginSessionResponse{idle=true} and the agent stays idle;
-// otherwise it creates a RUNNING command and replies with its command_id, which
-// the agent uses to anchor its execution events and link any posted replies.
+// BeginSession is sent by an agent over its AgentChannel to ask the Manager to
+// start a new autonomous processing session. It is retired with the
+// AgentChannel: the drain loop now pulls work through the unary BeginSession
+// RPC on MachineStreamService (see v1/machine.proto).
 type BeginSession struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -13037,20 +13065,24 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x13ProvidersDiscovered\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12:\n" +
-	"\tproviders\x18\x02 \x03(\v2\x1c.laelia.v1.AgentProviderInfoR\tproviders\"w\n" +
+	"\tproviders\x18\x02 \x03(\v2\x1c.laelia.v1.AgentProviderInfoR\tproviders\"\x96\x01\n" +
 	"\x14WorkspaceListRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x19\n" +
 	"\bdir_path\x18\x02 \x01(\tR\adirPath\x12%\n" +
-	"\x0einclude_hidden\x18\x03 \x01(\bR\rincludeHidden\"k\n" +
+	"\x0einclude_hidden\x18\x03 \x01(\bR\rincludeHidden\x12\x1d\n" +
+	"\n" +
+	"agent_name\x18\x04 \x01(\tR\tagentName\"k\n" +
 	"\x15WorkspaceListResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x123\n" +
-	"\aentries\x18\x02 \x03(\v2\x19.laelia.v1.WorkspaceEntryR\aentries\"I\n" +
+	"\aentries\x18\x02 \x03(\v2\x19.laelia.v1.WorkspaceEntryR\aentries\"h\n" +
 	"\x14WorkspaceReadRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\"\xeb\x03\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1d\n" +
+	"\n" +
+	"agent_name\x18\x03 \x01(\tR\tagentName\"\xeb\x03\n" +
 	"\x0eCommandRequest\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12 \n" +
@@ -13196,7 +13228,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x10TASK_STATUS_TODO\x10\x01\x12\x1b\n" +
 	"\x17TASK_STATUS_IN_PROGRESS\x10\x02\x12\x19\n" +
 	"\x15TASK_STATUS_IN_REVIEW\x10\x03\x12\x14\n" +
-	"\x10TASK_STATUS_DONE\x10\x04*\xfb\x02\n" +
+	"\x10TASK_STATUS_DONE\x10\x04*\x87\x03\n" +
 	"\x10CommandEventType\x12\"\n" +
 	"\x1eCOMMAND_EVENT_TYPE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tLIFECYCLE\x10\x01\x12\x0e\n" +
@@ -13215,7 +13247,9 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x1aCONTEXT_COMPACTION_STARTED\x10\f\x12\x1f\n" +
 	"\x1bCONTEXT_COMPACTION_FINISHED\x10\r\x12\x18\n" +
 	"\x14CONTEXT_USAGE_UPDATE\x10\x0e\x12\x0f\n" +
-	"\vTOKEN_USAGE\x10\x0f*\xdd\x01\n" +
+	"\vTOKEN_USAGE\x10\x0f\x12\n" +
+	"\n" +
+	"\x06SYSTEM\x10\x10*\xdd\x01\n" +
 	"\x0eReminderStatus\x12\x1f\n" +
 	"\x1bREMINDER_STATUS_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17REMINDER_STATUS_PENDING\x10\x01\x12\x17\n" +

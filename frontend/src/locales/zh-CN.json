@@ -456,6 +456,7 @@
     "event-permission-requested": "权限请求",
     "event-permission-timed-out": "权限超时",
     "event-raw-acp": "原始 ACP",
+    "event-system": "系统通知",
     "event-text": "文本",
     "event-token-usage": "Token 用量",
     "event-tool-finished": "工具完成",

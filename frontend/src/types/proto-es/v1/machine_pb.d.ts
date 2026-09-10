@@ -5,14 +5,35 @@
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 import type { EmptySchema, Timestamp } from "@bufbuild/protobuf/wkt";
-import type { CommandEvent, CommandProgress, CommandResult, DiscoverProviders, Ping, Pong, ProvidersDiscovered } from "./command_pb";
-import type { AgentACPConfig, AgentCapability, AgentModelOption, AgentProviderInfo, AgentSummary } from "./agent_pb";
+import type { BeginSessionResponseSchema, CancelMessage, CommandEvent, CommandProgress, CommandResult, DiscoverProviders, NewMessagesAvailable, Ping, Pong, PromptReleaseNotice, PromptReleaseNoticeAck, ProvidersDiscovered, SteerMessage, WorkspaceListRequest, WorkspaceListResponse, WorkspaceReadRequest } from "./command_pb";
+import type { AgentACPConfig, AgentCapability, AgentModelOption, AgentProviderInfo, AgentSummary, WorkspaceReadResponse } from "./agent_pb";
 import type { State } from "./common_pb";
 
 /**
  * Describes the file v1/machine.proto.
  */
 export declare const file_v1_machine: GenFile;
+
+/**
+ * BeginSessionRequest names the agent whose drain loop is pulling work.
+ *
+ * @generated from message laelia.v1.BeginSessionRequest
+ */
+export declare type BeginSessionRequest = Message<"laelia.v1.BeginSessionRequest"> & {
+  /**
+   * agent_name is the agent resource name (agents/{agent}); the manager
+   * validates the authenticated machine owns this agent.
+   *
+   * @generated from field: string agent_name = 1;
+   */
+  agentName: string;
+};
+
+/**
+ * Describes the message laelia.v1.BeginSessionRequest.
+ * Use `create(BeginSessionRequestSchema)` to create a new message.
+ */
+export declare const BeginSessionRequestSchema: GenMessage<BeginSessionRequest>;
 
 /**
  * UploadCommandDataEntry is one command data record, mirroring the durable
@@ -1351,6 +1372,30 @@ export declare type MachineStreamMessage = Message<"laelia.v1.MachineStreamMessa
     case: "upgradeProgress";
   } | {
     /**
+     * response to ManagerMachineStreamMessage.workspace_list_request
+     *
+     * @generated from field: laelia.v1.WorkspaceListResponse workspace_list_response = 7;
+     */
+    value: WorkspaceListResponse;
+    case: "workspaceListResponse";
+  } | {
+    /**
+     * response to ManagerMachineStreamMessage.workspace_read_request
+     *
+     * @generated from field: laelia.v1.WorkspaceReadResponse workspace_read_response = 8;
+     */
+    value: WorkspaceReadResponse;
+    case: "workspaceReadResponse";
+  } | {
+    /**
+     * ack that a prompt release notice was injected into a turn
+     *
+     * @generated from field: laelia.v1.PromptReleaseNoticeAck prompt_release_notice_ack = 9;
+     */
+    value: PromptReleaseNoticeAck;
+    case: "promptReleaseNoticeAck";
+  } | {
+    /**
      * response to ManagerMachineStreamMessage.discover_models
      *
      * @generated from field: laelia.v1.ModelsDiscovered models_discovered = 10;
@@ -1459,6 +1504,30 @@ export declare type ManagerMachineStreamMessage = Message<"laelia.v1.ManagerMach
      */
     value: RestartAgent;
     case: "restartAgent";
+  } | {
+    /**
+     * per-agent control interaction (cancel/steer/wake/prompt notice)
+     *
+     * @generated from field: laelia.v1.AgentControlRequest agent_control = 13;
+     */
+    value: AgentControlRequest;
+    case: "agentControl";
+  } | {
+    /**
+     * list one level of a hosted agent's workspace
+     *
+     * @generated from field: laelia.v1.WorkspaceListRequest workspace_list_request = 14;
+     */
+    value: WorkspaceListRequest;
+    case: "workspaceListRequest";
+  } | {
+    /**
+     * read one hosted agent's workspace file
+     *
+     * @generated from field: laelia.v1.WorkspaceReadRequest workspace_read_request = 15;
+     */
+    value: WorkspaceReadRequest;
+    case: "workspaceReadRequest";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1467,6 +1536,66 @@ export declare type ManagerMachineStreamMessage = Message<"laelia.v1.ManagerMach
  * Use `create(ManagerMachineStreamMessageSchema)` to create a new message.
  */
 export declare const ManagerMachineStreamMessageSchema: GenMessage<ManagerMachineStreamMessage>;
+
+/**
+ * AgentControlRequest carries one manager→agent control interaction on the
+ * machine control stream. agent_name routes it to that agent's runner on the
+ * machine; the oneof is the per-agent control payload.
+ *
+ * @generated from message laelia.v1.AgentControlRequest
+ */
+export declare type AgentControlRequest = Message<"laelia.v1.AgentControlRequest"> & {
+  /**
+   * agent_name is the agent resource name (agents/{agent}) the control
+   * interaction targets; the machine validates it hosts this agent.
+   *
+   * @generated from field: string agent_name = 1;
+   */
+  agentName: string;
+
+  /**
+   * @generated from oneof laelia.v1.AgentControlRequest.control
+   */
+  control: {
+    /**
+     * cancel stops the agent's in-flight turn.
+     *
+     * @generated from field: laelia.v1.CancelMessage cancel = 2;
+     */
+    value: CancelMessage;
+    case: "cancel";
+  } | {
+    /**
+     * steer injects a follow-up message into the in-flight turn.
+     *
+     * @generated from field: laelia.v1.SteerMessage steer = 3;
+     */
+    value: SteerMessage;
+    case: "steer";
+  } | {
+    /**
+     * wake kicks the agent's drain loop when new work may be available.
+     *
+     * @generated from field: laelia.v1.NewMessagesAvailable wake = 4;
+     */
+    value: NewMessagesAvailable;
+    case: "wake";
+  } | {
+    /**
+     * prompt_notice pushes a system-prompt release notice to the agent.
+     *
+     * @generated from field: laelia.v1.PromptReleaseNotice prompt_notice = 5;
+     */
+    value: PromptReleaseNotice;
+    case: "promptNotice";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message laelia.v1.AgentControlRequest.
+ * Use `create(AgentControlRequestSchema)` to create a new message.
+ */
+export declare const AgentControlRequestSchema: GenMessage<AgentControlRequest>;
 
 /**
  * @generated from message laelia.v1.MachineReady
@@ -2068,6 +2197,19 @@ export declare const MachineStreamService: GenService<{
     methodKind: "unary";
     input: typeof UploadCommandDataRequestSchema;
     output: typeof UploadCommandDataResponseSchema;
+  },
+  /**
+   * BeginSession is the agent drain loop's pull of its next unit of work
+   * (agent pull semantics, so it is unary rather than stream-bound). agent_name
+   * binds the request to an agent the authenticated machine hosts; the reply
+   * carries the command to run or idle.
+   *
+   * @generated from rpc laelia.v1.MachineStreamService.BeginSession
+   */
+  beginSession: {
+    methodKind: "unary";
+    input: typeof BeginSessionRequestSchema;
+    output: typeof BeginSessionResponseSchema;
   },
 }>;
 

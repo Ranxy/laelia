@@ -171,6 +171,21 @@ service MachineStreamService {
   rpc UploadCommandData(UploadCommandDataRequest) returns (UploadCommandDataResponse) {
     option (laelia.v1.auth_method) = CUSTOM;
   }
+
+  // BeginSession is the agent drain loop's pull of its next unit of work
+  // (agent pull semantics, so it is unary rather than stream-bound). agent_name
+  // binds the request to an agent the authenticated machine hosts; the reply
+  // carries the command to run or idle.
+  rpc BeginSession(BeginSessionRequest) returns (BeginSessionResponse) {
+    option (laelia.v1.auth_method) = CUSTOM;
+  }
+}
+
+// BeginSessionRequest names the agent whose drain loop is pulling work.
+message BeginSessionRequest {
+  // agent_name is the agent resource name (agents/{agent}); the manager
+  // validates the authenticated machine owns this agent.
+  string agent_name = 1;
 }
 
 // UploadEntryKind classifies one command-data entry. progress/event are the
@@ -636,6 +651,10 @@ message MachineStreamMessage {
     MachineDisconnectNotice disconnect_notice = 4; // graceful shutdown
     MachineWorkspaceScanResponse machine_workspace_scan_response = 5; // response to ManagerMachineStreamMessage.machine_workspace_scan_request
     UpgradeProgress upgrade_progress = 6; // self-upgrade progress report, response to ManagerMachineStreamMessage.upgrade_request
+    WorkspaceListResponse workspace_list_response = 7; // response to ManagerMachineStreamMessage.workspace_list_request
+    WorkspaceReadResponse workspace_read_response = 8; // response to ManagerMachineStreamMessage.workspace_read_request
+    // ack that a prompt release notice was injected into a turn
+    PromptReleaseNoticeAck prompt_release_notice_ack = 9;
     ModelsDiscovered models_discovered = 10; // response to ManagerMachineStreamMessage.discover_models
   }
 }
@@ -653,6 +672,28 @@ message ManagerMachineStreamMessage {
     UpgradeRequest upgrade_request = 9; // self-upgrade to the manager's embedded binary
     DiscoverModels discover_models = 11; // probe one provider's models with an env overlay
     RestartAgent restart_agent = 12; // force cold restart of one agent
+    AgentControlRequest agent_control = 13; // per-agent control interaction (cancel/steer/wake/prompt notice)
+    WorkspaceListRequest workspace_list_request = 14; // list one level of a hosted agent's workspace
+    WorkspaceReadRequest workspace_read_request = 15; // read one hosted agent's workspace file
+  }
+}
+
+// AgentControlRequest carries one manager→agent control interaction on the
+// machine control stream. agent_name routes it to that agent's runner on the
+// machine; the oneof is the per-agent control payload.
+message AgentControlRequest {
+  // agent_name is the agent resource name (agents/{agent}) the control
+  // interaction targets; the machine validates it hosts this agent.
+  string agent_name = 1;
+  oneof control {
+    // cancel stops the agent's in-flight turn.
+    CancelMessage cancel = 2;
+    // steer injects a follow-up message into the in-flight turn.
+    SteerMessage steer = 3;
+    // wake kicks the agent's drain loop when new work may be available.
+    NewMessagesAvailable wake = 4;
+    // prompt_notice pushes a system-prompt release notice to the agent.
+    PromptReleaseNotice prompt_notice = 5;
   }
 }
 

@@ -456,6 +456,7 @@
     "event-permission-requested": "Permission Requested",
     "event-permission-timed-out": "Permission Timed Out",
     "event-raw-acp": "Raw ACP",
+    "event-system": "System Notice",
     "event-text": "Text",
     "event-token-usage": "Token Usage",
     "event-tool-finished": "Tool Finished",

@@ -4800,9 +4800,10 @@ export declare type AgentReady = Message<"laelia.v1.AgentReady"> & {
 export declare const AgentReadySchema: GenMessage<AgentReady>;
 
 /**
- * DiscoverProviders asks the agent daemon to re-probe its host for installed
- * LLM agent providers and their models. The daemon replies with
- * AgentStreamMessage.providers_discovered.
+ * DiscoverProviders asks the machine app to re-probe its host for installed
+ * LLM agent providers and their models (one machine-scoped catalog serves
+ * every hosted agent). The machine replies with providers_discovered on its
+ * control stream.
  *
  * @generated from message laelia.v1.DiscoverProviders
  */
@@ -4850,7 +4851,8 @@ export declare const ProvidersDiscoveredSchema: GenMessage<ProvidersDiscovered>;
  * WorkspaceListRequest asks the agent daemon to list one directory level of an
  * agent's workspace (~/.laelia/<machineID>/<agentID>/ on the machine). Paths
  * are relative to the workspace root; an empty dir_path lists the root. The
- * daemon replies with AgentStreamMessage.workspace_list_response.
+ * daemon replies with workspace_list_response. agent_name routes the request
+ * to the agent's runner when it travels on the machine control stream.
  *
  * @generated from message laelia.v1.WorkspaceListRequest
  */
@@ -4875,6 +4877,15 @@ export declare type WorkspaceListRequest = Message<"laelia.v1.WorkspaceListReque
    * @generated from field: bool include_hidden = 3;
    */
   includeHidden: boolean;
+
+  /**
+   * agent_name is the agent (agents/{agent}) whose workspace is addressed;
+   * required on the machine control stream, where one stream serves every
+   * hosted agent.
+   *
+   * @generated from field: string agent_name = 4;
+   */
+  agentName: string;
 };
 
 /**
@@ -4913,6 +4924,8 @@ export declare const WorkspaceListResponseSchema: GenMessage<WorkspaceListRespon
  * preview. Text and image content is returned inline (see
  * WorkspaceReadResponse); other binaries return metadata only. Sensitive files
  * (secret/credential/token patterns) are always rejected by the daemon.
+ * agent_name routes the request to the agent's runner on the machine control
+ * stream.
  *
  * @generated from message laelia.v1.WorkspaceReadRequest
  */
@@ -4930,6 +4943,11 @@ export declare type WorkspaceReadRequest = Message<"laelia.v1.WorkspaceReadReque
    * @generated from field: string path = 2;
    */
   path: string;
+
+  /**
+   * @generated from field: string agent_name = 3;
+   */
+  agentName: string;
 };
 
 /**
@@ -5364,12 +5382,10 @@ export declare type NewMessagesAvailable = Message<"laelia.v1.NewMessagesAvailab
 export declare const NewMessagesAvailableSchema: GenMessage<NewMessagesAvailable>;
 
 /**
- * BeginSession is sent by an agent to ask the Manager to start a new
- * autonomous processing session. The Manager checks the agent's per-channel
- * cursors: if no conversation has room_version greater than the agent's cursor,
- * it replies BeginSessionResponse{idle=true} and the agent stays idle;
- * otherwise it creates a RUNNING command and replies with its command_id, which
- * the agent uses to anchor its execution events and link any posted replies.
+ * BeginSession is sent by an agent over its AgentChannel to ask the Manager to
+ * start a new autonomous processing session. It is retired with the
+ * AgentChannel: the drain loop now pulls work through the unary BeginSession
+ * RPC on MachineStreamService (see v1/machine.proto).
  *
  * @generated from message laelia.v1.BeginSession
  */
@@ -5853,6 +5869,16 @@ export enum CommandEventType {
    * @generated from enum value: TOKEN_USAGE = 15;
    */
   TOKEN_USAGE = 15,
+
+  /**
+   * SYSTEM is a machine/manager-authored explanatory event outside the turn's
+   * own execution stream (e.g. the note explaining that a command was marked
+   * FAILED while the machine was unreachable and is being regraded from a late
+   * result). It carries its meaning in summary; no typed payload is required.
+   *
+   * @generated from enum value: SYSTEM = 16;
+   */
+  SYSTEM = 16,
 }
 
 /**

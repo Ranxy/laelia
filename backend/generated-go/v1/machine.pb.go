@@ -196,7 +196,54 @@ func (x MachineStatus_ConnectionState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use MachineStatus_ConnectionState.Descriptor instead.
 func (MachineStatus_ConnectionState) EnumDescriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{37, 0}
+	return file_v1_machine_proto_rawDescGZIP(), []int{38, 0}
+}
+
+// BeginSessionRequest names the agent whose drain loop is pulling work.
+type BeginSessionRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// agent_name is the agent resource name (agents/{agent}); the manager
+	// validates the authenticated machine owns this agent.
+	AgentName     string `protobuf:"bytes,1,opt,name=agent_name,json=agentName,proto3" json:"agent_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BeginSessionRequest) Reset() {
+	*x = BeginSessionRequest{}
+	mi := &file_v1_machine_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BeginSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BeginSessionRequest) ProtoMessage() {}
+
+func (x *BeginSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_machine_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BeginSessionRequest.ProtoReflect.Descriptor instead.
+func (*BeginSessionRequest) Descriptor() ([]byte, []int) {
+	return file_v1_machine_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *BeginSessionRequest) GetAgentName() string {
+	if x != nil {
+		return x.AgentName
+	}
+	return ""
 }
 
 // UploadCommandDataEntry is one command data record, mirroring the durable
@@ -223,7 +270,7 @@ type UploadCommandDataEntry struct {
 
 func (x *UploadCommandDataEntry) Reset() {
 	*x = UploadCommandDataEntry{}
-	mi := &file_v1_machine_proto_msgTypes[0]
+	mi := &file_v1_machine_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -235,7 +282,7 @@ func (x *UploadCommandDataEntry) String() string {
 func (*UploadCommandDataEntry) ProtoMessage() {}
 
 func (x *UploadCommandDataEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[0]
+	mi := &file_v1_machine_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -248,7 +295,7 @@ func (x *UploadCommandDataEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadCommandDataEntry.ProtoReflect.Descriptor instead.
 func (*UploadCommandDataEntry) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{0}
+	return file_v1_machine_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *UploadCommandDataEntry) GetCommandId() string {
@@ -347,7 +394,7 @@ type UploadCommandDataRequest struct {
 
 func (x *UploadCommandDataRequest) Reset() {
 	*x = UploadCommandDataRequest{}
-	mi := &file_v1_machine_proto_msgTypes[1]
+	mi := &file_v1_machine_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -359,7 +406,7 @@ func (x *UploadCommandDataRequest) String() string {
 func (*UploadCommandDataRequest) ProtoMessage() {}
 
 func (x *UploadCommandDataRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[1]
+	mi := &file_v1_machine_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -372,7 +419,7 @@ func (x *UploadCommandDataRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadCommandDataRequest.ProtoReflect.Descriptor instead.
 func (*UploadCommandDataRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{1}
+	return file_v1_machine_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *UploadCommandDataRequest) GetEntries() []*UploadCommandDataEntry {
@@ -399,7 +446,7 @@ type UploadCommandDataAck struct {
 
 func (x *UploadCommandDataAck) Reset() {
 	*x = UploadCommandDataAck{}
-	mi := &file_v1_machine_proto_msgTypes[2]
+	mi := &file_v1_machine_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -411,7 +458,7 @@ func (x *UploadCommandDataAck) String() string {
 func (*UploadCommandDataAck) ProtoMessage() {}
 
 func (x *UploadCommandDataAck) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[2]
+	mi := &file_v1_machine_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -424,7 +471,7 @@ func (x *UploadCommandDataAck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadCommandDataAck.ProtoReflect.Descriptor instead.
 func (*UploadCommandDataAck) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{2}
+	return file_v1_machine_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *UploadCommandDataAck) GetCommandId() string {
@@ -470,7 +517,7 @@ type UploadCommandDataRejection struct {
 
 func (x *UploadCommandDataRejection) Reset() {
 	*x = UploadCommandDataRejection{}
-	mi := &file_v1_machine_proto_msgTypes[3]
+	mi := &file_v1_machine_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -482,7 +529,7 @@ func (x *UploadCommandDataRejection) String() string {
 func (*UploadCommandDataRejection) ProtoMessage() {}
 
 func (x *UploadCommandDataRejection) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[3]
+	mi := &file_v1_machine_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -495,7 +542,7 @@ func (x *UploadCommandDataRejection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadCommandDataRejection.ProtoReflect.Descriptor instead.
 func (*UploadCommandDataRejection) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{3}
+	return file_v1_machine_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *UploadCommandDataRejection) GetCommandId() string {
@@ -536,7 +583,7 @@ type UploadCommandDataResponse struct {
 
 func (x *UploadCommandDataResponse) Reset() {
 	*x = UploadCommandDataResponse{}
-	mi := &file_v1_machine_proto_msgTypes[4]
+	mi := &file_v1_machine_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -548,7 +595,7 @@ func (x *UploadCommandDataResponse) String() string {
 func (*UploadCommandDataResponse) ProtoMessage() {}
 
 func (x *UploadCommandDataResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[4]
+	mi := &file_v1_machine_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -561,7 +608,7 @@ func (x *UploadCommandDataResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadCommandDataResponse.ProtoReflect.Descriptor instead.
 func (*UploadCommandDataResponse) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{4}
+	return file_v1_machine_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UploadCommandDataResponse) GetAcks() []*UploadCommandDataAck {
@@ -589,7 +636,7 @@ type UpdateMachineRequest struct {
 
 func (x *UpdateMachineRequest) Reset() {
 	*x = UpdateMachineRequest{}
-	mi := &file_v1_machine_proto_msgTypes[5]
+	mi := &file_v1_machine_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -601,7 +648,7 @@ func (x *UpdateMachineRequest) String() string {
 func (*UpdateMachineRequest) ProtoMessage() {}
 
 func (x *UpdateMachineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[5]
+	mi := &file_v1_machine_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -614,7 +661,7 @@ func (x *UpdateMachineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateMachineRequest.ProtoReflect.Descriptor instead.
 func (*UpdateMachineRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{5}
+	return file_v1_machine_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpdateMachineRequest) GetName() string {
@@ -643,7 +690,7 @@ type TransferMachineOwnershipRequest struct {
 
 func (x *TransferMachineOwnershipRequest) Reset() {
 	*x = TransferMachineOwnershipRequest{}
-	mi := &file_v1_machine_proto_msgTypes[6]
+	mi := &file_v1_machine_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -655,7 +702,7 @@ func (x *TransferMachineOwnershipRequest) String() string {
 func (*TransferMachineOwnershipRequest) ProtoMessage() {}
 
 func (x *TransferMachineOwnershipRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[6]
+	mi := &file_v1_machine_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -668,7 +715,7 @@ func (x *TransferMachineOwnershipRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferMachineOwnershipRequest.ProtoReflect.Descriptor instead.
 func (*TransferMachineOwnershipRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{6}
+	return file_v1_machine_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TransferMachineOwnershipRequest) GetName() string {
@@ -701,7 +748,7 @@ type TransferMachineOwnershipResponse struct {
 
 func (x *TransferMachineOwnershipResponse) Reset() {
 	*x = TransferMachineOwnershipResponse{}
-	mi := &file_v1_machine_proto_msgTypes[7]
+	mi := &file_v1_machine_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -713,7 +760,7 @@ func (x *TransferMachineOwnershipResponse) String() string {
 func (*TransferMachineOwnershipResponse) ProtoMessage() {}
 
 func (x *TransferMachineOwnershipResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[7]
+	mi := &file_v1_machine_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -726,7 +773,7 @@ func (x *TransferMachineOwnershipResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferMachineOwnershipResponse.ProtoReflect.Descriptor instead.
 func (*TransferMachineOwnershipResponse) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{7}
+	return file_v1_machine_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *TransferMachineOwnershipResponse) GetMachine() *Machine {
@@ -746,7 +793,7 @@ type RevokeMachineTokenRequest struct {
 
 func (x *RevokeMachineTokenRequest) Reset() {
 	*x = RevokeMachineTokenRequest{}
-	mi := &file_v1_machine_proto_msgTypes[8]
+	mi := &file_v1_machine_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -758,7 +805,7 @@ func (x *RevokeMachineTokenRequest) String() string {
 func (*RevokeMachineTokenRequest) ProtoMessage() {}
 
 func (x *RevokeMachineTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[8]
+	mi := &file_v1_machine_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -771,7 +818,7 @@ func (x *RevokeMachineTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeMachineTokenRequest.ProtoReflect.Descriptor instead.
 func (*RevokeMachineTokenRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{8}
+	return file_v1_machine_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RevokeMachineTokenRequest) GetName() string {
@@ -796,7 +843,7 @@ type RevokeMachineTokenResponse struct {
 
 func (x *RevokeMachineTokenResponse) Reset() {
 	*x = RevokeMachineTokenResponse{}
-	mi := &file_v1_machine_proto_msgTypes[9]
+	mi := &file_v1_machine_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -808,7 +855,7 @@ func (x *RevokeMachineTokenResponse) String() string {
 func (*RevokeMachineTokenResponse) ProtoMessage() {}
 
 func (x *RevokeMachineTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[9]
+	mi := &file_v1_machine_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -821,7 +868,7 @@ func (x *RevokeMachineTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeMachineTokenResponse.ProtoReflect.Descriptor instead.
 func (*RevokeMachineTokenResponse) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{9}
+	return file_v1_machine_proto_rawDescGZIP(), []int{10}
 }
 
 type ForceDisconnectMachineRequest struct {
@@ -834,7 +881,7 @@ type ForceDisconnectMachineRequest struct {
 
 func (x *ForceDisconnectMachineRequest) Reset() {
 	*x = ForceDisconnectMachineRequest{}
-	mi := &file_v1_machine_proto_msgTypes[10]
+	mi := &file_v1_machine_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -846,7 +893,7 @@ func (x *ForceDisconnectMachineRequest) String() string {
 func (*ForceDisconnectMachineRequest) ProtoMessage() {}
 
 func (x *ForceDisconnectMachineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[10]
+	mi := &file_v1_machine_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -859,7 +906,7 @@ func (x *ForceDisconnectMachineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForceDisconnectMachineRequest.ProtoReflect.Descriptor instead.
 func (*ForceDisconnectMachineRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{10}
+	return file_v1_machine_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ForceDisconnectMachineRequest) GetName() string {
@@ -887,7 +934,7 @@ type ListMachineAgentsRequest struct {
 
 func (x *ListMachineAgentsRequest) Reset() {
 	*x = ListMachineAgentsRequest{}
-	mi := &file_v1_machine_proto_msgTypes[11]
+	mi := &file_v1_machine_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -899,7 +946,7 @@ func (x *ListMachineAgentsRequest) String() string {
 func (*ListMachineAgentsRequest) ProtoMessage() {}
 
 func (x *ListMachineAgentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[11]
+	mi := &file_v1_machine_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -912,7 +959,7 @@ func (x *ListMachineAgentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMachineAgentsRequest.ProtoReflect.Descriptor instead.
 func (*ListMachineAgentsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{11}
+	return file_v1_machine_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListMachineAgentsRequest) GetName() string {
@@ -946,7 +993,7 @@ type ListMachineAgentsResponse struct {
 
 func (x *ListMachineAgentsResponse) Reset() {
 	*x = ListMachineAgentsResponse{}
-	mi := &file_v1_machine_proto_msgTypes[12]
+	mi := &file_v1_machine_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -958,7 +1005,7 @@ func (x *ListMachineAgentsResponse) String() string {
 func (*ListMachineAgentsResponse) ProtoMessage() {}
 
 func (x *ListMachineAgentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[12]
+	mi := &file_v1_machine_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -971,7 +1018,7 @@ func (x *ListMachineAgentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMachineAgentsResponse.ProtoReflect.Descriptor instead.
 func (*ListMachineAgentsResponse) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{12}
+	return file_v1_machine_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ListMachineAgentsResponse) GetAgents() []*AgentSummary {
@@ -997,7 +1044,7 @@ type RefreshMachineProvidersRequest struct {
 
 func (x *RefreshMachineProvidersRequest) Reset() {
 	*x = RefreshMachineProvidersRequest{}
-	mi := &file_v1_machine_proto_msgTypes[13]
+	mi := &file_v1_machine_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1009,7 +1056,7 @@ func (x *RefreshMachineProvidersRequest) String() string {
 func (*RefreshMachineProvidersRequest) ProtoMessage() {}
 
 func (x *RefreshMachineProvidersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[13]
+	mi := &file_v1_machine_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1022,7 +1069,7 @@ func (x *RefreshMachineProvidersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshMachineProvidersRequest.ProtoReflect.Descriptor instead.
 func (*RefreshMachineProvidersRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{13}
+	return file_v1_machine_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RefreshMachineProvidersRequest) GetName() string {
@@ -1041,7 +1088,7 @@ type RefreshMachineProvidersResponse struct {
 
 func (x *RefreshMachineProvidersResponse) Reset() {
 	*x = RefreshMachineProvidersResponse{}
-	mi := &file_v1_machine_proto_msgTypes[14]
+	mi := &file_v1_machine_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1053,7 +1100,7 @@ func (x *RefreshMachineProvidersResponse) String() string {
 func (*RefreshMachineProvidersResponse) ProtoMessage() {}
 
 func (x *RefreshMachineProvidersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[14]
+	mi := &file_v1_machine_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1066,7 +1113,7 @@ func (x *RefreshMachineProvidersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshMachineProvidersResponse.ProtoReflect.Descriptor instead.
 func (*RefreshMachineProvidersResponse) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{14}
+	return file_v1_machine_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RefreshMachineProvidersResponse) GetProviders() []*AgentProviderInfo {
@@ -1089,7 +1136,7 @@ type RefreshMachineModelsRequest struct {
 
 func (x *RefreshMachineModelsRequest) Reset() {
 	*x = RefreshMachineModelsRequest{}
-	mi := &file_v1_machine_proto_msgTypes[15]
+	mi := &file_v1_machine_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1101,7 +1148,7 @@ func (x *RefreshMachineModelsRequest) String() string {
 func (*RefreshMachineModelsRequest) ProtoMessage() {}
 
 func (x *RefreshMachineModelsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[15]
+	mi := &file_v1_machine_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1114,7 +1161,7 @@ func (x *RefreshMachineModelsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshMachineModelsRequest.ProtoReflect.Descriptor instead.
 func (*RefreshMachineModelsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{15}
+	return file_v1_machine_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RefreshMachineModelsRequest) GetName() string {
@@ -1142,7 +1189,7 @@ type RefreshMachineModelsResponse struct {
 
 func (x *RefreshMachineModelsResponse) Reset() {
 	*x = RefreshMachineModelsResponse{}
-	mi := &file_v1_machine_proto_msgTypes[16]
+	mi := &file_v1_machine_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1154,7 +1201,7 @@ func (x *RefreshMachineModelsResponse) String() string {
 func (*RefreshMachineModelsResponse) ProtoMessage() {}
 
 func (x *RefreshMachineModelsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[16]
+	mi := &file_v1_machine_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1167,7 +1214,7 @@ func (x *RefreshMachineModelsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshMachineModelsResponse.ProtoReflect.Descriptor instead.
 func (*RefreshMachineModelsResponse) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{16}
+	return file_v1_machine_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RefreshMachineModelsResponse) GetProvider() string {
@@ -1201,7 +1248,7 @@ type UpgradeMachineRequest struct {
 
 func (x *UpgradeMachineRequest) Reset() {
 	*x = UpgradeMachineRequest{}
-	mi := &file_v1_machine_proto_msgTypes[17]
+	mi := &file_v1_machine_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1213,7 +1260,7 @@ func (x *UpgradeMachineRequest) String() string {
 func (*UpgradeMachineRequest) ProtoMessage() {}
 
 func (x *UpgradeMachineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[17]
+	mi := &file_v1_machine_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1226,7 +1273,7 @@ func (x *UpgradeMachineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpgradeMachineRequest.ProtoReflect.Descriptor instead.
 func (*UpgradeMachineRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{17}
+	return file_v1_machine_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *UpgradeMachineRequest) GetName() string {
@@ -1252,7 +1299,7 @@ type ListMachineWorkspacesRequest struct {
 
 func (x *ListMachineWorkspacesRequest) Reset() {
 	*x = ListMachineWorkspacesRequest{}
-	mi := &file_v1_machine_proto_msgTypes[18]
+	mi := &file_v1_machine_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1264,7 +1311,7 @@ func (x *ListMachineWorkspacesRequest) String() string {
 func (*ListMachineWorkspacesRequest) ProtoMessage() {}
 
 func (x *ListMachineWorkspacesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[18]
+	mi := &file_v1_machine_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1277,7 +1324,7 @@ func (x *ListMachineWorkspacesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMachineWorkspacesRequest.ProtoReflect.Descriptor instead.
 func (*ListMachineWorkspacesRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{18}
+	return file_v1_machine_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ListMachineWorkspacesRequest) GetName() string {
@@ -1296,7 +1343,7 @@ type ListMachineWorkspacesResponse struct {
 
 func (x *ListMachineWorkspacesResponse) Reset() {
 	*x = ListMachineWorkspacesResponse{}
-	mi := &file_v1_machine_proto_msgTypes[19]
+	mi := &file_v1_machine_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1308,7 +1355,7 @@ func (x *ListMachineWorkspacesResponse) String() string {
 func (*ListMachineWorkspacesResponse) ProtoMessage() {}
 
 func (x *ListMachineWorkspacesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[19]
+	mi := &file_v1_machine_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1321,7 +1368,7 @@ func (x *ListMachineWorkspacesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMachineWorkspacesResponse.ProtoReflect.Descriptor instead.
 func (*ListMachineWorkspacesResponse) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{19}
+	return file_v1_machine_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListMachineWorkspacesResponse) GetWorkspaces() []*MachineWorkspaceSummary {
@@ -1341,7 +1388,7 @@ type ConnectMachineRequest struct {
 
 func (x *ConnectMachineRequest) Reset() {
 	*x = ConnectMachineRequest{}
-	mi := &file_v1_machine_proto_msgTypes[20]
+	mi := &file_v1_machine_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1353,7 +1400,7 @@ func (x *ConnectMachineRequest) String() string {
 func (*ConnectMachineRequest) ProtoMessage() {}
 
 func (x *ConnectMachineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[20]
+	mi := &file_v1_machine_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1366,7 +1413,7 @@ func (x *ConnectMachineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectMachineRequest.ProtoReflect.Descriptor instead.
 func (*ConnectMachineRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{20}
+	return file_v1_machine_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ConnectMachineRequest) GetInfo() *MachineInfo {
@@ -1396,7 +1443,7 @@ type ConnectMachineResponse struct {
 
 func (x *ConnectMachineResponse) Reset() {
 	*x = ConnectMachineResponse{}
-	mi := &file_v1_machine_proto_msgTypes[21]
+	mi := &file_v1_machine_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1408,7 +1455,7 @@ func (x *ConnectMachineResponse) String() string {
 func (*ConnectMachineResponse) ProtoMessage() {}
 
 func (x *ConnectMachineResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[21]
+	mi := &file_v1_machine_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1421,7 +1468,7 @@ func (x *ConnectMachineResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectMachineResponse.ProtoReflect.Descriptor instead.
 func (*ConnectMachineResponse) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{21}
+	return file_v1_machine_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ConnectMachineResponse) GetSessionId() string {
@@ -1455,7 +1502,7 @@ type MachineHeartbeatRequest struct {
 
 func (x *MachineHeartbeatRequest) Reset() {
 	*x = MachineHeartbeatRequest{}
-	mi := &file_v1_machine_proto_msgTypes[22]
+	mi := &file_v1_machine_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1467,7 +1514,7 @@ func (x *MachineHeartbeatRequest) String() string {
 func (*MachineHeartbeatRequest) ProtoMessage() {}
 
 func (x *MachineHeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[22]
+	mi := &file_v1_machine_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1480,7 +1527,7 @@ func (x *MachineHeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineHeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*MachineHeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{22}
+	return file_v1_machine_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *MachineHeartbeatRequest) GetSessionId() string {
@@ -1509,7 +1556,7 @@ type MachineHeartbeatResponse struct {
 
 func (x *MachineHeartbeatResponse) Reset() {
 	*x = MachineHeartbeatResponse{}
-	mi := &file_v1_machine_proto_msgTypes[23]
+	mi := &file_v1_machine_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1521,7 +1568,7 @@ func (x *MachineHeartbeatResponse) String() string {
 func (*MachineHeartbeatResponse) ProtoMessage() {}
 
 func (x *MachineHeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[23]
+	mi := &file_v1_machine_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1534,7 +1581,7 @@ func (x *MachineHeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineHeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*MachineHeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{23}
+	return file_v1_machine_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *MachineHeartbeatResponse) GetNextNonce() string {
@@ -1575,7 +1622,7 @@ type MachineDisconnectRequest struct {
 
 func (x *MachineDisconnectRequest) Reset() {
 	*x = MachineDisconnectRequest{}
-	mi := &file_v1_machine_proto_msgTypes[24]
+	mi := &file_v1_machine_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1587,7 +1634,7 @@ func (x *MachineDisconnectRequest) String() string {
 func (*MachineDisconnectRequest) ProtoMessage() {}
 
 func (x *MachineDisconnectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[24]
+	mi := &file_v1_machine_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1600,7 +1647,7 @@ func (x *MachineDisconnectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineDisconnectRequest.ProtoReflect.Descriptor instead.
 func (*MachineDisconnectRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{24}
+	return file_v1_machine_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *MachineDisconnectRequest) GetSessionId() string {
@@ -1627,7 +1674,7 @@ type RefreshMachineTokenRequest struct {
 
 func (x *RefreshMachineTokenRequest) Reset() {
 	*x = RefreshMachineTokenRequest{}
-	mi := &file_v1_machine_proto_msgTypes[25]
+	mi := &file_v1_machine_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1639,7 +1686,7 @@ func (x *RefreshMachineTokenRequest) String() string {
 func (*RefreshMachineTokenRequest) ProtoMessage() {}
 
 func (x *RefreshMachineTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[25]
+	mi := &file_v1_machine_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1652,7 +1699,7 @@ func (x *RefreshMachineTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshMachineTokenRequest.ProtoReflect.Descriptor instead.
 func (*RefreshMachineTokenRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{25}
+	return file_v1_machine_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *RefreshMachineTokenRequest) GetRefreshToken() string {
@@ -1680,7 +1727,7 @@ type RefreshMachineTokenResponse struct {
 
 func (x *RefreshMachineTokenResponse) Reset() {
 	*x = RefreshMachineTokenResponse{}
-	mi := &file_v1_machine_proto_msgTypes[26]
+	mi := &file_v1_machine_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1692,7 +1739,7 @@ func (x *RefreshMachineTokenResponse) String() string {
 func (*RefreshMachineTokenResponse) ProtoMessage() {}
 
 func (x *RefreshMachineTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[26]
+	mi := &file_v1_machine_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1705,7 +1752,7 @@ func (x *RefreshMachineTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshMachineTokenResponse.ProtoReflect.Descriptor instead.
 func (*RefreshMachineTokenResponse) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{26}
+	return file_v1_machine_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *RefreshMachineTokenResponse) GetAccessToken() string {
@@ -1743,7 +1790,7 @@ type ListMachinesRequest struct {
 
 func (x *ListMachinesRequest) Reset() {
 	*x = ListMachinesRequest{}
-	mi := &file_v1_machine_proto_msgTypes[27]
+	mi := &file_v1_machine_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1755,7 +1802,7 @@ func (x *ListMachinesRequest) String() string {
 func (*ListMachinesRequest) ProtoMessage() {}
 
 func (x *ListMachinesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[27]
+	mi := &file_v1_machine_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1768,7 +1815,7 @@ func (x *ListMachinesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMachinesRequest.ProtoReflect.Descriptor instead.
 func (*ListMachinesRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{27}
+	return file_v1_machine_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ListMachinesRequest) GetPageSize() int32 {
@@ -1809,7 +1856,7 @@ type ListMachinesResponse struct {
 
 func (x *ListMachinesResponse) Reset() {
 	*x = ListMachinesResponse{}
-	mi := &file_v1_machine_proto_msgTypes[28]
+	mi := &file_v1_machine_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1821,7 +1868,7 @@ func (x *ListMachinesResponse) String() string {
 func (*ListMachinesResponse) ProtoMessage() {}
 
 func (x *ListMachinesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[28]
+	mi := &file_v1_machine_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1834,7 +1881,7 @@ func (x *ListMachinesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMachinesResponse.ProtoReflect.Descriptor instead.
 func (*ListMachinesResponse) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{28}
+	return file_v1_machine_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ListMachinesResponse) GetMachines() []*MachineSummary {
@@ -1860,7 +1907,7 @@ type GetMachineRequest struct {
 
 func (x *GetMachineRequest) Reset() {
 	*x = GetMachineRequest{}
-	mi := &file_v1_machine_proto_msgTypes[29]
+	mi := &file_v1_machine_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1872,7 +1919,7 @@ func (x *GetMachineRequest) String() string {
 func (*GetMachineRequest) ProtoMessage() {}
 
 func (x *GetMachineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[29]
+	mi := &file_v1_machine_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1885,7 +1932,7 @@ func (x *GetMachineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMachineRequest.ProtoReflect.Descriptor instead.
 func (*GetMachineRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{29}
+	return file_v1_machine_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *GetMachineRequest) GetName() string {
@@ -1904,7 +1951,7 @@ type DeleteMachineRequest struct {
 
 func (x *DeleteMachineRequest) Reset() {
 	*x = DeleteMachineRequest{}
-	mi := &file_v1_machine_proto_msgTypes[30]
+	mi := &file_v1_machine_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1916,7 +1963,7 @@ func (x *DeleteMachineRequest) String() string {
 func (*DeleteMachineRequest) ProtoMessage() {}
 
 func (x *DeleteMachineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[30]
+	mi := &file_v1_machine_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1929,7 +1976,7 @@ func (x *DeleteMachineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteMachineRequest.ProtoReflect.Descriptor instead.
 func (*DeleteMachineRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{30}
+	return file_v1_machine_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *DeleteMachineRequest) GetName() string {
@@ -1984,7 +2031,7 @@ type Machine struct {
 
 func (x *Machine) Reset() {
 	*x = Machine{}
-	mi := &file_v1_machine_proto_msgTypes[31]
+	mi := &file_v1_machine_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1996,7 +2043,7 @@ func (x *Machine) String() string {
 func (*Machine) ProtoMessage() {}
 
 func (x *Machine) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[31]
+	mi := &file_v1_machine_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2009,7 +2056,7 @@ func (x *Machine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Machine.ProtoReflect.Descriptor instead.
 func (*Machine) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{31}
+	return file_v1_machine_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *Machine) GetName() string {
@@ -2159,7 +2206,7 @@ type MachineSummary struct {
 
 func (x *MachineSummary) Reset() {
 	*x = MachineSummary{}
-	mi := &file_v1_machine_proto_msgTypes[32]
+	mi := &file_v1_machine_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2171,7 +2218,7 @@ func (x *MachineSummary) String() string {
 func (*MachineSummary) ProtoMessage() {}
 
 func (x *MachineSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[32]
+	mi := &file_v1_machine_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2184,7 +2231,7 @@ func (x *MachineSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineSummary.ProtoReflect.Descriptor instead.
 func (*MachineSummary) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{32}
+	return file_v1_machine_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *MachineSummary) GetName() string {
@@ -2299,7 +2346,7 @@ type UpgradeRequest struct {
 
 func (x *UpgradeRequest) Reset() {
 	*x = UpgradeRequest{}
-	mi := &file_v1_machine_proto_msgTypes[33]
+	mi := &file_v1_machine_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2311,7 +2358,7 @@ func (x *UpgradeRequest) String() string {
 func (*UpgradeRequest) ProtoMessage() {}
 
 func (x *UpgradeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[33]
+	mi := &file_v1_machine_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2324,7 +2371,7 @@ func (x *UpgradeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpgradeRequest.ProtoReflect.Descriptor instead.
 func (*UpgradeRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{33}
+	return file_v1_machine_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *UpgradeRequest) GetVersion() string {
@@ -2362,7 +2409,7 @@ type UpgradeProgress struct {
 
 func (x *UpgradeProgress) Reset() {
 	*x = UpgradeProgress{}
-	mi := &file_v1_machine_proto_msgTypes[34]
+	mi := &file_v1_machine_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2374,7 +2421,7 @@ func (x *UpgradeProgress) String() string {
 func (*UpgradeProgress) ProtoMessage() {}
 
 func (x *UpgradeProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[34]
+	mi := &file_v1_machine_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2387,7 +2434,7 @@ func (x *UpgradeProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpgradeProgress.ProtoReflect.Descriptor instead.
 func (*UpgradeProgress) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{34}
+	return file_v1_machine_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *UpgradeProgress) GetVersion() string {
@@ -2437,7 +2484,7 @@ type ProvisioningStatus struct {
 
 func (x *ProvisioningStatus) Reset() {
 	*x = ProvisioningStatus{}
-	mi := &file_v1_machine_proto_msgTypes[35]
+	mi := &file_v1_machine_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2449,7 +2496,7 @@ func (x *ProvisioningStatus) String() string {
 func (*ProvisioningStatus) ProtoMessage() {}
 
 func (x *ProvisioningStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[35]
+	mi := &file_v1_machine_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2462,7 +2509,7 @@ func (x *ProvisioningStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProvisioningStatus.ProtoReflect.Descriptor instead.
 func (*ProvisioningStatus) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{35}
+	return file_v1_machine_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ProvisioningStatus) GetPhase() ProvisioningPhase {
@@ -2551,7 +2598,7 @@ type MachineInfo struct {
 
 func (x *MachineInfo) Reset() {
 	*x = MachineInfo{}
-	mi := &file_v1_machine_proto_msgTypes[36]
+	mi := &file_v1_machine_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2563,7 +2610,7 @@ func (x *MachineInfo) String() string {
 func (*MachineInfo) ProtoMessage() {}
 
 func (x *MachineInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[36]
+	mi := &file_v1_machine_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2576,7 +2623,7 @@ func (x *MachineInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineInfo.ProtoReflect.Descriptor instead.
 func (*MachineInfo) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{36}
+	return file_v1_machine_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *MachineInfo) GetHostname() string {
@@ -2655,7 +2702,7 @@ type MachineStatus struct {
 
 func (x *MachineStatus) Reset() {
 	*x = MachineStatus{}
-	mi := &file_v1_machine_proto_msgTypes[37]
+	mi := &file_v1_machine_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2667,7 +2714,7 @@ func (x *MachineStatus) String() string {
 func (*MachineStatus) ProtoMessage() {}
 
 func (x *MachineStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[37]
+	mi := &file_v1_machine_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2680,7 +2727,7 @@ func (x *MachineStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineStatus.ProtoReflect.Descriptor instead.
 func (*MachineStatus) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{37}
+	return file_v1_machine_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *MachineStatus) GetState() MachineStatus_ConnectionState {
@@ -2732,7 +2779,7 @@ type AgentAssignment struct {
 
 func (x *AgentAssignment) Reset() {
 	*x = AgentAssignment{}
-	mi := &file_v1_machine_proto_msgTypes[38]
+	mi := &file_v1_machine_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2744,7 +2791,7 @@ func (x *AgentAssignment) String() string {
 func (*AgentAssignment) ProtoMessage() {}
 
 func (x *AgentAssignment) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[38]
+	mi := &file_v1_machine_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2757,7 +2804,7 @@ func (x *AgentAssignment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentAssignment.ProtoReflect.Descriptor instead.
 func (*AgentAssignment) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{38}
+	return file_v1_machine_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *AgentAssignment) GetAgentName() string {
@@ -2791,6 +2838,9 @@ type MachineStreamMessage struct {
 	//	*MachineStreamMessage_DisconnectNotice
 	//	*MachineStreamMessage_MachineWorkspaceScanResponse
 	//	*MachineStreamMessage_UpgradeProgress
+	//	*MachineStreamMessage_WorkspaceListResponse
+	//	*MachineStreamMessage_WorkspaceReadResponse
+	//	*MachineStreamMessage_PromptReleaseNoticeAck
 	//	*MachineStreamMessage_ModelsDiscovered
 	Message       isMachineStreamMessage_Message `protobuf_oneof:"message"`
 	unknownFields protoimpl.UnknownFields
@@ -2799,7 +2849,7 @@ type MachineStreamMessage struct {
 
 func (x *MachineStreamMessage) Reset() {
 	*x = MachineStreamMessage{}
-	mi := &file_v1_machine_proto_msgTypes[39]
+	mi := &file_v1_machine_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2811,7 +2861,7 @@ func (x *MachineStreamMessage) String() string {
 func (*MachineStreamMessage) ProtoMessage() {}
 
 func (x *MachineStreamMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[39]
+	mi := &file_v1_machine_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2824,7 +2874,7 @@ func (x *MachineStreamMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineStreamMessage.ProtoReflect.Descriptor instead.
 func (*MachineStreamMessage) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{39}
+	return file_v1_machine_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *MachineStreamMessage) GetMessage() isMachineStreamMessage_Message {
@@ -2888,6 +2938,33 @@ func (x *MachineStreamMessage) GetUpgradeProgress() *UpgradeProgress {
 	return nil
 }
 
+func (x *MachineStreamMessage) GetWorkspaceListResponse() *WorkspaceListResponse {
+	if x != nil {
+		if x, ok := x.Message.(*MachineStreamMessage_WorkspaceListResponse); ok {
+			return x.WorkspaceListResponse
+		}
+	}
+	return nil
+}
+
+func (x *MachineStreamMessage) GetWorkspaceReadResponse() *WorkspaceReadResponse {
+	if x != nil {
+		if x, ok := x.Message.(*MachineStreamMessage_WorkspaceReadResponse); ok {
+			return x.WorkspaceReadResponse
+		}
+	}
+	return nil
+}
+
+func (x *MachineStreamMessage) GetPromptReleaseNoticeAck() *PromptReleaseNoticeAck {
+	if x != nil {
+		if x, ok := x.Message.(*MachineStreamMessage_PromptReleaseNoticeAck); ok {
+			return x.PromptReleaseNoticeAck
+		}
+	}
+	return nil
+}
+
 func (x *MachineStreamMessage) GetModelsDiscovered() *ModelsDiscovered {
 	if x != nil {
 		if x, ok := x.Message.(*MachineStreamMessage_ModelsDiscovered); ok {
@@ -2925,6 +3002,19 @@ type MachineStreamMessage_UpgradeProgress struct {
 	UpgradeProgress *UpgradeProgress `protobuf:"bytes,6,opt,name=upgrade_progress,json=upgradeProgress,proto3,oneof"` // self-upgrade progress report, response to ManagerMachineStreamMessage.upgrade_request
 }
 
+type MachineStreamMessage_WorkspaceListResponse struct {
+	WorkspaceListResponse *WorkspaceListResponse `protobuf:"bytes,7,opt,name=workspace_list_response,json=workspaceListResponse,proto3,oneof"` // response to ManagerMachineStreamMessage.workspace_list_request
+}
+
+type MachineStreamMessage_WorkspaceReadResponse struct {
+	WorkspaceReadResponse *WorkspaceReadResponse `protobuf:"bytes,8,opt,name=workspace_read_response,json=workspaceReadResponse,proto3,oneof"` // response to ManagerMachineStreamMessage.workspace_read_request
+}
+
+type MachineStreamMessage_PromptReleaseNoticeAck struct {
+	// ack that a prompt release notice was injected into a turn
+	PromptReleaseNoticeAck *PromptReleaseNoticeAck `protobuf:"bytes,9,opt,name=prompt_release_notice_ack,json=promptReleaseNoticeAck,proto3,oneof"`
+}
+
 type MachineStreamMessage_ModelsDiscovered struct {
 	ModelsDiscovered *ModelsDiscovered `protobuf:"bytes,10,opt,name=models_discovered,json=modelsDiscovered,proto3,oneof"` // response to ManagerMachineStreamMessage.discover_models
 }
@@ -2940,6 +3030,12 @@ func (*MachineStreamMessage_DisconnectNotice) isMachineStreamMessage_Message() {
 func (*MachineStreamMessage_MachineWorkspaceScanResponse) isMachineStreamMessage_Message() {}
 
 func (*MachineStreamMessage_UpgradeProgress) isMachineStreamMessage_Message() {}
+
+func (*MachineStreamMessage_WorkspaceListResponse) isMachineStreamMessage_Message() {}
+
+func (*MachineStreamMessage_WorkspaceReadResponse) isMachineStreamMessage_Message() {}
+
+func (*MachineStreamMessage_PromptReleaseNoticeAck) isMachineStreamMessage_Message() {}
 
 func (*MachineStreamMessage_ModelsDiscovered) isMachineStreamMessage_Message() {}
 
@@ -2958,6 +3054,9 @@ type ManagerMachineStreamMessage struct {
 	//	*ManagerMachineStreamMessage_UpgradeRequest
 	//	*ManagerMachineStreamMessage_DiscoverModels
 	//	*ManagerMachineStreamMessage_RestartAgent
+	//	*ManagerMachineStreamMessage_AgentControl
+	//	*ManagerMachineStreamMessage_WorkspaceListRequest
+	//	*ManagerMachineStreamMessage_WorkspaceReadRequest
 	Message       isManagerMachineStreamMessage_Message `protobuf_oneof:"message"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2965,7 +3064,7 @@ type ManagerMachineStreamMessage struct {
 
 func (x *ManagerMachineStreamMessage) Reset() {
 	*x = ManagerMachineStreamMessage{}
-	mi := &file_v1_machine_proto_msgTypes[40]
+	mi := &file_v1_machine_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2977,7 +3076,7 @@ func (x *ManagerMachineStreamMessage) String() string {
 func (*ManagerMachineStreamMessage) ProtoMessage() {}
 
 func (x *ManagerMachineStreamMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[40]
+	mi := &file_v1_machine_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2990,7 +3089,7 @@ func (x *ManagerMachineStreamMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ManagerMachineStreamMessage.ProtoReflect.Descriptor instead.
 func (*ManagerMachineStreamMessage) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{40}
+	return file_v1_machine_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *ManagerMachineStreamMessage) GetMessage() isManagerMachineStreamMessage_Message {
@@ -3099,6 +3198,33 @@ func (x *ManagerMachineStreamMessage) GetRestartAgent() *RestartAgent {
 	return nil
 }
 
+func (x *ManagerMachineStreamMessage) GetAgentControl() *AgentControlRequest {
+	if x != nil {
+		if x, ok := x.Message.(*ManagerMachineStreamMessage_AgentControl); ok {
+			return x.AgentControl
+		}
+	}
+	return nil
+}
+
+func (x *ManagerMachineStreamMessage) GetWorkspaceListRequest() *WorkspaceListRequest {
+	if x != nil {
+		if x, ok := x.Message.(*ManagerMachineStreamMessage_WorkspaceListRequest); ok {
+			return x.WorkspaceListRequest
+		}
+	}
+	return nil
+}
+
+func (x *ManagerMachineStreamMessage) GetWorkspaceReadRequest() *WorkspaceReadRequest {
+	if x != nil {
+		if x, ok := x.Message.(*ManagerMachineStreamMessage_WorkspaceReadRequest); ok {
+			return x.WorkspaceReadRequest
+		}
+	}
+	return nil
+}
+
 type isManagerMachineStreamMessage_Message interface {
 	isManagerMachineStreamMessage_Message()
 }
@@ -3147,6 +3273,18 @@ type ManagerMachineStreamMessage_RestartAgent struct {
 	RestartAgent *RestartAgent `protobuf:"bytes,12,opt,name=restart_agent,json=restartAgent,proto3,oneof"` // force cold restart of one agent
 }
 
+type ManagerMachineStreamMessage_AgentControl struct {
+	AgentControl *AgentControlRequest `protobuf:"bytes,13,opt,name=agent_control,json=agentControl,proto3,oneof"` // per-agent control interaction (cancel/steer/wake/prompt notice)
+}
+
+type ManagerMachineStreamMessage_WorkspaceListRequest struct {
+	WorkspaceListRequest *WorkspaceListRequest `protobuf:"bytes,14,opt,name=workspace_list_request,json=workspaceListRequest,proto3,oneof"` // list one level of a hosted agent's workspace
+}
+
+type ManagerMachineStreamMessage_WorkspaceReadRequest struct {
+	WorkspaceReadRequest *WorkspaceReadRequest `protobuf:"bytes,15,opt,name=workspace_read_request,json=workspaceReadRequest,proto3,oneof"` // read one hosted agent's workspace file
+}
+
 func (*ManagerMachineStreamMessage_AgentAssignment) isManagerMachineStreamMessage_Message() {}
 
 func (*ManagerMachineStreamMessage_RemoveAgent) isManagerMachineStreamMessage_Message() {}
@@ -3170,6 +3308,143 @@ func (*ManagerMachineStreamMessage_DiscoverModels) isManagerMachineStreamMessage
 
 func (*ManagerMachineStreamMessage_RestartAgent) isManagerMachineStreamMessage_Message() {}
 
+func (*ManagerMachineStreamMessage_AgentControl) isManagerMachineStreamMessage_Message() {}
+
+func (*ManagerMachineStreamMessage_WorkspaceListRequest) isManagerMachineStreamMessage_Message() {}
+
+func (*ManagerMachineStreamMessage_WorkspaceReadRequest) isManagerMachineStreamMessage_Message() {}
+
+// AgentControlRequest carries one manager→agent control interaction on the
+// machine control stream. agent_name routes it to that agent's runner on the
+// machine; the oneof is the per-agent control payload.
+type AgentControlRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// agent_name is the agent resource name (agents/{agent}) the control
+	// interaction targets; the machine validates it hosts this agent.
+	AgentName string `protobuf:"bytes,1,opt,name=agent_name,json=agentName,proto3" json:"agent_name,omitempty"`
+	// Types that are valid to be assigned to Control:
+	//
+	//	*AgentControlRequest_Cancel
+	//	*AgentControlRequest_Steer
+	//	*AgentControlRequest_Wake
+	//	*AgentControlRequest_PromptNotice
+	Control       isAgentControlRequest_Control `protobuf_oneof:"control"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentControlRequest) Reset() {
+	*x = AgentControlRequest{}
+	mi := &file_v1_machine_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentControlRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentControlRequest) ProtoMessage() {}
+
+func (x *AgentControlRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_machine_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentControlRequest.ProtoReflect.Descriptor instead.
+func (*AgentControlRequest) Descriptor() ([]byte, []int) {
+	return file_v1_machine_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *AgentControlRequest) GetAgentName() string {
+	if x != nil {
+		return x.AgentName
+	}
+	return ""
+}
+
+func (x *AgentControlRequest) GetControl() isAgentControlRequest_Control {
+	if x != nil {
+		return x.Control
+	}
+	return nil
+}
+
+func (x *AgentControlRequest) GetCancel() *CancelMessage {
+	if x != nil {
+		if x, ok := x.Control.(*AgentControlRequest_Cancel); ok {
+			return x.Cancel
+		}
+	}
+	return nil
+}
+
+func (x *AgentControlRequest) GetSteer() *SteerMessage {
+	if x != nil {
+		if x, ok := x.Control.(*AgentControlRequest_Steer); ok {
+			return x.Steer
+		}
+	}
+	return nil
+}
+
+func (x *AgentControlRequest) GetWake() *NewMessagesAvailable {
+	if x != nil {
+		if x, ok := x.Control.(*AgentControlRequest_Wake); ok {
+			return x.Wake
+		}
+	}
+	return nil
+}
+
+func (x *AgentControlRequest) GetPromptNotice() *PromptReleaseNotice {
+	if x != nil {
+		if x, ok := x.Control.(*AgentControlRequest_PromptNotice); ok {
+			return x.PromptNotice
+		}
+	}
+	return nil
+}
+
+type isAgentControlRequest_Control interface {
+	isAgentControlRequest_Control()
+}
+
+type AgentControlRequest_Cancel struct {
+	// cancel stops the agent's in-flight turn.
+	Cancel *CancelMessage `protobuf:"bytes,2,opt,name=cancel,proto3,oneof"`
+}
+
+type AgentControlRequest_Steer struct {
+	// steer injects a follow-up message into the in-flight turn.
+	Steer *SteerMessage `protobuf:"bytes,3,opt,name=steer,proto3,oneof"`
+}
+
+type AgentControlRequest_Wake struct {
+	// wake kicks the agent's drain loop when new work may be available.
+	Wake *NewMessagesAvailable `protobuf:"bytes,4,opt,name=wake,proto3,oneof"`
+}
+
+type AgentControlRequest_PromptNotice struct {
+	// prompt_notice pushes a system-prompt release notice to the agent.
+	PromptNotice *PromptReleaseNotice `protobuf:"bytes,5,opt,name=prompt_notice,json=promptNotice,proto3,oneof"`
+}
+
+func (*AgentControlRequest_Cancel) isAgentControlRequest_Control() {}
+
+func (*AgentControlRequest_Steer) isAgentControlRequest_Control() {}
+
+func (*AgentControlRequest_Wake) isAgentControlRequest_Control() {}
+
+func (*AgentControlRequest_PromptNotice) isAgentControlRequest_Control() {}
+
 type MachineReady struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
@@ -3179,7 +3454,7 @@ type MachineReady struct {
 
 func (x *MachineReady) Reset() {
 	*x = MachineReady{}
-	mi := &file_v1_machine_proto_msgTypes[41]
+	mi := &file_v1_machine_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3191,7 +3466,7 @@ func (x *MachineReady) String() string {
 func (*MachineReady) ProtoMessage() {}
 
 func (x *MachineReady) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[41]
+	mi := &file_v1_machine_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3204,7 +3479,7 @@ func (x *MachineReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineReady.ProtoReflect.Descriptor instead.
 func (*MachineReady) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{41}
+	return file_v1_machine_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *MachineReady) GetSessionId() string {
@@ -3223,7 +3498,7 @@ type RemoveAgent struct {
 
 func (x *RemoveAgent) Reset() {
 	*x = RemoveAgent{}
-	mi := &file_v1_machine_proto_msgTypes[42]
+	mi := &file_v1_machine_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3235,7 +3510,7 @@ func (x *RemoveAgent) String() string {
 func (*RemoveAgent) ProtoMessage() {}
 
 func (x *RemoveAgent) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[42]
+	mi := &file_v1_machine_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3248,7 +3523,7 @@ func (x *RemoveAgent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveAgent.ProtoReflect.Descriptor instead.
 func (*RemoveAgent) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{42}
+	return file_v1_machine_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *RemoveAgent) GetAgentName() string {
@@ -3270,7 +3545,7 @@ type RestartAgent struct {
 
 func (x *RestartAgent) Reset() {
 	*x = RestartAgent{}
-	mi := &file_v1_machine_proto_msgTypes[43]
+	mi := &file_v1_machine_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3282,7 +3557,7 @@ func (x *RestartAgent) String() string {
 func (*RestartAgent) ProtoMessage() {}
 
 func (x *RestartAgent) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[43]
+	mi := &file_v1_machine_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3295,7 +3570,7 @@ func (x *RestartAgent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestartAgent.ProtoReflect.Descriptor instead.
 func (*RestartAgent) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{43}
+	return file_v1_machine_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *RestartAgent) GetAgentName() string {
@@ -3316,7 +3591,7 @@ type DeleteAgentWorkspace struct {
 
 func (x *DeleteAgentWorkspace) Reset() {
 	*x = DeleteAgentWorkspace{}
-	mi := &file_v1_machine_proto_msgTypes[44]
+	mi := &file_v1_machine_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3328,7 +3603,7 @@ func (x *DeleteAgentWorkspace) String() string {
 func (*DeleteAgentWorkspace) ProtoMessage() {}
 
 func (x *DeleteAgentWorkspace) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[44]
+	mi := &file_v1_machine_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3341,7 +3616,7 @@ func (x *DeleteAgentWorkspace) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAgentWorkspace.ProtoReflect.Descriptor instead.
 func (*DeleteAgentWorkspace) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{44}
+	return file_v1_machine_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *DeleteAgentWorkspace) GetAgentName() string {
@@ -3361,7 +3636,7 @@ type AgentConfigUpdate struct {
 
 func (x *AgentConfigUpdate) Reset() {
 	*x = AgentConfigUpdate{}
-	mi := &file_v1_machine_proto_msgTypes[45]
+	mi := &file_v1_machine_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3373,7 +3648,7 @@ func (x *AgentConfigUpdate) String() string {
 func (*AgentConfigUpdate) ProtoMessage() {}
 
 func (x *AgentConfigUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[45]
+	mi := &file_v1_machine_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3386,7 +3661,7 @@ func (x *AgentConfigUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentConfigUpdate.ProtoReflect.Descriptor instead.
 func (*AgentConfigUpdate) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{45}
+	return file_v1_machine_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *AgentConfigUpdate) GetAgentName() string {
@@ -3412,7 +3687,7 @@ type MachineDisconnectNotice struct {
 
 func (x *MachineDisconnectNotice) Reset() {
 	*x = MachineDisconnectNotice{}
-	mi := &file_v1_machine_proto_msgTypes[46]
+	mi := &file_v1_machine_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3424,7 +3699,7 @@ func (x *MachineDisconnectNotice) String() string {
 func (*MachineDisconnectNotice) ProtoMessage() {}
 
 func (x *MachineDisconnectNotice) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[46]
+	mi := &file_v1_machine_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3437,7 +3712,7 @@ func (x *MachineDisconnectNotice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineDisconnectNotice.ProtoReflect.Descriptor instead.
 func (*MachineDisconnectNotice) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{46}
+	return file_v1_machine_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *MachineDisconnectNotice) GetReason() string {
@@ -3463,7 +3738,7 @@ type DiscoverModels struct {
 
 func (x *DiscoverModels) Reset() {
 	*x = DiscoverModels{}
-	mi := &file_v1_machine_proto_msgTypes[47]
+	mi := &file_v1_machine_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3475,7 +3750,7 @@ func (x *DiscoverModels) String() string {
 func (*DiscoverModels) ProtoMessage() {}
 
 func (x *DiscoverModels) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[47]
+	mi := &file_v1_machine_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3488,7 +3763,7 @@ func (x *DiscoverModels) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiscoverModels.ProtoReflect.Descriptor instead.
 func (*DiscoverModels) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{47}
+	return file_v1_machine_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *DiscoverModels) GetRequestId() string {
@@ -3526,7 +3801,7 @@ type ModelsDiscovered struct {
 
 func (x *ModelsDiscovered) Reset() {
 	*x = ModelsDiscovered{}
-	mi := &file_v1_machine_proto_msgTypes[48]
+	mi := &file_v1_machine_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3538,7 +3813,7 @@ func (x *ModelsDiscovered) String() string {
 func (*ModelsDiscovered) ProtoMessage() {}
 
 func (x *ModelsDiscovered) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[48]
+	mi := &file_v1_machine_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3551,7 +3826,7 @@ func (x *ModelsDiscovered) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModelsDiscovered.ProtoReflect.Descriptor instead.
 func (*ModelsDiscovered) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{48}
+	return file_v1_machine_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *ModelsDiscovered) GetRequestId() string {
@@ -3594,7 +3869,7 @@ type ReloadAgentAssignment struct {
 
 func (x *ReloadAgentAssignment) Reset() {
 	*x = ReloadAgentAssignment{}
-	mi := &file_v1_machine_proto_msgTypes[49]
+	mi := &file_v1_machine_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3606,7 +3881,7 @@ func (x *ReloadAgentAssignment) String() string {
 func (*ReloadAgentAssignment) ProtoMessage() {}
 
 func (x *ReloadAgentAssignment) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[49]
+	mi := &file_v1_machine_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3619,7 +3894,7 @@ func (x *ReloadAgentAssignment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReloadAgentAssignment.ProtoReflect.Descriptor instead.
 func (*ReloadAgentAssignment) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{49}
+	return file_v1_machine_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *ReloadAgentAssignment) GetAgentName() string {
@@ -3648,7 +3923,7 @@ type MachineWorkspaceScanRequest struct {
 
 func (x *MachineWorkspaceScanRequest) Reset() {
 	*x = MachineWorkspaceScanRequest{}
-	mi := &file_v1_machine_proto_msgTypes[50]
+	mi := &file_v1_machine_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3660,7 +3935,7 @@ func (x *MachineWorkspaceScanRequest) String() string {
 func (*MachineWorkspaceScanRequest) ProtoMessage() {}
 
 func (x *MachineWorkspaceScanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[50]
+	mi := &file_v1_machine_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3673,7 +3948,7 @@ func (x *MachineWorkspaceScanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineWorkspaceScanRequest.ProtoReflect.Descriptor instead.
 func (*MachineWorkspaceScanRequest) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{50}
+	return file_v1_machine_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *MachineWorkspaceScanRequest) GetRequestId() string {
@@ -3696,7 +3971,7 @@ type MachineWorkspaceSummary struct {
 
 func (x *MachineWorkspaceSummary) Reset() {
 	*x = MachineWorkspaceSummary{}
-	mi := &file_v1_machine_proto_msgTypes[51]
+	mi := &file_v1_machine_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3708,7 +3983,7 @@ func (x *MachineWorkspaceSummary) String() string {
 func (*MachineWorkspaceSummary) ProtoMessage() {}
 
 func (x *MachineWorkspaceSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[51]
+	mi := &file_v1_machine_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3721,7 +3996,7 @@ func (x *MachineWorkspaceSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineWorkspaceSummary.ProtoReflect.Descriptor instead.
 func (*MachineWorkspaceSummary) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{51}
+	return file_v1_machine_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *MachineWorkspaceSummary) GetDirectoryName() string {
@@ -3762,7 +4037,7 @@ type MachineWorkspaceScanResponse struct {
 
 func (x *MachineWorkspaceScanResponse) Reset() {
 	*x = MachineWorkspaceScanResponse{}
-	mi := &file_v1_machine_proto_msgTypes[52]
+	mi := &file_v1_machine_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3774,7 +4049,7 @@ func (x *MachineWorkspaceScanResponse) String() string {
 func (*MachineWorkspaceScanResponse) ProtoMessage() {}
 
 func (x *MachineWorkspaceScanResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_machine_proto_msgTypes[52]
+	mi := &file_v1_machine_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3787,7 +4062,7 @@ func (x *MachineWorkspaceScanResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MachineWorkspaceScanResponse.ProtoReflect.Descriptor instead.
 func (*MachineWorkspaceScanResponse) Descriptor() ([]byte, []int) {
-	return file_v1_machine_proto_rawDescGZIP(), []int{52}
+	return file_v1_machine_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *MachineWorkspaceScanResponse) GetRequestId() string {
@@ -3808,7 +4083,10 @@ var File_v1_machine_proto protoreflect.FileDescriptor
 
 const file_v1_machine_proto_rawDesc = "" +
 	"\n" +
-	"\x10v1/machine.proto\x12\tlaelia.v1\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0ev1/agent.proto\x1a\x13v1/annotation.proto\x1a\x10v1/command.proto\x1a\x0fv1/common.proto\"\xf6\x02\n" +
+	"\x10v1/machine.proto\x12\tlaelia.v1\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0ev1/agent.proto\x1a\x13v1/annotation.proto\x1a\x10v1/command.proto\x1a\x0fv1/common.proto\"4\n" +
+	"\x13BeginSessionRequest\x12\x1d\n" +
+	"\n" +
+	"agent_name\x18\x01 \x01(\tR\tagentName\"\xf6\x02\n" +
 	"\x16UploadCommandDataEntry\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12.\n" +
@@ -4039,17 +4317,20 @@ const file_v1_machine_proto_rawDesc = "" +
 	"agent_name\x18\x01 \x01(\tR\tagentName\x12,\n" +
 	"\x12agent_display_name\x18\x02 \x01(\tR\x10agentDisplayName\x128\n" +
 	"\n" +
-	"acp_config\x18\x03 \x01(\v2\x19.laelia.v1.AgentACPConfigR\tacpConfig\"\xb7\x04\n" +
+	"acp_config\x18\x03 \x01(\v2\x19.laelia.v1.AgentACPConfigR\tacpConfig\"\xcf\x06\n" +
 	"\x14MachineStreamMessage\x12>\n" +
 	"\rmachine_ready\x18\x01 \x01(\v2\x17.laelia.v1.MachineReadyH\x00R\fmachineReady\x12%\n" +
 	"\x04ping\x18\x02 \x01(\v2\x0f.laelia.v1.PingH\x00R\x04ping\x12S\n" +
 	"\x14providers_discovered\x18\x03 \x01(\v2\x1e.laelia.v1.ProvidersDiscoveredH\x00R\x13providersDiscovered\x12Q\n" +
 	"\x11disconnect_notice\x18\x04 \x01(\v2\".laelia.v1.MachineDisconnectNoticeH\x00R\x10disconnectNotice\x12p\n" +
 	"\x1fmachine_workspace_scan_response\x18\x05 \x01(\v2'.laelia.v1.MachineWorkspaceScanResponseH\x00R\x1cmachineWorkspaceScanResponse\x12G\n" +
-	"\x10upgrade_progress\x18\x06 \x01(\v2\x1a.laelia.v1.UpgradeProgressH\x00R\x0fupgradeProgress\x12J\n" +
+	"\x10upgrade_progress\x18\x06 \x01(\v2\x1a.laelia.v1.UpgradeProgressH\x00R\x0fupgradeProgress\x12Z\n" +
+	"\x17workspace_list_response\x18\a \x01(\v2 .laelia.v1.WorkspaceListResponseH\x00R\x15workspaceListResponse\x12Z\n" +
+	"\x17workspace_read_response\x18\b \x01(\v2 .laelia.v1.WorkspaceReadResponseH\x00R\x15workspaceReadResponse\x12^\n" +
+	"\x19prompt_release_notice_ack\x18\t \x01(\v2!.laelia.v1.PromptReleaseNoticeAckH\x00R\x16promptReleaseNoticeAck\x12J\n" +
 	"\x11models_discovered\x18\n" +
 	" \x01(\v2\x1b.laelia.v1.ModelsDiscoveredH\x00R\x10modelsDiscoveredB\t\n" +
-	"\amessage\"\xe4\x06\n" +
+	"\amessage\"\xdd\b\n" +
 	"\x1bManagerMachineStreamMessage\x12G\n" +
 	"\x10agent_assignment\x18\x01 \x01(\v2\x1a.laelia.v1.AgentAssignmentH\x00R\x0fagentAssignment\x12;\n" +
 	"\fremove_agent\x18\x02 \x01(\v2\x16.laelia.v1.RemoveAgentH\x00R\vremoveAgent\x12N\n" +
@@ -4061,8 +4342,19 @@ const file_v1_machine_proto_rawDesc = "" +
 	"\x16delete_agent_workspace\x18\b \x01(\v2\x1f.laelia.v1.DeleteAgentWorkspaceH\x00R\x14deleteAgentWorkspace\x12D\n" +
 	"\x0fupgrade_request\x18\t \x01(\v2\x19.laelia.v1.UpgradeRequestH\x00R\x0eupgradeRequest\x12D\n" +
 	"\x0fdiscover_models\x18\v \x01(\v2\x19.laelia.v1.DiscoverModelsH\x00R\x0ediscoverModels\x12>\n" +
-	"\rrestart_agent\x18\f \x01(\v2\x17.laelia.v1.RestartAgentH\x00R\frestartAgentB\t\n" +
-	"\amessage\"-\n" +
+	"\rrestart_agent\x18\f \x01(\v2\x17.laelia.v1.RestartAgentH\x00R\frestartAgent\x12E\n" +
+	"\ragent_control\x18\r \x01(\v2\x1e.laelia.v1.AgentControlRequestH\x00R\fagentControl\x12W\n" +
+	"\x16workspace_list_request\x18\x0e \x01(\v2\x1f.laelia.v1.WorkspaceListRequestH\x00R\x14workspaceListRequest\x12W\n" +
+	"\x16workspace_read_request\x18\x0f \x01(\v2\x1f.laelia.v1.WorkspaceReadRequestH\x00R\x14workspaceReadRequestB\t\n" +
+	"\amessage\"\xa2\x02\n" +
+	"\x13AgentControlRequest\x12\x1d\n" +
+	"\n" +
+	"agent_name\x18\x01 \x01(\tR\tagentName\x122\n" +
+	"\x06cancel\x18\x02 \x01(\v2\x18.laelia.v1.CancelMessageH\x00R\x06cancel\x12/\n" +
+	"\x05steer\x18\x03 \x01(\v2\x17.laelia.v1.SteerMessageH\x00R\x05steer\x125\n" +
+	"\x04wake\x18\x04 \x01(\v2\x1f.laelia.v1.NewMessagesAvailableH\x00R\x04wake\x12E\n" +
+	"\rprompt_notice\x18\x05 \x01(\v2\x1e.laelia.v1.PromptReleaseNoticeH\x00R\fpromptNoticeB\t\n" +
+	"\acontrol\"-\n" +
 	"\fMachineReady\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\",\n" +
@@ -4147,10 +4439,11 @@ const file_v1_machine_proto_rawDesc = "" +
 	"\x0eConnectMachine\x12 .laelia.v1.ConnectMachineRequest\x1a!.laelia.v1.ConnectMachineResponse\"\b\x90\xea0\x02\x98\xea0\x01\x12a\n" +
 	"\x10MachineHeartbeat\x12\".laelia.v1.MachineHeartbeatRequest\x1a#.laelia.v1.MachineHeartbeatResponse\"\x04\x90\xea0\x02\x12Z\n" +
 	"\x11MachineDisconnect\x12#.laelia.v1.MachineDisconnectRequest\x1a\x16.google.protobuf.Empty\"\b\x90\xea0\x02\x98\xea0\x01\x12n\n" +
-	"\x13RefreshMachineToken\x12%.laelia.v1.RefreshMachineTokenRequest\x1a&.laelia.v1.RefreshMachineTokenResponse\"\b\x90\xea0\x02\x98\xea0\x012\xdb\x01\n" +
+	"\x13RefreshMachineToken\x12%.laelia.v1.RefreshMachineTokenRequest\x1a&.laelia.v1.RefreshMachineTokenResponse\"\b\x90\xea0\x02\x98\xea0\x012\xb2\x02\n" +
 	"\x14MachineStreamService\x12]\n" +
 	"\x0eMachineChannel\x12\x1f.laelia.v1.MachineStreamMessage\x1a&.laelia.v1.ManagerMachineStreamMessage(\x010\x01\x12d\n" +
-	"\x11UploadCommandData\x12#.laelia.v1.UploadCommandDataRequest\x1a$.laelia.v1.UploadCommandDataResponse\"\x04\x90\xea0\x02B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"\x11UploadCommandData\x12#.laelia.v1.UploadCommandDataRequest\x1a$.laelia.v1.UploadCommandDataResponse\"\x04\x90\xea0\x02\x12U\n" +
+	"\fBeginSession\x12\x1e.laelia.v1.BeginSessionRequest\x1a\x1f.laelia.v1.BeginSessionResponse\"\x04\x90\xea0\x02B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_machine_proto_rawDescOnce sync.Once
@@ -4165,197 +4458,221 @@ func file_v1_machine_proto_rawDescGZIP() []byte {
 }
 
 var file_v1_machine_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_v1_machine_proto_msgTypes = make([]protoimpl.MessageInfo, 58)
+var file_v1_machine_proto_msgTypes = make([]protoimpl.MessageInfo, 60)
 var file_v1_machine_proto_goTypes = []any{
 	(UploadEntryKind)(0),                     // 0: laelia.v1.UploadEntryKind
 	(ProvisioningPhase)(0),                   // 1: laelia.v1.ProvisioningPhase
 	(MachineStatus_ConnectionState)(0),       // 2: laelia.v1.MachineStatus.ConnectionState
-	(*UploadCommandDataEntry)(nil),           // 3: laelia.v1.UploadCommandDataEntry
-	(*UploadCommandDataRequest)(nil),         // 4: laelia.v1.UploadCommandDataRequest
-	(*UploadCommandDataAck)(nil),             // 5: laelia.v1.UploadCommandDataAck
-	(*UploadCommandDataRejection)(nil),       // 6: laelia.v1.UploadCommandDataRejection
-	(*UploadCommandDataResponse)(nil),        // 7: laelia.v1.UploadCommandDataResponse
-	(*UpdateMachineRequest)(nil),             // 8: laelia.v1.UpdateMachineRequest
-	(*TransferMachineOwnershipRequest)(nil),  // 9: laelia.v1.TransferMachineOwnershipRequest
-	(*TransferMachineOwnershipResponse)(nil), // 10: laelia.v1.TransferMachineOwnershipResponse
-	(*RevokeMachineTokenRequest)(nil),        // 11: laelia.v1.RevokeMachineTokenRequest
-	(*RevokeMachineTokenResponse)(nil),       // 12: laelia.v1.RevokeMachineTokenResponse
-	(*ForceDisconnectMachineRequest)(nil),    // 13: laelia.v1.ForceDisconnectMachineRequest
-	(*ListMachineAgentsRequest)(nil),         // 14: laelia.v1.ListMachineAgentsRequest
-	(*ListMachineAgentsResponse)(nil),        // 15: laelia.v1.ListMachineAgentsResponse
-	(*RefreshMachineProvidersRequest)(nil),   // 16: laelia.v1.RefreshMachineProvidersRequest
-	(*RefreshMachineProvidersResponse)(nil),  // 17: laelia.v1.RefreshMachineProvidersResponse
-	(*RefreshMachineModelsRequest)(nil),      // 18: laelia.v1.RefreshMachineModelsRequest
-	(*RefreshMachineModelsResponse)(nil),     // 19: laelia.v1.RefreshMachineModelsResponse
-	(*UpgradeMachineRequest)(nil),            // 20: laelia.v1.UpgradeMachineRequest
-	(*ListMachineWorkspacesRequest)(nil),     // 21: laelia.v1.ListMachineWorkspacesRequest
-	(*ListMachineWorkspacesResponse)(nil),    // 22: laelia.v1.ListMachineWorkspacesResponse
-	(*ConnectMachineRequest)(nil),            // 23: laelia.v1.ConnectMachineRequest
-	(*ConnectMachineResponse)(nil),           // 24: laelia.v1.ConnectMachineResponse
-	(*MachineHeartbeatRequest)(nil),          // 25: laelia.v1.MachineHeartbeatRequest
-	(*MachineHeartbeatResponse)(nil),         // 26: laelia.v1.MachineHeartbeatResponse
-	(*MachineDisconnectRequest)(nil),         // 27: laelia.v1.MachineDisconnectRequest
-	(*RefreshMachineTokenRequest)(nil),       // 28: laelia.v1.RefreshMachineTokenRequest
-	(*RefreshMachineTokenResponse)(nil),      // 29: laelia.v1.RefreshMachineTokenResponse
-	(*ListMachinesRequest)(nil),              // 30: laelia.v1.ListMachinesRequest
-	(*ListMachinesResponse)(nil),             // 31: laelia.v1.ListMachinesResponse
-	(*GetMachineRequest)(nil),                // 32: laelia.v1.GetMachineRequest
-	(*DeleteMachineRequest)(nil),             // 33: laelia.v1.DeleteMachineRequest
-	(*Machine)(nil),                          // 34: laelia.v1.Machine
-	(*MachineSummary)(nil),                   // 35: laelia.v1.MachineSummary
-	(*UpgradeRequest)(nil),                   // 36: laelia.v1.UpgradeRequest
-	(*UpgradeProgress)(nil),                  // 37: laelia.v1.UpgradeProgress
-	(*ProvisioningStatus)(nil),               // 38: laelia.v1.ProvisioningStatus
-	(*MachineInfo)(nil),                      // 39: laelia.v1.MachineInfo
-	(*MachineStatus)(nil),                    // 40: laelia.v1.MachineStatus
-	(*AgentAssignment)(nil),                  // 41: laelia.v1.AgentAssignment
-	(*MachineStreamMessage)(nil),             // 42: laelia.v1.MachineStreamMessage
-	(*ManagerMachineStreamMessage)(nil),      // 43: laelia.v1.ManagerMachineStreamMessage
-	(*MachineReady)(nil),                     // 44: laelia.v1.MachineReady
-	(*RemoveAgent)(nil),                      // 45: laelia.v1.RemoveAgent
-	(*RestartAgent)(nil),                     // 46: laelia.v1.RestartAgent
-	(*DeleteAgentWorkspace)(nil),             // 47: laelia.v1.DeleteAgentWorkspace
-	(*AgentConfigUpdate)(nil),                // 48: laelia.v1.AgentConfigUpdate
-	(*MachineDisconnectNotice)(nil),          // 49: laelia.v1.MachineDisconnectNotice
-	(*DiscoverModels)(nil),                   // 50: laelia.v1.DiscoverModels
-	(*ModelsDiscovered)(nil),                 // 51: laelia.v1.ModelsDiscovered
-	(*ReloadAgentAssignment)(nil),            // 52: laelia.v1.ReloadAgentAssignment
-	(*MachineWorkspaceScanRequest)(nil),      // 53: laelia.v1.MachineWorkspaceScanRequest
-	(*MachineWorkspaceSummary)(nil),          // 54: laelia.v1.MachineWorkspaceSummary
-	(*MachineWorkspaceScanResponse)(nil),     // 55: laelia.v1.MachineWorkspaceScanResponse
-	nil,                                      // 56: laelia.v1.Machine.LabelsEntry
-	nil,                                      // 57: laelia.v1.ProvisioningStatus.WorkloadLabelsEntry
-	nil,                                      // 58: laelia.v1.ProvisioningStatus.MachineParamsEntry
-	nil,                                      // 59: laelia.v1.MachineInfo.LabelsEntry
-	nil,                                      // 60: laelia.v1.DiscoverModels.EnvEntry
-	(*timestamppb.Timestamp)(nil),            // 61: google.protobuf.Timestamp
-	(*CommandProgress)(nil),                  // 62: laelia.v1.CommandProgress
-	(*CommandEvent)(nil),                     // 63: laelia.v1.CommandEvent
-	(*CommandResult)(nil),                    // 64: laelia.v1.CommandResult
-	(*AgentSummary)(nil),                     // 65: laelia.v1.AgentSummary
-	(*AgentProviderInfo)(nil),                // 66: laelia.v1.AgentProviderInfo
-	(*AgentACPConfig)(nil),                   // 67: laelia.v1.AgentACPConfig
-	(*AgentModelOption)(nil),                 // 68: laelia.v1.AgentModelOption
-	(State)(0),                               // 69: laelia.v1.State
-	(*AgentCapability)(nil),                  // 70: laelia.v1.AgentCapability
-	(*Ping)(nil),                             // 71: laelia.v1.Ping
-	(*ProvidersDiscovered)(nil),              // 72: laelia.v1.ProvidersDiscovered
-	(*DiscoverProviders)(nil),                // 73: laelia.v1.DiscoverProviders
-	(*Pong)(nil),                             // 74: laelia.v1.Pong
-	(*emptypb.Empty)(nil),                    // 75: google.protobuf.Empty
+	(*BeginSessionRequest)(nil),              // 3: laelia.v1.BeginSessionRequest
+	(*UploadCommandDataEntry)(nil),           // 4: laelia.v1.UploadCommandDataEntry
+	(*UploadCommandDataRequest)(nil),         // 5: laelia.v1.UploadCommandDataRequest
+	(*UploadCommandDataAck)(nil),             // 6: laelia.v1.UploadCommandDataAck
+	(*UploadCommandDataRejection)(nil),       // 7: laelia.v1.UploadCommandDataRejection
+	(*UploadCommandDataResponse)(nil),        // 8: laelia.v1.UploadCommandDataResponse
+	(*UpdateMachineRequest)(nil),             // 9: laelia.v1.UpdateMachineRequest
+	(*TransferMachineOwnershipRequest)(nil),  // 10: laelia.v1.TransferMachineOwnershipRequest
+	(*TransferMachineOwnershipResponse)(nil), // 11: laelia.v1.TransferMachineOwnershipResponse
+	(*RevokeMachineTokenRequest)(nil),        // 12: laelia.v1.RevokeMachineTokenRequest
+	(*RevokeMachineTokenResponse)(nil),       // 13: laelia.v1.RevokeMachineTokenResponse
+	(*ForceDisconnectMachineRequest)(nil),    // 14: laelia.v1.ForceDisconnectMachineRequest
+	(*ListMachineAgentsRequest)(nil),         // 15: laelia.v1.ListMachineAgentsRequest
+	(*ListMachineAgentsResponse)(nil),        // 16: laelia.v1.ListMachineAgentsResponse
+	(*RefreshMachineProvidersRequest)(nil),   // 17: laelia.v1.RefreshMachineProvidersRequest
+	(*RefreshMachineProvidersResponse)(nil),  // 18: laelia.v1.RefreshMachineProvidersResponse
+	(*RefreshMachineModelsRequest)(nil),      // 19: laelia.v1.RefreshMachineModelsRequest
+	(*RefreshMachineModelsResponse)(nil),     // 20: laelia.v1.RefreshMachineModelsResponse
+	(*UpgradeMachineRequest)(nil),            // 21: laelia.v1.UpgradeMachineRequest
+	(*ListMachineWorkspacesRequest)(nil),     // 22: laelia.v1.ListMachineWorkspacesRequest
+	(*ListMachineWorkspacesResponse)(nil),    // 23: laelia.v1.ListMachineWorkspacesResponse
+	(*ConnectMachineRequest)(nil),            // 24: laelia.v1.ConnectMachineRequest
+	(*ConnectMachineResponse)(nil),           // 25: laelia.v1.ConnectMachineResponse
+	(*MachineHeartbeatRequest)(nil),          // 26: laelia.v1.MachineHeartbeatRequest
+	(*MachineHeartbeatResponse)(nil),         // 27: laelia.v1.MachineHeartbeatResponse
+	(*MachineDisconnectRequest)(nil),         // 28: laelia.v1.MachineDisconnectRequest
+	(*RefreshMachineTokenRequest)(nil),       // 29: laelia.v1.RefreshMachineTokenRequest
+	(*RefreshMachineTokenResponse)(nil),      // 30: laelia.v1.RefreshMachineTokenResponse
+	(*ListMachinesRequest)(nil),              // 31: laelia.v1.ListMachinesRequest
+	(*ListMachinesResponse)(nil),             // 32: laelia.v1.ListMachinesResponse
+	(*GetMachineRequest)(nil),                // 33: laelia.v1.GetMachineRequest
+	(*DeleteMachineRequest)(nil),             // 34: laelia.v1.DeleteMachineRequest
+	(*Machine)(nil),                          // 35: laelia.v1.Machine
+	(*MachineSummary)(nil),                   // 36: laelia.v1.MachineSummary
+	(*UpgradeRequest)(nil),                   // 37: laelia.v1.UpgradeRequest
+	(*UpgradeProgress)(nil),                  // 38: laelia.v1.UpgradeProgress
+	(*ProvisioningStatus)(nil),               // 39: laelia.v1.ProvisioningStatus
+	(*MachineInfo)(nil),                      // 40: laelia.v1.MachineInfo
+	(*MachineStatus)(nil),                    // 41: laelia.v1.MachineStatus
+	(*AgentAssignment)(nil),                  // 42: laelia.v1.AgentAssignment
+	(*MachineStreamMessage)(nil),             // 43: laelia.v1.MachineStreamMessage
+	(*ManagerMachineStreamMessage)(nil),      // 44: laelia.v1.ManagerMachineStreamMessage
+	(*AgentControlRequest)(nil),              // 45: laelia.v1.AgentControlRequest
+	(*MachineReady)(nil),                     // 46: laelia.v1.MachineReady
+	(*RemoveAgent)(nil),                      // 47: laelia.v1.RemoveAgent
+	(*RestartAgent)(nil),                     // 48: laelia.v1.RestartAgent
+	(*DeleteAgentWorkspace)(nil),             // 49: laelia.v1.DeleteAgentWorkspace
+	(*AgentConfigUpdate)(nil),                // 50: laelia.v1.AgentConfigUpdate
+	(*MachineDisconnectNotice)(nil),          // 51: laelia.v1.MachineDisconnectNotice
+	(*DiscoverModels)(nil),                   // 52: laelia.v1.DiscoverModels
+	(*ModelsDiscovered)(nil),                 // 53: laelia.v1.ModelsDiscovered
+	(*ReloadAgentAssignment)(nil),            // 54: laelia.v1.ReloadAgentAssignment
+	(*MachineWorkspaceScanRequest)(nil),      // 55: laelia.v1.MachineWorkspaceScanRequest
+	(*MachineWorkspaceSummary)(nil),          // 56: laelia.v1.MachineWorkspaceSummary
+	(*MachineWorkspaceScanResponse)(nil),     // 57: laelia.v1.MachineWorkspaceScanResponse
+	nil,                                      // 58: laelia.v1.Machine.LabelsEntry
+	nil,                                      // 59: laelia.v1.ProvisioningStatus.WorkloadLabelsEntry
+	nil,                                      // 60: laelia.v1.ProvisioningStatus.MachineParamsEntry
+	nil,                                      // 61: laelia.v1.MachineInfo.LabelsEntry
+	nil,                                      // 62: laelia.v1.DiscoverModels.EnvEntry
+	(*timestamppb.Timestamp)(nil),            // 63: google.protobuf.Timestamp
+	(*CommandProgress)(nil),                  // 64: laelia.v1.CommandProgress
+	(*CommandEvent)(nil),                     // 65: laelia.v1.CommandEvent
+	(*CommandResult)(nil),                    // 66: laelia.v1.CommandResult
+	(*AgentSummary)(nil),                     // 67: laelia.v1.AgentSummary
+	(*AgentProviderInfo)(nil),                // 68: laelia.v1.AgentProviderInfo
+	(*AgentACPConfig)(nil),                   // 69: laelia.v1.AgentACPConfig
+	(*AgentModelOption)(nil),                 // 70: laelia.v1.AgentModelOption
+	(State)(0),                               // 71: laelia.v1.State
+	(*AgentCapability)(nil),                  // 72: laelia.v1.AgentCapability
+	(*Ping)(nil),                             // 73: laelia.v1.Ping
+	(*ProvidersDiscovered)(nil),              // 74: laelia.v1.ProvidersDiscovered
+	(*WorkspaceListResponse)(nil),            // 75: laelia.v1.WorkspaceListResponse
+	(*WorkspaceReadResponse)(nil),            // 76: laelia.v1.WorkspaceReadResponse
+	(*PromptReleaseNoticeAck)(nil),           // 77: laelia.v1.PromptReleaseNoticeAck
+	(*DiscoverProviders)(nil),                // 78: laelia.v1.DiscoverProviders
+	(*Pong)(nil),                             // 79: laelia.v1.Pong
+	(*WorkspaceListRequest)(nil),             // 80: laelia.v1.WorkspaceListRequest
+	(*WorkspaceReadRequest)(nil),             // 81: laelia.v1.WorkspaceReadRequest
+	(*CancelMessage)(nil),                    // 82: laelia.v1.CancelMessage
+	(*SteerMessage)(nil),                     // 83: laelia.v1.SteerMessage
+	(*NewMessagesAvailable)(nil),             // 84: laelia.v1.NewMessagesAvailable
+	(*PromptReleaseNotice)(nil),              // 85: laelia.v1.PromptReleaseNotice
+	(*emptypb.Empty)(nil),                    // 86: google.protobuf.Empty
+	(*BeginSessionResponse)(nil),             // 87: laelia.v1.BeginSessionResponse
 }
 var file_v1_machine_proto_depIdxs = []int32{
 	0,  // 0: laelia.v1.UploadCommandDataEntry.kind:type_name -> laelia.v1.UploadEntryKind
-	61, // 1: laelia.v1.UploadCommandDataEntry.agent_side_timestamp:type_name -> google.protobuf.Timestamp
-	62, // 2: laelia.v1.UploadCommandDataEntry.progress:type_name -> laelia.v1.CommandProgress
-	63, // 3: laelia.v1.UploadCommandDataEntry.event:type_name -> laelia.v1.CommandEvent
-	64, // 4: laelia.v1.UploadCommandDataEntry.result:type_name -> laelia.v1.CommandResult
-	3,  // 5: laelia.v1.UploadCommandDataRequest.entries:type_name -> laelia.v1.UploadCommandDataEntry
+	63, // 1: laelia.v1.UploadCommandDataEntry.agent_side_timestamp:type_name -> google.protobuf.Timestamp
+	64, // 2: laelia.v1.UploadCommandDataEntry.progress:type_name -> laelia.v1.CommandProgress
+	65, // 3: laelia.v1.UploadCommandDataEntry.event:type_name -> laelia.v1.CommandEvent
+	66, // 4: laelia.v1.UploadCommandDataEntry.result:type_name -> laelia.v1.CommandResult
+	4,  // 5: laelia.v1.UploadCommandDataRequest.entries:type_name -> laelia.v1.UploadCommandDataEntry
 	0,  // 6: laelia.v1.UploadCommandDataRejection.kind:type_name -> laelia.v1.UploadEntryKind
-	5,  // 7: laelia.v1.UploadCommandDataResponse.acks:type_name -> laelia.v1.UploadCommandDataAck
-	6,  // 8: laelia.v1.UploadCommandDataResponse.rejected:type_name -> laelia.v1.UploadCommandDataRejection
-	34, // 9: laelia.v1.TransferMachineOwnershipResponse.machine:type_name -> laelia.v1.Machine
-	65, // 10: laelia.v1.ListMachineAgentsResponse.agents:type_name -> laelia.v1.AgentSummary
-	66, // 11: laelia.v1.RefreshMachineProvidersResponse.providers:type_name -> laelia.v1.AgentProviderInfo
-	67, // 12: laelia.v1.RefreshMachineModelsRequest.acp_config:type_name -> laelia.v1.AgentACPConfig
-	68, // 13: laelia.v1.RefreshMachineModelsResponse.models:type_name -> laelia.v1.AgentModelOption
-	54, // 14: laelia.v1.ListMachineWorkspacesResponse.workspaces:type_name -> laelia.v1.MachineWorkspaceSummary
-	39, // 15: laelia.v1.ConnectMachineRequest.info:type_name -> laelia.v1.MachineInfo
-	40, // 16: laelia.v1.ConnectMachineResponse.initial_status:type_name -> laelia.v1.MachineStatus
-	41, // 17: laelia.v1.ConnectMachineResponse.assigned_agents:type_name -> laelia.v1.AgentAssignment
-	61, // 18: laelia.v1.MachineHeartbeatResponse.next_heartbeat_at:type_name -> google.protobuf.Timestamp
-	61, // 19: laelia.v1.MachineHeartbeatResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
-	61, // 20: laelia.v1.RefreshMachineTokenResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
-	35, // 21: laelia.v1.ListMachinesResponse.machines:type_name -> laelia.v1.MachineSummary
-	69, // 22: laelia.v1.Machine.state:type_name -> laelia.v1.State
-	39, // 23: laelia.v1.Machine.info:type_name -> laelia.v1.MachineInfo
-	40, // 24: laelia.v1.Machine.status:type_name -> laelia.v1.MachineStatus
-	61, // 25: laelia.v1.Machine.created_at:type_name -> google.protobuf.Timestamp
-	56, // 26: laelia.v1.Machine.labels:type_name -> laelia.v1.Machine.LabelsEntry
-	37, // 27: laelia.v1.Machine.upgrade_status:type_name -> laelia.v1.UpgradeProgress
-	38, // 28: laelia.v1.Machine.provisioning:type_name -> laelia.v1.ProvisioningStatus
-	69, // 29: laelia.v1.MachineSummary.state:type_name -> laelia.v1.State
-	40, // 30: laelia.v1.MachineSummary.status:type_name -> laelia.v1.MachineStatus
-	61, // 31: laelia.v1.MachineSummary.created_at:type_name -> google.protobuf.Timestamp
-	38, // 32: laelia.v1.MachineSummary.provisioning:type_name -> laelia.v1.ProvisioningStatus
+	6,  // 7: laelia.v1.UploadCommandDataResponse.acks:type_name -> laelia.v1.UploadCommandDataAck
+	7,  // 8: laelia.v1.UploadCommandDataResponse.rejected:type_name -> laelia.v1.UploadCommandDataRejection
+	35, // 9: laelia.v1.TransferMachineOwnershipResponse.machine:type_name -> laelia.v1.Machine
+	67, // 10: laelia.v1.ListMachineAgentsResponse.agents:type_name -> laelia.v1.AgentSummary
+	68, // 11: laelia.v1.RefreshMachineProvidersResponse.providers:type_name -> laelia.v1.AgentProviderInfo
+	69, // 12: laelia.v1.RefreshMachineModelsRequest.acp_config:type_name -> laelia.v1.AgentACPConfig
+	70, // 13: laelia.v1.RefreshMachineModelsResponse.models:type_name -> laelia.v1.AgentModelOption
+	56, // 14: laelia.v1.ListMachineWorkspacesResponse.workspaces:type_name -> laelia.v1.MachineWorkspaceSummary
+	40, // 15: laelia.v1.ConnectMachineRequest.info:type_name -> laelia.v1.MachineInfo
+	41, // 16: laelia.v1.ConnectMachineResponse.initial_status:type_name -> laelia.v1.MachineStatus
+	42, // 17: laelia.v1.ConnectMachineResponse.assigned_agents:type_name -> laelia.v1.AgentAssignment
+	63, // 18: laelia.v1.MachineHeartbeatResponse.next_heartbeat_at:type_name -> google.protobuf.Timestamp
+	63, // 19: laelia.v1.MachineHeartbeatResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
+	63, // 20: laelia.v1.RefreshMachineTokenResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
+	36, // 21: laelia.v1.ListMachinesResponse.machines:type_name -> laelia.v1.MachineSummary
+	71, // 22: laelia.v1.Machine.state:type_name -> laelia.v1.State
+	40, // 23: laelia.v1.Machine.info:type_name -> laelia.v1.MachineInfo
+	41, // 24: laelia.v1.Machine.status:type_name -> laelia.v1.MachineStatus
+	63, // 25: laelia.v1.Machine.created_at:type_name -> google.protobuf.Timestamp
+	58, // 26: laelia.v1.Machine.labels:type_name -> laelia.v1.Machine.LabelsEntry
+	38, // 27: laelia.v1.Machine.upgrade_status:type_name -> laelia.v1.UpgradeProgress
+	39, // 28: laelia.v1.Machine.provisioning:type_name -> laelia.v1.ProvisioningStatus
+	71, // 29: laelia.v1.MachineSummary.state:type_name -> laelia.v1.State
+	41, // 30: laelia.v1.MachineSummary.status:type_name -> laelia.v1.MachineStatus
+	63, // 31: laelia.v1.MachineSummary.created_at:type_name -> google.protobuf.Timestamp
+	39, // 32: laelia.v1.MachineSummary.provisioning:type_name -> laelia.v1.ProvisioningStatus
 	1,  // 33: laelia.v1.ProvisioningStatus.phase:type_name -> laelia.v1.ProvisioningPhase
-	57, // 34: laelia.v1.ProvisioningStatus.workload_labels:type_name -> laelia.v1.ProvisioningStatus.WorkloadLabelsEntry
-	61, // 35: laelia.v1.ProvisioningStatus.pending_at:type_name -> google.protobuf.Timestamp
-	61, // 36: laelia.v1.ProvisioningStatus.provisioned_at:type_name -> google.protobuf.Timestamp
-	61, // 37: laelia.v1.ProvisioningStatus.failed_at:type_name -> google.protobuf.Timestamp
-	58, // 38: laelia.v1.ProvisioningStatus.machine_params:type_name -> laelia.v1.ProvisioningStatus.MachineParamsEntry
-	59, // 39: laelia.v1.MachineInfo.labels:type_name -> laelia.v1.MachineInfo.LabelsEntry
-	70, // 40: laelia.v1.MachineInfo.capability:type_name -> laelia.v1.AgentCapability
-	66, // 41: laelia.v1.MachineInfo.available_providers:type_name -> laelia.v1.AgentProviderInfo
+	59, // 34: laelia.v1.ProvisioningStatus.workload_labels:type_name -> laelia.v1.ProvisioningStatus.WorkloadLabelsEntry
+	63, // 35: laelia.v1.ProvisioningStatus.pending_at:type_name -> google.protobuf.Timestamp
+	63, // 36: laelia.v1.ProvisioningStatus.provisioned_at:type_name -> google.protobuf.Timestamp
+	63, // 37: laelia.v1.ProvisioningStatus.failed_at:type_name -> google.protobuf.Timestamp
+	60, // 38: laelia.v1.ProvisioningStatus.machine_params:type_name -> laelia.v1.ProvisioningStatus.MachineParamsEntry
+	61, // 39: laelia.v1.MachineInfo.labels:type_name -> laelia.v1.MachineInfo.LabelsEntry
+	72, // 40: laelia.v1.MachineInfo.capability:type_name -> laelia.v1.AgentCapability
+	68, // 41: laelia.v1.MachineInfo.available_providers:type_name -> laelia.v1.AgentProviderInfo
 	2,  // 42: laelia.v1.MachineStatus.state:type_name -> laelia.v1.MachineStatus.ConnectionState
-	61, // 43: laelia.v1.MachineStatus.last_heartbeat_time:type_name -> google.protobuf.Timestamp
-	61, // 44: laelia.v1.MachineStatus.connected_time:type_name -> google.protobuf.Timestamp
-	67, // 45: laelia.v1.AgentAssignment.acp_config:type_name -> laelia.v1.AgentACPConfig
-	44, // 46: laelia.v1.MachineStreamMessage.machine_ready:type_name -> laelia.v1.MachineReady
-	71, // 47: laelia.v1.MachineStreamMessage.ping:type_name -> laelia.v1.Ping
-	72, // 48: laelia.v1.MachineStreamMessage.providers_discovered:type_name -> laelia.v1.ProvidersDiscovered
-	49, // 49: laelia.v1.MachineStreamMessage.disconnect_notice:type_name -> laelia.v1.MachineDisconnectNotice
-	55, // 50: laelia.v1.MachineStreamMessage.machine_workspace_scan_response:type_name -> laelia.v1.MachineWorkspaceScanResponse
-	37, // 51: laelia.v1.MachineStreamMessage.upgrade_progress:type_name -> laelia.v1.UpgradeProgress
-	51, // 52: laelia.v1.MachineStreamMessage.models_discovered:type_name -> laelia.v1.ModelsDiscovered
-	41, // 53: laelia.v1.ManagerMachineStreamMessage.agent_assignment:type_name -> laelia.v1.AgentAssignment
-	45, // 54: laelia.v1.ManagerMachineStreamMessage.remove_agent:type_name -> laelia.v1.RemoveAgent
-	48, // 55: laelia.v1.ManagerMachineStreamMessage.agent_config_update:type_name -> laelia.v1.AgentConfigUpdate
-	73, // 56: laelia.v1.ManagerMachineStreamMessage.discover_providers:type_name -> laelia.v1.DiscoverProviders
-	74, // 57: laelia.v1.ManagerMachineStreamMessage.pong:type_name -> laelia.v1.Pong
-	52, // 58: laelia.v1.ManagerMachineStreamMessage.reload_agent_assignment:type_name -> laelia.v1.ReloadAgentAssignment
-	53, // 59: laelia.v1.ManagerMachineStreamMessage.machine_workspace_scan_request:type_name -> laelia.v1.MachineWorkspaceScanRequest
-	47, // 60: laelia.v1.ManagerMachineStreamMessage.delete_agent_workspace:type_name -> laelia.v1.DeleteAgentWorkspace
-	36, // 61: laelia.v1.ManagerMachineStreamMessage.upgrade_request:type_name -> laelia.v1.UpgradeRequest
-	50, // 62: laelia.v1.ManagerMachineStreamMessage.discover_models:type_name -> laelia.v1.DiscoverModels
-	46, // 63: laelia.v1.ManagerMachineStreamMessage.restart_agent:type_name -> laelia.v1.RestartAgent
-	67, // 64: laelia.v1.AgentConfigUpdate.acp_config:type_name -> laelia.v1.AgentACPConfig
-	60, // 65: laelia.v1.DiscoverModels.env:type_name -> laelia.v1.DiscoverModels.EnvEntry
-	68, // 66: laelia.v1.ModelsDiscovered.models:type_name -> laelia.v1.AgentModelOption
-	41, // 67: laelia.v1.ReloadAgentAssignment.assignment:type_name -> laelia.v1.AgentAssignment
-	61, // 68: laelia.v1.MachineWorkspaceSummary.last_modified:type_name -> google.protobuf.Timestamp
-	54, // 69: laelia.v1.MachineWorkspaceScanResponse.workspaces:type_name -> laelia.v1.MachineWorkspaceSummary
-	30, // 70: laelia.v1.MachineService.ListMachines:input_type -> laelia.v1.ListMachinesRequest
-	32, // 71: laelia.v1.MachineService.GetMachine:input_type -> laelia.v1.GetMachineRequest
-	33, // 72: laelia.v1.MachineService.DeleteMachine:input_type -> laelia.v1.DeleteMachineRequest
-	8,  // 73: laelia.v1.MachineService.UpdateMachine:input_type -> laelia.v1.UpdateMachineRequest
-	9,  // 74: laelia.v1.MachineService.TransferMachineOwnership:input_type -> laelia.v1.TransferMachineOwnershipRequest
-	11, // 75: laelia.v1.MachineService.RevokeMachineToken:input_type -> laelia.v1.RevokeMachineTokenRequest
-	13, // 76: laelia.v1.MachineService.ForceDisconnectMachine:input_type -> laelia.v1.ForceDisconnectMachineRequest
-	14, // 77: laelia.v1.MachineService.ListMachineAgents:input_type -> laelia.v1.ListMachineAgentsRequest
-	16, // 78: laelia.v1.MachineService.RefreshMachineProviders:input_type -> laelia.v1.RefreshMachineProvidersRequest
-	18, // 79: laelia.v1.MachineService.RefreshMachineModels:input_type -> laelia.v1.RefreshMachineModelsRequest
-	20, // 80: laelia.v1.MachineService.UpgradeMachine:input_type -> laelia.v1.UpgradeMachineRequest
-	21, // 81: laelia.v1.MachineService.ListMachineWorkspaces:input_type -> laelia.v1.ListMachineWorkspacesRequest
-	23, // 82: laelia.v1.MachineService.ConnectMachine:input_type -> laelia.v1.ConnectMachineRequest
-	25, // 83: laelia.v1.MachineService.MachineHeartbeat:input_type -> laelia.v1.MachineHeartbeatRequest
-	27, // 84: laelia.v1.MachineService.MachineDisconnect:input_type -> laelia.v1.MachineDisconnectRequest
-	28, // 85: laelia.v1.MachineService.RefreshMachineToken:input_type -> laelia.v1.RefreshMachineTokenRequest
-	42, // 86: laelia.v1.MachineStreamService.MachineChannel:input_type -> laelia.v1.MachineStreamMessage
-	4,  // 87: laelia.v1.MachineStreamService.UploadCommandData:input_type -> laelia.v1.UploadCommandDataRequest
-	31, // 88: laelia.v1.MachineService.ListMachines:output_type -> laelia.v1.ListMachinesResponse
-	34, // 89: laelia.v1.MachineService.GetMachine:output_type -> laelia.v1.Machine
-	75, // 90: laelia.v1.MachineService.DeleteMachine:output_type -> google.protobuf.Empty
-	34, // 91: laelia.v1.MachineService.UpdateMachine:output_type -> laelia.v1.Machine
-	10, // 92: laelia.v1.MachineService.TransferMachineOwnership:output_type -> laelia.v1.TransferMachineOwnershipResponse
-	12, // 93: laelia.v1.MachineService.RevokeMachineToken:output_type -> laelia.v1.RevokeMachineTokenResponse
-	75, // 94: laelia.v1.MachineService.ForceDisconnectMachine:output_type -> google.protobuf.Empty
-	15, // 95: laelia.v1.MachineService.ListMachineAgents:output_type -> laelia.v1.ListMachineAgentsResponse
-	17, // 96: laelia.v1.MachineService.RefreshMachineProviders:output_type -> laelia.v1.RefreshMachineProvidersResponse
-	19, // 97: laelia.v1.MachineService.RefreshMachineModels:output_type -> laelia.v1.RefreshMachineModelsResponse
-	75, // 98: laelia.v1.MachineService.UpgradeMachine:output_type -> google.protobuf.Empty
-	22, // 99: laelia.v1.MachineService.ListMachineWorkspaces:output_type -> laelia.v1.ListMachineWorkspacesResponse
-	24, // 100: laelia.v1.MachineService.ConnectMachine:output_type -> laelia.v1.ConnectMachineResponse
-	26, // 101: laelia.v1.MachineService.MachineHeartbeat:output_type -> laelia.v1.MachineHeartbeatResponse
-	75, // 102: laelia.v1.MachineService.MachineDisconnect:output_type -> google.protobuf.Empty
-	29, // 103: laelia.v1.MachineService.RefreshMachineToken:output_type -> laelia.v1.RefreshMachineTokenResponse
-	43, // 104: laelia.v1.MachineStreamService.MachineChannel:output_type -> laelia.v1.ManagerMachineStreamMessage
-	7,  // 105: laelia.v1.MachineStreamService.UploadCommandData:output_type -> laelia.v1.UploadCommandDataResponse
-	88, // [88:106] is the sub-list for method output_type
-	70, // [70:88] is the sub-list for method input_type
-	70, // [70:70] is the sub-list for extension type_name
-	70, // [70:70] is the sub-list for extension extendee
-	0,  // [0:70] is the sub-list for field type_name
+	63, // 43: laelia.v1.MachineStatus.last_heartbeat_time:type_name -> google.protobuf.Timestamp
+	63, // 44: laelia.v1.MachineStatus.connected_time:type_name -> google.protobuf.Timestamp
+	69, // 45: laelia.v1.AgentAssignment.acp_config:type_name -> laelia.v1.AgentACPConfig
+	46, // 46: laelia.v1.MachineStreamMessage.machine_ready:type_name -> laelia.v1.MachineReady
+	73, // 47: laelia.v1.MachineStreamMessage.ping:type_name -> laelia.v1.Ping
+	74, // 48: laelia.v1.MachineStreamMessage.providers_discovered:type_name -> laelia.v1.ProvidersDiscovered
+	51, // 49: laelia.v1.MachineStreamMessage.disconnect_notice:type_name -> laelia.v1.MachineDisconnectNotice
+	57, // 50: laelia.v1.MachineStreamMessage.machine_workspace_scan_response:type_name -> laelia.v1.MachineWorkspaceScanResponse
+	38, // 51: laelia.v1.MachineStreamMessage.upgrade_progress:type_name -> laelia.v1.UpgradeProgress
+	75, // 52: laelia.v1.MachineStreamMessage.workspace_list_response:type_name -> laelia.v1.WorkspaceListResponse
+	76, // 53: laelia.v1.MachineStreamMessage.workspace_read_response:type_name -> laelia.v1.WorkspaceReadResponse
+	77, // 54: laelia.v1.MachineStreamMessage.prompt_release_notice_ack:type_name -> laelia.v1.PromptReleaseNoticeAck
+	53, // 55: laelia.v1.MachineStreamMessage.models_discovered:type_name -> laelia.v1.ModelsDiscovered
+	42, // 56: laelia.v1.ManagerMachineStreamMessage.agent_assignment:type_name -> laelia.v1.AgentAssignment
+	47, // 57: laelia.v1.ManagerMachineStreamMessage.remove_agent:type_name -> laelia.v1.RemoveAgent
+	50, // 58: laelia.v1.ManagerMachineStreamMessage.agent_config_update:type_name -> laelia.v1.AgentConfigUpdate
+	78, // 59: laelia.v1.ManagerMachineStreamMessage.discover_providers:type_name -> laelia.v1.DiscoverProviders
+	79, // 60: laelia.v1.ManagerMachineStreamMessage.pong:type_name -> laelia.v1.Pong
+	54, // 61: laelia.v1.ManagerMachineStreamMessage.reload_agent_assignment:type_name -> laelia.v1.ReloadAgentAssignment
+	55, // 62: laelia.v1.ManagerMachineStreamMessage.machine_workspace_scan_request:type_name -> laelia.v1.MachineWorkspaceScanRequest
+	49, // 63: laelia.v1.ManagerMachineStreamMessage.delete_agent_workspace:type_name -> laelia.v1.DeleteAgentWorkspace
+	37, // 64: laelia.v1.ManagerMachineStreamMessage.upgrade_request:type_name -> laelia.v1.UpgradeRequest
+	52, // 65: laelia.v1.ManagerMachineStreamMessage.discover_models:type_name -> laelia.v1.DiscoverModels
+	48, // 66: laelia.v1.ManagerMachineStreamMessage.restart_agent:type_name -> laelia.v1.RestartAgent
+	45, // 67: laelia.v1.ManagerMachineStreamMessage.agent_control:type_name -> laelia.v1.AgentControlRequest
+	80, // 68: laelia.v1.ManagerMachineStreamMessage.workspace_list_request:type_name -> laelia.v1.WorkspaceListRequest
+	81, // 69: laelia.v1.ManagerMachineStreamMessage.workspace_read_request:type_name -> laelia.v1.WorkspaceReadRequest
+	82, // 70: laelia.v1.AgentControlRequest.cancel:type_name -> laelia.v1.CancelMessage
+	83, // 71: laelia.v1.AgentControlRequest.steer:type_name -> laelia.v1.SteerMessage
+	84, // 72: laelia.v1.AgentControlRequest.wake:type_name -> laelia.v1.NewMessagesAvailable
+	85, // 73: laelia.v1.AgentControlRequest.prompt_notice:type_name -> laelia.v1.PromptReleaseNotice
+	69, // 74: laelia.v1.AgentConfigUpdate.acp_config:type_name -> laelia.v1.AgentACPConfig
+	62, // 75: laelia.v1.DiscoverModels.env:type_name -> laelia.v1.DiscoverModels.EnvEntry
+	70, // 76: laelia.v1.ModelsDiscovered.models:type_name -> laelia.v1.AgentModelOption
+	42, // 77: laelia.v1.ReloadAgentAssignment.assignment:type_name -> laelia.v1.AgentAssignment
+	63, // 78: laelia.v1.MachineWorkspaceSummary.last_modified:type_name -> google.protobuf.Timestamp
+	56, // 79: laelia.v1.MachineWorkspaceScanResponse.workspaces:type_name -> laelia.v1.MachineWorkspaceSummary
+	31, // 80: laelia.v1.MachineService.ListMachines:input_type -> laelia.v1.ListMachinesRequest
+	33, // 81: laelia.v1.MachineService.GetMachine:input_type -> laelia.v1.GetMachineRequest
+	34, // 82: laelia.v1.MachineService.DeleteMachine:input_type -> laelia.v1.DeleteMachineRequest
+	9,  // 83: laelia.v1.MachineService.UpdateMachine:input_type -> laelia.v1.UpdateMachineRequest
+	10, // 84: laelia.v1.MachineService.TransferMachineOwnership:input_type -> laelia.v1.TransferMachineOwnershipRequest
+	12, // 85: laelia.v1.MachineService.RevokeMachineToken:input_type -> laelia.v1.RevokeMachineTokenRequest
+	14, // 86: laelia.v1.MachineService.ForceDisconnectMachine:input_type -> laelia.v1.ForceDisconnectMachineRequest
+	15, // 87: laelia.v1.MachineService.ListMachineAgents:input_type -> laelia.v1.ListMachineAgentsRequest
+	17, // 88: laelia.v1.MachineService.RefreshMachineProviders:input_type -> laelia.v1.RefreshMachineProvidersRequest
+	19, // 89: laelia.v1.MachineService.RefreshMachineModels:input_type -> laelia.v1.RefreshMachineModelsRequest
+	21, // 90: laelia.v1.MachineService.UpgradeMachine:input_type -> laelia.v1.UpgradeMachineRequest
+	22, // 91: laelia.v1.MachineService.ListMachineWorkspaces:input_type -> laelia.v1.ListMachineWorkspacesRequest
+	24, // 92: laelia.v1.MachineService.ConnectMachine:input_type -> laelia.v1.ConnectMachineRequest
+	26, // 93: laelia.v1.MachineService.MachineHeartbeat:input_type -> laelia.v1.MachineHeartbeatRequest
+	28, // 94: laelia.v1.MachineService.MachineDisconnect:input_type -> laelia.v1.MachineDisconnectRequest
+	29, // 95: laelia.v1.MachineService.RefreshMachineToken:input_type -> laelia.v1.RefreshMachineTokenRequest
+	43, // 96: laelia.v1.MachineStreamService.MachineChannel:input_type -> laelia.v1.MachineStreamMessage
+	5,  // 97: laelia.v1.MachineStreamService.UploadCommandData:input_type -> laelia.v1.UploadCommandDataRequest
+	3,  // 98: laelia.v1.MachineStreamService.BeginSession:input_type -> laelia.v1.BeginSessionRequest
+	32, // 99: laelia.v1.MachineService.ListMachines:output_type -> laelia.v1.ListMachinesResponse
+	35, // 100: laelia.v1.MachineService.GetMachine:output_type -> laelia.v1.Machine
+	86, // 101: laelia.v1.MachineService.DeleteMachine:output_type -> google.protobuf.Empty
+	35, // 102: laelia.v1.MachineService.UpdateMachine:output_type -> laelia.v1.Machine
+	11, // 103: laelia.v1.MachineService.TransferMachineOwnership:output_type -> laelia.v1.TransferMachineOwnershipResponse
+	13, // 104: laelia.v1.MachineService.RevokeMachineToken:output_type -> laelia.v1.RevokeMachineTokenResponse
+	86, // 105: laelia.v1.MachineService.ForceDisconnectMachine:output_type -> google.protobuf.Empty
+	16, // 106: laelia.v1.MachineService.ListMachineAgents:output_type -> laelia.v1.ListMachineAgentsResponse
+	18, // 107: laelia.v1.MachineService.RefreshMachineProviders:output_type -> laelia.v1.RefreshMachineProvidersResponse
+	20, // 108: laelia.v1.MachineService.RefreshMachineModels:output_type -> laelia.v1.RefreshMachineModelsResponse
+	86, // 109: laelia.v1.MachineService.UpgradeMachine:output_type -> google.protobuf.Empty
+	23, // 110: laelia.v1.MachineService.ListMachineWorkspaces:output_type -> laelia.v1.ListMachineWorkspacesResponse
+	25, // 111: laelia.v1.MachineService.ConnectMachine:output_type -> laelia.v1.ConnectMachineResponse
+	27, // 112: laelia.v1.MachineService.MachineHeartbeat:output_type -> laelia.v1.MachineHeartbeatResponse
+	86, // 113: laelia.v1.MachineService.MachineDisconnect:output_type -> google.protobuf.Empty
+	30, // 114: laelia.v1.MachineService.RefreshMachineToken:output_type -> laelia.v1.RefreshMachineTokenResponse
+	44, // 115: laelia.v1.MachineStreamService.MachineChannel:output_type -> laelia.v1.ManagerMachineStreamMessage
+	8,  // 116: laelia.v1.MachineStreamService.UploadCommandData:output_type -> laelia.v1.UploadCommandDataResponse
+	87, // 117: laelia.v1.MachineStreamService.BeginSession:output_type -> laelia.v1.BeginSessionResponse
+	99, // [99:118] is the sub-list for method output_type
+	80, // [80:99] is the sub-list for method input_type
+	80, // [80:80] is the sub-list for extension type_name
+	80, // [80:80] is the sub-list for extension extendee
+	0,  // [0:80] is the sub-list for field type_name
 }
 
 func init() { file_v1_machine_proto_init() }
@@ -4367,21 +4684,24 @@ func file_v1_machine_proto_init() {
 	file_v1_annotation_proto_init()
 	file_v1_command_proto_init()
 	file_v1_common_proto_init()
-	file_v1_machine_proto_msgTypes[0].OneofWrappers = []any{
+	file_v1_machine_proto_msgTypes[1].OneofWrappers = []any{
 		(*UploadCommandDataEntry_Progress)(nil),
 		(*UploadCommandDataEntry_Event)(nil),
 		(*UploadCommandDataEntry_Result)(nil),
 	}
-	file_v1_machine_proto_msgTypes[39].OneofWrappers = []any{
+	file_v1_machine_proto_msgTypes[40].OneofWrappers = []any{
 		(*MachineStreamMessage_MachineReady)(nil),
 		(*MachineStreamMessage_Ping)(nil),
 		(*MachineStreamMessage_ProvidersDiscovered)(nil),
 		(*MachineStreamMessage_DisconnectNotice)(nil),
 		(*MachineStreamMessage_MachineWorkspaceScanResponse)(nil),
 		(*MachineStreamMessage_UpgradeProgress)(nil),
+		(*MachineStreamMessage_WorkspaceListResponse)(nil),
+		(*MachineStreamMessage_WorkspaceReadResponse)(nil),
+		(*MachineStreamMessage_PromptReleaseNoticeAck)(nil),
 		(*MachineStreamMessage_ModelsDiscovered)(nil),
 	}
-	file_v1_machine_proto_msgTypes[40].OneofWrappers = []any{
+	file_v1_machine_proto_msgTypes[41].OneofWrappers = []any{
 		(*ManagerMachineStreamMessage_AgentAssignment)(nil),
 		(*ManagerMachineStreamMessage_RemoveAgent)(nil),
 		(*ManagerMachineStreamMessage_AgentConfigUpdate)(nil),
@@ -4393,6 +4713,15 @@ func file_v1_machine_proto_init() {
 		(*ManagerMachineStreamMessage_UpgradeRequest)(nil),
 		(*ManagerMachineStreamMessage_DiscoverModels)(nil),
 		(*ManagerMachineStreamMessage_RestartAgent)(nil),
+		(*ManagerMachineStreamMessage_AgentControl)(nil),
+		(*ManagerMachineStreamMessage_WorkspaceListRequest)(nil),
+		(*ManagerMachineStreamMessage_WorkspaceReadRequest)(nil),
+	}
+	file_v1_machine_proto_msgTypes[42].OneofWrappers = []any{
+		(*AgentControlRequest_Cancel)(nil),
+		(*AgentControlRequest_Steer)(nil),
+		(*AgentControlRequest_Wake)(nil),
+		(*AgentControlRequest_PromptNotice)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -4400,7 +4729,7 @@ func file_v1_machine_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_machine_proto_rawDesc), len(file_v1_machine_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   58,
+			NumMessages:   60,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

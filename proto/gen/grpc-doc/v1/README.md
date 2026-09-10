@@ -436,6 +436,8 @@
 - [v1/machine.proto](#v1_machine-proto)
     - [AgentAssignment](#laelia-v1-AgentAssignment)
     - [AgentConfigUpdate](#laelia-v1-AgentConfigUpdate)
+    - [AgentControlRequest](#laelia-v1-AgentControlRequest)
+    - [BeginSessionRequest](#laelia-v1-BeginSessionRequest)
     - [ConnectMachineRequest](#laelia-v1-ConnectMachineRequest)
     - [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse)
     - [DeleteAgentWorkspace](#laelia-v1-DeleteAgentWorkspace)
@@ -3294,12 +3296,10 @@ source of truth) and left empty for ordinary whole-file attachments.
 <a name="laelia-v1-BeginSession"></a>
 
 ### BeginSession
-BeginSession is sent by an agent to ask the Manager to start a new
-autonomous processing session. The Manager checks the agent&#39;s per-channel
-cursors: if no conversation has room_version greater than the agent&#39;s cursor,
-it replies BeginSessionResponse{idle=true} and the agent stays idle;
-otherwise it creates a RUNNING command and replies with its command_id, which
-the agent uses to anchor its execution events and link any posted replies.
+BeginSession is sent by an agent over its AgentChannel to ask the Manager to
+start a new autonomous processing session. It is retired with the
+AgentChannel: the drain loop now pulls work through the unary BeginSession
+RPC on MachineStreamService (see v1/machine.proto).
 
 
 
@@ -4019,9 +4019,10 @@ uploaded but never attached to a message (e.g. an abandoned upload).
 <a name="laelia-v1-DiscoverProviders"></a>
 
 ### DiscoverProviders
-DiscoverProviders asks the agent daemon to re-probe its host for installed
-LLM agent providers and their models. The daemon replies with
-AgentStreamMessage.providers_discovered.
+DiscoverProviders asks the machine app to re-probe its host for installed
+LLM agent providers and their models (one machine-scoped catalog serves
+every hosted agent). The machine replies with providers_discovered on its
+control stream.
 
 
 | Field | Type | Label | Description |
@@ -6118,7 +6119,8 @@ settable here — ownership only moves via TransferChannelOwnership.
 WorkspaceListRequest asks the agent daemon to list one directory level of an
 agent&#39;s workspace (~/.laelia/&lt;machineID&gt;/&lt;agentID&gt;/ on the machine). Paths
 are relative to the workspace root; an empty dir_path lists the root. The
-daemon replies with AgentStreamMessage.workspace_list_response.
+daemon replies with workspace_list_response. agent_name routes the request
+to the agent&#39;s runner when it travels on the machine control stream.
 
 
 | Field | Type | Label | Description |
@@ -6126,6 +6128,7 @@ daemon replies with AgentStreamMessage.workspace_list_response.
 | request_id | [string](#string) |  | correlation id for the pending unary ListAgentWorkspace call |
 | dir_path | [string](#string) |  | relative to the workspace root; empty = root |
 | include_hidden | [bool](#bool) |  | show dotfiles (still filtered by the never-visible policy) |
+| agent_name | [string](#string) |  | agent_name is the agent (agents/{agent}) whose workspace is addressed; required on the machine control stream, where one stream serves every hosted agent. |
 
 
 
@@ -6157,12 +6160,15 @@ WorkspaceReadRequest asks the agent daemon to read a workspace file for
 preview. Text and image content is returned inline (see
 WorkspaceReadResponse); other binaries return metadata only. Sensitive files
 (secret/credential/token patterns) are always rejected by the daemon.
+agent_name routes the request to the agent&#39;s runner on the machine control
+stream.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | request_id | [string](#string) |  | correlation id for the pending unary ReadAgentWorkspaceFile call |
 | path | [string](#string) |  | relative to the workspace root |
+| agent_name | [string](#string) |  |  |
 
 
 
@@ -6234,6 +6240,7 @@ and Unread. The ACTIVITY_STATE prefix satisfies protobuf C&#43;&#43; scoping rul
 | CONTEXT_COMPACTION_FINISHED | 13 |  |
 | CONTEXT_USAGE_UPDATE | 14 |  |
 | TOKEN_USAGE | 15 |  |
+| SYSTEM | 16 | SYSTEM is a machine/manager-authored explanatory event outside the turn&#39;s own execution stream (e.g. the note explaining that a command was marked FAILED while the machine was unreachable and is being regraded from a late result). It carries its meaning in summary; no typed payload is required. |
 
 
 
@@ -7551,6 +7558,42 @@ in full in ConnectMachineResponse.assigned_agents on (re)connect.
 
 
 
+<a name="laelia-v1-AgentControlRequest"></a>
+
+### AgentControlRequest
+AgentControlRequest carries one manager→agent control interaction on the
+machine control stream. agent_name routes it to that agent&#39;s runner on the
+machine; the oneof is the per-agent control payload.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_name | [string](#string) |  | agent_name is the agent resource name (agents/{agent}) the control interaction targets; the machine validates it hosts this agent. |
+| cancel | [CancelMessage](#laelia-v1-CancelMessage) |  | cancel stops the agent&#39;s in-flight turn. |
+| steer | [SteerMessage](#laelia-v1-SteerMessage) |  | steer injects a follow-up message into the in-flight turn. |
+| wake | [NewMessagesAvailable](#laelia-v1-NewMessagesAvailable) |  | wake kicks the agent&#39;s drain loop when new work may be available. |
+| prompt_notice | [PromptReleaseNotice](#laelia-v1-PromptReleaseNotice) |  | prompt_notice pushes a system-prompt release notice to the agent. |
+
+
+
+
+
+
+<a name="laelia-v1-BeginSessionRequest"></a>
+
+### BeginSessionRequest
+BeginSessionRequest names the agent whose drain loop is pulling work.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_name | [string](#string) |  | agent_name is the agent resource name (agents/{agent}); the manager validates the authenticated machine owns this agent. |
+
+
+
+
+
+
 <a name="laelia-v1-ConnectMachineRequest"></a>
 
 ### ConnectMachineRequest
@@ -7978,6 +8021,9 @@ RPC so the model picker reflects an agent&#39;s custom env before saving.
 | disconnect_notice | [MachineDisconnectNotice](#laelia-v1-MachineDisconnectNotice) |  | graceful shutdown |
 | machine_workspace_scan_response | [MachineWorkspaceScanResponse](#laelia-v1-MachineWorkspaceScanResponse) |  | response to ManagerMachineStreamMessage.machine_workspace_scan_request |
 | upgrade_progress | [UpgradeProgress](#laelia-v1-UpgradeProgress) |  | self-upgrade progress report, response to ManagerMachineStreamMessage.upgrade_request |
+| workspace_list_response | [WorkspaceListResponse](#laelia-v1-WorkspaceListResponse) |  | response to ManagerMachineStreamMessage.workspace_list_request |
+| workspace_read_response | [WorkspaceReadResponse](#laelia-v1-WorkspaceReadResponse) |  | response to ManagerMachineStreamMessage.workspace_read_request |
+| prompt_release_notice_ack | [PromptReleaseNoticeAck](#laelia-v1-PromptReleaseNoticeAck) |  | ack that a prompt release notice was injected into a turn |
 | models_discovered | [ModelsDiscovered](#laelia-v1-ModelsDiscovered) |  | response to ManagerMachineStreamMessage.discover_models |
 
 
@@ -8084,6 +8130,9 @@ MachineWorkspaceSummary is one agent workspace directory&#39;s usage summary.
 | upgrade_request | [UpgradeRequest](#laelia-v1-UpgradeRequest) |  | self-upgrade to the manager&#39;s embedded binary |
 | discover_models | [DiscoverModels](#laelia-v1-DiscoverModels) |  | probe one provider&#39;s models with an env overlay |
 | restart_agent | [RestartAgent](#laelia-v1-RestartAgent) |  | force cold restart of one agent |
+| agent_control | [AgentControlRequest](#laelia-v1-AgentControlRequest) |  | per-agent control interaction (cancel/steer/wake/prompt notice) |
+| workspace_list_request | [WorkspaceListRequest](#laelia-v1-WorkspaceListRequest) |  | list one level of a hosted agent&#39;s workspace |
+| workspace_read_request | [WorkspaceReadRequest](#laelia-v1-WorkspaceReadRequest) |  | read one hosted agent&#39;s workspace file |
 
 
 
@@ -8640,6 +8689,7 @@ its own AgentChannel.
 | ----------- | ------------ | ------------- | ------------|
 | MachineChannel | [MachineStreamMessage](#laelia-v1-MachineStreamMessage) stream | [ManagerMachineStreamMessage](#laelia-v1-ManagerMachineStreamMessage) stream |  |
 | UploadCommandData | [UploadCommandDataRequest](#laelia-v1-UploadCommandDataRequest) | [UploadCommandDataResponse](#laelia-v1-UploadCommandDataResponse) | UploadCommandData persists a machine&#39;s batched command data (progress / events / result) as the sole machine→manager reporting path. The batch is applied in a single transaction in order; the response carries per-(command, kind) persisted watermarks plus an explicit rejection list so the machine&#39;s uploader can evict settled records and drop poison entries. Idempotent: retransmission dedups on (command_id, seq_no) per kind. |
+| BeginSession | [BeginSessionRequest](#laelia-v1-BeginSessionRequest) | [BeginSessionResponse](#laelia-v1-BeginSessionResponse) | BeginSession is the agent drain loop&#39;s pull of its next unit of work (agent pull semantics, so it is unary rather than stream-bound). agent_name binds the request to an agent the authenticated machine hosts; the reply carries the command to run or idle. |
 
  
 
