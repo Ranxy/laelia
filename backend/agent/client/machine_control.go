@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -8,6 +9,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/expfmt"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -126,6 +129,10 @@ func (c *MachineClient) runControlStream(ctx context.Context, _ *daemonsrv.Serve
 				// Scanning the workspace root can take a while on a big disk;
 				// run it off the receive pump.
 				go c.handleMachineWorkspaceScan(ctx, sendStream, m.MachineWorkspaceScanRequest)
+
+			case *v1pb.ManagerMachineStreamMessage_MachineMetricsRequest:
+				// Rendering the local metric families is fast; reply inline.
+				c.handleMachineMetrics(sendStream, m.MachineMetricsRequest)
 
 			case *v1pb.ManagerMachineStreamMessage_AgentControl:
 				// Per-agent control interaction (cancel/steer/wake/prompt
@@ -378,6 +385,47 @@ func (c *MachineClient) handleMachineWorkspaceScan(_ context.Context, send func(
 			},
 		},
 	})
+}
+
+// handleMachineMetrics renders this machine's local Prometheus metrics
+// (outbox lag/bytes, upload batching, barrier waits; design §8.2) into the
+// text exposition format and replies. The manager's GetMachineMetrics RPC
+// scrapes them through this round trip, so machine-local observability works
+// without the machine exposing any inbound port.
+func (*MachineClient) handleMachineMetrics(send func(*v1pb.MachineStreamMessage) error, req *v1pb.MachineMetricsRequest) {
+	if req == nil {
+		return
+	}
+	resp := &v1pb.MachineMetricsResponse{RequestId: req.RequestId}
+	payload, err := renderMetrics()
+	if err != nil {
+		slog.Warn("failed to render machine metrics", "error", err)
+		resp.Error = err.Error()
+	} else {
+		resp.Payload = payload
+	}
+	_ = send(&v1pb.MachineStreamMessage{
+		Message: &v1pb.MachineStreamMessage_MachineMetricsResponse{
+			MachineMetricsResponse: resp,
+		},
+	})
+}
+
+// renderMetrics gathers the default registry into the Prometheus text
+// exposition format. Unparseable families are tolerated (skipped): a metric
+// render failure must not take the control round trip down.
+func renderMetrics() (string, error) {
+	families, err := prometheus.DefaultGatherer.Gather()
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	for _, mf := range families {
+		if _, wErr := expfmt.MetricFamilyToText(&buf, mf); wErr != nil {
+			continue
+		}
+	}
+	return buf.String(), nil
 }
 
 // setControlSend installs the current MachineChannel send function (per

@@ -1882,6 +1882,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.GetMachineMetricsRequest"><span class="badge">M</span>GetMachineMetricsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetMachineMetricsResponse"><span class="badge">M</span>GetMachineMetricsResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.GetMachineRequest"><span class="badge">M</span>GetMachineRequest</a>
                 </li>
               
@@ -1939,6 +1947,14 @@
               
                 <li>
                   <a href="#laelia.v1.MachineInfo.LabelsEntry"><span class="badge">M</span>MachineInfo.LabelsEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.MachineMetricsRequest"><span class="badge">M</span>MachineMetricsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.MachineMetricsResponse"><span class="badge">M</span>MachineMetricsResponse</a>
                 </li>
               
                 <li>
@@ -18748,6 +18764,54 @@ runner per entry immediately after connect (and on every reconnect). </p></td>
 
         
       
+        <h3 id="laelia.v1.GetMachineMetricsRequest">GetMachineMetricsRequest</h3>
+        <p>GetMachineMetricsRequest names the machine whose local metrics to scrape.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>machines/{machine} </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetMachineMetricsResponse">GetMachineMetricsResponse</h3>
+        <p>GetMachineMetricsResponse carries the machine's rendered metrics payload.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>payload</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Prometheus text exposition format </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.GetMachineRequest">GetMachineRequest</h3>
         <p></p>
 
@@ -19384,6 +19448,68 @@ to detect when a machine&#39;s bundled system prompt is out of date. </p></td>
 
         
       
+        <h3 id="laelia.v1.MachineMetricsRequest">MachineMetricsRequest</h3>
+        <p>MachineMetricsRequest asks a connected machine to render its local metrics</p><p>(outbox lag/bytes, upload batching, barrier waits; design §8.2) in the</p><p>Prometheus text exposition format. The machine app replies with</p><p>MachineStreamMessage.machine_metrics_response.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>correlation id for the pending GetMachineMetrics call </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.MachineMetricsResponse">MachineMetricsResponse</h3>
+        <p>MachineMetricsResponse carries one machine's rendered Prometheus text</p><p>exposition payload back to the pending GetMachineMetrics caller.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>payload</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Prometheus text exposition format; empty on error </p></td>
+                </tr>
+              
+                <tr>
+                  <td>error</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>render failure message; empty on success </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.MachineReady">MachineReady</h3>
         <p></p>
 
@@ -19538,6 +19664,13 @@ to detect when a machine&#39;s bundled system prompt is out of date. </p></td>
                   <td><a href="#laelia.v1.ModelsDiscovered">ModelsDiscovered</a></td>
                   <td></td>
                   <td><p>response to ManagerMachineStreamMessage.discover_models </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_metrics_response</td>
+                  <td><a href="#laelia.v1.MachineMetricsResponse">MachineMetricsResponse</a></td>
+                  <td></td>
+                  <td><p>response to ManagerMachineStreamMessage.machine_metrics_request </p></td>
                 </tr>
               
             </tbody>
@@ -19866,6 +19999,13 @@ phase badge. Set only for provisioned machines. </p></td>
                   <td><a href="#laelia.v1.WorkspaceReadRequest">WorkspaceReadRequest</a></td>
                   <td></td>
                   <td><p>read one hosted agent&#39;s workspace file </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_metrics_request</td>
+                  <td><a href="#laelia.v1.MachineMetricsRequest">MachineMetricsRequest</a></td>
+                  <td></td>
+                  <td><p>ask the machine to render its local metrics </p></td>
                 </tr>
               
             </tbody>
@@ -21044,6 +21184,19 @@ and restarts. Progress is reported through Machine.upgrade_status.</p></td>
 machine (~/.laelia/&lt;machineID&gt;/). Workspace content is sensitive:
 authorized in the handler for the machine&#39;s creator or a workspace admin
 (isMachineAdmin, matching Machine.can_manage); no permission annotation.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetMachineMetrics</td>
+                <td><a href="#laelia.v1.GetMachineMetricsRequest">GetMachineMetricsRequest</a></td>
+                <td><a href="#laelia.v1.GetMachineMetricsResponse">GetMachineMetricsResponse</a></td>
+                <td><p>GetMachineMetrics renders an online machine&#39;s local metrics (outbox lag
+and bytes, upload batching, barrier waits; design §8.2) in the Prometheus
+text exposition format. The scrape travels over the machine control
+stream, so the manager can expose machine-local observability even though
+machines make outbound-only connections. Authorized in the handler for
+the machine&#39;s creator or a workspace admin (isMachineAdmin); no
+permission annotation.</p></td>
               </tr>
             
               <tr>

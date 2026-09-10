@@ -89,6 +89,10 @@ type CommandUploadBatchResult struct {
 	Regrades        []*CommandUploadRegrade
 	InsertedOutputs []*CommandOutputMessage
 	InsertedEvents  []*CommandEventMessage
+	// LateFailures counts §3.6 rule-2's reverse direction: FAILED
+	// (machine_unreachable) rows that a late real failure re-attributed to
+	// the agent's own verdict (status unchanged; audit trail updated).
+	LateFailures int
 }
 
 // uploadOwnershipSQL loads the ownership + status state of every command in a
@@ -394,6 +398,7 @@ func (s *Store) ApplyCommandUploadBatch(
 					e.CommandID, CommandStatusFailed, CommandFailureKindMachineUnreachable); err != nil {
 					return nil, errors.Wrapf(err, "failed to re-attribute late failure (command %s)", e.CommandID)
 				}
+				res.LateFailures++
 
 			default:
 				// COMPLETED / CANCELED / FAILED(agent_failed): the irreversible

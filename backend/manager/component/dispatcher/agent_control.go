@@ -168,10 +168,15 @@ func (d *Dispatcher) DispatchPendingAgentControl(machineID int) {
 	}
 
 	delivered := make([]int64, 0, len(rows))
+	drop := func(kind string) {
+		pendingControlDroppedTotal.WithLabelValues(kind).Inc()
+	}
 	for _, row := range rows {
+		kind := row.Kind
 		cmd, err := d.store.GetCommand(ctx, row.CommandID)
 		if err != nil || cmd == nil {
 			slog.Warn("pending control for a missing command; dropping", "commandID", row.CommandID, "kind", row.Kind)
+			drop(kind)
 			delivered = append(delivered, row.ID)
 			continue
 		}
@@ -180,6 +185,7 @@ func (d *Dispatcher) DispatchPendingAgentControl(machineID int) {
 			// The agent is gone or moved machines; the row's machine binding is
 			// stale, so delivery would not reach the runner.
 			slog.Warn("pending control for a re-bound agent; dropping", "commandID", row.CommandID, "kind", row.Kind)
+			drop(kind)
 			delivered = append(delivered, row.ID)
 			continue
 		}
@@ -187,17 +193,20 @@ func (d *Dispatcher) DispatchPendingAgentControl(machineID int) {
 		case store.ControlKindCancel:
 			if cmd.Status == store.CommandStatusCompleted || cmd.Status == store.CommandStatusFailed {
 				// The machine closed the command while offline: nothing to stop.
+				drop(kind)
 				delivered = append(delivered, row.ID)
 				continue
 			}
 		case store.ControlKindSteer:
 			if cmd.Status != store.CommandStatusRunning {
 				// A steer into a turn that no longer exists is meaningless.
+				drop(kind)
 				delivered = append(delivered, row.ID)
 				continue
 			}
 		default:
 			slog.Warn("unknown pending control kind; dropping", "kind", row.Kind)
+			drop(kind)
 			delivered = append(delivered, row.ID)
 			continue
 		}
@@ -210,6 +219,7 @@ func (d *Dispatcher) DispatchPendingAgentControl(machineID int) {
 			slog.Warn("pending control delivery failed; keeping the row", "commandID", row.CommandID, "kind", row.Kind, "error", err)
 			continue
 		}
+		pendingControlDispatchTotal.WithLabelValues(kind).Inc()
 		delivered = append(delivered, row.ID)
 	}
 	if err := d.store.DeleteAgentControl(ctx, delivered); err != nil {

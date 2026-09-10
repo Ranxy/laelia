@@ -106,6 +106,10 @@ type Dispatcher struct {
 	pendingWorkspaceReads *pendingReplies[*v1pb.WorkspaceReadResponse]
 	pendingMachineScans   *pendingReplies[*v1pb.MachineWorkspaceScanResponse]
 
+	// pendingMetrics correlates the MachineMetrics round trip over the machine
+	// control stream to its waiting unary GetMachineMetrics call.
+	pendingMetrics *pendingReplies[*v1pb.MachineMetricsResponse]
+
 	// machineUpgrades holds the live (or last completed) self-upgrade progress
 	// per machine id, reported by the machine over its control stream and read
 	// by GetMachine for the frontend. Reset whenever the machine (re)connects.
@@ -127,6 +131,7 @@ func New(s *store.Store) *Dispatcher {
 		pendingWorkspaceLists: newPendingReplies[*v1pb.WorkspaceListResponse](),
 		pendingWorkspaceReads: newPendingReplies[*v1pb.WorkspaceReadResponse](),
 		pendingMachineScans:   newPendingReplies[*v1pb.MachineWorkspaceScanResponse](),
+		pendingMetrics:        newPendingReplies[*v1pb.MachineMetricsResponse](),
 		machineUpgrades:       make(map[int]*v1pb.UpgradeProgress),
 		lifecycleCtx:          ctx,
 		lifecycleCancel:       cancel,
@@ -407,6 +412,40 @@ func (d *Dispatcher) CompletePendingModels(msg *v1pb.ModelsDiscovered) {
 		return
 	}
 	d.pendingModels.complete(msg.RequestId, msg)
+}
+
+// SendMachineMetricsRequest asks a connected machine to render its local
+// metrics (§8.2) and reply with MachineMetricsResponse. The reply resolves a
+// pending entry registered via RegisterPendingMetrics.
+func (d *Dispatcher) SendMachineMetricsRequest(machineID int, requestID string) error {
+	return d.sendToMachine(machineID, &v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_MachineMetricsRequest{
+			MachineMetricsRequest: &v1pb.MachineMetricsRequest{RequestId: requestID},
+		},
+	})
+}
+
+// RegisterPendingMetrics creates a response channel keyed by requestID for an
+// in-flight GetMachineMetrics round trip. CancelPendingMetrics must be called
+// if the caller gives up waiting, to avoid leaking the entry.
+func (d *Dispatcher) RegisterPendingMetrics(requestID string) chan *v1pb.MachineMetricsResponse {
+	return d.pendingMetrics.register(requestID)
+}
+
+// CancelPendingMetrics removes a pending metrics entry without delivering a
+// result. Safe to call after the reply arrived.
+func (d *Dispatcher) CancelPendingMetrics(requestID string) {
+	d.pendingMetrics.cancel(requestID)
+}
+
+// CompletePendingMetrics delivers a MachineMetricsResponse to the waiting
+// caller and removes the pending entry. Called from the MachineChannel receive
+// loop. Unknown request ids (late replies, already-cancelled callers) drop.
+func (d *Dispatcher) CompletePendingMetrics(msg *v1pb.MachineMetricsResponse) {
+	if msg == nil {
+		return
+	}
+	d.pendingMetrics.complete(msg.RequestId, msg)
 }
 
 // SendUpgradeRequest pushes a self-upgrade command to a connected machine's

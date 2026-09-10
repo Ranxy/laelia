@@ -80,8 +80,10 @@ func NewUploader(ob *Outbox, upload UploadFunc) *Uploader {
 }
 
 // FlushNow requests an immediate upload cycle, interrupting any pending
-// backoff sleep. Buffered: coalesced like a wake.
+// backoff sleep. Buffered: coalesced like a wake. Counts on §8.2's flush-now
+// metric (with the barrier wait distribution it evidences flush-now's effect).
 func (u *Uploader) FlushNow() {
+	uploadFlushNowTotal.WithLabelValues(agentLabel(u.ob.Dir())).Inc()
 	select {
 	case u.flushNow <- struct{}{}:
 	default:
@@ -97,6 +99,10 @@ func (u *Uploader) FlushNow() {
 // group truncation.
 func (u *Uploader) WaitDrained(ctx context.Context) error {
 	u.FlushNow()
+	start := time.Now()
+	defer func() {
+		barrierWaitSeconds.WithLabelValues(agentLabel(u.ob.Dir())).Observe(float64(time.Since(start).Milliseconds()))
+	}()
 	for {
 		empty, err := u.ob.Empty()
 		if err != nil {
@@ -141,6 +147,10 @@ type orphanGroup struct {
 // immediately, polls at the batch-window cadence, and watches ctx so a dead
 // connection releases the barrier (the caller aborts the turn).
 func (u *Uploader) WaitClearFor(ctx context.Context, commandID string) error {
+	start := time.Now()
+	defer func() {
+		barrierWaitSeconds.WithLabelValues(agentLabel(u.ob.Dir())).Observe(float64(time.Since(start).Milliseconds()))
+	}()
 	for {
 		blocked, orphans, err := u.blockingFor(commandID)
 		if err != nil {
@@ -422,17 +432,28 @@ func (u *Uploader) uploadCycle(ctx context.Context) {
 		return
 	}
 	if len(records) == 0 {
+		u.updateGauges(0)
 		return
 	}
 
 	entries := make([]*Entry, 0, len(records))
+	poison := 0
 	for _, r := range records {
 		if r.Entry != nil {
 			entries = append(entries, r.Entry)
+		} else {
+			poison++
 		}
 	}
 
+	label := agentLabel(u.ob.Dir())
+	if poison > 0 {
+		uploadPoisonTotal.WithLabelValues(label).Add(float64(poison))
+	}
+	uploadBatchSize.WithLabelValues(label).Observe(float64(len(entries)))
+	start := time.Now()
 	resp, err := u.upload(ctx, entries)
+	uploadRTT.WithLabelValues(label).Observe(time.Since(start).Seconds())
 	if err != nil {
 		slog.Warn("outbox upload failed; backing off", "dir", u.ob.Dir(), "entries", len(entries), "error", err)
 		u.recordFailure()
@@ -440,7 +461,34 @@ func (u *Uploader) uploadCycle(ctx context.Context) {
 	}
 	u.recordSuccess()
 	u.fold(records, resp)
+	u.updateGauges(u.readFromLocked())
 	u.ob.EnforceCap()
+}
+
+// updateGauges refreshes the per-agent outbox gauges (§8.2): lag is the record
+// count still queued past the settled boundary (LastIndex − F; 0 for an empty
+// log — boundary 0 here means "nothing settled in this range", the cursor
+// itself is the settled frontier), bytes the WAL's segment footprint.
+func (u *Uploader) updateGauges(boundary uint64) {
+	label := agentLabel(u.ob.Dir())
+	first, last, err := u.ob.rangeForMetrics()
+	if err != nil {
+		return
+	}
+	var lag int64
+	if last >= first {
+		from := boundary
+		if from < first {
+			from = first
+		}
+		if from <= last {
+			lag = int64(last - from + 1)
+		}
+	}
+	outboxLagRecords.WithLabelValues(label).Set(float64(lag))
+	if size, sErr := dirSize(u.ob.dir); sErr == nil {
+		outboxBytes.WithLabelValues(label).Set(float64(size))
+	}
 }
 
 // readFromLocked snapshots the upload cursor.

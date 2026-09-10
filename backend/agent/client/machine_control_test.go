@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/home"
+	"github.com/Ranxy/laelia/backend/agent/outbox"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -368,4 +370,45 @@ func TestTurnLocalEventSequences(t *testing.T) {
 	// The command mark is runSession-owned: runCommand leaves it alone, so the
 	// control router's scoping window covers the whole turn.
 	assert.Equal(t, "cmd-t", cs.currentCommand())
+}
+
+// TestMachineMetricsRequestRepliesWithPayload verifies the §8.2 scrape round
+// trip: a MachineMetricsRequest is answered on the machine control stream with
+// a Prometheus text payload rendered from the machine's local registry.
+func TestMachineMetricsRequestRepliesWithPayload(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	c, _ := newRoutedCommandStream(t)
+
+	// Touch one machine-local metric deterministically (an agent outbox's
+	// flush-now counter) so the rendered payload provably carries the laelia
+	// series and not just the Go runtime's.
+	ob, err := outbox.Open(outbox.AgentOutboxDir(home.Dir(), c.machineID, "a1"))
+	require.NoError(t, err)
+	defer ob.Close()
+	outbox.NewUploader(ob, func(_ context.Context, _ []*outbox.Entry) (*v1pb.UploadCommandDataResponse, error) {
+		return &v1pb.UploadCommandDataResponse{}, nil
+	}).FlushNow()
+
+	var mu sync.Mutex
+	var sent []*v1pb.MachineStreamMessage
+	c.setControlSend(func(m *v1pb.MachineStreamMessage) error {
+		mu.Lock()
+		sent = append(sent, m)
+		mu.Unlock()
+		return nil
+	})
+
+	c.handleMachineMetrics(func(m *v1pb.MachineStreamMessage) error {
+		return c.sendOnControlStream(m)
+	}, &v1pb.MachineMetricsRequest{RequestId: "req-metrics"})
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, sent, 1)
+	resp := sent[0].GetMachineMetricsResponse()
+	require.NotNil(t, resp)
+	assert.Equal(t, "req-metrics", resp.GetRequestId())
+	assert.Empty(t, resp.GetError())
+	assert.Contains(t, resp.GetPayload(), "laelia_upload_flush_now_total",
+		"the payload must render the machine's local metrics in text exposition format")
 }

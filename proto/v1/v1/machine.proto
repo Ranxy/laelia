@@ -130,6 +130,18 @@ service MachineService {
     option (laelia.v1.audit) = true;
   }
 
+  // GetMachineMetrics renders an online machine's local metrics (outbox lag
+  // and bytes, upload batching, barrier waits; design §8.2) in the Prometheus
+  // text exposition format. The scrape travels over the machine control
+  // stream, so the manager can expose machine-local observability even though
+  // machines make outbound-only connections. Authorized in the handler for
+  // the machine's creator or a workspace admin (isMachineAdmin); no
+  // permission annotation.
+  rpc GetMachineMetrics(GetMachineMetricsRequest) returns (GetMachineMetricsResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
   // ========== Machine Connection APIs (CUSTOM auth, machine tokens) ==========
 
   // Machine initial connection using a registration token. Returns access +
@@ -657,6 +669,7 @@ message MachineStreamMessage {
     // ack that a prompt release notice was injected into a turn
     PromptReleaseNoticeAck prompt_release_notice_ack = 9;
     ModelsDiscovered models_discovered = 10; // response to ManagerMachineStreamMessage.discover_models
+    MachineMetricsResponse machine_metrics_response = 11; // response to ManagerMachineStreamMessage.machine_metrics_request
   }
 }
 
@@ -676,6 +689,7 @@ message ManagerMachineStreamMessage {
     AgentControlRequest agent_control = 13; // per-agent control interaction (cancel/steer/wake/prompt notice)
     WorkspaceListRequest workspace_list_request = 14; // list one level of a hosted agent's workspace
     WorkspaceReadRequest workspace_read_request = 15; // read one hosted agent's workspace file
+    MachineMetricsRequest machine_metrics_request = 16; // ask the machine to render its local metrics
   }
 }
 
@@ -773,6 +787,32 @@ message MachineWorkspaceSummary {
 message MachineWorkspaceScanResponse {
   string request_id = 1;
   repeated MachineWorkspaceSummary workspaces = 2;
+}
+
+// MachineMetricsRequest asks a connected machine to render its local metrics
+// (outbox lag/bytes, upload batching, barrier waits; design §8.2) in the
+// Prometheus text exposition format. The machine app replies with
+// MachineStreamMessage.machine_metrics_response.
+message MachineMetricsRequest {
+  string request_id = 1; // correlation id for the pending GetMachineMetrics call
+}
+
+// MachineMetricsResponse carries one machine's rendered Prometheus text
+// exposition payload back to the pending GetMachineMetrics caller.
+message MachineMetricsResponse {
+  string request_id = 1;
+  string payload = 2; // Prometheus text exposition format; empty on error
+  string error = 3; // render failure message; empty on success
+}
+
+// GetMachineMetricsRequest names the machine whose local metrics to scrape.
+message GetMachineMetricsRequest {
+  string name = 1; // machines/{machine}
+}
+
+// GetMachineMetricsResponse carries the machine's rendered metrics payload.
+message GetMachineMetricsResponse {
+  string payload = 1; // Prometheus text exposition format
 }
 
 // DiscoverProviders / ProvidersDiscovered are reused from command.proto

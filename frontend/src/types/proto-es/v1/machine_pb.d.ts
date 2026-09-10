@@ -1402,6 +1402,14 @@ export declare type MachineStreamMessage = Message<"laelia.v1.MachineStreamMessa
      */
     value: ModelsDiscovered;
     case: "modelsDiscovered";
+  } | {
+    /**
+     * response to ManagerMachineStreamMessage.machine_metrics_request
+     *
+     * @generated from field: laelia.v1.MachineMetricsResponse machine_metrics_response = 11;
+     */
+    value: MachineMetricsResponse;
+    case: "machineMetricsResponse";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1528,6 +1536,14 @@ export declare type ManagerMachineStreamMessage = Message<"laelia.v1.ManagerMach
      */
     value: WorkspaceReadRequest;
     case: "workspaceReadRequest";
+  } | {
+    /**
+     * ask the machine to render its local metrics
+     *
+     * @generated from field: laelia.v1.MachineMetricsRequest machine_metrics_request = 16;
+     */
+    value: MachineMetricsRequest;
+    case: "machineMetricsRequest";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1880,6 +1896,102 @@ export declare type MachineWorkspaceScanResponse = Message<"laelia.v1.MachineWor
 export declare const MachineWorkspaceScanResponseSchema: GenMessage<MachineWorkspaceScanResponse>;
 
 /**
+ * MachineMetricsRequest asks a connected machine to render its local metrics
+ * (outbox lag/bytes, upload batching, barrier waits; design §8.2) in the
+ * Prometheus text exposition format. The machine app replies with
+ * MachineStreamMessage.machine_metrics_response.
+ *
+ * @generated from message laelia.v1.MachineMetricsRequest
+ */
+export declare type MachineMetricsRequest = Message<"laelia.v1.MachineMetricsRequest"> & {
+  /**
+   * correlation id for the pending GetMachineMetrics call
+   *
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+};
+
+/**
+ * Describes the message laelia.v1.MachineMetricsRequest.
+ * Use `create(MachineMetricsRequestSchema)` to create a new message.
+ */
+export declare const MachineMetricsRequestSchema: GenMessage<MachineMetricsRequest>;
+
+/**
+ * MachineMetricsResponse carries one machine's rendered Prometheus text
+ * exposition payload back to the pending GetMachineMetrics caller.
+ *
+ * @generated from message laelia.v1.MachineMetricsResponse
+ */
+export declare type MachineMetricsResponse = Message<"laelia.v1.MachineMetricsResponse"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * Prometheus text exposition format; empty on error
+   *
+   * @generated from field: string payload = 2;
+   */
+  payload: string;
+
+  /**
+   * render failure message; empty on success
+   *
+   * @generated from field: string error = 3;
+   */
+  error: string;
+};
+
+/**
+ * Describes the message laelia.v1.MachineMetricsResponse.
+ * Use `create(MachineMetricsResponseSchema)` to create a new message.
+ */
+export declare const MachineMetricsResponseSchema: GenMessage<MachineMetricsResponse>;
+
+/**
+ * GetMachineMetricsRequest names the machine whose local metrics to scrape.
+ *
+ * @generated from message laelia.v1.GetMachineMetricsRequest
+ */
+export declare type GetMachineMetricsRequest = Message<"laelia.v1.GetMachineMetricsRequest"> & {
+  /**
+   * machines/{machine}
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetMachineMetricsRequest.
+ * Use `create(GetMachineMetricsRequestSchema)` to create a new message.
+ */
+export declare const GetMachineMetricsRequestSchema: GenMessage<GetMachineMetricsRequest>;
+
+/**
+ * GetMachineMetricsResponse carries the machine's rendered metrics payload.
+ *
+ * @generated from message laelia.v1.GetMachineMetricsResponse
+ */
+export declare type GetMachineMetricsResponse = Message<"laelia.v1.GetMachineMetricsResponse"> & {
+  /**
+   * Prometheus text exposition format
+   *
+   * @generated from field: string payload = 1;
+   */
+  payload: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetMachineMetricsResponse.
+ * Use `create(GetMachineMetricsResponseSchema)` to create a new message.
+ */
+export declare const GetMachineMetricsResponseSchema: GenMessage<GetMachineMetricsResponse>;
+
+/**
  * UploadEntryKind classifies one command-data entry. progress/event are the
  * two existing per-(command) seq spaces (command_output / command_event dedup
  * keys); result is the per-command terminal record.
@@ -2127,6 +2239,22 @@ export declare const MachineService: GenService<{
     methodKind: "unary";
     input: typeof ListMachineWorkspacesRequestSchema;
     output: typeof ListMachineWorkspacesResponseSchema;
+  },
+  /**
+   * GetMachineMetrics renders an online machine's local metrics (outbox lag
+   * and bytes, upload batching, barrier waits; design §8.2) in the Prometheus
+   * text exposition format. The scrape travels over the machine control
+   * stream, so the manager can expose machine-local observability even though
+   * machines make outbound-only connections. Authorized in the handler for
+   * the machine's creator or a workspace admin (isMachineAdmin); no
+   * permission annotation.
+   *
+   * @generated from rpc laelia.v1.MachineService.GetMachineMetrics
+   */
+  getMachineMetrics: {
+    methodKind: "unary";
+    input: typeof GetMachineMetricsRequestSchema;
+    output: typeof GetMachineMetricsResponseSchema;
   },
   /**
    * Machine initial connection using a registration token. Returns access +

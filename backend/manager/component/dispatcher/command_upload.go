@@ -90,6 +90,7 @@ func (d *Dispatcher) ApplyCommandUpload(
 		slog.Info("command terminal applied from upload batch", "commandID", t.CommandID, "status", t.Status)
 	}
 	for _, rg := range res.Regrades {
+		commandRegradeTotal.WithLabelValues("regraded_completed").Inc()
 		d.clearCurrentCommand(rg.AgentID, rg.CommandID.String())
 		if rg.Event != nil {
 			d.broadcastEvent(rg.Event.CommandID.String(), &v1pb.CommandEvent{
@@ -101,6 +102,9 @@ func (d *Dispatcher) ApplyCommandUpload(
 		}
 		d.scheduleWatcherClose(rg.CommandID.String())
 		slog.Info("command re-graded completed from a late result", "commandID", rg.CommandID)
+	}
+	if res.LateFailures > 0 {
+		commandRegradeTotal.WithLabelValues("late_failure_reattributed").Add(float64(res.LateFailures))
 	}
 
 	resp := &v1pb.UploadCommandDataResponse{}

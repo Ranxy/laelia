@@ -93,6 +93,7 @@ func (d *Dispatcher) sweepStaleCommands() {
 			if !reaped {
 				continue
 			}
+			commandReapedTotal.WithLabelValues(store.CommandFailureKindMachineUnreachable).Inc()
 			slog.Warn("running command reaped after machine loss",
 				"commandID", cmd.ID, "agentID", cmd.AgentID, "machineID", machineID)
 			d.closeWatchers(cmd.ID.String())

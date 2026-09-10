@@ -441,6 +441,8 @@
     - [DiscoverModels](#laelia-v1-DiscoverModels)
     - [DiscoverModels.EnvEntry](#laelia-v1-DiscoverModels-EnvEntry)
     - [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest)
+    - [GetMachineMetricsRequest](#laelia-v1-GetMachineMetricsRequest)
+    - [GetMachineMetricsResponse](#laelia-v1-GetMachineMetricsResponse)
     - [GetMachineRequest](#laelia-v1-GetMachineRequest)
     - [ListMachineAgentsRequest](#laelia-v1-ListMachineAgentsRequest)
     - [ListMachineAgentsResponse](#laelia-v1-ListMachineAgentsResponse)
@@ -456,6 +458,8 @@
     - [MachineHeartbeatResponse](#laelia-v1-MachineHeartbeatResponse)
     - [MachineInfo](#laelia-v1-MachineInfo)
     - [MachineInfo.LabelsEntry](#laelia-v1-MachineInfo-LabelsEntry)
+    - [MachineMetricsRequest](#laelia-v1-MachineMetricsRequest)
+    - [MachineMetricsResponse](#laelia-v1-MachineMetricsResponse)
     - [MachineReady](#laelia-v1-MachineReady)
     - [MachineStatus](#laelia-v1-MachineStatus)
     - [MachineStreamMessage](#laelia-v1-MachineStreamMessage)
@@ -7637,6 +7641,36 @@ RPC so the model picker reflects an agent&#39;s custom env before saving.
 
 
 
+<a name="laelia-v1-GetMachineMetricsRequest"></a>
+
+### GetMachineMetricsRequest
+GetMachineMetricsRequest names the machine whose local metrics to scrape.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | machines/{machine} |
+
+
+
+
+
+
+<a name="laelia-v1-GetMachineMetricsResponse"></a>
+
+### GetMachineMetricsResponse
+GetMachineMetricsResponse carries the machine&#39;s rendered metrics payload.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| payload | [string](#string) |  | Prometheus text exposition format |
+
+
+
+
+
+
 <a name="laelia-v1-GetMachineRequest"></a>
 
 ### GetMachineRequest
@@ -7899,6 +7933,42 @@ RPC so the model picker reflects an agent&#39;s custom env before saving.
 
 
 
+<a name="laelia-v1-MachineMetricsRequest"></a>
+
+### MachineMetricsRequest
+MachineMetricsRequest asks a connected machine to render its local metrics
+(outbox lag/bytes, upload batching, barrier waits; design §8.2) in the
+Prometheus text exposition format. The machine app replies with
+MachineStreamMessage.machine_metrics_response.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  | correlation id for the pending GetMachineMetrics call |
+
+
+
+
+
+
+<a name="laelia-v1-MachineMetricsResponse"></a>
+
+### MachineMetricsResponse
+MachineMetricsResponse carries one machine&#39;s rendered Prometheus text
+exposition payload back to the pending GetMachineMetrics caller.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  |  |
+| payload | [string](#string) |  | Prometheus text exposition format; empty on error |
+| error | [string](#string) |  | render failure message; empty on success |
+
+
+
+
+
+
 <a name="laelia-v1-MachineReady"></a>
 
 ### MachineReady
@@ -7951,6 +8021,7 @@ RPC so the model picker reflects an agent&#39;s custom env before saving.
 | workspace_read_response | [WorkspaceReadResponse](#laelia-v1-WorkspaceReadResponse) |  | response to ManagerMachineStreamMessage.workspace_read_request |
 | prompt_release_notice_ack | [PromptReleaseNoticeAck](#laelia-v1-PromptReleaseNoticeAck) |  | ack that a prompt release notice was injected into a turn |
 | models_discovered | [ModelsDiscovered](#laelia-v1-ModelsDiscovered) |  | response to ManagerMachineStreamMessage.discover_models |
+| machine_metrics_response | [MachineMetricsResponse](#laelia-v1-MachineMetricsResponse) |  | response to ManagerMachineStreamMessage.machine_metrics_request |
 
 
 
@@ -8059,6 +8130,7 @@ MachineWorkspaceSummary is one agent workspace directory&#39;s usage summary.
 | agent_control | [AgentControlRequest](#laelia-v1-AgentControlRequest) |  | per-agent control interaction (cancel/steer/wake/prompt notice) |
 | workspace_list_request | [WorkspaceListRequest](#laelia-v1-WorkspaceListRequest) |  | list one level of a hosted agent&#39;s workspace |
 | workspace_read_request | [WorkspaceReadRequest](#laelia-v1-WorkspaceReadRequest) |  | read one hosted agent&#39;s workspace file |
+| machine_metrics_request | [MachineMetricsRequest](#laelia-v1-MachineMetricsRequest) |  | ask the machine to render its local metrics |
 
 
 
@@ -8597,6 +8669,7 @@ on MachineStreamService, not per-agent streams.
 | RefreshMachineModels | [RefreshMachineModelsRequest](#laelia-v1-RefreshMachineModelsRequest) | [RefreshMachineModelsResponse](#laelia-v1-RefreshMachineModelsResponse) | Probe one provider&#39;s models on this machine using the given (draft) ACP config&#39;s custom_env — the add-agent form uses it so a model picker reflects a custom env (e.g. CODEX_HOME) before the agent exists. Returns the freshly probed model list for that provider; NOT persisted (session-only). Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit; no permission annotation so the creator short-circuit can run. |
 | UpgradeMachine | [UpgradeMachineRequest](#laelia-v1-UpgradeMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | UpgradeMachine asks an online machine to upgrade itself: the manager sends an UpgradeRequest over the machine control stream and the machine&#39;s supervisor process downloads the new binary from the manager, installs it, and restarts. Progress is reported through Machine.upgrade_status. |
 | ListMachineWorkspaces | [ListMachineWorkspacesRequest](#laelia-v1-ListMachineWorkspacesRequest) | [ListMachineWorkspacesResponse](#laelia-v1-ListMachineWorkspacesResponse) | ListMachineWorkspaces summarizes every per-agent workspace directory on a machine (~/.laelia/&lt;machineID&gt;/). Workspace content is sensitive: authorized in the handler for the machine&#39;s creator or a workspace admin (isMachineAdmin, matching Machine.can_manage); no permission annotation. |
+| GetMachineMetrics | [GetMachineMetricsRequest](#laelia-v1-GetMachineMetricsRequest) | [GetMachineMetricsResponse](#laelia-v1-GetMachineMetricsResponse) | GetMachineMetrics renders an online machine&#39;s local metrics (outbox lag and bytes, upload batching, barrier waits; design §8.2) in the Prometheus text exposition format. The scrape travels over the machine control stream, so the manager can expose machine-local observability even though machines make outbound-only connections. Authorized in the handler for the machine&#39;s creator or a workspace admin (isMachineAdmin); no permission annotation. |
 | ConnectMachine | [ConnectMachineRequest](#laelia-v1-ConnectMachineRequest) | [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse) | Machine initial connection using a registration token. Returns access &#43; refresh tokens, the machine session id, and the full list of agents the machine must host (so the machine app can start a runner for each). |
 | MachineHeartbeat | [MachineHeartbeatRequest](#laelia-v1-MachineHeartbeatRequest) | [MachineHeartbeatResponse](#laelia-v1-MachineHeartbeatResponse) |  |
 | MachineDisconnect | [MachineDisconnectRequest](#laelia-v1-MachineDisconnectRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |

@@ -72,6 +72,9 @@ const (
 	// MachineServiceListMachineWorkspacesProcedure is the fully-qualified name of the MachineService's
 	// ListMachineWorkspaces RPC.
 	MachineServiceListMachineWorkspacesProcedure = "/laelia.v1.MachineService/ListMachineWorkspaces"
+	// MachineServiceGetMachineMetricsProcedure is the fully-qualified name of the MachineService's
+	// GetMachineMetrics RPC.
+	MachineServiceGetMachineMetricsProcedure = "/laelia.v1.MachineService/GetMachineMetrics"
 	// MachineServiceConnectMachineProcedure is the fully-qualified name of the MachineService's
 	// ConnectMachine RPC.
 	MachineServiceConnectMachineProcedure = "/laelia.v1.MachineService/ConnectMachine"
@@ -153,6 +156,14 @@ type MachineServiceClient interface {
 	// authorized in the handler for the machine's creator or a workspace admin
 	// (isMachineAdmin, matching Machine.can_manage); no permission annotation.
 	ListMachineWorkspaces(context.Context, *connect.Request[v1.ListMachineWorkspacesRequest]) (*connect.Response[v1.ListMachineWorkspacesResponse], error)
+	// GetMachineMetrics renders an online machine's local metrics (outbox lag
+	// and bytes, upload batching, barrier waits; design §8.2) in the Prometheus
+	// text exposition format. The scrape travels over the machine control
+	// stream, so the manager can expose machine-local observability even though
+	// machines make outbound-only connections. Authorized in the handler for
+	// the machine's creator or a workspace admin (isMachineAdmin); no
+	// permission annotation.
+	GetMachineMetrics(context.Context, *connect.Request[v1.GetMachineMetricsRequest]) (*connect.Response[v1.GetMachineMetricsResponse], error)
 	// Machine initial connection using a registration token. Returns access +
 	// refresh tokens, the machine session id, and the full list of agents the
 	// machine must host (so the machine app can start a runner for each).
@@ -245,6 +256,12 @@ func NewMachineServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(machineServiceMethods.ByName("ListMachineWorkspaces")),
 			connect.WithClientOptions(opts...),
 		),
+		getMachineMetrics: connect.NewClient[v1.GetMachineMetricsRequest, v1.GetMachineMetricsResponse](
+			httpClient,
+			baseURL+MachineServiceGetMachineMetricsProcedure,
+			connect.WithSchema(machineServiceMethods.ByName("GetMachineMetrics")),
+			connect.WithClientOptions(opts...),
+		),
 		connectMachine: connect.NewClient[v1.ConnectMachineRequest, v1.ConnectMachineResponse](
 			httpClient,
 			baseURL+MachineServiceConnectMachineProcedure,
@@ -286,6 +303,7 @@ type machineServiceClient struct {
 	refreshMachineModels     *connect.Client[v1.RefreshMachineModelsRequest, v1.RefreshMachineModelsResponse]
 	upgradeMachine           *connect.Client[v1.UpgradeMachineRequest, emptypb.Empty]
 	listMachineWorkspaces    *connect.Client[v1.ListMachineWorkspacesRequest, v1.ListMachineWorkspacesResponse]
+	getMachineMetrics        *connect.Client[v1.GetMachineMetricsRequest, v1.GetMachineMetricsResponse]
 	connectMachine           *connect.Client[v1.ConnectMachineRequest, v1.ConnectMachineResponse]
 	machineHeartbeat         *connect.Client[v1.MachineHeartbeatRequest, v1.MachineHeartbeatResponse]
 	machineDisconnect        *connect.Client[v1.MachineDisconnectRequest, emptypb.Empty]
@@ -350,6 +368,11 @@ func (c *machineServiceClient) UpgradeMachine(ctx context.Context, req *connect.
 // ListMachineWorkspaces calls laelia.v1.MachineService.ListMachineWorkspaces.
 func (c *machineServiceClient) ListMachineWorkspaces(ctx context.Context, req *connect.Request[v1.ListMachineWorkspacesRequest]) (*connect.Response[v1.ListMachineWorkspacesResponse], error) {
 	return c.listMachineWorkspaces.CallUnary(ctx, req)
+}
+
+// GetMachineMetrics calls laelia.v1.MachineService.GetMachineMetrics.
+func (c *machineServiceClient) GetMachineMetrics(ctx context.Context, req *connect.Request[v1.GetMachineMetricsRequest]) (*connect.Response[v1.GetMachineMetricsResponse], error) {
+	return c.getMachineMetrics.CallUnary(ctx, req)
 }
 
 // ConnectMachine calls laelia.v1.MachineService.ConnectMachine.
@@ -430,6 +453,14 @@ type MachineServiceHandler interface {
 	// authorized in the handler for the machine's creator or a workspace admin
 	// (isMachineAdmin, matching Machine.can_manage); no permission annotation.
 	ListMachineWorkspaces(context.Context, *connect.Request[v1.ListMachineWorkspacesRequest]) (*connect.Response[v1.ListMachineWorkspacesResponse], error)
+	// GetMachineMetrics renders an online machine's local metrics (outbox lag
+	// and bytes, upload batching, barrier waits; design §8.2) in the Prometheus
+	// text exposition format. The scrape travels over the machine control
+	// stream, so the manager can expose machine-local observability even though
+	// machines make outbound-only connections. Authorized in the handler for
+	// the machine's creator or a workspace admin (isMachineAdmin); no
+	// permission annotation.
+	GetMachineMetrics(context.Context, *connect.Request[v1.GetMachineMetricsRequest]) (*connect.Response[v1.GetMachineMetricsResponse], error)
 	// Machine initial connection using a registration token. Returns access +
 	// refresh tokens, the machine session id, and the full list of agents the
 	// machine must host (so the machine app can start a runner for each).
@@ -518,6 +549,12 @@ func NewMachineServiceHandler(svc MachineServiceHandler, opts ...connect.Handler
 		connect.WithSchema(machineServiceMethods.ByName("ListMachineWorkspaces")),
 		connect.WithHandlerOptions(opts...),
 	)
+	machineServiceGetMachineMetricsHandler := connect.NewUnaryHandler(
+		MachineServiceGetMachineMetricsProcedure,
+		svc.GetMachineMetrics,
+		connect.WithSchema(machineServiceMethods.ByName("GetMachineMetrics")),
+		connect.WithHandlerOptions(opts...),
+	)
 	machineServiceConnectMachineHandler := connect.NewUnaryHandler(
 		MachineServiceConnectMachineProcedure,
 		svc.ConnectMachine,
@@ -568,6 +605,8 @@ func NewMachineServiceHandler(svc MachineServiceHandler, opts ...connect.Handler
 			machineServiceUpgradeMachineHandler.ServeHTTP(w, r)
 		case MachineServiceListMachineWorkspacesProcedure:
 			machineServiceListMachineWorkspacesHandler.ServeHTTP(w, r)
+		case MachineServiceGetMachineMetricsProcedure:
+			machineServiceGetMachineMetricsHandler.ServeHTTP(w, r)
 		case MachineServiceConnectMachineProcedure:
 			machineServiceConnectMachineHandler.ServeHTTP(w, r)
 		case MachineServiceMachineHeartbeatProcedure:
@@ -631,6 +670,10 @@ func (UnimplementedMachineServiceHandler) UpgradeMachine(context.Context, *conne
 
 func (UnimplementedMachineServiceHandler) ListMachineWorkspaces(context.Context, *connect.Request[v1.ListMachineWorkspacesRequest]) (*connect.Response[v1.ListMachineWorkspacesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineService.ListMachineWorkspaces is not implemented"))
+}
+
+func (UnimplementedMachineServiceHandler) GetMachineMetrics(context.Context, *connect.Request[v1.GetMachineMetricsRequest]) (*connect.Response[v1.GetMachineMetricsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineService.GetMachineMetrics is not implemented"))
 }
 
 func (UnimplementedMachineServiceHandler) ConnectMachine(context.Context, *connect.Request[v1.ConnectMachineRequest]) (*connect.Response[v1.ConnectMachineResponse], error) {

@@ -124,7 +124,10 @@ func openWAL(dir string) (*wal.Log, error) {
 
 // quarantine renames a corrupt WAL directory aside so a fresh one can be
 // created. Best-effort: a failed rename leaves the directory for a human.
+// Counts the incident on §8.2's quarantine metric (the WAL loss is bounded to
+// the agent's unreported tail).
 func quarantine(dir string) error {
+	outboxQuarantineTotal.WithLabelValues(agentLabel(dir)).Inc()
 	target := dir + ".quarantine-" + fmt.Sprint(time.Now().UnixNano())
 	return os.Rename(dir, target)
 }
@@ -485,6 +488,17 @@ func (o *Outbox) Close() error {
 // Dir returns the outbox directory (exported for tests and workspace reuse).
 func (o *Outbox) Dir() string {
 	return o.dir
+}
+
+// rangeForMetrics exposes the WAL's current [first, last] index range to the
+// uploader's lag gauge (same package; not part of the public WAL surface).
+func (o *Outbox) rangeForMetrics() (first, last uint64, err error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.closed || o.log == nil {
+		return 0, 0, ErrClosed
+	}
+	return walRange(o.log)
 }
 
 // AgentOutboxDir is the canonical WAL directory for one agent.

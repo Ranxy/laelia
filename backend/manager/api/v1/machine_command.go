@@ -198,6 +198,10 @@ func (s *MachineStreamService) MachineChannel(
 			// Completes a pending ReadAgentWorkspaceFile round-trip.
 			s.dispatcher.CompletePendingWorkspaceRead(m.WorkspaceReadResponse)
 
+		case *v1pb.MachineStreamMessage_MachineMetricsResponse:
+			// Completes a pending GetMachineMetrics round-trip.
+			s.dispatcher.CompletePendingMetrics(m.MachineMetricsResponse)
+
 		case *v1pb.MachineStreamMessage_PromptReleaseNoticeAck:
 			ack := m.PromptReleaseNoticeAck
 			agentID, err := s.dispatcher.ResolveAgentByName(machine.ID, ack.GetAgentName())
