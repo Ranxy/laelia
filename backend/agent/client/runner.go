@@ -131,52 +131,70 @@ func (r *agentRunner) buildPiConfig(assignment *v1pb.AgentAssignment) *pi.PiConf
 // agent, an unchanged launch fingerprint keeps the warm session; a changed one
 // restarts the subprocess so the new launch shape (provider/model/key/binary)
 // takes effect. The non-active side is always torn down so the two runtimes
-// never coexist. Every teardown that SIGKILLs a pi process under a possibly
-// in-flight turn first coordinates that turn (cancel + wait) so the restart
-// never races the dying turn's session access and the turn reports an explicit
-// reload cause instead of a generic "session exited mid-turn".
+// never coexist.
+//
+// Only a teardown that kills a subprocess under a possibly in-flight turn
+// coordinates that turn first (cancel + bounded wait) so the restart never
+// races the dying turn's session access and the turn reports an explicit
+// reload cause. Everything else — notably a reconnect's roster resync
+// re-applying an UNCHANGED assignment — must never touch a running turn: the
+// machine reconnects on its own schedule (e.g. a proxy cutting the control
+// stream) and reconcileAssignments runs on every connect, so an unconditional
+// cancel here would fail every turn that happens to be running across a
+// reconnect (§3.2: a dead stream never touches a running turn).
 func (r *agentRunner) applyAssignment(a *v1pb.AgentAssignment) {
 	acp := a.GetAcpConfig()
 	if acp != nil && pi.IsPiProvider(acp.GetProvider()) {
-		// pi owns the runner: tear down any resident thread subprocess first
-		// (coordinated so an in-flight thread turn reports a reload cause).
-		r.coordinateInFlightTurn(reloadedMidTurnReason)
-		r.stopThreadSession()
-		r.setConfig(nil)
 		newPi := r.buildPiConfig(a)
 		if newPi == nil {
+			// Unusable pi assignment: coordinated teardown of both runtimes.
 			r.coordinateInFlightTurn(reloadedMidTurnReason)
+			r.stopThreadSession()
 			r.stopPiSession()
+			r.setConfig(nil)
 			return
 		}
 		prev := r.currentPiConfig()
-		if prev == nil || prev.LaunchFingerprint() != newPi.LaunchFingerprint() {
-			// Launch shape changed (or first pi config): cancel any in-flight
-			// drain turn and wait for it to end, THEN restart the subprocess. The
-			// cancel surfaces an explicit "config reloaded mid-turn" failure to
-			// the manager (not a mid-flight "session exited mid-turn") and the
-			// wait guarantees the restart never races the dying turn's session
-			// access. No-op when no turn is in flight (e.g. the first config).
-			r.coordinateInFlightTurn(reloadedMidTurnReason)
-			r.restartPiSession(newPi)
+		if prev != nil && prev.LaunchFingerprint() == newPi.LaunchFingerprint() {
+			// Unchanged launch shape: keep the warm session AND the running
+			// turn; just refresh the config (e.g. a persona_prompt change).
+			// A thread session cannot exist for a pi agent; if one does (a
+			// race from a flip-flopping roster), coordinate before the stop.
+			if r.currentThreadSession() != nil {
+				r.coordinateInFlightTurn(reloadedMidTurnReason)
+				r.stopThreadSession()
+			}
+			r.setPiConfig(newPi)
 			return
 		}
-		// Unchanged launch shape: keep the warm session, just refresh the config
-		// (e.g. a persona_prompt change). The session's launch shape still
-		// matches, so it stays valid for the new config.
-		r.setPiConfig(newPi)
+		// Launch shape changed (or first pi config): cancel any in-flight
+		// drain turn and wait for it to end, THEN restart the subprocess. The
+		// cancel surfaces an explicit "config reloaded mid-turn" failure to
+		// the manager (not a mid-flight "session exited mid-turn") and the
+		// wait guarantees the restart never races the dying turn's session
+		// access.
+		r.coordinateInFlightTurn(reloadedMidTurnReason)
+		r.stopThreadSession()
+		r.setConfig(nil)
+		r.restartPiSession(newPi)
 		return
 	}
-	// ACP (or unconfigured): coordinate any in-flight pi turn, then tear down
-	// the pi session and load the ACP config.
-	r.coordinateInFlightTurn(reloadedMidTurnReason)
-	r.stopPiSession()
+	// ACP (or unconfigured). Only a teardown that can kill the running turn
+	// coordinates it: a resident pi session must go (pi→ACP switch), and a
+	// resident thread session must go when the agent is no longer a
+	// resident-thread agent. A same-shape ACP reload (setConfig only) is a
+	// next-turn concern — buildThreadRuntime re-fingerprints at the next turn
+	// — so a reconnect's roster resync leaves a running turn alone.
+	if r.currentPiConfig() != nil {
+		r.coordinateInFlightTurn(reloadedMidTurnReason)
+		r.stopPiSession()
+	}
 	cfg := r.buildAcpConfig(a)
 	r.setConfig(cfg)
 	// A resident thread session survives config hot-reloads (the next turn's
-	// buildThreadRuntime restarts it on a launch-shape change), but must go
-	// when the agent is no longer a resident-thread agent.
-	if !threadResidentEligible(cfg) {
+	// buildThreadRuntime restarts it on a launch-shape change).
+	if !threadResidentEligible(cfg) && r.currentThreadSession() != nil {
+		r.coordinateInFlightTurn(reloadedMidTurnReason)
 		r.stopThreadSession()
 	}
 }
@@ -203,6 +221,13 @@ func (r *agentRunner) currentPiConfig() *pi.PiConfig {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.piConfig
+}
+
+// currentThreadSession returns the resident thread session (nil when none).
+func (r *agentRunner) currentThreadSession() *executor.ThreadSession {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.threadSession
 }
 
 // restartPiSession swaps the pi session for a fresh one bound to cfg. The new

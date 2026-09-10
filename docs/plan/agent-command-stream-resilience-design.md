@@ -143,7 +143,7 @@
   - `CancelMessage` / `SteerMessage` / `NewMessagesAvailable`(wake)/ `PromptReleaseNotice` → ManagerMachineStreamMessage 新增对应消息,machine 端路由到对应 runner 的现有入口(message_router 的 cancel/steer 分支逻辑复用)。
 - **断线期间的控制消息(决策 ①:仅重连后生效)**:manager 新增 `agent_pending_control` 表。现状两 API 行为不一致:`CancelCommand` 离线时**只告警、仍把命令标 CANCELLED**(`command.go:113-121`,旧架构靠"turn 已随流死、不会再有终态"侥幸自洽);`SteerCommand` 离线时直接报错(`command.go:145-147`)。新语义:机器不在线时**两者都入队**——`CancelCommand` 照旧立即标 CANCELED(它是 §3.6 规则 3 的不可改判锚点,语义不变),`SteerCommand` 返回"已排队,机器恢复连接后送达";MachineChannel(重)连时按序派发。派发前 manager 校验:命令已有终态则丢弃(cancel 不追杀已结束命令;steer 无意义)。**保留策略**:派发成功或命中终态即删;机器删除级联清理;TTL(默认 7 天)兜底回收——机器永久退役后无人消费的积压不能无限滞留。**明确代价**:断线期间取消不生效,命令可能继续运行至完成并烧 token;迟到结果按 §3.6 对账规则处理(用户取消的命令永不复活)。
 - **会话注册表的存续**:`currentCmdID` 的 reaper 豁免职责随 §3.6 消亡,但它还支撑 conversation activity feed 的"进行中工作"链接(`dispatcher.go:594-602`);AgentChannel 退役后按 agent 的会话注册消失,该映射改由 BeginSession(mint 时)与 UploadCommandData(终态 ack 时)维护。
-- **控制面仍会被代理杀流拍动**:本设计让流死不再影响执行与上报,但 MachineChannel 本身仍是长流——Traefik 未修复时它以 60s 周期被杀重连,presence 振荡、pending 控制每周期重放。这是**正确但降级**的状态:grace 必须大于重连退避上限(§3.6 规则 4),UI 对短暂离线做迟滞展示;运维修复(§七.6)仍是优先动作。
+- **控制面仍会被代理杀流拍动**:本设计让流死不再影响执行与上报,但 MachineChannel 本身仍是长流——Traefik 未修复时它以 60s 周期被杀重连,presence 振荡、pending 控制每周期重放。这是**正确但降级**的状态:grace 必须大于重连退避上限(§3.6 规则 4),UI 对短暂离线做迟滞展示;运维修复(§七.6)仍是优先动作。**实现约束(§3.2 的机器侧落实)**:重连后的 roster 重新同步(connect 响应的 assigned_agents → `spawnOrUpdate` → `applyAssignment`)在每次重连都会跑一遍——`applyAssignment` 只允许在**确实要拆除/重启会话**(pi 指纹变更或首次配置、pi→ACP 切换、配置解析失败)时协调取消在途 turn;指纹未变的重新套用只热刷新配置、绝不能触碰运行中的 turn,否则每次重连都会以 "config reloaded mid-turn" 杀掉跨重连窗口的 turn(60s 拍动下即"命令跑 30s 必失败")。
 
 ### 3.6 状态对账(决策 ②:允许迟到结果改判)
 
