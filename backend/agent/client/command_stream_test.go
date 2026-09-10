@@ -386,7 +386,7 @@ func TestRunnerCoordinatesInFlightTurnOnReload(t *testing.T) {
 	// Hot-reload: cancel the in-flight turn and wait for it to end. This must
 	// return quickly (bounded by inFlightTurnTimeout, here near-instant once
 	// the runtime unblocks on cancel), not hang to the turn timeout.
-	r.coordinateInFlightTurn()
+	r.coordinateInFlightTurn("config reloaded mid-turn")
 	elapsed := time.Since(start)
 
 	assert.GreaterOrEqual(t, runtime.cancelCount.Load(), int32(1), "in-flight turn must be cancelled")

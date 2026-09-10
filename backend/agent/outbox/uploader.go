@@ -152,7 +152,7 @@ func (u *Uploader) WaitClearFor(ctx context.Context, commandID string) error {
 		for _, o := range orphans {
 			slog.Warn("outbox holds an unterminated command group; synthesizing the terminal",
 				"dir", u.ob.Dir(), "commandID", o.commandID)
-			if aErr := u.ob.Append(syntheticTerminal(o)); aErr != nil {
+			if aErr := u.ob.Append(syntheticTerminal(o, agentStoppedMessage)); aErr != nil {
 				return aErr
 			}
 		}
@@ -216,10 +216,16 @@ func (u *Uploader) blockingFor(commandID string) (blocked bool, orphans []orphan
 	return blocked, orphans, nil
 }
 
+// agentStoppedMessage is the synthetic terminal the turn-start barrier appends
+// when it finds an orphan group mid-run.
+const agentStoppedMessage = "agent stopped before the turn reported a result"
+
 // syntheticTerminal builds the FAILED result a barrier appends for an orphan
 // group (seq 1 in the unused result space; LastSeqNo covers the group's stored
-// progress so the manager's ack cursor stays complete).
-func syntheticTerminal(o orphanGroup) *Entry {
+// progress so the manager's ack cursor stays complete). The message names the
+// cause so the audit trail distinguishes a barrier synthesis from the shutdown
+// / restart syntheses.
+func syntheticTerminal(o orphanGroup, message string) *Entry {
 	return &Entry{
 		CommandId: o.commandID,
 		Kind:      v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT,
@@ -229,9 +235,102 @@ func syntheticTerminal(o orphanGroup) *Entry {
 				CommandId:    o.commandID,
 				ExitCode:     -1,
 				LastSeqNo:    o.lastProgressSeq,
-				ErrorMessage: "agent stopped before the turn reported a result",
+				ErrorMessage: message,
 			},
 		},
+	}
+}
+
+// SynthesizeInterruptedTerminals is the §3.7 self-check: it scans the whole
+// log, and for every command whose records lack a terminal appends the synthetic
+// FAILED terminal with message as the cause, then flushes so the terminal is
+// durable before the caller continues. Wired at machine startup (crash backstop,
+// "machine restarted mid-turn") and on runner teardown (a turn that outlived
+// its bounded cancel). Idempotent: groups with a terminal record are skipped.
+func (u *Uploader) SynthesizeInterruptedTerminals(message string) error {
+	orphans, err := u.orphanGroups()
+	if err != nil {
+		return err
+	}
+	for _, o := range orphans {
+		slog.Warn("outbox holds an interrupted command group; synthesizing the terminal",
+			"dir", u.ob.Dir(), "commandID", o.commandID, "message", message)
+		if err := u.ob.Append(syntheticTerminal(o, message)); err != nil {
+			return err
+		}
+	}
+	return u.ob.Flush()
+}
+
+// orphanGroups reads the whole log and returns one orphanGroup per command
+// that has records but no terminal record anywhere in the log. Unlike the
+// barrier's single-shard scan (which runs per turn and may false-positive
+// past the shard), this is the full scan used where the log is already known
+// to be writer-free (startup, after the runner's loops exited).
+func (u *Uploader) orphanGroups() ([]orphanGroup, error) {
+	type group struct {
+		hasTerminal bool
+		lastProgSeq int32
+	}
+	groups := make(map[string]*group)
+	var from uint64
+	for {
+		records, err := u.ob.ReadRecords(ReadBatchMaxEntries, UploadMaxBytes, from)
+		if err != nil {
+			return nil, err
+		}
+		if len(records) == 0 {
+			break
+		}
+		for _, r := range records {
+			e := r.Entry
+			if e == nil {
+				continue
+			}
+			g := groups[e.GetCommandId()]
+			if g == nil {
+				g = &group{}
+				groups[e.GetCommandId()] = g
+			}
+			switch e.GetKind() {
+			case v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT:
+				g.hasTerminal = true
+			case v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_PROGRESS:
+				g.lastProgSeq = max32(g.lastProgSeq, e.GetSeqNo())
+			default:
+			}
+		}
+		from = records[len(records)-1].Index + 1
+	}
+	var orphans []orphanGroup
+	for id, g := range groups {
+		if !g.hasTerminal {
+			orphans = append(orphans, orphanGroup{commandID: id, lastProgressSeq: g.lastProgSeq})
+		}
+	}
+	slices.SortFunc(orphans, func(a, b orphanGroup) int {
+		return strings.Compare(a.commandID, b.commandID)
+	})
+	return orphans, nil
+}
+
+// Drain uploads until the log is empty or ctx is done. It is the graceful
+// shutdown path (§3.7): the synthetic terminals are already durable in the
+// WAL, so a drain that fails (manager unreachable) only delays their delivery
+// to the next startup's replay — the drain is the best-effort "healthy manager
+// gets the terminal now" bonus.
+func (u *Uploader) Drain(ctx context.Context) {
+	for {
+		empty, err := u.ob.Empty()
+		if err != nil || empty {
+			return
+		}
+		u.uploadCycle(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(BatchWindow):
+		}
 	}
 }
 

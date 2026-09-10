@@ -140,12 +140,12 @@ func (r *agentRunner) applyAssignment(a *v1pb.AgentAssignment) {
 	if acp != nil && pi.IsPiProvider(acp.GetProvider()) {
 		// pi owns the runner: tear down any resident thread subprocess first
 		// (coordinated so an in-flight thread turn reports a reload cause).
-		r.coordinateInFlightTurn()
+		r.coordinateInFlightTurn(reloadedMidTurnReason)
 		r.stopThreadSession()
 		r.setConfig(nil)
 		newPi := r.buildPiConfig(a)
 		if newPi == nil {
-			r.coordinateInFlightTurn()
+			r.coordinateInFlightTurn(reloadedMidTurnReason)
 			r.stopPiSession()
 			return
 		}
@@ -157,7 +157,7 @@ func (r *agentRunner) applyAssignment(a *v1pb.AgentAssignment) {
 			// the manager (not a mid-flight "session exited mid-turn") and the
 			// wait guarantees the restart never races the dying turn's session
 			// access. No-op when no turn is in flight (e.g. the first config).
-			r.coordinateInFlightTurn()
+			r.coordinateInFlightTurn(reloadedMidTurnReason)
 			r.restartPiSession(newPi)
 			return
 		}
@@ -169,7 +169,7 @@ func (r *agentRunner) applyAssignment(a *v1pb.AgentAssignment) {
 	}
 	// ACP (or unconfigured): coordinate any in-flight pi turn, then tear down
 	// the pi session and load the ACP config.
-	r.coordinateInFlightTurn()
+	r.coordinateInFlightTurn(reloadedMidTurnReason)
 	r.stopPiSession()
 	cfg := r.buildAcpConfig(a)
 	r.setConfig(cfg)
@@ -334,6 +334,14 @@ func (r *agentRunner) wireOutbox(cs *commandStream) {
 	cs.ob = ob
 	cs.sink = outboxSink{ob: ob}
 	cs.uploader = outbox.NewUploader(ob, r.machine.uploadCommandData(cs.getToken))
+	// §3.7 startup self-check: the WAL is opened fresh, so any command group
+	// still holding records without a terminal belongs to a turn the previous
+	// process died inside (the graceful-stop path already synthesized them).
+	// The synthetic terminals are durable here and upload with the first
+	// cycle, so the manager closes the commands without waiting for the reaper.
+	if err := cs.uploader.SynthesizeInterruptedTerminals("machine restarted mid-turn"); err != nil {
+		slog.Warn("outbox startup self-check failed", "agent", r.agentName, "error", err)
+	}
 }
 
 func (r *agentRunner) currentCommandStream() *commandStream {
@@ -342,25 +350,30 @@ func (r *agentRunner) currentCommandStream() *commandStream {
 	return r.cs
 }
 
+// reloadedMidTurnReason is the terminal cause a coordinated cancel reports when
+// an assignment hot-reload killed the turn.
+const reloadedMidTurnReason = "config reloaded mid-turn"
+
 // inFlightTurnTimeout bounds how long coordinateInFlightTurn waits for an
 // in-flight turn to end after cancelling it. A runtime that ignores Cancel is
 // reaped by the subsequent restartPiSession's stopPiSession (the safe Stop
-// blocks on the process reap), so the wait is best-effort and bounded.
-const inFlightTurnTimeout = 5 * time.Second
+// blocks on the process reap), so the wait is best-effort and bounded. A
+// variable so tests can shorten the wait.
+var inFlightTurnTimeout = 5 * time.Second
 
 // coordinateInFlightTurn cancels any in-flight drain turn and waits (bounded)
-// for it to end. applyAssignment calls this before every teardown that would
-// SIGKILL a pi process under a possibly in-flight turn (a launch-fingerprint
-// change, a pi agent becoming unconfigured, or a pi→ACP switch) so the restart
-// never races the dying turn's session access and the turn reports an explicit
-// "config reloaded mid-turn" failure instead of a mid-flight "session exited
-// mid-turn". No-op when no turn is in flight.
-func (r *agentRunner) coordinateInFlightTurn() {
+// for it to end. Callers pass the cause that the dying turn's terminal should
+// carry (e.g. "config reloaded mid-turn", or the runner's teardown cause). The
+// teardown paths (applyAssignment before every SIGKILL-prone session restart,
+// stop before the runner ctx dies) call this so the restart never races the
+// dying turn's session access and the manager sees an explicit cause instead
+// of a mid-flight "session exited mid-turn". No-op when no turn is in flight.
+func (r *agentRunner) coordinateInFlightTurn(reason string) {
 	cs := r.currentCommandStream()
 	if cs == nil {
 		return
 	}
-	done, cancelled := cs.CancelInFlight("config reloaded mid-turn")
+	done, cancelled := cs.CancelInFlight(reason)
 	if !cancelled {
 		return
 	}
@@ -380,7 +393,7 @@ func (r *agentRunner) coordinateInFlightTurn() {
 func (r *agentRunner) coldRestart() {
 	// 1. Cancel any in-flight turn and wait (bounded) so the restart never
 	// races the dying turn's session access.
-	r.coordinateInFlightTurn()
+	r.coordinateInFlightTurn("agent cold-restarted mid-turn")
 
 	// 2. Clear persisted LLM session state so the next turn cold-starts.
 	executor.ClearSessionState(home.Join(r.machine.machineID, r.agentID, "acp-session.json"))
@@ -571,9 +584,23 @@ func (r *agentRunner) buildMcpServers(req executor.Request) []acp.McpServer {
 	}
 }
 
-// stop cancels the runner's drain loop, tears down any pi subprocess, closes
-// the agent's outbox, and waits for the loop to exit.
-func (r *agentRunner) stop() {
+// stop tears down the runner. cause names why the runner is going away
+// ("machine shutting down" on machine exit, "agent removed from this machine"
+// on RemoveAgent, "agent unassigned from this machine" on a roster reconcile)
+// and becomes the in-flight turn's terminal cause (design §3.6 rule 5: the
+// manager must not wait for the reaper when this machine itself cancels the
+// turn).
+//
+// Order matters (§3.7): the in-flight turn is cancelled while the runner ctx
+// is still alive so its own FAILED terminal records through the normal path;
+// then the loops exit; then any turn that outlived the bounded cancel leaves
+// records without a terminal, and the outbox self-check synthesizes those
+// terminals durably BEFORE the WAL closes — a later replay (or the drain)
+// delivers them. The outbox then gets one bounded window to drain to a
+// healthy manager; if the machine is killed before it finishes, the WAL keeps
+// everything and the next startup replays it.
+func (r *agentRunner) stop(cause string) {
+	r.coordinateInFlightTurn(cause)
 	if r.cancel != nil {
 		r.cancel()
 	}
@@ -584,17 +611,47 @@ func (r *agentRunner) stop() {
 	cs := r.cs
 	r.cs = nil
 	r.mu.Unlock()
-	// Close the outbox after the runner's goroutine exits. The drain loop may
-	// still be unwinding; a late append gets ErrClosed and the turn's own
-	// failure path handles it, so the race is benign.
-	if cs != nil && cs.ob != nil {
-		if err := cs.ob.Close(); err != nil {
-			slog.Warn("failed to close agent outbox", "agent", r.agentName, "error", err)
-		}
-	}
+	r.closeOutbox(cs, cause)
 	r.stopPiSession()
 	r.stopThreadSession()
 	slog.Info("tore down agent runner", "agent", r.agentName)
+}
+
+// shutdownDrainTimeout bounds the runner's final upload window in stop(): long
+// enough for a healthy manager to take the terminal records, short enough that
+// a dead manager does not stall the shutdown (the supervisor force-kills the
+// process after its grace anyway, and the WAL keeps the records either way).
+const shutdownDrainTimeout = 5 * time.Second
+
+// closeOutbox finishes the runner's outbox after the loops exited (no
+// concurrent writer): it synthesizes FAILED terminals for command groups whose
+// turn died without reporting (the bounded cancel window expired — §3.7), then
+// gives a healthy manager one bounded window to drain the log, and only then
+// closes the WAL. No-op when the outbox never opened (the turn's own failure
+// path and the manager's reaper own the commands).
+func (r *agentRunner) closeOutbox(cs *commandStream, cause string) {
+	if cs == nil || cs.ob == nil {
+		return
+	}
+	if cs.uploader != nil {
+		if err := cs.uploader.SynthesizeInterruptedTerminals(cause); err != nil {
+			slog.Warn("failed to synthesize interrupted-turn terminals",
+				"agent", r.agentName, "error", err)
+		} else {
+			drainCtx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
+			cs.uploader.Drain(drainCtx)
+			cancel()
+		}
+	}
+	// SynthesizeInterruptedTerminals flushes its own appends and the drain's
+	// reads flush the rest; this covers the degraded paths (no uploader, a
+	// failed synthesis) so Close never drops buffered records.
+	if err := cs.ob.Flush(); err != nil {
+		slog.Warn("failed to flush agent outbox", "agent", r.agentName, "error", err)
+	}
+	if err := cs.ob.Close(); err != nil {
+		slog.Warn("failed to close agent outbox", "agent", r.agentName, "error", err)
+	}
 }
 
 // spawnAssignedAgents aligns the runner set with the roster the manager
@@ -622,7 +679,7 @@ func (c *MachineClient) spawnAssignedAgents(ctx context.Context, assignments []*
 	c.runnersMu.Unlock()
 	for _, r := range removed {
 		slog.Info("agent no longer assigned to this machine; stopping runner", "agent", r.agentName)
-		r.stop()
+		r.stop("agent unassigned from this machine")
 	}
 }
 
@@ -662,7 +719,8 @@ func (c *MachineClient) spawnOrUpdate(ctx context.Context, a *v1pb.AgentAssignme
 	r.start(ctx)
 }
 
-// stopRunner tears down one agent's runner (on RemoveAgent). Missing is a no-op.
+// stopRunner tears down one agent's runner (on RemoveAgent / a full
+// ReloadAgentAssignment). Missing is a no-op.
 func (c *MachineClient) stopRunner(agentName string) {
 	agentID := bareAgentID(agentName)
 	c.runnersMu.Lock()
@@ -672,7 +730,7 @@ func (c *MachineClient) stopRunner(agentName string) {
 	}
 	c.runnersMu.Unlock()
 	if ok {
-		r.stop()
+		r.stop("agent removed from this machine")
 	}
 }
 
@@ -691,10 +749,13 @@ func (c *MachineClient) coldRestartAgent(agentName string) {
 	r.coldRestart()
 }
 
-// teardownRunners stops every live runner. Called on machine shutdown only:
-// since phase 2 the runner outlives connections (a dead stream never tears
-// down a runner), so disconnect paths keep the runners and the roster is
-// reconciled from the next connect's assignment list.
+// teardownRunners stops every live runner with the machine-shutdown cause.
+// Called on machine shutdown only: since phase 2 the runner outlives
+// connections (a dead stream never tears down a runner), so disconnect paths
+// keep the runners and the roster is reconciled from the next connect's
+// assignment list. The graceful shutdown hook runs first in each stop()
+// (§3.7): in-flight turns cancel with an explicit terminal and the WAL
+// self-check synthesizes whatever outlived the bounded cancel.
 func (c *MachineClient) teardownRunners() {
 	c.runnersMu.Lock()
 	runners := make([]*agentRunner, 0, len(c.runners))
@@ -704,7 +765,7 @@ func (c *MachineClient) teardownRunners() {
 	}
 	c.runnersMu.Unlock()
 	for _, r := range runners {
-		r.stop()
+		r.stop("machine shutting down")
 	}
 }
 

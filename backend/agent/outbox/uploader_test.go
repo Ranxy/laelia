@@ -518,6 +518,122 @@ func TestWaitClearForSkipsOrphanForOwnCommand(t *testing.T) {
 	}
 }
 
+// TestSynthesizeInterruptedTerminals locks the §3.7 self-check: a command
+// whose records lack a terminal gets the synthetic FAILED terminal (the caller's
+// cause carried, the group's progress watermark covered), a command that
+// already has a terminal is untouched, and a second pass is a no-op.
+func TestSynthesizeInterruptedTerminals(t *testing.T) {
+	o, err := Open(filepathJoinTemp(t))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer o.Close()
+
+	if err := o.Append(progressEntry("cmd-1", 3, "x")); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	if err := o.Append(eventEntry("cmd-1", 1)); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	if err := o.Append(progressEntry("cmd-2", 1, "x")); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	if err := o.Append(resultEntry("cmd-2", 0)); err != nil {
+		t.Fatalf("append result: %v", err)
+	}
+
+	u := NewUploader(o, (&fakeUploader{}).upload)
+	if err := u.SynthesizeInterruptedTerminals("machine restarted mid-turn"); err != nil {
+		t.Fatalf("synthesize: %v", err)
+	}
+
+	results := resultResults(t, o)
+	if got := results["cmd-1"]; got == nil {
+		t.Fatal("the unterminated command group must get a synthetic terminal")
+	} else {
+		if got.GetExitCode() != -1 {
+			t.Fatalf("synthetic terminal must be a failure, got exit %d", got.GetExitCode())
+		}
+		if got.GetLastSeqNo() != 3 {
+			t.Fatalf("synthetic terminal must cover the group's progress watermark, got %d", got.GetLastSeqNo())
+		}
+		if got.GetErrorMessage() != "machine restarted mid-turn" {
+			t.Fatalf("synthetic terminal must carry the caller's cause, got %q", got.GetErrorMessage())
+		}
+	}
+	if got := results["cmd-2"]; got == nil || got.GetErrorMessage() != "" {
+		t.Fatal("a command with a terminal must not be re-terminated")
+	}
+
+	// Idempotent: a second pass must not duplicate the terminal.
+	if err := u.SynthesizeInterruptedTerminals("machine restarted mid-turn"); err != nil {
+		t.Fatalf("second synthesize: %v", err)
+	}
+	results = resultResults(t, o)
+	if len(results) != 2 {
+		t.Fatalf("synthesize must not duplicate terminals, saw %d", len(results))
+	}
+}
+
+// resultResults reads the whole log and returns each command's terminal.
+func resultResults(t *testing.T, o *Outbox) map[string]*v1pb.CommandResult {
+	t.Helper()
+	records, err := o.ReadRecords(1024, 1<<20, 0)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	results := map[string]*v1pb.CommandResult{}
+	for _, r := range records {
+		if e := r.Entry; e != nil && e.GetKind() == v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT {
+			results[e.GetCommandId()] = e.GetResult()
+		}
+	}
+	return results
+}
+
+// TestDrainUploadsUntilEmpty locks the graceful-shutdown drain: records upload
+// to the fake manager until the log is empty, then Drain returns.
+func TestDrainUploadsUntilEmpty(t *testing.T) {
+	fastUploaderTunables(t)
+	o, err := Open(filepathJoinTemp(t))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer o.Close()
+
+	if err := o.Append(progressEntry("cmd-1", 1, "x")); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	if err := o.Append(resultEntry("cmd-1", 0)); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+
+	fake := &fakeUploader{}
+	u := NewUploader(o, fake.upload)
+	u.Drain(context.Background())
+	if empty, _ := o.Empty(); !empty {
+		t.Fatal("drain must empty the log against a healthy manager")
+	}
+	if fake.callCount() == 0 {
+		t.Fatal("drain must call the transport")
+	}
+
+	// A dead manager must not wedge the drain past its context.
+	o2, err := Open(filepathJoinTemp(t))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer o2.Close()
+	if err := o2.Append(progressEntry("cmd-1", 1, "x")); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	stuck := &fakeUploader{failNext: 1 << 30}
+	u2 := NewUploader(o2, stuck.upload)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	u2.Drain(ctx) // must return via ctx, not block
+}
+
 // runUploader starts the uploader's Run loop and stops it (waiting for exit)
 // during cleanup, before fastUploaderTunables restores the globals.
 func runUploader(t *testing.T, u *Uploader) {

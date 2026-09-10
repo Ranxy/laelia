@@ -563,7 +563,12 @@ func (c *MachineClient) Run(ctx context.Context) error {
 	}
 }
 
-// shutdown stops runners and notifies the manager of a graceful disconnect.
+// shutdown is the machine's graceful-stop hook (§3.7): each runner cancels its
+// in-flight turn with an explicit "machine shutting down" terminal, the WAL
+// self-check synthesizes terminals for turns that outlived the bounded cancel,
+// and each outbox gets one bounded drain to a healthy manager before the
+// machine notifies the manager of the disconnect. Anything the drain did not
+// deliver stays durable in the WAL for the next startup's replay.
 func (c *MachineClient) shutdown() {
 	slog.Info("machine stopping")
 	c.teardownRunners()
