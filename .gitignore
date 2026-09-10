@@ -24,3 +24,4 @@ docs/review
 
 # local go build cache used in restricted dev environments
 .gocache/
+.gomodcache/
