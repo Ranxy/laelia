@@ -161,6 +161,78 @@ service MachineService {
 // its own AgentChannel.
 service MachineStreamService {
   rpc MachineChannel(stream MachineStreamMessage) returns (stream ManagerMachineStreamMessage);
+
+  // UploadCommandData persists a machine's batched command data (progress /
+  // events / result) as the sole machine→manager reporting path. The batch is
+  // applied in a single transaction in order; the response carries per-(command,
+  // kind) persisted watermarks plus an explicit rejection list so the machine's
+  // uploader can evict settled records and drop poison entries. Idempotent:
+  // retransmission dedups on (command_id, seq_no) per kind.
+  rpc UploadCommandData(UploadCommandDataRequest) returns (UploadCommandDataResponse) {
+    option (laelia.v1.auth_method) = CUSTOM;
+  }
+}
+
+// UploadEntryKind classifies one command-data entry. progress/event are the
+// two existing per-(command) seq spaces (command_output / command_event dedup
+// keys); result is the per-command terminal record.
+enum UploadEntryKind {
+  UPLOAD_ENTRY_KIND_UNSPECIFIED = 0;
+  UPLOAD_ENTRY_KIND_PROGRESS = 1;
+  UPLOAD_ENTRY_KIND_EVENT = 2;
+  UPLOAD_ENTRY_KIND_RESULT = 3;
+}
+
+// UploadCommandDataEntry is one command data record, mirroring the durable
+// outbox envelope the machine appends per turn. seq_no is the per-(command,
+// kind) sequence number the manager dedups on.
+message UploadCommandDataEntry {
+  string command_id = 1;
+  UploadEntryKind kind = 2;
+  int32 seq_no = 3;
+  // agent_side_timestamp is the machine's wall-clock time when the record was
+  // produced, so the manager can order and store it without adding arrival
+  // delay. Empty means "use arrival time".
+  google.protobuf.Timestamp agent_side_timestamp = 4;
+  oneof payload {
+    CommandProgress progress = 5;
+    CommandEvent event = 6;
+    CommandResult result = 7;
+  }
+}
+
+// UploadCommandDataRequest carries one uploader batch. Mixed commands are
+// legal (forward-compatible with a machine-level uploader); within one
+// command, entries are strictly seq-ascending per kind.
+message UploadCommandDataRequest {
+  repeated UploadCommandDataEntry entries = 1;
+}
+
+// UploadCommandDataAck is the per-command persisted watermark of one batch.
+// A kind's watermark is the highest seq_no of that kind persisted by the
+// manager (contiguous from the machine's side because retransmission dedups).
+message UploadCommandDataAck {
+  string command_id = 1;
+  int32 last_progress_seq = 2;
+  int32 last_event_seq = 3;
+  // result_acked means the command's terminal record (and therefore every
+  // record of the command in this batch and earlier) is durably persisted.
+  bool result_acked = 4;
+}
+
+// UploadCommandDataRejection explicitly lists one entry the manager refused.
+// A watermark cannot express holes inside a batch, so rejected entries are
+// enumerated and treated as "never retransmit" by the uploader.
+message UploadCommandDataRejection {
+  string command_id = 1;
+  UploadEntryKind kind = 2;
+  int32 seq_no = 3;
+  string reason = 4;
+}
+
+message UploadCommandDataResponse {
+  repeated UploadCommandDataAck acks = 1;
+  repeated UploadCommandDataRejection rejected = 2;
 }
 
 // ========== Request/Response Messages ==========

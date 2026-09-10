@@ -21,3 +21,6 @@ backend/agent/pi/embedded/dist-*/pi.meta
 backend/agent/pi/embedded/dist-*/theme/
 temp/
 docs/review
+
+# local go build cache used in restricted dev environments
+.gocache/

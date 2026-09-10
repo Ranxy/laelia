@@ -2065,6 +2065,26 @@
                   <a href="#laelia.v1.UpgradeRequest"><span class="badge">M</span>UpgradeRequest</a>
                 </li>
               
+                <li>
+                  <a href="#laelia.v1.UploadCommandDataAck"><span class="badge">M</span>UploadCommandDataAck</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UploadCommandDataEntry"><span class="badge">M</span>UploadCommandDataEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UploadCommandDataRejection"><span class="badge">M</span>UploadCommandDataRejection</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UploadCommandDataRequest"><span class="badge">M</span>UploadCommandDataRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UploadCommandDataResponse"><span class="badge">M</span>UploadCommandDataResponse</a>
+                </li>
+              
               
                 <li>
                   <a href="#laelia.v1.MachineStatus.ConnectionState"><span class="badge">E</span>MachineStatus.ConnectionState</a>
@@ -2072,6 +2092,10 @@
               
                 <li>
                   <a href="#laelia.v1.ProvisioningPhase"><span class="badge">E</span>ProvisioningPhase</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UploadEntryKind"><span class="badge">E</span>UploadEntryKind</a>
                 </li>
               
               
@@ -20619,6 +20643,220 @@ manager&#39;s manifest; the machine verifies the download against it. </p></td>
 
         
       
+        <h3 id="laelia.v1.UploadCommandDataAck">UploadCommandDataAck</h3>
+        <p>UploadCommandDataAck is the per-command persisted watermark of one batch.</p><p>A kind's watermark is the highest seq_no of that kind persisted by the</p><p>manager (contiguous from the machine's side because retransmission dedups).</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>command_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_progress_seq</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_event_seq</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>result_acked</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>result_acked means the command&#39;s terminal record (and therefore every
+record of the command in this batch and earlier) is durably persisted. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UploadCommandDataEntry">UploadCommandDataEntry</h3>
+        <p>UploadCommandDataEntry is one command data record, mirroring the durable</p><p>outbox envelope the machine appends per turn. seq_no is the per-(command,</p><p>kind) sequence number the manager dedups on.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>command_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>kind</td>
+                  <td><a href="#laelia.v1.UploadEntryKind">UploadEntryKind</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>seq_no</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>agent_side_timestamp</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p>agent_side_timestamp is the machine&#39;s wall-clock time when the record was
+produced, so the manager can order and store it without adding arrival
+delay. Empty means &#34;use arrival time&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>progress</td>
+                  <td><a href="#laelia.v1.CommandProgress">CommandProgress</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>event</td>
+                  <td><a href="#laelia.v1.CommandEvent">CommandEvent</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>result</td>
+                  <td><a href="#laelia.v1.CommandResult">CommandResult</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UploadCommandDataRejection">UploadCommandDataRejection</h3>
+        <p>UploadCommandDataRejection explicitly lists one entry the manager refused.</p><p>A watermark cannot express holes inside a batch, so rejected entries are</p><p>enumerated and treated as "never retransmit" by the uploader.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>command_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>kind</td>
+                  <td><a href="#laelia.v1.UploadEntryKind">UploadEntryKind</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>seq_no</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UploadCommandDataRequest">UploadCommandDataRequest</h3>
+        <p>UploadCommandDataRequest carries one uploader batch. Mixed commands are</p><p>legal (forward-compatible with a machine-level uploader); within one</p><p>command, entries are strictly seq-ascending per kind.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>entries</td>
+                  <td><a href="#laelia.v1.UploadCommandDataEntry">UploadCommandDataEntry</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UploadCommandDataResponse">UploadCommandDataResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>acks</td>
+                  <td><a href="#laelia.v1.UploadCommandDataAck">UploadCommandDataAck</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>rejected</td>
+                  <td><a href="#laelia.v1.UploadCommandDataRejection">UploadCommandDataRejection</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
 
       
         <h3 id="laelia.v1.MachineStatus.ConnectionState">MachineStatus.ConnectionState</h3>
@@ -20709,6 +20947,41 @@ manager&#39;s manifest; the machine verifies the download against it. </p></td>
               <tr>
                 <td>PROVISIONING_PHASE_DELETED</td>
                 <td>6</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+        <h3 id="laelia.v1.UploadEntryKind">UploadEntryKind</h3>
+        <p>UploadEntryKind classifies one command-data entry. progress/event are the</p><p>two existing per-(command) seq spaces (command_output / command_event dedup</p><p>keys); result is the per-command terminal record.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>UPLOAD_ENTRY_KIND_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>UPLOAD_ENTRY_KIND_PROGRESS</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>UPLOAD_ENTRY_KIND_EVENT</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>UPLOAD_ENTRY_KIND_RESULT</td>
+                <td>3</td>
                 <td><p></p></td>
               </tr>
             
@@ -20892,6 +21165,18 @@ machine must host (so the machine app can open an AgentChannel for each).</p></t
                 <td><a href="#laelia.v1.MachineStreamMessage">MachineStreamMessage</a> stream</td>
                 <td><a href="#laelia.v1.ManagerMachineStreamMessage">ManagerMachineStreamMessage</a> stream</td>
                 <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>UploadCommandData</td>
+                <td><a href="#laelia.v1.UploadCommandDataRequest">UploadCommandDataRequest</a></td>
+                <td><a href="#laelia.v1.UploadCommandDataResponse">UploadCommandDataResponse</a></td>
+                <td><p>UploadCommandData persists a machine&#39;s batched command data (progress /
+events / result) as the sole machine→manager reporting path. The batch is
+applied in a single transaction in order; the response carries per-(command,
+kind) persisted watermarks plus an explicit rejection list so the machine&#39;s
+uploader can evict settled records and drop poison entries. Idempotent:
+retransmission dedups on (command_id, seq_no) per kind.</p></td>
               </tr>
             
           </tbody>

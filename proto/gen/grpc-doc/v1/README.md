@@ -487,9 +487,15 @@
     - [UpgradeMachineRequest](#laelia-v1-UpgradeMachineRequest)
     - [UpgradeProgress](#laelia-v1-UpgradeProgress)
     - [UpgradeRequest](#laelia-v1-UpgradeRequest)
+    - [UploadCommandDataAck](#laelia-v1-UploadCommandDataAck)
+    - [UploadCommandDataEntry](#laelia-v1-UploadCommandDataEntry)
+    - [UploadCommandDataRejection](#laelia-v1-UploadCommandDataRejection)
+    - [UploadCommandDataRequest](#laelia-v1-UploadCommandDataRequest)
+    - [UploadCommandDataResponse](#laelia-v1-UploadCommandDataResponse)
   
     - [MachineStatus.ConnectionState](#laelia-v1-MachineStatus-ConnectionState)
     - [ProvisioningPhase](#laelia-v1-ProvisioningPhase)
+    - [UploadEntryKind](#laelia-v1-UploadEntryKind)
   
     - [MachineService](#laelia-v1-MachineService)
     - [MachineStreamService](#laelia-v1-MachineStreamService)
@@ -8434,6 +8440,102 @@ verifies the sha256, installs it, and restarts the machine process.
 
 
 
+
+<a name="laelia-v1-UploadCommandDataAck"></a>
+
+### UploadCommandDataAck
+UploadCommandDataAck is the per-command persisted watermark of one batch.
+A kind&#39;s watermark is the highest seq_no of that kind persisted by the
+manager (contiguous from the machine&#39;s side because retransmission dedups).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+| last_progress_seq | [int32](#int32) |  |  |
+| last_event_seq | [int32](#int32) |  |  |
+| result_acked | [bool](#bool) |  | result_acked means the command&#39;s terminal record (and therefore every record of the command in this batch and earlier) is durably persisted. |
+
+
+
+
+
+
+<a name="laelia-v1-UploadCommandDataEntry"></a>
+
+### UploadCommandDataEntry
+UploadCommandDataEntry is one command data record, mirroring the durable
+outbox envelope the machine appends per turn. seq_no is the per-(command,
+kind) sequence number the manager dedups on.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+| kind | [UploadEntryKind](#laelia-v1-UploadEntryKind) |  |  |
+| seq_no | [int32](#int32) |  |  |
+| agent_side_timestamp | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | agent_side_timestamp is the machine&#39;s wall-clock time when the record was produced, so the manager can order and store it without adding arrival delay. Empty means &#34;use arrival time&#34;. |
+| progress | [CommandProgress](#laelia-v1-CommandProgress) |  |  |
+| event | [CommandEvent](#laelia-v1-CommandEvent) |  |  |
+| result | [CommandResult](#laelia-v1-CommandResult) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UploadCommandDataRejection"></a>
+
+### UploadCommandDataRejection
+UploadCommandDataRejection explicitly lists one entry the manager refused.
+A watermark cannot express holes inside a batch, so rejected entries are
+enumerated and treated as &#34;never retransmit&#34; by the uploader.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+| kind | [UploadEntryKind](#laelia-v1-UploadEntryKind) |  |  |
+| seq_no | [int32](#int32) |  |  |
+| reason | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UploadCommandDataRequest"></a>
+
+### UploadCommandDataRequest
+UploadCommandDataRequest carries one uploader batch. Mixed commands are
+legal (forward-compatible with a machine-level uploader); within one
+command, entries are strictly seq-ascending per kind.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| entries | [UploadCommandDataEntry](#laelia-v1-UploadCommandDataEntry) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-UploadCommandDataResponse"></a>
+
+### UploadCommandDataResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| acks | [UploadCommandDataAck](#laelia-v1-UploadCommandDataAck) | repeated |  |
+| rejected | [UploadCommandDataRejection](#laelia-v1-UploadCommandDataRejection) | repeated |  |
+
+
+
+
+
  
 
 
@@ -8469,6 +8571,22 @@ ProvisionJobProgress frames.
 | PROVISIONING_PHASE_FAILED | 4 |  |
 | PROVISIONING_PHASE_DEPROVISIONING | 5 |  |
 | PROVISIONING_PHASE_DELETED | 6 |  |
+
+
+
+<a name="laelia-v1-UploadEntryKind"></a>
+
+### UploadEntryKind
+UploadEntryKind classifies one command-data entry. progress/event are the
+two existing per-(command) seq spaces (command_output / command_event dedup
+keys); result is the per-command terminal record.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| UPLOAD_ENTRY_KIND_UNSPECIFIED | 0 |  |
+| UPLOAD_ENTRY_KIND_PROGRESS | 1 |  |
+| UPLOAD_ENTRY_KIND_EVENT | 2 |  |
+| UPLOAD_ENTRY_KIND_RESULT | 3 |  |
 
 
  
@@ -8521,6 +8639,7 @@ its own AgentChannel.
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | MachineChannel | [MachineStreamMessage](#laelia-v1-MachineStreamMessage) stream | [ManagerMachineStreamMessage](#laelia-v1-ManagerMachineStreamMessage) stream |  |
+| UploadCommandData | [UploadCommandDataRequest](#laelia-v1-UploadCommandDataRequest) | [UploadCommandDataResponse](#laelia-v1-UploadCommandDataResponse) | UploadCommandData persists a machine&#39;s batched command data (progress / events / result) as the sole machine→manager reporting path. The batch is applied in a single transaction in order; the response carries per-(command, kind) persisted watermarks plus an explicit rejection list so the machine&#39;s uploader can evict settled records and drop poison entries. Idempotent: retransmission dedups on (command_id, seq_no) per kind. |
 
  
 

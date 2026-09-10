@@ -87,6 +87,9 @@ const (
 	// MachineStreamServiceMachineChannelProcedure is the fully-qualified name of the
 	// MachineStreamService's MachineChannel RPC.
 	MachineStreamServiceMachineChannelProcedure = "/laelia.v1.MachineStreamService/MachineChannel"
+	// MachineStreamServiceUploadCommandDataProcedure is the fully-qualified name of the
+	// MachineStreamService's UploadCommandData RPC.
+	MachineStreamServiceUploadCommandDataProcedure = "/laelia.v1.MachineStreamService/UploadCommandData"
 )
 
 // MachineServiceClient is a client for the laelia.v1.MachineService service.
@@ -646,6 +649,13 @@ func (UnimplementedMachineServiceHandler) RefreshMachineToken(context.Context, *
 // MachineStreamServiceClient is a client for the laelia.v1.MachineStreamService service.
 type MachineStreamServiceClient interface {
 	MachineChannel(context.Context) *connect.BidiStreamForClient[v1.MachineStreamMessage, v1.ManagerMachineStreamMessage]
+	// UploadCommandData persists a machine's batched command data (progress /
+	// events / result) as the sole machine→manager reporting path. The batch is
+	// applied in a single transaction in order; the response carries per-(command,
+	// kind) persisted watermarks plus an explicit rejection list so the machine's
+	// uploader can evict settled records and drop poison entries. Idempotent:
+	// retransmission dedups on (command_id, seq_no) per kind.
+	UploadCommandData(context.Context, *connect.Request[v1.UploadCommandDataRequest]) (*connect.Response[v1.UploadCommandDataResponse], error)
 }
 
 // NewMachineStreamServiceClient constructs a client for the laelia.v1.MachineStreamService service.
@@ -665,12 +675,19 @@ func NewMachineStreamServiceClient(httpClient connect.HTTPClient, baseURL string
 			connect.WithSchema(machineStreamServiceMethods.ByName("MachineChannel")),
 			connect.WithClientOptions(opts...),
 		),
+		uploadCommandData: connect.NewClient[v1.UploadCommandDataRequest, v1.UploadCommandDataResponse](
+			httpClient,
+			baseURL+MachineStreamServiceUploadCommandDataProcedure,
+			connect.WithSchema(machineStreamServiceMethods.ByName("UploadCommandData")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // machineStreamServiceClient implements MachineStreamServiceClient.
 type machineStreamServiceClient struct {
-	machineChannel *connect.Client[v1.MachineStreamMessage, v1.ManagerMachineStreamMessage]
+	machineChannel    *connect.Client[v1.MachineStreamMessage, v1.ManagerMachineStreamMessage]
+	uploadCommandData *connect.Client[v1.UploadCommandDataRequest, v1.UploadCommandDataResponse]
 }
 
 // MachineChannel calls laelia.v1.MachineStreamService.MachineChannel.
@@ -678,9 +695,21 @@ func (c *machineStreamServiceClient) MachineChannel(ctx context.Context) *connec
 	return c.machineChannel.CallBidiStream(ctx)
 }
 
+// UploadCommandData calls laelia.v1.MachineStreamService.UploadCommandData.
+func (c *machineStreamServiceClient) UploadCommandData(ctx context.Context, req *connect.Request[v1.UploadCommandDataRequest]) (*connect.Response[v1.UploadCommandDataResponse], error) {
+	return c.uploadCommandData.CallUnary(ctx, req)
+}
+
 // MachineStreamServiceHandler is an implementation of the laelia.v1.MachineStreamService service.
 type MachineStreamServiceHandler interface {
 	MachineChannel(context.Context, *connect.BidiStream[v1.MachineStreamMessage, v1.ManagerMachineStreamMessage]) error
+	// UploadCommandData persists a machine's batched command data (progress /
+	// events / result) as the sole machine→manager reporting path. The batch is
+	// applied in a single transaction in order; the response carries per-(command,
+	// kind) persisted watermarks plus an explicit rejection list so the machine's
+	// uploader can evict settled records and drop poison entries. Idempotent:
+	// retransmission dedups on (command_id, seq_no) per kind.
+	UploadCommandData(context.Context, *connect.Request[v1.UploadCommandDataRequest]) (*connect.Response[v1.UploadCommandDataResponse], error)
 }
 
 // NewMachineStreamServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -696,10 +725,18 @@ func NewMachineStreamServiceHandler(svc MachineStreamServiceHandler, opts ...con
 		connect.WithSchema(machineStreamServiceMethods.ByName("MachineChannel")),
 		connect.WithHandlerOptions(opts...),
 	)
+	machineStreamServiceUploadCommandDataHandler := connect.NewUnaryHandler(
+		MachineStreamServiceUploadCommandDataProcedure,
+		svc.UploadCommandData,
+		connect.WithSchema(machineStreamServiceMethods.ByName("UploadCommandData")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.MachineStreamService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case MachineStreamServiceMachineChannelProcedure:
 			machineStreamServiceMachineChannelHandler.ServeHTTP(w, r)
+		case MachineStreamServiceUploadCommandDataProcedure:
+			machineStreamServiceUploadCommandDataHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -711,4 +748,8 @@ type UnimplementedMachineStreamServiceHandler struct{}
 
 func (UnimplementedMachineStreamServiceHandler) MachineChannel(context.Context, *connect.BidiStream[v1.MachineStreamMessage, v1.ManagerMachineStreamMessage]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineStreamService.MachineChannel is not implemented"))
+}
+
+func (UnimplementedMachineStreamServiceHandler) UploadCommandData(context.Context, *connect.Request[v1.UploadCommandDataRequest]) (*connect.Response[v1.UploadCommandDataResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineStreamService.UploadCommandData is not implemented"))
 }

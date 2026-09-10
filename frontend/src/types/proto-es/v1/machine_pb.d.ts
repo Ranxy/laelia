@@ -4,15 +4,191 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { AgentACPConfig, AgentCapability, AgentModelOption, AgentProviderInfo, AgentSummary } from "./agent_pb";
 import type { EmptySchema, Timestamp } from "@bufbuild/protobuf/wkt";
+import type { CommandEvent, CommandProgress, CommandResult, DiscoverProviders, Ping, Pong, ProvidersDiscovered } from "./command_pb";
+import type { AgentACPConfig, AgentCapability, AgentModelOption, AgentProviderInfo, AgentSummary } from "./agent_pb";
 import type { State } from "./common_pb";
-import type { DiscoverProviders, Ping, Pong, ProvidersDiscovered } from "./command_pb";
 
 /**
  * Describes the file v1/machine.proto.
  */
 export declare const file_v1_machine: GenFile;
+
+/**
+ * UploadCommandDataEntry is one command data record, mirroring the durable
+ * outbox envelope the machine appends per turn. seq_no is the per-(command,
+ * kind) sequence number the manager dedups on.
+ *
+ * @generated from message laelia.v1.UploadCommandDataEntry
+ */
+export declare type UploadCommandDataEntry = Message<"laelia.v1.UploadCommandDataEntry"> & {
+  /**
+   * @generated from field: string command_id = 1;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: laelia.v1.UploadEntryKind kind = 2;
+   */
+  kind: UploadEntryKind;
+
+  /**
+   * @generated from field: int32 seq_no = 3;
+   */
+  seqNo: number;
+
+  /**
+   * agent_side_timestamp is the machine's wall-clock time when the record was
+   * produced, so the manager can order and store it without adding arrival
+   * delay. Empty means "use arrival time".
+   *
+   * @generated from field: google.protobuf.Timestamp agent_side_timestamp = 4;
+   */
+  agentSideTimestamp?: Timestamp | undefined;
+
+  /**
+   * @generated from oneof laelia.v1.UploadCommandDataEntry.payload
+   */
+  payload: {
+    /**
+     * @generated from field: laelia.v1.CommandProgress progress = 5;
+     */
+    value: CommandProgress;
+    case: "progress";
+  } | {
+    /**
+     * @generated from field: laelia.v1.CommandEvent event = 6;
+     */
+    value: CommandEvent;
+    case: "event";
+  } | {
+    /**
+     * @generated from field: laelia.v1.CommandResult result = 7;
+     */
+    value: CommandResult;
+    case: "result";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message laelia.v1.UploadCommandDataEntry.
+ * Use `create(UploadCommandDataEntrySchema)` to create a new message.
+ */
+export declare const UploadCommandDataEntrySchema: GenMessage<UploadCommandDataEntry>;
+
+/**
+ * UploadCommandDataRequest carries one uploader batch. Mixed commands are
+ * legal (forward-compatible with a machine-level uploader); within one
+ * command, entries are strictly seq-ascending per kind.
+ *
+ * @generated from message laelia.v1.UploadCommandDataRequest
+ */
+export declare type UploadCommandDataRequest = Message<"laelia.v1.UploadCommandDataRequest"> & {
+  /**
+   * @generated from field: repeated laelia.v1.UploadCommandDataEntry entries = 1;
+   */
+  entries: UploadCommandDataEntry[];
+};
+
+/**
+ * Describes the message laelia.v1.UploadCommandDataRequest.
+ * Use `create(UploadCommandDataRequestSchema)` to create a new message.
+ */
+export declare const UploadCommandDataRequestSchema: GenMessage<UploadCommandDataRequest>;
+
+/**
+ * UploadCommandDataAck is the per-command persisted watermark of one batch.
+ * A kind's watermark is the highest seq_no of that kind persisted by the
+ * manager (contiguous from the machine's side because retransmission dedups).
+ *
+ * @generated from message laelia.v1.UploadCommandDataAck
+ */
+export declare type UploadCommandDataAck = Message<"laelia.v1.UploadCommandDataAck"> & {
+  /**
+   * @generated from field: string command_id = 1;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: int32 last_progress_seq = 2;
+   */
+  lastProgressSeq: number;
+
+  /**
+   * @generated from field: int32 last_event_seq = 3;
+   */
+  lastEventSeq: number;
+
+  /**
+   * result_acked means the command's terminal record (and therefore every
+   * record of the command in this batch and earlier) is durably persisted.
+   *
+   * @generated from field: bool result_acked = 4;
+   */
+  resultAcked: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.UploadCommandDataAck.
+ * Use `create(UploadCommandDataAckSchema)` to create a new message.
+ */
+export declare const UploadCommandDataAckSchema: GenMessage<UploadCommandDataAck>;
+
+/**
+ * UploadCommandDataRejection explicitly lists one entry the manager refused.
+ * A watermark cannot express holes inside a batch, so rejected entries are
+ * enumerated and treated as "never retransmit" by the uploader.
+ *
+ * @generated from message laelia.v1.UploadCommandDataRejection
+ */
+export declare type UploadCommandDataRejection = Message<"laelia.v1.UploadCommandDataRejection"> & {
+  /**
+   * @generated from field: string command_id = 1;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: laelia.v1.UploadEntryKind kind = 2;
+   */
+  kind: UploadEntryKind;
+
+  /**
+   * @generated from field: int32 seq_no = 3;
+   */
+  seqNo: number;
+
+  /**
+   * @generated from field: string reason = 4;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message laelia.v1.UploadCommandDataRejection.
+ * Use `create(UploadCommandDataRejectionSchema)` to create a new message.
+ */
+export declare const UploadCommandDataRejectionSchema: GenMessage<UploadCommandDataRejection>;
+
+/**
+ * @generated from message laelia.v1.UploadCommandDataResponse
+ */
+export declare type UploadCommandDataResponse = Message<"laelia.v1.UploadCommandDataResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.UploadCommandDataAck acks = 1;
+   */
+  acks: UploadCommandDataAck[];
+
+  /**
+   * @generated from field: repeated laelia.v1.UploadCommandDataRejection rejected = 2;
+   */
+  rejected: UploadCommandDataRejection[];
+};
+
+/**
+ * Describes the message laelia.v1.UploadCommandDataResponse.
+ * Use `create(UploadCommandDataResponseSchema)` to create a new message.
+ */
+export declare const UploadCommandDataResponseSchema: GenMessage<UploadCommandDataResponse>;
 
 /**
  * @generated from message laelia.v1.UpdateMachineRequest
@@ -1575,6 +1751,40 @@ export declare type MachineWorkspaceScanResponse = Message<"laelia.v1.MachineWor
 export declare const MachineWorkspaceScanResponseSchema: GenMessage<MachineWorkspaceScanResponse>;
 
 /**
+ * UploadEntryKind classifies one command-data entry. progress/event are the
+ * two existing per-(command) seq spaces (command_output / command_event dedup
+ * keys); result is the per-command terminal record.
+ *
+ * @generated from enum laelia.v1.UploadEntryKind
+ */
+export enum UploadEntryKind {
+  /**
+   * @generated from enum value: UPLOAD_ENTRY_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: UPLOAD_ENTRY_KIND_PROGRESS = 1;
+   */
+  PROGRESS = 1,
+
+  /**
+   * @generated from enum value: UPLOAD_ENTRY_KIND_EVENT = 2;
+   */
+  EVENT = 2,
+
+  /**
+   * @generated from enum value: UPLOAD_ENTRY_KIND_RESULT = 3;
+   */
+  RESULT = 3,
+}
+
+/**
+ * Describes the enum laelia.v1.UploadEntryKind.
+ */
+export declare const UploadEntryKindSchema: GenEnum<UploadEntryKind>;
+
+/**
  * ProvisioningPhase is the API-level lifecycle of one provisioning job,
  * mirroring laelia.store.ProvisioningPhase. The manager records transitions on
  * Machine.provisioning; the provisioner drives them through
@@ -1843,6 +2053,21 @@ export declare const MachineStreamService: GenService<{
     methodKind: "bidi_streaming";
     input: typeof MachineStreamMessageSchema;
     output: typeof ManagerMachineStreamMessageSchema;
+  },
+  /**
+   * UploadCommandData persists a machine's batched command data (progress /
+   * events / result) as the sole machine→manager reporting path. The batch is
+   * applied in a single transaction in order; the response carries per-(command,
+   * kind) persisted watermarks plus an explicit rejection list so the machine's
+   * uploader can evict settled records and drop poison entries. Idempotent:
+   * retransmission dedups on (command_id, seq_no) per kind.
+   *
+   * @generated from rpc laelia.v1.MachineStreamService.UploadCommandData
+   */
+  uploadCommandData: {
+    methodKind: "unary";
+    input: typeof UploadCommandDataRequestSchema;
+    output: typeof UploadCommandDataResponseSchema;
   },
 }>;
 
