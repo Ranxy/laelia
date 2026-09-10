@@ -280,13 +280,14 @@ func (o *Outbox) reopenLocked() error {
 	return nil
 }
 
-// ReadRecords returns up to maxRecords records starting at the log's first
-// index, capped at maxBytes of raw payload, in log order. Unparseable records
-// are torn data inside a readable frame: they are reported as poison records
-// (Entry == nil) so the uploader still counts them as settled and can evict
-// through them instead of stalling on them. The returned envelopes are
-// freshly unmarshalled (caller-owned).
-func (o *Outbox) ReadRecords(maxRecords int, maxBytes int64) (records []Record, err error) {
+// ReadRecords returns up to maxRecords records starting at from (clamped to
+// the log's current first index; 0 means "from the beginning"), capped at
+// maxBytes of raw payload, in log order. Unparseable records are torn data
+// inside a readable frame: they are reported as poison records (Entry == nil)
+// so the uploader still counts them as settled and can evict through them
+// instead of stalling on them. The returned envelopes are freshly
+// unmarshalled (caller-owned).
+func (o *Outbox) ReadRecords(maxRecords int, maxBytes int64, from uint64) (records []Record, err error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.closed {
@@ -303,6 +304,14 @@ func (o *Outbox) ReadRecords(maxRecords int, maxBytes int64) (records []Record, 
 	first, last, err := walRange(o.log)
 	if err != nil {
 		return nil, err
+	}
+	if from > last+1 {
+		// The cursor is beyond the log: the log restarted under us (isolation
+		// swap / quarantine reset the index space); re-read from its start.
+		from = first
+	}
+	if from > first {
+		first = from
 	}
 	for len(records) < maxRecords {
 		if last < first {
@@ -327,6 +336,12 @@ func (o *Outbox) ReadRecords(maxRecords int, maxBytes int64) (records []Record, 
 				return nil, errors.Join(rErr, oErr)
 			}
 			return nil, rErr
+		}
+		// The request cap shards the log along WAL order. A lone record that
+		// exceeds the cap on its own must still go through (it cannot be
+		// split), so only additional records are bounded by the cap.
+		if len(records) > 0 && maxBytes-int64(len(data)) < 0 {
+			break
 		}
 		var e Entry
 		if uErr := proto.Unmarshal(data, &e); uErr != nil {
@@ -382,7 +397,9 @@ func (o *Outbox) EvictThrough(index uint64) error {
 	return nil
 }
 
-// Empty reports whether the WAL holds no records.
+// Empty reports whether the outbox holds no records waiting for upload: the
+// WAL is empty AND the append buffer is empty. The barrier (WaitDrained) relies
+// on this to release only after everything appended is evicted.
 func (o *Outbox) Empty() (bool, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -391,6 +408,9 @@ func (o *Outbox) Empty() (bool, error) {
 	}
 	if err := o.ensureLogLocked(); err != nil {
 		return true, err
+	}
+	if len(o.buffered) > 0 {
+		return false, nil
 	}
 	first, last, err := walRange(o.log)
 	if err != nil {

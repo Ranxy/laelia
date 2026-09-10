@@ -33,14 +33,15 @@ func progressEntry(commandID string, seq int32, content string) *Entry {
 	}
 }
 
-// resultEntry builds a terminal envelope for tests.
+// resultEntry builds a terminal envelope for tests. Terminal envelopes carry
+// seq 1: one terminal per command per turn.
 //
 // nolint:unused // used by uploader tests
-func resultEntry(commandID string, seq int32, exitCode int32) *Entry {
+func resultEntry(commandID string, exitCode int32) *Entry {
 	return &Entry{
 		CommandId: commandID,
 		Kind:      v1pb.UploadEntryKind_UPLOAD_ENTRY_KIND_RESULT,
-		SeqNo:     seq,
+		SeqNo:     1,
 		Payload: &v1pb.UploadCommandDataEntry_Result{
 			Result: &v1pb.CommandResult{
 				CommandId: commandID,
@@ -73,7 +74,7 @@ func TestAppendReadRoundTrip(t *testing.T) {
 		t.Fatalf("outbox should not be empty (empty=%v err=%v)", empty, err)
 	}
 
-	records, err := o.ReadRecords(ReadBatchMaxEntries, 1<<20)
+	records, err := o.ReadRecords(ReadBatchMaxEntries, 1<<20, 0)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -123,7 +124,7 @@ func TestAllowEmptyEvictionRoundTrip(t *testing.T) {
 	if err := o.Flush(); err != nil {
 		t.Fatalf("flush after evict: %v", err)
 	}
-	records, err := o.ReadRecords(10, 1<<20)
+	records, err := o.ReadRecords(10, 1<<20, 0)
 	if err != nil {
 		t.Fatalf("read after evict: %v", err)
 	}
@@ -138,7 +139,7 @@ func TestAllowEmptyEvictionRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
-	records, err = o2.ReadRecords(10, 1<<20)
+	records, err = o2.ReadRecords(10, 1<<20, 0)
 	if err != nil {
 		t.Fatalf("read after reopen: %v", err)
 	}
@@ -169,7 +170,7 @@ func TestPartialEvictionBoundary(t *testing.T) {
 	if err := o.EvictThrough(4); err != nil {
 		t.Fatalf("evict: %v", err)
 	}
-	records, err := o.ReadRecords(10, 1<<20)
+	records, err := o.ReadRecords(10, 1<<20, 0)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -230,7 +231,7 @@ func TestWALErrorIsolatesAndRecovers(t *testing.T) {
 	if err := o.Flush(); err != nil {
 		t.Fatalf("flush after recovery: %v", err)
 	}
-	records, err := o.ReadRecords(10, 1<<20)
+	records, err := o.ReadRecords(10, 1<<20, 0)
 	if err != nil {
 		t.Fatalf("read after recovery: %v", err)
 	}
@@ -350,7 +351,7 @@ func TestPoisonRecordReportedAndEvictable(t *testing.T) {
 		t.Fatalf("reopen: %v", err)
 	}
 	defer o2.Close()
-	records, err := o2.ReadRecords(10, 1<<20)
+	records, err := o2.ReadRecords(10, 1<<20, 0)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -432,7 +433,7 @@ func TestConcurrentAppendRead(t *testing.T) {
 	})
 	wg.Go(func() {
 		for i := 0; i < 20; i++ {
-			records, rErr := o.ReadRecords(ReadBatchMaxEntries, 1<<20)
+			records, rErr := o.ReadRecords(ReadBatchMaxEntries, 1<<20, 0)
 			if rErr != nil {
 				t.Errorf("read: %v", rErr)
 				return
@@ -475,7 +476,7 @@ func TestEnvelopeWireShape(t *testing.T) {
 	if err := o.Flush(); err != nil {
 		t.Fatalf("flush: %v", err)
 	}
-	records, err := o.ReadRecords(10, 1<<20)
+	records, err := o.ReadRecords(10, 1<<20, 0)
 	if err != nil || len(records) != 1 {
 		t.Fatalf("read: %v records=%d", err, len(records))
 	}
@@ -509,7 +510,7 @@ func TestClosedOutboxRefusesOperations(t *testing.T) {
 	if err := o.Flush(); err != ErrClosed {
 		t.Fatalf("flush on closed outbox = %v, want ErrClosed", err)
 	}
-	if _, err := o.ReadRecords(10, 1<<20); err != ErrClosed {
+	if _, err := o.ReadRecords(10, 1<<20, 0); err != ErrClosed {
 		t.Fatalf("read on closed outbox = %v, want ErrClosed", err)
 	}
 	if _, err := o.Empty(); err != ErrClosed {
