@@ -1,5 +1,7 @@
 # Agent 命令执行与上报解耦(outbox)架构设计
 
+> 状态:2026-10-11 **已全部实现**(四阶段提交链:阶段 1 `524a237`→`ea0bd5c`(proto/UploadCommandData → store → dispatcher → outbox/uploader);阶段 2 `3854bc7`(runner 生命周期上移);阶段 3 `9bfb502`/`34376e1`/`aa58b8f`/`3007bad`(proto 增量 → manager 排队控制 → manager 退役+改判 → machine 收敛+proto 退役);阶段 4 `52c42dd`/`7680043`(自愈收口 + §8.2 指标)。实现与第三版设计的偏差与补充见 §六阶段 4 的状态注记。
+>
 > 状态:2026-10-10(第二版);第三版为设计评审修订。第一版分析并落地了 resume-on-BeginSession(`611aa69` 僵尸清理、`7b0fbfe` resume),经评审确认那只是**过渡修复**——它把"流断→turn 死"的事故变成了"中断→续跑"的低效循环,但 turn 与流的耦合仍在,由此派生的一系列问题(livelock、副作用重复、seq 冲突)无法根治。第二版按评审确定的方向重写:**turn 执行与数据上报彻底解耦**,machine 本地持久化缓冲 + 幂等重传(outbox 模式),上报通道改为无长连接的 unary 批量 RPC。原文档中的候选方案 B~F 均被本设计取代。第三版吸收第二轮设计评审(逐条核对现状代码与 tidwall/wal 源码)结论:修正对现状的几处不精确描述(§1.2、§2.3、§3.3、§3.6);补齐边缘路径规格——WAL 运行期写错误隔离、ack 拒收表达、barrier×退避交互、BeginSession 遗留 RUNNING、强制断连语义、盘满终态旁路(§3.1~§3.7);参数定值:grace、批字节上限、uploader 基数(§3.2、§3.6);新增截断摊销(§3.1)、progress 持久化取舍(§3.8)、测试计划与可观测性(§八)。
 
 ---
@@ -216,6 +218,7 @@ turn 不再被流检测,机器彻底崩溃时命令无人收尾。闭环:
 2. **阶段 2 — 执行面与流解绑**:runner/turn 生命周期上移(§3.3 四项);teardown 语义改为"断线只关流"。**本阶段是最大的结构倒置**:drain loop 现由每连接的 `mainLoop` spawn(`stream_connector.go:109`),此后必须比流长寿——动手前先写清三者的生命周期矩阵(drain loop 常驻;BeginSession 与 wake 走当期连接;流重连不重建 loop),这是最容易产生悬挂 goroutine / 双 loop 的改动点。此阶段结束后,60s 杀流对命令已完全无感。
 3. **阶段 3 — 控制面收敛与对账**:cancel/steer/wake/prompt-notice/workspace 并入 MachineChannel;BeginSession 改 unary;断线积压控制消息(pending 表 + 重连派发);退役 AgentChannel 与全部 resume 机制(`pickResumeCommand`、resume notice/WARNING、load-or-init 的 resume 分支、stale-reply 处理);reaper 新语义 + `failure_kind` 迁移 + 改判规则。
 4. **阶段 4 — 自愈与兜底**:机器启动自检补终态(§3.7);outbox 上限与告警(§3.8);清理 `AgentReady`/`lastCommandId`/`resumeTurnNotice` 等退役协议痕迹。
+   > 状态(2026-10-11):全部四阶段已落地。阶段 4:优雅停机收口(每 runner CancelInFlight + 越窗者由 outbox 自检合成终态,`runner.go:stop`)、启动 WAL 自检(`wireOutbox` 合成 "machine restarted mid-turn")、RemoveAgent 在途取消补终态;§8.2 指标(机器侧经 `GetMachineMetrics` 转发抓取 + manager 侧 regrade/reaped/pending-control 计数);退役痕迹已清零(grep 验证)。§3.8 的机器级总量上限以 per-agent 512MB 兜底实现(`outbox.MaxBytes`),机器级聚合按最旧命令整组丢弃的精确形态留待压测定参时收敛。
 
 ---
 
