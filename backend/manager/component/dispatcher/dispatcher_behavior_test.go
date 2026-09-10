@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -144,21 +146,36 @@ func TestDispatcher_AgentSendMethods(t *testing.T) {
 	defer d.Stop()
 
 	var mu sync.Mutex
-	received := make([]*v1pb.ManagerStreamMessage, 0)
-	d.RegisterAgent(context.Background(), 2, 0, "agents/a2", func(msg *v1pb.ManagerStreamMessage) error {
+	received := make([]*v1pb.ManagerMachineStreamMessage, 0)
+	// Per-agent pushes travel on the agent's machine control stream: register
+	// both sessions so the agent → machine routing resolves.
+	d.RegisterMachine(1, "machines/m1", func(msg *v1pb.ManagerMachineStreamMessage) error {
 		mu.Lock()
 		received = append(received, msg)
 		mu.Unlock()
 		return nil
 	})
+	d.RegisterAgent(context.Background(), 2, 1, "a2", noopSend)
 
-	require.NoError(t, d.SendDiscoverProviders(2, "req-discover"))
 	require.NoError(t, d.SendWorkspaceListRequest(2, "req-list", "/tmp", true))
 	require.NoError(t, d.SendWorkspaceReadRequest(2, "req-read", "/tmp/a.txt"))
 
 	mu.Lock()
-	require.Len(t, received, 3)
+	require.Len(t, received, 2)
 	mu.Unlock()
+
+	lr, ok := received[0].Message.(*v1pb.ManagerMachineStreamMessage_WorkspaceListRequest)
+	require.True(t, ok)
+	require.Equal(t, "req-list", lr.WorkspaceListRequest.GetRequestId())
+	require.Equal(t, "/tmp", lr.WorkspaceListRequest.GetDirPath())
+	require.Equal(t, true, lr.WorkspaceListRequest.GetIncludeHidden())
+	require.Equal(t, "agents/a2", lr.WorkspaceListRequest.GetAgentName(),
+		"the machine stream serves every hosted agent, so requests carry agent_name")
+
+	rr, ok := received[1].Message.(*v1pb.ManagerMachineStreamMessage_WorkspaceReadRequest)
+	require.True(t, ok)
+	require.Equal(t, "req-read", rr.WorkspaceReadRequest.GetRequestId())
+	require.Equal(t, "agents/a2", rr.WorkspaceReadRequest.GetAgentName())
 }
 
 func TestDispatcher_WatcherBroadcastAndUnsubscribe(t *testing.T) {
@@ -222,7 +239,7 @@ func TestDispatcher_SessionLifecycle(t *testing.T) {
 	require.False(t, d.IsAgentConnected(1))
 	require.False(t, d.IsMachineConnected(1))
 
-	d.RegisterAgent(context.Background(), 1, 10, "agents/a1", noopSend)
+	d.RegisterAgent(context.Background(), 1, 10, "a1", noopSend)
 	d.RegisterMachine(1, "machines/m1", func(*v1pb.ManagerMachineStreamMessage) error { return nil })
 
 	require.True(t, d.IsAgentConnected(1))
@@ -238,7 +255,7 @@ func TestDispatcher_UnregisterMachineDetachesAgents(t *testing.T) {
 	d := New(nil)
 	defer d.Stop()
 
-	d.RegisterAgent(context.Background(), 1, 10, "agents/a1", noopSend)
+	d.RegisterAgent(context.Background(), 1, 10, "a1", noopSend)
 	d.RegisterAgent(context.Background(), 2, 10, "agents/a2", noopSend)
 	d.RegisterMachine(10, "machines/m10", func(*v1pb.ManagerMachineStreamMessage) error { return nil })
 
@@ -257,22 +274,24 @@ func TestDispatcher_NotifyNewMessages(t *testing.T) {
 	defer d.Stop()
 
 	var mu sync.Mutex
-	var got *v1pb.ManagerStreamMessage
-	d.RegisterAgent(context.Background(), 1, 0, "agents/a1", func(msg *v1pb.ManagerStreamMessage) error {
+	var got *v1pb.ManagerMachineStreamMessage
+	d.RegisterMachine(1, "machines/m1", func(msg *v1pb.ManagerMachineStreamMessage) error {
 		mu.Lock()
 		got = msg
 		mu.Unlock()
 		return nil
 	})
+	d.RegisterAgent(context.Background(), 1, 1, "a1", noopSend)
 
 	d.NotifyNewMessages(context.Background(), 1, "conversations/c1", 7)
 
 	mu.Lock()
 	require.NotNil(t, got)
-	nm, ok := got.Message.(*v1pb.ManagerStreamMessage_NewMessages)
-	require.True(t, ok)
-	require.Equal(t, []string{"conversations/c1"}, nm.NewMessages.ConversationIds)
-	require.Equal(t, []int64{7}, nm.NewMessages.Versions)
+	ac, ok := got.Message.(*v1pb.ManagerMachineStreamMessage_AgentControl)
+	require.True(t, ok, "wakes travel on the machine control stream")
+	require.Equal(t, "agents/a1", ac.AgentControl.GetAgentName())
+	require.Equal(t, []string{"conversations/c1"}, ac.AgentControl.GetWake().GetConversationIds())
+	require.Equal(t, []int64{7}, ac.AgentControl.GetWake().GetVersions())
 	mu.Unlock()
 }
 
@@ -281,21 +300,22 @@ func TestDispatcher_NotifyWake(t *testing.T) {
 	defer d.Stop()
 
 	var mu sync.Mutex
-	var got *v1pb.ManagerStreamMessage
-	d.RegisterAgent(context.Background(), 1, 0, "agents/a1", func(msg *v1pb.ManagerStreamMessage) error {
+	var got *v1pb.ManagerMachineStreamMessage
+	d.RegisterMachine(1, "machines/m1", func(msg *v1pb.ManagerMachineStreamMessage) error {
 		mu.Lock()
 		got = msg
 		mu.Unlock()
 		return nil
 	})
+	d.RegisterAgent(context.Background(), 1, 1, "a1", noopSend)
 
 	d.NotifyWake(context.Background(), 1)
 
 	mu.Lock()
 	require.NotNil(t, got)
-	nm, ok := got.Message.(*v1pb.ManagerStreamMessage_NewMessages)
+	ac, ok := got.Message.(*v1pb.ManagerMachineStreamMessage_AgentControl)
 	require.True(t, ok)
-	require.Empty(t, nm.NewMessages.ConversationIds)
+	require.Empty(t, ac.AgentControl.GetWake().GetConversationIds())
 	mu.Unlock()
 }
 
@@ -304,66 +324,74 @@ func TestDispatcher_NotifyThreadMention(t *testing.T) {
 	defer d.Stop()
 
 	var mu sync.Mutex
-	var got *v1pb.ManagerStreamMessage
-	d.RegisterAgent(context.Background(), 1, 0, "agents/a1", func(msg *v1pb.ManagerStreamMessage) error {
+	var got *v1pb.ManagerMachineStreamMessage
+	d.RegisterMachine(1, "machines/m1", func(msg *v1pb.ManagerMachineStreamMessage) error {
 		mu.Lock()
 		got = msg
 		mu.Unlock()
 		return nil
 	})
+	d.RegisterAgent(context.Background(), 1, 1, "a1", noopSend)
 
 	d.NotifyThreadMention(context.Background(), 1, "conversations/c1", 9, "thread-1")
 
 	mu.Lock()
 	require.NotNil(t, got)
-	nm, ok := got.Message.(*v1pb.ManagerStreamMessage_NewMessages)
+	ac, ok := got.Message.(*v1pb.ManagerMachineStreamMessage_AgentControl)
 	require.True(t, ok)
-	require.Equal(t, "thread-1", nm.NewMessages.ThreadRootMessageId)
+	require.Equal(t, "thread-1", ac.AgentControl.GetWake().GetThreadRootMessageId())
 	mu.Unlock()
 }
 
 func TestDispatcher_CancelCommand(t *testing.T) {
 	d := New(nil)
 	defer d.Stop()
+	cmdID1 := uuid.NewString()
 
 	var mu sync.Mutex
-	var got *v1pb.ManagerStreamMessage
-	d.RegisterAgent(context.Background(), 1, 0, "agents/a1", func(msg *v1pb.ManagerStreamMessage) error {
+	var got *v1pb.ManagerMachineStreamMessage
+	d.RegisterMachine(1, "machines/m1", func(msg *v1pb.ManagerMachineStreamMessage) error {
 		mu.Lock()
 		got = msg
 		mu.Unlock()
 		return nil
 	})
+	d.RegisterAgent(context.Background(), 1, 1, "a1", noopSend)
 
-	require.NoError(t, d.CancelCommand(context.Background(), 1, "cmd-1"))
+	require.NoError(t, d.CancelCommand(context.Background(), 1, cmdID1))
 	mu.Lock()
 	require.NotNil(t, got)
-	c, ok := got.Message.(*v1pb.ManagerStreamMessage_Cancel)
-	require.True(t, ok)
-	require.Equal(t, "cmd-1", c.Cancel.CommandId)
+	ac, ok := got.Message.(*v1pb.ManagerMachineStreamMessage_AgentControl)
+	require.True(t, ok, "the cancel travels on the machine control stream")
+	require.Equal(t, "agents/a1", ac.AgentControl.GetAgentName())
+	require.Equal(t, cmdID1, ac.AgentControl.GetCancel().GetCommandId())
 	mu.Unlock()
 }
 
 func TestDispatcher_SteerCommand(t *testing.T) {
 	d := New(nil)
 	defer d.Stop()
+	cmdID1 := uuid.NewString()
 
 	var mu sync.Mutex
-	var got *v1pb.ManagerStreamMessage
-	d.RegisterAgent(context.Background(), 1, 0, "agents/a1", func(msg *v1pb.ManagerStreamMessage) error {
+	var got *v1pb.ManagerMachineStreamMessage
+	d.RegisterMachine(1, "machines/m1", func(msg *v1pb.ManagerMachineStreamMessage) error {
 		mu.Lock()
 		got = msg
 		mu.Unlock()
 		return nil
 	})
+	d.RegisterAgent(context.Background(), 1, 1, "a1", noopSend)
 
-	require.NoError(t, d.SteerCommand(context.Background(), 1, "cmd-1", "continue"))
+	queued, err := d.SteerCommand(context.Background(), 1, cmdID1, "continue")
+	require.NoError(t, err)
+	require.False(t, queued, "a connected machine delivers the steer immediately")
 	mu.Lock()
 	require.NotNil(t, got)
-	s, ok := got.Message.(*v1pb.ManagerStreamMessage_Steer)
+	ac, ok := got.Message.(*v1pb.ManagerMachineStreamMessage_AgentControl)
 	require.True(t, ok)
-	require.Equal(t, "cmd-1", s.Steer.CommandId)
-	require.Equal(t, "continue", s.Steer.Text)
+	require.Equal(t, cmdID1, ac.AgentControl.GetSteer().GetCommandId())
+	require.Equal(t, "continue", ac.AgentControl.GetSteer().GetText())
 	mu.Unlock()
 }
 
@@ -371,8 +399,8 @@ func TestDispatcher_UnregisterAgentIfDoesNotDeleteReplacement(t *testing.T) {
 	d := New(nil)
 	defer d.Stop()
 
-	old := d.RegisterAgent(context.Background(), 1, 0, "agents/a1", noopSend)
-	replacement := d.RegisterAgent(context.Background(), 1, 0, "agents/a1", noopSend)
+	old := d.RegisterAgent(context.Background(), 1, 0, "a1", noopSend)
+	replacement := d.RegisterAgent(context.Background(), 1, 0, "a1", noopSend)
 
 	d.UnregisterAgentIf(1, old)
 
@@ -397,7 +425,7 @@ func TestDispatcher_SendAfterUnregisterReturnsError(t *testing.T) {
 	d := New(nil)
 	defer d.Stop()
 
-	d.RegisterAgent(context.Background(), 1, 0, "agents/a1", noopSend)
+	d.RegisterAgent(context.Background(), 1, 0, "a1", noopSend)
 	d.UnregisterAgent(1)
 
 	require.Error(t, d.SendDiscoverProviders(1, "req"))

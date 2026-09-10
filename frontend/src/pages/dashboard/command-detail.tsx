@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
 import { isVisibleEvent, mergeOutputRuns } from "@/lib/command-events-model";
 import { FinalSummary } from "@/lib/markdown";
 import { formatDuration, formatTimestamp } from "@/lib/time-format";
+import { toastManager } from "@/lib/toast";
 import { pairToolCallEvents, type ToolCallPair } from "@/lib/tool-call-events";
 import { useAppStore } from "@/stores";
 import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
@@ -288,8 +289,16 @@ export function CommandDetailPage() {
     if (!cmdName || !steerText.trim()) return;
     setSteering(true);
     try {
-      await steerCommand(cmdName, steerText.trim());
+      const res = await steerCommand(cmdName, steerText.trim());
       setSteerText("");
+      // An offline machine queues the steer for delivery at its next
+      // (re)connect; make that explicit instead of a silent success.
+      if (res.queued) {
+        toastManager.add({
+          type: "info",
+          title: t("command.steer-queued"),
+        });
+      }
     } finally {
       setSteering(false);
     }

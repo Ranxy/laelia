@@ -4751,6 +4751,15 @@ export declare type PromptReleaseNoticeAck = Message<"laelia.v1.PromptReleaseNot
    * @generated from field: string prompt_version = 2;
    */
   promptVersion: string;
+
+  /**
+   * agent_name identifies the acking agent (agents/{agent}); required when the
+   * ack travels on the machine control stream, where one stream serves every
+   * hosted agent.
+   *
+   * @generated from field: string agent_name = 3;
+   */
+  agentName: string;
 };
 
 /**
@@ -5299,6 +5308,31 @@ export declare type SteerCommandRequest = Message<"laelia.v1.SteerCommandRequest
  * Use `create(SteerCommandRequestSchema)` to create a new message.
  */
 export declare const SteerCommandRequestSchema: GenMessage<SteerCommandRequest>;
+
+/**
+ * SteerCommandResponse reports where the steer went: queued=true means the
+ * machine was offline and the steer is queued for delivery at the machine's
+ * next (re)connect; queued=false means it was delivered to a connected machine.
+ *
+ * @generated from message laelia.v1.SteerCommandResponse
+ */
+export declare type SteerCommandResponse = Message<"laelia.v1.SteerCommandResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Command command = 1;
+   */
+  command?: Command | undefined;
+
+  /**
+   * @generated from field: bool queued = 2;
+   */
+  queued: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.SteerCommandResponse.
+ * Use `create(SteerCommandResponseSchema)` to create a new message.
+ */
+export declare const SteerCommandResponseSchema: GenMessage<SteerCommandResponse>;
 
 /**
  * @generated from message laelia.v1.WatchCommandRequest
@@ -6090,7 +6124,7 @@ export declare const CommandService: GenService<{
   steerCommand: {
     methodKind: "unary";
     input: typeof SteerCommandRequestSchema;
-    output: typeof CommandSchema;
+    output: typeof SteerCommandResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.CommandService.WatchCommand

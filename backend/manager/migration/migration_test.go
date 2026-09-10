@@ -246,3 +246,25 @@ func TestUserPresenceTablePresent(t *testing.T) {
 		}
 	}
 }
+
+// TestAgentPendingControlTablePresent locks in the queued-control table that
+// backs offline cancel/steer delivery (design §3.5): rows are dispatched in
+// serial-id order per machine, cascade away with the machine, and carry a
+// created_at index for the retention TTL sweep.
+func TestAgentPendingControlTablePresent(t *testing.T) {
+	sql := latestSQL(t)
+
+	for _, want := range []string{
+		"CREATE TABLE IF NOT EXISTS agent_pending_control",
+		"machine_id int NOT NULL REFERENCES machine(id) ON DELETE CASCADE",
+		"agent_id   int NOT NULL",
+		"kind       text NOT NULL",
+		"command_id uuid NOT NULL",
+		"CREATE INDEX IF NOT EXISTS idx_agent_pending_control_machine",
+		"CREATE INDEX IF NOT EXISTS idx_agent_pending_control_created_at",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration missing agent_pending_control declaration: %q", want)
+		}
+	}
+}

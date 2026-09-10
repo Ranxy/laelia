@@ -315,6 +315,7 @@
     - [SetConversationPinnedRequest](#laelia-v1-SetConversationPinnedRequest)
     - [SetConversationPinnedResponse](#laelia-v1-SetConversationPinnedResponse)
     - [SteerCommandRequest](#laelia-v1-SteerCommandRequest)
+    - [SteerCommandResponse](#laelia-v1-SteerCommandResponse)
     - [SteerMessage](#laelia-v1-SteerMessage)
     - [TaskInfo](#laelia-v1-TaskInfo)
     - [TeamContext](#laelia-v1-TeamContext)
@@ -5315,6 +5316,7 @@ PromptReleaseNoticeAck confirms that an agent injected a PromptReleaseNotice.
 | ----- | ---- | ----- | ----------- |
 | notice_key | [string](#string) |  |  |
 | prompt_version | [string](#string) |  |  |
+| agent_name | [string](#string) |  | agent_name identifies the acking agent (agents/{agent}); required when the ack travels on the machine control stream, where one stream serves every hosted agent. |
 
 
 
@@ -5694,6 +5696,24 @@ affected.
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
 | text | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SteerCommandResponse"></a>
+
+### SteerCommandResponse
+SteerCommandResponse reports where the steer went: queued=true means the
+machine was offline and the steer is queued for delivery at the machine&#39;s
+next (re)connect; queued=false means it was delivered to a connected machine.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command | [Command](#laelia-v1-Command) |  |  |
+| queued | [bool](#bool) |  |  |
 
 
 
@@ -6370,7 +6390,7 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | ListCommands | [ListCommandsRequest](#laelia-v1-ListCommandsRequest) | [ListCommandsResponse](#laelia-v1-ListCommandsResponse) |  |
 | GetCommand | [GetCommandRequest](#laelia-v1-GetCommandRequest) | [Command](#laelia-v1-Command) |  |
 | CancelCommand | [CancelCommandRequest](#laelia-v1-CancelCommandRequest) | [Command](#laelia-v1-Command) |  |
-| SteerCommand | [SteerCommandRequest](#laelia-v1-SteerCommandRequest) | [Command](#laelia-v1-Command) | SteerCommand injects a follow-up message into a running command&#39;s in-flight turn. Only executors that support mid-turn steering (the ACP v2 thread protocol&#39;s turn/steer) honor it; others ignore it. |
+| SteerCommand | [SteerCommandRequest](#laelia-v1-SteerCommandRequest) | [SteerCommandResponse](#laelia-v1-SteerCommandResponse) | SteerCommand injects a follow-up message into a running command&#39;s in-flight turn. Only executors that support mid-turn steering (the ACP v2 thread protocol&#39;s turn/steer) honor it; others ignore it. |
 | WatchCommand | [WatchCommandRequest](#laelia-v1-WatchCommandRequest) | [CommandOutput](#laelia-v1-CommandOutput) stream |  |
 | WatchCommandEvents | [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest) | [CommandEvent](#laelia-v1-CommandEvent) stream |  |
 | SearchChatHistory | [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest) | [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse) | SearchChatHistory searches chat messages (and attachment file names) the caller can read. With `conversation` set it searches one conversation; without it, every conversation the caller can read. CUSTOM auth: the handler enforces conversations.read per conversation (or workspace scope for admins) because a global search has no single resource to gate on. |

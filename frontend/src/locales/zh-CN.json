@@ -503,6 +503,7 @@
     "status-unknown": "未知",
     "steer": "干预",
     "steer-placeholder": "向当前回合注入消息…",
+    "steer-queued": "已排队,机器恢复连接后送达",
     "steering": "干预中…",
     "stream-assistant": "助手",
     "stream-stderr": "错误",

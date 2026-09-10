@@ -1695,7 +1695,7 @@ service CommandService {
   // SteerCommand injects a follow-up message into a running command's
   // in-flight turn. Only executors that support mid-turn steering (the ACP v2
   // thread protocol's turn/steer) honor it; others ignore it.
-  rpc SteerCommand(SteerCommandRequest) returns (Command) {
+  rpc SteerCommand(SteerCommandRequest) returns (SteerCommandResponse) {
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.commands.cancel";
     option (laelia.v1.audit) = true;
@@ -2179,6 +2179,10 @@ message PromptReleaseNotice {
 message PromptReleaseNoticeAck {
   string notice_key = 1;
   string prompt_version = 2;
+  // agent_name identifies the acking agent (agents/{agent}); required when the
+  // ack travels on the machine control stream, where one stream serves every
+  // hosted agent.
+  string agent_name = 3;
 }
 
 message AgentReady {
@@ -2335,6 +2339,14 @@ message SteerCommandRequest {
     (google.api.resource_reference).type = "laelia/Command"
   ];
   string text = 2;
+}
+
+// SteerCommandResponse reports where the steer went: queued=true means the
+// machine was offline and the steer is queued for delivery at the machine's
+// next (re)connect; queued=false means it was delivered to a connected machine.
+message SteerCommandResponse {
+  Command command = 1;
+  bool queued = 2;
 }
 
 message WatchCommandRequest {

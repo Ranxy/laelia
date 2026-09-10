@@ -253,7 +253,7 @@ type CommandServiceClient interface {
 	// SteerCommand injects a follow-up message into a running command's
 	// in-flight turn. Only executors that support mid-turn steering (the ACP v2
 	// thread protocol's turn/steer) honor it; others ignore it.
-	SteerCommand(context.Context, *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.Command], error)
+	SteerCommand(context.Context, *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.SteerCommandResponse], error)
 	WatchCommand(context.Context, *connect.Request[v1.WatchCommandRequest]) (*connect.ServerStreamForClient[v1.CommandOutput], error)
 	WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest]) (*connect.ServerStreamForClient[v1.CommandEvent], error)
 	// SearchChatHistory searches chat messages (and attachment file names) the
@@ -476,7 +476,7 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("CancelCommand")),
 			connect.WithClientOptions(opts...),
 		),
-		steerCommand: connect.NewClient[v1.SteerCommandRequest, v1.Command](
+		steerCommand: connect.NewClient[v1.SteerCommandRequest, v1.SteerCommandResponse](
 			httpClient,
 			baseURL+CommandServiceSteerCommandProcedure,
 			connect.WithSchema(commandServiceMethods.ByName("SteerCommand")),
@@ -874,7 +874,7 @@ type commandServiceClient struct {
 	listCommands              *connect.Client[v1.ListCommandsRequest, v1.ListCommandsResponse]
 	getCommand                *connect.Client[v1.GetCommandRequest, v1.Command]
 	cancelCommand             *connect.Client[v1.CancelCommandRequest, v1.Command]
-	steerCommand              *connect.Client[v1.SteerCommandRequest, v1.Command]
+	steerCommand              *connect.Client[v1.SteerCommandRequest, v1.SteerCommandResponse]
 	watchCommand              *connect.Client[v1.WatchCommandRequest, v1.CommandOutput]
 	watchCommandEvents        *connect.Client[v1.WatchCommandEventsRequest, v1.CommandEvent]
 	searchChatHistory         *connect.Client[v1.SearchChatHistoryRequest, v1.SearchChatHistoryResponse]
@@ -957,7 +957,7 @@ func (c *commandServiceClient) CancelCommand(ctx context.Context, req *connect.R
 }
 
 // SteerCommand calls laelia.v1.CommandService.SteerCommand.
-func (c *commandServiceClient) SteerCommand(ctx context.Context, req *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.Command], error) {
+func (c *commandServiceClient) SteerCommand(ctx context.Context, req *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.SteerCommandResponse], error) {
 	return c.steerCommand.CallUnary(ctx, req)
 }
 
@@ -1289,7 +1289,7 @@ type CommandServiceHandler interface {
 	// SteerCommand injects a follow-up message into a running command's
 	// in-flight turn. Only executors that support mid-turn steering (the ACP v2
 	// thread protocol's turn/steer) honor it; others ignore it.
-	SteerCommand(context.Context, *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.Command], error)
+	SteerCommand(context.Context, *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.SteerCommandResponse], error)
 	WatchCommand(context.Context, *connect.Request[v1.WatchCommandRequest], *connect.ServerStream[v1.CommandOutput]) error
 	WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest], *connect.ServerStream[v1.CommandEvent]) error
 	// SearchChatHistory searches chat messages (and attachment file names) the
@@ -2057,7 +2057,7 @@ func (UnimplementedCommandServiceHandler) CancelCommand(context.Context, *connec
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.CancelCommand is not implemented"))
 }
 
-func (UnimplementedCommandServiceHandler) SteerCommand(context.Context, *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.Command], error) {
+func (UnimplementedCommandServiceHandler) SteerCommand(context.Context, *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.SteerCommandResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.SteerCommand is not implemented"))
 }
 

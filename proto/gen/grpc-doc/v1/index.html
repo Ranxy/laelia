@@ -1403,6 +1403,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.SteerCommandResponse"><span class="badge">M</span>SteerCommandResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.SteerMessage"><span class="badge">M</span>SteerMessage</a>
                 </li>
               
@@ -13371,6 +13375,15 @@ rooted at the given message name. Empty posts a normal channel message. </p></td
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>agent_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>agent_name identifies the acking agent (agents/{agent}); required when the
+ack travels on the machine control stream, where one stream serves every
+hosted agent. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -14201,6 +14214,37 @@ TODO. Only valid for top-level messages (thread_root must be empty). </p></td>
                 <tr>
                   <td>text</td>
                   <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SteerCommandResponse">SteerCommandResponse</h3>
+        <p>SteerCommandResponse reports where the steer went: queued=true means the</p><p>machine was offline and the steer is queued for delivery at the machine's</p><p>next (re)connect; queued=false means it was delivered to a connected machine.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>command</td>
+                  <td><a href="#laelia.v1.Command">Command</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>queued</td>
+                  <td><a href="#bool">bool</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -15708,7 +15752,7 @@ is not a raw stdout/stderr/system message).</p></td>
               <tr>
                 <td>SteerCommand</td>
                 <td><a href="#laelia.v1.SteerCommandRequest">SteerCommandRequest</a></td>
-                <td><a href="#laelia.v1.Command">Command</a></td>
+                <td><a href="#laelia.v1.SteerCommandResponse">SteerCommandResponse</a></td>
                 <td><p>SteerCommand injects a follow-up message into a running command&#39;s
 in-flight turn. Only executors that support mid-turn steering (the ACP v2
 thread protocol&#39;s turn/steer) honor it; others ignore it.</p></td>

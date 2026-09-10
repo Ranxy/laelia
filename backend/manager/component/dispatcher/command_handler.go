@@ -15,58 +15,6 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
-func (d *Dispatcher) CancelCommand(_ context.Context, agentID int, commandID string) error {
-	sess, ok := d.registry.getAgent(agentID)
-
-	if !ok {
-		return errors.New("agent not connected")
-	}
-
-	msg := &v1pb.ManagerStreamMessage{
-		Message: &v1pb.ManagerStreamMessage_Cancel{
-			Cancel: &v1pb.CancelMessage{
-				CommandId: commandID,
-			},
-		},
-	}
-
-	if err := sess.deliver(msg); err != nil {
-		slog.Error("failed to send cancel to agent", "error", err)
-		return errors.Wrapf(err, "failed to send cancel to agent")
-	}
-
-	slog.Info("cancel sent to agent", "commandID", commandID, "agentID", agentID)
-	return nil
-}
-
-// SteerCommand injects a follow-up message into the in-flight turn of a
-// running command. It is best-effort: executors without mid-turn steering
-// support ignore the message.
-func (d *Dispatcher) SteerCommand(_ context.Context, agentID int, commandID, text string) error {
-	sess, ok := d.registry.getAgent(agentID)
-
-	if !ok {
-		return errors.New("agent not connected")
-	}
-
-	msg := &v1pb.ManagerStreamMessage{
-		Message: &v1pb.ManagerStreamMessage_Steer{
-			Steer: &v1pb.SteerMessage{
-				CommandId: commandID,
-				Text:      text,
-			},
-		},
-	}
-
-	if err := sess.deliver(msg); err != nil {
-		slog.Error("failed to send steer to agent", "error", err)
-		return errors.Wrapf(err, "failed to send steer to agent")
-	}
-
-	slog.Info("steer sent to agent", "commandID", commandID, "agentID", agentID)
-	return nil
-}
-
 func (d *Dispatcher) HandleProgress(ctx context.Context, _ int, progress *v1pb.CommandProgress) error {
 	commanID, err := uuid.Parse(progress.GetCommandId())
 	if err != nil {

@@ -503,6 +503,7 @@
     "status-unknown": "Unknown",
     "steer": "Steer",
     "steer-placeholder": "Inject a message into the running turn…",
+    "steer-queued": "Steer queued; delivered when the machine reconnects",
     "steering": "Steering…",
     "stream-assistant": "ASSISTANT",
     "stream-stderr": "ERROR",

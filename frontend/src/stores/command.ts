@@ -4,6 +4,7 @@ import type {
   Command,
   CommandEvent,
   CommandOutput,
+  SteerCommandResponse,
 } from "@/types/proto-es/v1/command_pb";
 import {
   CancelCommandRequestSchema,
@@ -20,8 +21,9 @@ export interface CommandSlice {
   cancelCommand: (name: string) => Promise<Command>;
   // steerCommand injects a follow-up message into the in-flight turn of a
   // running command. Best-effort: executors without mid-turn steering ignore
-  // it. Throws when the command is not running or the agent is unreachable.
-  steerCommand: (name: string, text: string) => Promise<Command>;
+  // it. Resolves with the steer outcome: `queued` is true when the machine was
+  // offline and the steer takes effect at the machine's next (re)connect.
+  steerCommand: (name: string, text: string) => Promise<SteerCommandResponse>;
   getCommand: (name: string) => Promise<Command | undefined>;
   // watchCommand/watchCommandEvents resolve with true when the server closed
   // the stream normally (e.g. the command finished), false when the stream was

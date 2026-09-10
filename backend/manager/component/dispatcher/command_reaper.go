@@ -42,6 +42,7 @@ func (d *Dispatcher) StartStaleCommandReaper() {
 				return
 			case <-ticker.C:
 				d.sweepStaleCommands()
+				d.sweepExpiredPendingControl()
 			}
 		}
 	}()
@@ -141,4 +142,15 @@ func (d *Dispatcher) reapCommand(ctx context.Context, cmd *store.CommandMessage)
 	slog.Warn("reaped running command on begin session", "commandID", cmd.ID, "agentID", cmd.AgentID)
 	d.closeWatchers(cmd.ID.String())
 	d.closeEventWatchers(cmd.ID.String())
+}
+
+// sweepExpiredPendingControl reclaims queued control interactions older than
+// the retention backstop: a machine that never returns must not leave rows in
+// the queue forever (store.PendingControlTTL).
+func (d *Dispatcher) sweepExpiredPendingControl() {
+	ctx, cancel := context.WithTimeout(d.lifecycleCtx, graceDBTimeout)
+	defer cancel()
+	if err := d.store.DeleteExpiredAgentControl(ctx, time.Now().Add(-store.PendingControlTTL)); err != nil {
+		slog.Warn("pending control TTL sweep failed", "error", err)
+	}
 }

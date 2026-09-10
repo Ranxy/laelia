@@ -110,14 +110,18 @@ func (s *CommandService) CancelCommand(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("command is not in pending or running state"))
 	}
 
-	if err := s.dispatcher.CancelCommand(ctx, cmd.AgentID, cmd.ID.String()); err != nil {
-		// agent may not be connected, still proceed to cancel in DB
-		slog.Warn("failed to send cancel to agent", "commandID", cmd.ID, "error", err)
-	}
-
+	// Cancel semantics are unchanged: the command is marked CANCELED before the
+	// interaction is delivered (the cancelled state is the irreversible anchor
+	// — it is never re-graded from a late result). The cancel interaction goes
+	// to the machine's control stream, or is queued for delivery at the
+	// machine's next (re)connect when the machine is offline.
 	status := store.CommandStatusCancelled
 	if err := s.store.UpdateCommandStatus(ctx, cmd.ID, status, nil, nil, nil, nil, ""); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to update command status"))
+	}
+
+	if err := s.dispatcher.CancelCommand(ctx, cmd.AgentID, cmd.ID.String()); err != nil {
+		slog.Warn("failed to deliver cancel to machine", "commandID", cmd.ID, "error", err)
 	}
 
 	cmd.Status = status
@@ -125,12 +129,11 @@ func (s *CommandService) CancelCommand(ctx context.Context, req *connect.Request
 }
 
 // SteerCommand injects a follow-up message into the in-flight turn of a
-// running command. Unlike CancelCommand it does not change the command's DB
-// state — it is a pure best-effort push to the agent; executors that do not
-// support mid-turn steering ignore it. A non-running command or an agent that
-// is not connected surfaces an error so the caller knows the steer did not go
-// through.
-func (s *CommandService) SteerCommand(ctx context.Context, req *connect.Request[v1pb.SteerCommandRequest]) (*connect.Response[v1pb.Command], error) {
+// running command. It is delivered through the machine's control stream; when
+// the machine is offline the steer is queued and queued=true is reported so
+// the caller knows it takes effect at the machine's next (re)connect. A
+// non-running command surfaces an error.
+func (s *CommandService) SteerCommand(ctx context.Context, req *connect.Request[v1pb.SteerCommandRequest]) (*connect.Response[v1pb.SteerCommandResponse], error) {
 	cmd, err := s.store.GetCommandByName(ctx, req.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
@@ -142,10 +145,14 @@ func (s *CommandService) SteerCommand(ctx context.Context, req *connect.Request[
 	if text == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("steer text must not be empty"))
 	}
-	if err := s.dispatcher.SteerCommand(ctx, cmd.AgentID, cmd.ID.String(), text); err != nil {
+	queued, err := s.dispatcher.SteerCommand(ctx, cmd.AgentID, cmd.ID.String(), text)
+	if err != nil {
 		return nil, connect.NewError(connect.CodeUnavailable, err)
 	}
-	return connect.NewResponse(convertToV1Command(cmd)), nil
+	return connect.NewResponse(&v1pb.SteerCommandResponse{
+		Command: convertToV1Command(cmd),
+		Queued:  queued,
+	}), nil
 }
 
 func (s *CommandService) WatchCommand(ctx context.Context, req *connect.Request[v1pb.WatchCommandRequest], stream *connect.ServerStream[v1pb.CommandOutput]) error {

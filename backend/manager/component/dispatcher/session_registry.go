@@ -134,11 +134,3 @@ func (r *sessionRegistry) sendToMachine(machineID int, msg *v1pb.ManagerMachineS
 	}
 	return sess.Send(msg)
 }
-
-func (r *sessionRegistry) sendToAgent(agentID int, msg *v1pb.ManagerStreamMessage) error {
-	sess, ok := r.getAgent(agentID)
-	if !ok {
-		return errors.New("agent is not connected")
-	}
-	return sess.Send(msg)
-}

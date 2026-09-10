@@ -187,13 +187,6 @@ func (d *Dispatcher) sendToMachine(machineID int, msg *v1pb.ManagerMachineStream
 	return d.registry.sendToMachine(machineID, msg)
 }
 
-// sendToAgent is the single agent-session send path: look up the connected
-// agent session and deliver a control message, returning an error when the
-// agent is offline.
-func (d *Dispatcher) sendToAgent(agentID int, msg *v1pb.ManagerStreamMessage) error {
-	return d.registry.sendToAgent(agentID, msg)
-}
-
 // SendPromptReleaseNotice pushes a system-prompt release notice to a connected
 // agent's AgentChannel so it can inject the change into the current or next
 // turn. Best-effort: if the agent is offline the notice is recovered on the
@@ -202,9 +195,16 @@ func (d *Dispatcher) SendPromptReleaseNotice(agentID int, notice *v1pb.PromptRel
 	if notice == nil {
 		return nil
 	}
-	return d.sendToAgent(agentID, &v1pb.ManagerStreamMessage{
-		Message: &v1pb.ManagerStreamMessage_PromptReleaseNotice{
-			PromptReleaseNotice: notice,
+	sess, ok := d.registry.getAgent(agentID)
+	if !ok {
+		return errors.New("agent is not connected")
+	}
+	return d.sendToMachine(sess.machineID, &v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_AgentControl{
+			AgentControl: &v1pb.AgentControlRequest{
+				AgentName: common.FormatAgentUID(sess.agentResourceID),
+				Control:   &v1pb.AgentControlRequest_PromptNotice{PromptNotice: notice},
+			},
 		},
 	})
 }
@@ -469,27 +469,37 @@ func (d *Dispatcher) MachineUpgradeStatus(machineID int) *v1pb.UpgradeProgress {
 	return d.machineUpgrades[machineID]
 }
 
-// SendDiscoverProviders sends a DiscoverProviders control message to the
-// agent's active bidi stream. Returns an error if the agent has no active
-// session (the frontend should show "agent offline").
+// SendDiscoverProviders asks the agent's machine to re-probe its host for
+// installed LLM agent providers. One machine-scoped catalog serves every
+// hosted agent, so the probe travels on the machine control stream. Returns an
+// error when the machine is not connected (the frontend should show "agent
+// offline").
 func (d *Dispatcher) SendDiscoverProviders(agentID int, requestID string) error {
-	return d.sendToAgent(agentID, &v1pb.ManagerStreamMessage{
-		Message: &v1pb.ManagerStreamMessage_DiscoverProviders{
-			DiscoverProviders: &v1pb.DiscoverProviders{RequestId: requestID},
-		},
-	})
+	if d.store == nil {
+		return errors.New("agent is not connected")
+	}
+	agent, err := d.store.GetAgent(context.Background(), agentID)
+	if err != nil || agent == nil {
+		return errors.Wrap(err, "failed to load agent for provider discovery")
+	}
+	return d.SendDiscoverProvidersToMachine(agent.MachineID, requestID)
 }
 
 // SendWorkspaceListRequest asks the agent daemon to list one directory level of
 // its workspace. The reply resolves a pending entry registered via
 // RegisterPendingWorkspaceList.
 func (d *Dispatcher) SendWorkspaceListRequest(agentID int, requestID, dirPath string, includeHidden bool) error {
-	return d.sendToAgent(agentID, &v1pb.ManagerStreamMessage{
-		Message: &v1pb.ManagerStreamMessage_WorkspaceListRequest{
+	sess, ok := d.registry.getAgent(agentID)
+	if !ok {
+		return errors.New("agent is not connected")
+	}
+	return d.sendToMachine(sess.machineID, &v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_WorkspaceListRequest{
 			WorkspaceListRequest: &v1pb.WorkspaceListRequest{
 				RequestId:     requestID,
 				DirPath:       dirPath,
 				IncludeHidden: includeHidden,
+				AgentName:     common.FormatAgentUID(sess.agentResourceID),
 			},
 		},
 	})
@@ -499,11 +509,16 @@ func (d *Dispatcher) SendWorkspaceListRequest(agentID int, requestID, dirPath st
 // preview. The reply resolves a pending entry registered via
 // RegisterPendingWorkspaceRead.
 func (d *Dispatcher) SendWorkspaceReadRequest(agentID int, requestID, path string) error {
-	return d.sendToAgent(agentID, &v1pb.ManagerStreamMessage{
-		Message: &v1pb.ManagerStreamMessage_WorkspaceReadRequest{
+	sess, ok := d.registry.getAgent(agentID)
+	if !ok {
+		return errors.New("agent is not connected")
+	}
+	return d.sendToMachine(sess.machineID, &v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_WorkspaceReadRequest{
 			WorkspaceReadRequest: &v1pb.WorkspaceReadRequest{
 				RequestId: requestID,
 				Path:      path,
+				AgentName: common.FormatAgentUID(sess.agentResourceID),
 			},
 		},
 	})
@@ -822,18 +837,27 @@ func (d *Dispatcher) NotifyNewMessages(ctx context.Context, agentID int, convers
 	if !ok {
 		return
 	}
-
-	msg := &v1pb.ManagerStreamMessage{
-		Message: &v1pb.ManagerStreamMessage_NewMessages{
-			NewMessages: &v1pb.NewMessagesAvailable{
+	d.notifyAgent(sess, &v1pb.AgentControlRequest{
+		Control: &v1pb.AgentControlRequest_Wake{
+			Wake: &v1pb.NewMessagesAvailable{
 				ConversationIds: []string{conversationID},
 				Versions:        []int64{version},
 			},
 		},
-	}
+	})
+}
 
-	if err := sess.deliver(msg); err != nil {
-		slog.Warn("failed to send NewMessagesAvailable", "agentID", agentID, "error", err)
+// notifyAgent pushes one per-agent control interaction through the agent's
+// machine control stream. Best-effort: a failed send only logs (a dropped wake
+// is recovered by the next BeginSession's cursor comparison, a dropped notice
+// by the prompt-version comparison). The request's agent_name is filled here.
+func (d *Dispatcher) notifyAgent(sess *AgentSession, req *v1pb.AgentControlRequest) {
+	req.AgentName = common.FormatAgentUID(sess.agentResourceID)
+	msg := &v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_AgentControl{AgentControl: req},
+	}
+	if err := d.sendToMachine(sess.machineID, msg); err != nil {
+		slog.Warn("failed to deliver agent control push", "agentID", sess.agentID, "error", err)
 	}
 }
 
@@ -852,14 +876,9 @@ func (d *Dispatcher) NotifyWake(ctx context.Context, agentID int) {
 		return
 	}
 
-	msg := &v1pb.ManagerStreamMessage{
-		Message: &v1pb.ManagerStreamMessage_NewMessages{
-			NewMessages: &v1pb.NewMessagesAvailable{},
-		},
-	}
-	if err := sess.deliver(msg); err != nil {
-		slog.Warn("failed to send wake to agent", "agentID", agentID, "error", err)
-	}
+	d.notifyAgent(sess, &v1pb.AgentControlRequest{
+		Control: &v1pb.AgentControlRequest_Wake{Wake: &v1pb.NewMessagesAvailable{}},
+	})
 }
 
 // NotifyThreadMention pushes a NewMessagesAvailable hint to a connected agent
@@ -877,18 +896,15 @@ func (d *Dispatcher) NotifyThreadMention(ctx context.Context, agentID int, conve
 		return
 	}
 
-	msg := &v1pb.ManagerStreamMessage{
-		Message: &v1pb.ManagerStreamMessage_NewMessages{
-			NewMessages: &v1pb.NewMessagesAvailable{
+	d.notifyAgent(sess, &v1pb.AgentControlRequest{
+		Control: &v1pb.AgentControlRequest_Wake{
+			Wake: &v1pb.NewMessagesAvailable{
 				ConversationIds:     []string{conversationID},
 				Versions:            []int64{version},
 				ThreadRootMessageId: threadRootMessageID,
 			},
 		},
-	}
-	if err := sess.deliver(msg); err != nil {
-		slog.Warn("failed to send thread mention wake", "agentID", agentID, "error", err)
-	}
+	})
 }
 
 // FetchConversationActivity returns the execution status of every agent member

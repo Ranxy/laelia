@@ -86,6 +86,11 @@ func (s *MachineStreamService) MachineChannel(
 	// old stream ends, do not destroy the new (live) session.
 	defer s.dispatcher.UnregisterMachineIf(machine.ID, sess)
 
+	// Drain this machine's queued control interactions (cancel/steer issued
+	// while offline) in issue order (design §3.5: control issued offline takes
+	// effect only after the machine comes back).
+	s.dispatcher.DispatchPendingAgentControl(machine.ID)
+
 	slog.Info("machine control stream connected", "machineID", machine.ID, "resourceID", machine.ResourceID)
 
 	for {
@@ -156,6 +161,26 @@ func (s *MachineStreamService) MachineChannel(
 		case *v1pb.MachineStreamMessage_UpgradeProgress:
 			s.dispatcher.RecordMachineUpgrade(machine.ID, m.UpgradeProgress)
 			slog.Info("machine upgrade progress", "machineID", machine.ID, "version", m.UpgradeProgress.GetVersion(), "stage", m.UpgradeProgress.GetStage(), "error", m.UpgradeProgress.GetError())
+
+		case *v1pb.MachineStreamMessage_WorkspaceListResponse:
+			// Completes a pending ListAgentWorkspace round-trip; correlated by
+			// request_id.
+			s.dispatcher.CompletePendingWorkspaceList(m.WorkspaceListResponse)
+
+		case *v1pb.MachineStreamMessage_WorkspaceReadResponse:
+			// Completes a pending ReadAgentWorkspaceFile round-trip.
+			s.dispatcher.CompletePendingWorkspaceRead(m.WorkspaceReadResponse)
+
+		case *v1pb.MachineStreamMessage_PromptReleaseNoticeAck:
+			ack := m.PromptReleaseNoticeAck
+			agentID, err := s.dispatcher.ResolveAgentByName(machine.ID, ack.GetAgentName())
+			if err != nil {
+				slog.Warn("prompt release notice ack from an unhosted agent", "machineID", machine.ID, "agentName", ack.GetAgentName())
+				break
+			}
+			if err := s.dispatcher.HandlePromptReleaseNoticeAck(ctx, agentID, ack); err != nil {
+				slog.Warn("failed to record prompt release notice ack", "machineID", machine.ID, "error", err)
+			}
 
 		case *v1pb.MachineStreamMessage_DisconnectNotice:
 			slog.Info("machine announced graceful disconnect", "machineID", machine.ID, "reason", m.DisconnectNotice.GetReason())
